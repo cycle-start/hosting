@@ -9,9 +9,8 @@ type Node struct {
 	Hostname    string  `json:"hostname" db:"hostname"`
 	IPAddress   *string `json:"ip_address,omitempty" db:"ip_address"`
 	IP6Address  *string `json:"ip6_address,omitempty" db:"ip6_address"`
-	Roles       []string  `json:"roles" db:"roles"`
-	GRPCAddress string    `json:"grpc_address" db:"grpc_address"`
-	Status      string    `json:"status" db:"status"`
+	Roles     []string  `json:"roles" db:"roles"`
+	Status    string    `json:"status" db:"status"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 }

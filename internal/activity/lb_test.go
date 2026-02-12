@@ -4,65 +4,58 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"github.com/edvin/hosting/internal/deployer"
-	"github.com/edvin/hosting/internal/model"
 )
 
-// --- Mock deployer for LB tests ---
+// mockHAProxy starts a TCP listener that echoes a canned response for each
+// incoming command. Returns the listener address and a cleanup function.
+func mockHAProxy(t *testing.T, handler func(cmd string) string) (string, func()) {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
 
-type mockLBDeployer struct {
-	mock.Mock
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				buf := make([]byte, 4096)
+				n, err := c.Read(buf)
+				if err != nil {
+					return
+				}
+				cmd := strings.TrimSpace(string(buf[:n]))
+				resp := handler(cmd)
+				fmt.Fprint(c, resp)
+			}(conn)
+		}
+	}()
+
+	return ln.Addr().String(), func() { ln.Close() }
 }
 
-func (m *mockLBDeployer) ExecInContainer(ctx context.Context, host *model.HostMachine, containerNameOrID string, cmd []string) (*deployer.ExecResult, error) {
-	args := m.Called(ctx, host, containerNameOrID, cmd)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*deployer.ExecResult), args.Error(1)
-}
+// setupLBResolve sets up the mockDB to return a cluster config with the given
+// haproxy_admin_addr for resolveHAProxyAddr calls.
+func setupLBResolve(db *mockDB, addr string) {
+	cfg := json.RawMessage(fmt.Sprintf(`{"haproxy_admin_addr":"%s"}`, addr))
 
-func (m *mockLBDeployer) PullImage(ctx context.Context, host *model.HostMachine, image string) (string, error) {
-	args := m.Called(ctx, host, image)
-	return args.String(0), args.Error(1)
+	db.On("QueryRow", mock.Anything, mock.MatchedBy(func(sql string) bool {
+		return strings.Contains(sql, "clusters")
+	}), mock.Anything).Return(&lbMockRow{scanFn: func(dest ...any) error {
+		*(dest[0].(*json.RawMessage)) = cfg
+		return nil
+	}})
 }
-
-func (m *mockLBDeployer) CreateContainer(ctx context.Context, host *model.HostMachine, opts deployer.ContainerOpts) (*deployer.CreateResult, error) {
-	args := m.Called(ctx, host, opts)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*deployer.CreateResult), args.Error(1)
-}
-
-func (m *mockLBDeployer) StartContainer(ctx context.Context, host *model.HostMachine, containerID string) error {
-	return m.Called(ctx, host, containerID).Error(0)
-}
-
-func (m *mockLBDeployer) StopContainer(ctx context.Context, host *model.HostMachine, containerID string) error {
-	return m.Called(ctx, host, containerID).Error(0)
-}
-
-func (m *mockLBDeployer) RemoveContainer(ctx context.Context, host *model.HostMachine, containerID string) error {
-	return m.Called(ctx, host, containerID).Error(0)
-}
-
-func (m *mockLBDeployer) InspectContainer(ctx context.Context, host *model.HostMachine, containerID string) (*deployer.ContainerStatus, error) {
-	args := m.Called(ctx, host, containerID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*deployer.ContainerStatus), args.Error(1)
-}
-
-// --- mock row for LB resolve queries ---
 
 type lbMockRow struct {
 	scanFn func(dest ...any) error
@@ -72,108 +65,58 @@ func (r *lbMockRow) Scan(dest ...any) error {
 	return r.scanFn(dest...)
 }
 
-// setupResolveHAProxy sets up the mockDB to return a cluster and host machine
-// for resolveHAProxy calls.
-func setupResolveHAProxy(db *mockDB, clusterConfig json.RawMessage) {
-	now := time.Now()
-	// First QueryRow: cluster lookup
-	db.On("QueryRow", mock.Anything, mock.MatchedBy(func(sql string) bool {
-		return len(sql) > 20 && sql[0:6] == "SELECT" && containsSubstring(sql, "clusters")
-	}), mock.Anything).Return(&lbMockRow{scanFn: func(dest ...any) error {
-		*(dest[0].(*string)) = "cluster-1"
-		*(dest[1].(*string)) = "region-1"
-		*(dest[2].(*string)) = "test-cluster"
-		*(dest[3].(*json.RawMessage)) = clusterConfig
-		*(dest[4].(*string)) = model.StatusActive
-		*(dest[5].(*json.RawMessage)) = json.RawMessage(`{}`)
-		*(dest[6].(*time.Time)) = now
-		*(dest[7].(*time.Time)) = now
-		return nil
-	}}).Once()
-
-	// Second QueryRow: host machine lookup
-	db.On("QueryRow", mock.Anything, mock.MatchedBy(func(sql string) bool {
-		return len(sql) > 20 && sql[0:6] == "SELECT" && containsSubstring(sql, "host_machines")
-	}), mock.Anything).Return(&lbMockRow{scanFn: func(dest ...any) error {
-		*(dest[0].(*string)) = "host-1"
-		*(dest[1].(*string)) = "cluster-1"
-		*(dest[2].(*string)) = "localhost"
-		*(dest[3].(*string)) = "127.0.0.1"
-		*(dest[4].(*string)) = "unix:///var/run/docker.sock"
-		*(dest[5].(*string)) = ""
-		*(dest[6].(*string)) = ""
-		*(dest[7].(*string)) = ""
-		*(dest[8].(*json.RawMessage)) = json.RawMessage(`{}`)
-		*(dest[9].(*[]string)) = []string{"web"}
-		*(dest[10].(*string)) = model.StatusActive
-		*(dest[11].(*time.Time)) = now
-		*(dest[12].(*time.Time)) = now
-		return nil
-	}}).Once()
-}
-
-func containsSubstring(s, sub string) bool {
-	return len(s) >= len(sub) && (s == sub || len(s) > 0 && findSubstring(s, sub))
-}
-
-func findSubstring(s, sub string) bool {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
-}
-
 func TestLB_SetLBMapEntry(t *testing.T) {
+	addr, cleanup := mockHAProxy(t, func(cmd string) string {
+		return "\n"
+	})
+	defer cleanup()
+
 	db := &mockDB{}
-	dep := &mockLBDeployer{}
-	lb := NewLB(dep, db)
-	ctx := context.Background()
+	setupLBResolve(db, addr)
+	lb := NewLB(db)
 
-	setupResolveHAProxy(db, json.RawMessage(`{"haproxy_container":"test-haproxy"}`))
-	dep.On("ExecInContainer", ctx, mock.Anything, "test-haproxy", mock.Anything).
-		Return(&deployer.ExecResult{ExitCode: 0, Stdout: "\n"}, nil)
-
-	err := lb.SetLBMapEntry(ctx, SetLBMapEntryParams{
+	err := lb.SetLBMapEntry(context.Background(), SetLBMapEntryParams{
 		ClusterID: "cluster-1",
 		FQDN:      "example.com",
 		LBBackend: "shard-web-1",
 	})
 	require.NoError(t, err)
-	dep.AssertExpectations(t)
 }
 
-func TestLB_SetLBMapEntry_NonZeroExitCode(t *testing.T) {
+func TestLB_SetLBMapEntry_FallbackToAdd(t *testing.T) {
+	callCount := 0
+	addr, cleanup := mockHAProxy(t, func(cmd string) string {
+		callCount++
+		if strings.HasPrefix(cmd, "set map") {
+			return "entry not found\n"
+		}
+		return "\n"
+	})
+	defer cleanup()
+
 	db := &mockDB{}
-	dep := &mockLBDeployer{}
-	lb := NewLB(dep, db)
-	ctx := context.Background()
+	setupLBResolve(db, addr)
+	lb := NewLB(db)
 
-	setupResolveHAProxy(db, json.RawMessage(`{}`))
-	dep.On("ExecInContainer", ctx, mock.Anything, defaultHAProxyContainer, mock.Anything).
-		Return(&deployer.ExecResult{ExitCode: 1, Stderr: "some error"}, nil)
-
-	err := lb.SetLBMapEntry(ctx, SetLBMapEntryParams{
+	err := lb.SetLBMapEntry(context.Background(), SetLBMapEntryParams{
 		ClusterID: "cluster-1",
 		FQDN:      "example.com",
 		LBBackend: "shard-web-1",
 	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "some error")
+	require.NoError(t, err)
 }
 
 func TestLB_DeleteLBMapEntry(t *testing.T) {
+	addr, cleanup := mockHAProxy(t, func(cmd string) string {
+		return "\n"
+	})
+	defer cleanup()
+
 	db := &mockDB{}
-	dep := &mockLBDeployer{}
-	lb := NewLB(dep, db)
-	ctx := context.Background()
+	setupLBResolve(db, addr)
+	lb := NewLB(db)
 
-	setupResolveHAProxy(db, json.RawMessage(`{}`))
-	dep.On("ExecInContainer", ctx, mock.Anything, defaultHAProxyContainer, mock.Anything).
-		Return(&deployer.ExecResult{ExitCode: 0, Stdout: "\n"}, nil)
-
-	err := lb.DeleteLBMapEntry(ctx, DeleteLBMapEntryParams{
+	err := lb.DeleteLBMapEntry(context.Background(), DeleteLBMapEntryParams{
 		ClusterID: "cluster-1",
 		FQDN:      "example.com",
 	})
@@ -181,62 +124,67 @@ func TestLB_DeleteLBMapEntry(t *testing.T) {
 }
 
 func TestLB_DeleteLBMapEntry_NotFoundIgnored(t *testing.T) {
+	addr, cleanup := mockHAProxy(t, func(cmd string) string {
+		return "entry not found\n"
+	})
+	defer cleanup()
+
 	db := &mockDB{}
-	dep := &mockLBDeployer{}
-	lb := NewLB(dep, db)
-	ctx := context.Background()
+	setupLBResolve(db, addr)
+	lb := NewLB(db)
 
-	setupResolveHAProxy(db, json.RawMessage(`{}`))
-	dep.On("ExecInContainer", ctx, mock.Anything, defaultHAProxyContainer, mock.Anything).
-		Return(&deployer.ExecResult{ExitCode: 1, Stdout: "entry not found\n"}, nil)
-
-	err := lb.DeleteLBMapEntry(ctx, DeleteLBMapEntryParams{
+	err := lb.DeleteLBMapEntry(context.Background(), DeleteLBMapEntryParams{
 		ClusterID: "cluster-1",
 		FQDN:      "example.com",
 	})
 	require.NoError(t, err, "not found errors should be ignored")
 }
 
-func TestLB_DeleteLBMapEntry_RealError(t *testing.T) {
+func TestLB_DeleteLBMapEntry_ConnectionRefused(t *testing.T) {
+	// Use an address that won't be listening.
+	addr := "127.0.0.1:1"
+
 	db := &mockDB{}
-	dep := &mockLBDeployer{}
-	lb := NewLB(dep, db)
-	ctx := context.Background()
+	setupLBResolve(db, addr)
+	lb := NewLB(db)
 
-	setupResolveHAProxy(db, json.RawMessage(`{}`))
-	dep.On("ExecInContainer", ctx, mock.Anything, defaultHAProxyContainer, mock.Anything).
-		Return(nil, fmt.Errorf("connection refused"))
-
-	err := lb.DeleteLBMapEntry(ctx, DeleteLBMapEntryParams{
+	err := lb.DeleteLBMapEntry(context.Background(), DeleteLBMapEntryParams{
 		ClusterID: "cluster-1",
 		FQDN:      "example.com",
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "connection refused")
+	assert.Contains(t, err.Error(), "connect to haproxy")
 }
 
-func TestLB_ResolveHAProxy_DefaultContainer(t *testing.T) {
+func TestLB_ResolveHAProxyAddr_Default(t *testing.T) {
 	db := &mockDB{}
-	dep := &mockLBDeployer{}
-	lb := NewLB(dep, db)
-	ctx := context.Background()
+	db.On("QueryRow", mock.Anything, mock.MatchedBy(func(sql string) bool {
+		return strings.Contains(sql, "clusters")
+	}), mock.Anything).Return(&lbMockRow{scanFn: func(dest ...any) error {
+		*(dest[0].(*json.RawMessage)) = json.RawMessage(`{}`)
+		return nil
+	}})
 
-	setupResolveHAProxy(db, json.RawMessage(`{}`))
-
-	_, containerName, err := lb.resolveHAProxy(ctx, "cluster-1")
+	lb := NewLB(db)
+	addr, err := lb.resolveHAProxyAddr(context.Background(), "cluster-1")
 	require.NoError(t, err)
-	assert.Equal(t, defaultHAProxyContainer, containerName)
+	assert.Equal(t, defaultHAProxyAdmin, addr)
 }
 
-func TestLB_ResolveHAProxy_CustomContainer(t *testing.T) {
+func TestLB_ResolveHAProxyAddr_Custom(t *testing.T) {
 	db := &mockDB{}
-	dep := &mockLBDeployer{}
-	lb := NewLB(dep, db)
-	ctx := context.Background()
+	db.On("QueryRow", mock.Anything, mock.MatchedBy(func(sql string) bool {
+		return strings.Contains(sql, "clusters")
+	}), mock.Anything).Return(&lbMockRow{scanFn: func(dest ...any) error {
+		*(dest[0].(*json.RawMessage)) = json.RawMessage(`{"haproxy_admin_addr":"10.0.0.1:9999"}`)
+		return nil
+	}})
 
-	setupResolveHAProxy(db, json.RawMessage(`{"haproxy_container":"my-haproxy"}`))
-
-	_, containerName, err := lb.resolveHAProxy(ctx, "cluster-1")
+	lb := NewLB(db)
+	addr, err := lb.resolveHAProxyAddr(context.Background(), "cluster-1")
 	require.NoError(t, err)
-	assert.Equal(t, "my-haproxy", containerName)
+	assert.Equal(t, "10.0.0.1:9999", addr)
 }
+
+// Suppress unused variable warning for time import (used by other tests in package).
+var _ = time.Now

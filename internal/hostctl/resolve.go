@@ -26,28 +26,6 @@ func (c *Client) FindTenantByName(name string) (string, error) {
 	return c.findByName("/tenants", name)
 }
 
-func (c *Client) FindHostByHostname(clusterID string, hostname string) (string, error) {
-	resp, err := c.Get(fmt.Sprintf("/clusters/%s/hosts", clusterID))
-	if err != nil {
-		return "", err
-	}
-
-	var hosts []struct {
-		ID       string `json:"id"`
-		Hostname string `json:"hostname"`
-	}
-	if err := json.Unmarshal(resp.Body, &hosts); err != nil {
-		return "", fmt.Errorf("parse hosts: %w", err)
-	}
-
-	for _, h := range hosts {
-		if h.Hostname == hostname {
-			return h.ID, nil
-		}
-	}
-	return "", fmt.Errorf("host %q not found in cluster %s", hostname, clusterID)
-}
-
 func (c *Client) findByName(path, name string) (string, error) {
 	resp, err := c.Get(path)
 	if err != nil {

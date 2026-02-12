@@ -12,7 +12,7 @@ Client → DNS → HAProxy (port 80)
                  ↓
          Consistent hash on Host header
                  ↓
-         Node container (nginx)
+         Node VM (nginx)
                  ↓
          Response with X-Served-By + X-Shard headers
 ```
@@ -23,29 +23,21 @@ DNS resolves to the cluster's LB IP addresses. HAProxy receives the request on p
 
 ### Backend Configuration (infrequent)
 
-Full `haproxy.cfg` regeneration + container restart. Triggered by:
-- Cluster provisioning (`ProvisionClusterWorkflow`)
-- Node additions/removals
-
-The `ConfigureHAProxyBackends` activity:
-1. Queries all active web shards with `LBBackend` set
-2. For each shard, queries active nodes + their `node_deployments` for container names
-3. Generates a complete `haproxy.cfg` from template
-4. Writes the config into the HAProxy container via `ExecInContainer`
-5. Validates with `haproxy -c`
-6. Restarts HAProxy (stop + start)
+Full `haproxy.cfg` regeneration + reload. Triggered by node additions/removals or shard changes. Backend server lists are derived from active nodes in each web shard.
 
 ### Map Entries (frequent)
 
-HAProxy Runtime API via `socat` — instant, no reload. Triggered by:
+HAProxy Runtime API via TCP socket (port 9999) — instant, no reload. Triggered by:
 - FQDN bind (`BindFQDNWorkflow` → `SetLBMapEntry`)
 - FQDN unbind (`UnbindFQDNWorkflow` → `DeleteLBMapEntry`)
 
-Commands are executed inside the HAProxy container:
+Commands are sent via direct TCP connection to HAProxy's admin socket:
 ```
-echo "set map /var/lib/haproxy/maps/fqdn-to-shard.map example.com shard-web-1" | socat stdio /var/run/haproxy/admin.sock
-echo "del map /var/lib/haproxy/maps/fqdn-to-shard.map example.com" | socat stdio /var/run/haproxy/admin.sock
+echo "set map /var/lib/haproxy/maps/fqdn-to-shard.map example.com shard-web-1" | nc localhost 9999
+echo "del map /var/lib/haproxy/maps/fqdn-to-shard.map example.com" | nc localhost 9999
 ```
+
+The `haproxy_admin_addr` is read from the cluster's config JSON field. Falls back to `localhost:9999`.
 
 Map entries survive HAProxy restarts because the map file is persisted via volume mount.
 
@@ -55,8 +47,8 @@ Map entries survive HAProxy restarts because the map file is persisted via volum
 backend shard-web-1
     balance hdr(Host)
     hash-type consistent
-    server web-1-node-0 <container>:80 check
-    server web-1-node-1 <container>:80 check
+    server web-1-node-0 <ip>:80 check
+    server web-1-node-1 <ip>:80 check
 ```
 
 - `balance hdr(Host)` — the same FQDN always hits the same node, which is good for PHP opcache locality
@@ -69,13 +61,13 @@ backend shard-web-1
 
 Auto-generated as `shard-{name}` during cluster provisioning (e.g. `shard-web-1`). This is the HAProxy backend name that maps receive when FQDNs are bound.
 
-### Cluster Config: `haproxy_container`
+### Cluster Config: `haproxy_admin_addr`
 
-The Docker container name for the cluster's HAProxy instance. Read from the cluster's `config` JSON field. Falls back to `hosting-haproxy` if not set.
+The TCP address for the cluster's HAProxy Runtime API. Read from the cluster's `config` JSON field. Falls back to `localhost:9999` if not set.
 
 ### Worker → HAProxy Communication
 
-The worker communicates with HAProxy via Docker exec (`ExecInContainer`). The worker container has `/var/run/docker.sock` mounted, giving it access to all containers on the Docker host. The `resolveHAProxy` helper reads the container name from cluster config and finds an active host machine for Docker API access.
+The worker communicates with HAProxy via direct TCP connection to the Runtime API. The `resolveHAProxyAddr` helper reads the address from the cluster config JSON.
 
 ## Debugging
 
@@ -115,12 +107,6 @@ Look for:
 
 Repeat the same curl multiple times — `X-Served-By` should stay the same for the same `Host` header (assuming all nodes are healthy).
 
-### Check node containers
-
-```bash
-docker ps | grep node-
-```
-
 ## Architecture Diagram
 
 ```
@@ -149,11 +135,6 @@ docker ps | grep node-
 
 | File | Purpose |
 |------|---------|
-| `internal/deployer/deployer.go` | `ExecInContainer` interface method |
-| `internal/deployer/docker.go` | Docker SDK implementation of exec |
-| `internal/activity/lb.go` | `SetLBMapEntry`, `DeleteLBMapEntry` via socat |
-| `internal/activity/cluster.go` | `ConfigureHAProxyBackends` — full cfg generation |
+| `internal/activity/lb.go` | `SetLBMapEntry`, `DeleteLBMapEntry` via TCP Runtime API |
 | `internal/workflow/fqdn.go` | Calls LB activities with `ClusterID` |
-| `internal/workflow/cluster.go` | Sets `LBBackend` on shard creation |
-| `docker/haproxy/Dockerfile` | HAProxy image with socat installed |
-| `docker/haproxy/haproxy.cfg` | Base config (backends generated dynamically) |
+| `docker/haproxy/haproxy.cfg` | Base config with TCP admin socket on port 9999 |

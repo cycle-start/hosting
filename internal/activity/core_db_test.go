@@ -196,10 +196,9 @@ func TestCoreDB_ListNodesByShard_Success(t *testing.T) {
 			*(dest[4].(**string)) = &ip1
 			*(dest[5].(**string)) = &ip61
 			*(dest[6].(*[]string)) = []string{"web"}
-			*(dest[7].(*string)) = ""
-			*(dest[8].(*string)) = model.StatusActive
+			*(dest[7].(*string)) = model.StatusActive
+			*(dest[8].(*time.Time)) = now
 			*(dest[9].(*time.Time)) = now
-			*(dest[10].(*time.Time)) = now
 			return nil
 		},
 		func(dest ...any) error {
@@ -212,10 +211,9 @@ func TestCoreDB_ListNodesByShard_Success(t *testing.T) {
 			*(dest[4].(**string)) = &ip2
 			*(dest[5].(**string)) = &ip62
 			*(dest[6].(*[]string)) = []string{"db"}
-			*(dest[7].(*string)) = ""
-			*(dest[8].(*string)) = model.StatusActive
+			*(dest[7].(*string)) = model.StatusActive
+			*(dest[8].(*time.Time)) = now
 			*(dest[9].(*time.Time)) = now
-			*(dest[10].(*time.Time)) = now
 			return nil
 		},
 	)

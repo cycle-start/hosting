@@ -19,6 +19,4 @@ func registerActivities(env *testsuite.TestWorkflowEnvironment) {
 	env.RegisterActivity(&activity.CertificateActivity{})
 	env.RegisterActivity(&activity.LB{})
 	env.RegisterActivity(&activity.Stalwart{})
-	env.RegisterActivity(&activity.Cluster{})
-	env.RegisterActivity(&activity.Deploy{})
 }

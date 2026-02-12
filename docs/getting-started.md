@@ -7,31 +7,25 @@
 - [just](https://github.com/casey/just) command runner
 - [goose](https://github.com/pressly/goose) for database migrations
 - protoc 3.21+ (only if modifying gRPC definitions)
+- Terraform + libvirt provider (for VM-based nodes)
 
 ## Quick Start
 
-### 1. Start infrastructure and build node images
+### 1. Start infrastructure and control plane
 
 ```bash
-just dev-up
+just dev
 ```
 
-This starts PostgreSQL, Temporal, the local container registry, and other infrastructure services. It then runs database migrations and builds + pushes node images to the local registry.
+This starts the Docker Compose control plane (PostgreSQL, Temporal, HAProxy, MySQL, PowerDNS, Ceph, etc.), runs database migrations, and starts core-api + worker.
 
-### 2. Bootstrap a cluster
+### 2. Create VMs and bootstrap a cluster
 
 ```bash
-go run ./cmd/hostctl cluster apply -f clusters/dev.yaml
+just dev-vm
 ```
 
-This creates:
-- A `dev` region
-- Node profiles for each role (web, database, dns, valkey)
-- A `dev-cluster-1` cluster with one shard per role
-- A localhost host machine using the local Docker socket
-- Provisions all nodes as Docker containers via the local registry images
-
-The tool waits for the cluster to reach `active` status before printing a summary of shards and nodes.
+This runs `just dev` then provisions VMs via Terraform/libvirt and registers them with the platform using `hostctl cluster apply`.
 
 ### 3. Seed test data
 
@@ -61,10 +55,19 @@ curl -s http://localhost:8090/api/v1/zones | jq
 open http://localhost:8080
 ```
 
+### 5. Run e2e tests
+
+```bash
+just test-e2e
+```
+
 ## Teardown
 
 ```bash
-# Stop everything, remove volumes (clean slate)
+# Destroy VMs
+just vm-down
+
+# Stop control plane, remove volumes (clean slate)
 just down-clean
 ```
 
@@ -83,7 +86,6 @@ This drops all tables and re-applies all migrations from scratch. All data will 
 ```bash
 just rebuild core-api          # Rebuild and restart core-api
 just rebuild worker            # Rebuild and restart worker
-just build-push-node-images    # Rebuild and push node images to local registry
 ```
 
 ## Project layout
@@ -92,7 +94,7 @@ just build-push-node-images    # Rebuild and push node images to local registry
 cmd/
   core-api/          REST API server
   worker/            Temporal worker (workflows + activities)
-  node-agent/        gRPC agent running inside each node
+  node-agent/        Temporal worker running on each VM node
   hostctl/           CLI for cluster bootstrap and test data seeding
 
 internal/
@@ -102,17 +104,18 @@ internal/
   agent/             Node agent managers (tenant, webroot, nginx, database, valkey)
   config/            Configuration loading
   core/              Core business logic services
-  deployer/          Container deployment (Docker implementation)
+  hostctl/           Cluster bootstrap and seed logic
   model/             Domain models
   platform/          Shared utilities
 
-clusters/            Cluster definition YAML files
+terraform/           Terraform configs for VM provisioning
 seeds/               Test data seed YAML files
 migrations/
   core/              Core database migrations
   service/           Service database migrations
-docker/              Dockerfiles and container configs
+docker/              Dockerfiles and container configs (control plane)
 docs/                Documentation
+tests/e2e/           End-to-end tests (require VMs)
 ```
 
 ## Architecture overview
@@ -121,9 +124,9 @@ The platform uses a desired-state / actual-state model:
 
 1. **core-api** accepts REST requests and writes desired state to the core database
 2. **worker** picks up Temporal workflows that converge actual state to match
-3. **node-agent** runs inside each node and manages workloads (tenants, webroots, runtimes, databases)
+3. **node-agent** runs on each VM node as a Temporal worker, receiving tasks via node-specific task queues
 
-Hierarchy: Region > Cluster > Shard > Node. Tenants are assigned to shards. The deployer (currently Docker) creates node containers on host machines; the node agent is agnostic to how it was deployed.
+Hierarchy: Region > Cluster > Shard > Node. Tenants are assigned to shards. Nodes are VMs provisioned by Terraform/libvirt and registered with the platform via `hostctl cluster apply`.
 
 ## Useful commands
 
@@ -135,4 +138,6 @@ just log core-api     # Tail logs for a service
 just ps               # Show running services
 just db-core          # Connect to core database
 just migrate-status   # Check migration status
+just vm-ssh web-1-node-0  # SSH into a VM
+just lb-show          # Show HAProxy map entries
 ```

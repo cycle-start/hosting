@@ -3,10 +3,10 @@
 ## Current Status Summary
 
 **Build:** Compiles clean, `go vet` passes, all test packages pass.
-**Infrastructure:** Docker Compose stack with core-db, service-db, temporal, temporal-ui, platform-valkey, mysql, powerdns, ceph, haproxy, local registry, stalwart, prometheus, grafana, loki, promtail, core-api, worker.
+**Infrastructure:** Docker Compose for control plane (core-db, service-db, temporal, temporal-ui, platform-valkey, mysql, powerdns, ceph, haproxy, local registry, stalwart, prometheus, grafana, loki, promtail, core-api, worker). Nodes run on VMs provisioned by Terraform/libvirt.
 **Migrations:** All core + service DB migrations applied.
 **CLI:** `hostctl cluster apply` bootstraps a full cluster; `hostctl seed` populates tenant data; `hostctl converge-shard` triggers manual shard convergence.
-**Integration tests:** None exist yet (`tests/e2e/` is empty).
+**E2E tests:** Full pipeline: health check, cluster bootstrap, tenant seeding, shared storage verification, web traffic through HAProxy.
 
 ---
 
@@ -20,13 +20,10 @@ Full CRUD REST API at `localhost:8090/api/v1`:
 |------------------|--------------------------------------------------|-------|
 | Platform Config  | GET/PUT `/platform/config`                       | No    |
 | Regions          | CRUD `/regions`, runtimes sub-resource            | No    |
-| Clusters         | CRUD `/regions/{id}/clusters`, provision/decommission | Yes |
+| Clusters         | CRUD `/regions/{id}/clusters`                    | No    |
 | Cluster LB Addrs | CRUD `/clusters/{id}/lb-addresses`               | No    |
 | Shards           | CRUD `/clusters/{id}/shards`, converge            | Yes   |
-| Host Machines    | CRUD `/clusters/{id}/hosts`                      | No    |
-| Node Profiles    | CRUD `/node-profiles`                            | No    |
-| Nodes            | CRUD `/clusters/{id}/nodes`, provision/decommission | Yes |
-| Node Deployments | GET `/nodes/{id}/deployment`, list by host        | No    |
+| Nodes            | CRUD `/clusters/{id}/nodes`                      | No    |
 | Tenants          | CRUD + suspend/unsuspend/migrate `/tenants`       | Yes   |
 | Webroots         | CRUD `/tenants/{id}/webroots`                    | Yes   |
 | FQDNs            | Create/delete `/webroots/{id}/fqdns`             | Yes   |
@@ -39,7 +36,7 @@ Full CRUD REST API at `localhost:8090/api/v1`:
 | Valkey Users     | CRUD `/valkey-instances/{id}/users`              | Yes   |
 | Email Accounts   | CRUD `/fqdns/{id}/email-accounts`                | Yes   |
 
-Infrastructure resources (regions, clusters, shards, nodes, hosts, profiles) use synchronous CRUD.
+Infrastructure resources (regions, clusters, shards, nodes) use synchronous CRUD.
 Tenant-level resources are async: API returns 202, Temporal workflow handles provisioning.
 
 ### Temporal Workflows
@@ -58,18 +55,15 @@ Tenant-level resources are async: API returns 202, Temporal workflow handles pro
 - Email Account: create, delete (schema-only, Stalwart integration stubbed)
 
 **Infrastructure lifecycle:**
-- ProvisionClusterWorkflow: creates shards + nodes from cluster spec, deploys infrastructure containers (HAProxy, service DB, Valkey), provisions all node containers, configures HAProxy backends, runs smoke test
-- DecommissionClusterWorkflow: tears down all nodes and infrastructure containers
-- ProvisionNodeWorkflow: selects host, pulls image, creates Docker container, waits for health, sets gRPC address, triggers shard convergence
-- DecommissionNodeWorkflow: stops + removes container, updates deployment record
-- RollingUpdateWorkflow: updates all nodes in a shard to a new image one at a time
-- ConvergeShardWorkflow: pushes all existing resources (tenants, webroots, databases, valkey instances + their users) to every node in a shard, role-aware (web/database/valkey)
+- ConvergeShardWorkflow: pushes all existing resources (tenants, webroots, databases, valkey instances + their users) to every node in a shard via Temporal task queue routing, role-aware (web/database/valkey)
+
+Nodes are provisioned externally via Terraform/libvirt. The `hostctl cluster apply` CLI registers them with the platform and triggers shard convergence.
 
 Status progression: `pending -> provisioning -> active` (or `failed`/`deleted`).
 
-### Node Agent (gRPC)
+### Node Agent (Temporal Worker)
 
-Runs privileged inside each node container:
+Runs on each VM node, connecting to Temporal via a node-specific task queue:
 
 - **TenantManager:** Linux user accounts (useradd/userdel/usermod), directory structure, SFTP setup
 - **WebrootManager:** Webroot directories under tenant home
@@ -77,23 +71,6 @@ Runs privileged inside each node container:
 - **DatabaseManager:** MySQL CREATE/DROP DATABASE, CREATE/DROP USER, GRANT
 - **ValkeyManager:** Valkey instance lifecycle (config + systemd template units), ACL user management via valkey-cli
 - **Runtime managers:** PHP-FPM pool configs + systemctl reload, Node.js proxy, Python (gunicorn), Ruby (puma), Static
-
-### Docker Deployer
-
-Full Docker SDK integration for node container lifecycle:
-- Image pulling with digest tracking
-- Container creation with env, volumes, ports, resource constraints, health checks, network attachment
-- TLS support for remote Docker hosts (client certs, CA cert)
-- Ephemeral port mapping (Docker picks host ports)
-- Docker network attachment (for development `hosting_default` network)
-
-### Node Container Images
-
-Dockerfiles for each role, built and pushed to local registry:
-- `web-node`: Ubuntu 24.04 + nginx + PHP 8.5 + Node/Python/Ruby + node-agent
-- `db-node`: Ubuntu 24.04 + MySQL 8.4 LTS + node-agent
-- `dns-node`: PowerDNS + node-agent
-- `valkey-node`: Valkey 8 + node-agent
 
 ### DNS (PowerDNS)
 
@@ -104,14 +81,14 @@ Dockerfiles for each role, built and pushed to local registry:
 
 ### Load Balancing (HAProxy)
 
-- Runtime map file (`fqdn-to-shard.map`) updated via socat without reload
+- Runtime map file (`fqdn-to-shard.map`) updated via HAProxy Runtime API (TCP socket) without reload
 - `SetLBMapEntry`/`DeleteLBMapEntry` activities update mappings when FQDNs are bound/unbound
 - Consistent hashing on Host header within shard backends
-- HAProxy deployed as infrastructure container during cluster provisioning
+- HAProxy runs in Docker Compose, Runtime API exposed on port 9999
 
 ### CLI Tooling (`hostctl`)
 
-- `hostctl cluster apply -f <yaml>`: bootstraps full cluster from declarative YAML (region, cluster, LB addresses, node profiles, host machines, provision)
+- `hostctl cluster apply -f <yaml>`: bootstraps full cluster from declarative YAML (region, cluster, LB addresses, shards, nodes, converge)
 - `hostctl seed -f <yaml>`: seeds tenant data (zones, tenants, webroots, FQDNs, databases, valkey instances, email accounts)
 - `hostctl converge-shard <shard-id>`: triggers manual shard convergence
 
@@ -120,7 +97,7 @@ Dockerfiles for each role, built and pushed to local registry:
 Full coverage across all packages:
 - Workflow tests (mock activities, verify state transitions)
 - Handler tests (HTTP request/response, validation, chi routing)
-- Activity tests (mock DB/gRPC calls)
+- Activity tests (mock DB calls, mock TCP listener for LB)
 - Agent tests (mock exec commands, template rendering)
 - Runtime manager tests
 - Request validation, response formatting, config loading, model helpers
@@ -159,12 +136,13 @@ Let's Encrypt certificate provisioning is stubbed:
 - Certificate storage workflow works but uses placeholder PEM data
 - Renewal and cleanup cron workflows are stubs
 
-### Priority 5: Integration & E2E Tests
+### Priority 5: Extended E2E Tests
 
-`tests/e2e/` directory exists but is empty:
-- Full lifecycle API integration tests
-- Workflow integration tests against real Temporal + databases
-- Node-agent integration tests in Docker
+`tests/e2e/` has a basic pipeline (health, bootstrap, seed, shared storage, web traffic). Still needed:
+- Full lifecycle API integration tests (CRUD + workflow completion)
+- Database shard e2e (MySQL create/drop/replication)
+- Valkey shard e2e
+- DNS record propagation e2e
 
 ### Priority 6: Monitoring & Observability
 

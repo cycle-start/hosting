@@ -86,10 +86,9 @@ func TestNodeService_GetByID_Success(t *testing.T) {
 		*(dest[4].(**string)) = &ipAddr
 		*(dest[5].(**string)) = &ip6Addr
 		*(dest[6].(*[]string)) = []string{"web", "db"}
-		*(dest[7].(*string)) = "10.0.0.10:9090"
-		*(dest[8].(*string)) = model.StatusActive
+		*(dest[7].(*string)) = model.StatusActive
+		*(dest[8].(*time.Time)) = now
 		*(dest[9].(*time.Time)) = now
-		*(dest[10].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -147,10 +146,9 @@ func TestNodeService_ListByCluster_Success(t *testing.T) {
 			*(dest[4].(**string)) = &ip
 			*(dest[5].(**string)) = &ip6
 			*(dest[6].(*[]string)) = []string{"web"}
-			*(dest[7].(*string)) = ""
-			*(dest[8].(*string)) = model.StatusActive
+			*(dest[7].(*string)) = model.StatusActive
+			*(dest[8].(*time.Time)) = now
 			*(dest[9].(*time.Time)) = now
-			*(dest[10].(*time.Time)) = now
 			return nil
 		},
 		func(dest ...any) error {
@@ -163,10 +161,9 @@ func TestNodeService_ListByCluster_Success(t *testing.T) {
 			*(dest[4].(**string)) = &ip
 			*(dest[5].(**string)) = &ip6
 			*(dest[6].(*[]string)) = []string{"db"}
-			*(dest[7].(*string)) = ""
-			*(dest[8].(*string)) = model.StatusActive
+			*(dest[7].(*string)) = model.StatusActive
+			*(dest[8].(*time.Time)) = now
 			*(dest[9].(*time.Time)) = now
-			*(dest[10].(*time.Time)) = now
 			return nil
 		},
 	)
@@ -231,10 +228,9 @@ func TestNodeService_ListByShard_Success(t *testing.T) {
 			*(dest[4].(**string)) = &ip
 			*(dest[5].(**string)) = &ip6
 			*(dest[6].(*[]string)) = []string{"web"}
-			*(dest[7].(*string)) = ""
-			*(dest[8].(*string)) = model.StatusActive
+			*(dest[7].(*string)) = model.StatusActive
+			*(dest[8].(*time.Time)) = now
 			*(dest[9].(*time.Time)) = now
-			*(dest[10].(*time.Time)) = now
 			return nil
 		},
 		func(dest ...any) error {
@@ -247,10 +243,9 @@ func TestNodeService_ListByShard_Success(t *testing.T) {
 			*(dest[4].(**string)) = &ip
 			*(dest[5].(**string)) = &ip6
 			*(dest[6].(*[]string)) = []string{"db"}
-			*(dest[7].(*string)) = ""
-			*(dest[8].(*string)) = model.StatusActive
+			*(dest[7].(*string)) = model.StatusActive
+			*(dest[8].(*time.Time)) = now
 			*(dest[9].(*time.Time)) = now
-			*(dest[10].(*time.Time)) = now
 			return nil
 		},
 	)

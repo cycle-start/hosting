@@ -152,6 +152,7 @@ services:
       - "80:80"
       - "443:443"
       - "8404:8404"   # stats UI
+      - "9999:9999"   # Runtime API
     volumes:
       - ./docker/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
       - ./docker/haproxy/fqdn-to-shard.map:/var/lib/haproxy/maps/fqdn-to-shard.map
@@ -260,26 +261,6 @@ services:
       - SERVICE_DATABASE_URL=postgres://hosting:hosting@service-db:5432/hosting_service
       - TEMPORAL_ADDRESS=temporal:7233
       - REGISTRY_URL=registry:5000
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-
-  node-agent:
-    container_name: hosting-node-agent
-    build:
-      context: .
-      dockerfile: docker/node-agent.Dockerfile
-    privileged: true
-    depends_on:
-      temporal:
-        condition: service_started
-      mysql:
-        condition: service_healthy
-    environment:
-      - TEMPORAL_ADDRESS=temporal:7233
-      - NODE_ID=dev-node-1
-      - SHARD_NAME=web-1
-      - MYSQL_DSN=root:rootpassword@tcp(mysql:3306)/
-
 volumes:
   core-db-data:
   service-db-data:

@@ -13,7 +13,6 @@ import (
 	"github.com/edvin/hosting/internal/activity"
 	"github.com/edvin/hosting/internal/config"
 	"github.com/edvin/hosting/internal/db"
-	"github.com/edvin/hosting/internal/deployer"
 	"github.com/edvin/hosting/internal/workflow"
 )
 
@@ -67,17 +66,7 @@ func main() {
 	certActivities := activity.NewCertificateActivity(corePool)
 	w.RegisterActivity(certActivities)
 
-	var dep deployer.Deployer
-	switch cfg.Deployer {
-	case "docker":
-		dep = deployer.NewDockerDeployer()
-	default:
-		logger.Fatal().Str("deployer", cfg.Deployer).Msg("unknown deployer")
-	}
-	deployActivities := activity.NewDeploy(dep)
-	w.RegisterActivity(deployActivities)
-
-	lbActivities := activity.NewLB(dep, corePool)
+	lbActivities := activity.NewLB(corePool)
 	w.RegisterActivity(lbActivities)
 
 	migrateActivities := activity.NewMigrate(corePool)
@@ -85,9 +74,6 @@ func main() {
 
 	stalwartActivities := activity.NewStalwart(corePool)
 	w.RegisterActivity(stalwartActivities)
-
-	clusterActivities := activity.NewCluster(dep, corePool)
-	w.RegisterActivity(clusterActivities)
 
 	// Register workflows
 	w.RegisterWorkflow(workflow.CreateTenantWorkflow)
@@ -115,9 +101,6 @@ func main() {
 	w.RegisterWorkflow(workflow.UpdateDatabaseUserWorkflow)
 	w.RegisterWorkflow(workflow.DeleteDatabaseUserWorkflow)
 	w.RegisterWorkflow(workflow.UpdateServiceHostnamesWorkflow)
-	w.RegisterWorkflow(workflow.ProvisionNodeWorkflow)
-	w.RegisterWorkflow(workflow.DecommissionNodeWorkflow)
-	w.RegisterWorkflow(workflow.RollingUpdateWorkflow)
 	w.RegisterWorkflow(workflow.MigrateTenantWorkflow)
 	w.RegisterWorkflow(workflow.CreateEmailAccountWorkflow)
 	w.RegisterWorkflow(workflow.DeleteEmailAccountWorkflow)
@@ -127,8 +110,6 @@ func main() {
 	w.RegisterWorkflow(workflow.DeleteEmailForwardWorkflow)
 	w.RegisterWorkflow(workflow.UpdateEmailAutoReplyWorkflow)
 	w.RegisterWorkflow(workflow.DeleteEmailAutoReplyWorkflow)
-	w.RegisterWorkflow(workflow.ProvisionClusterWorkflow)
-	w.RegisterWorkflow(workflow.DecommissionClusterWorkflow)
 	w.RegisterWorkflow(workflow.CreateValkeyInstanceWorkflow)
 	w.RegisterWorkflow(workflow.DeleteValkeyInstanceWorkflow)
 	w.RegisterWorkflow(workflow.CreateValkeyUserWorkflow)

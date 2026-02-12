@@ -7,10 +7,10 @@ region:
 
 cluster:
   name: vm-cluster-1
-  provisioner: external
   lb_addresses:
     - address: "${gateway_ip}"
   config:
+    haproxy_admin_addr: "${gateway_ip}:9999"
     stalwart_url: "http://${gateway_ip}:8082"
     stalwart_token: "dev-token"
     mail_hostname: "mail.hosting.localhost"
@@ -43,39 +43,9 @@ cluster:
       service_db: false
       valkey: false
 
-  external_nodes:
+  nodes:
 %{ for node in nodes ~}
     - id: ${node.id}
       shard_name: ${node.shard_name}
       ip_address: "${node.ip}"
 %{ endfor ~}
-
-node_profiles:
-  - name: web-node
-    role: web
-    image: "unused-for-external"
-    privileged: true
-    resources:
-      memory_mb: 1024
-      cpu_shares: 2048
-
-  - name: db-node
-    role: database
-    image: "unused-for-external"
-    resources:
-      memory_mb: 1024
-      cpu_shares: 2048
-
-  - name: dns-node
-    role: dns
-    image: "unused-for-external"
-    resources:
-      memory_mb: 512
-      cpu_shares: 512
-
-  - name: valkey-node
-    role: valkey
-    image: "unused-for-external"
-    resources:
-      memory_mb: 512
-      cpu_shares: 512

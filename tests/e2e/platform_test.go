@@ -3,7 +3,7 @@
 package e2e
 
 import (
-	"context"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -12,16 +12,21 @@ import (
 )
 
 const (
-	clusterConfigPath = "../../clusters/dev.yaml"
-	seedConfigPath    = "../../seeds/dev-tenants.yaml"
-	provisionTimeout  = 5 * time.Minute
-	seedTimeout       = 5 * time.Minute
-	httpTimeout       = 60 * time.Second
+	seedConfigPath   = "../../seeds/dev-tenants.yaml"
+	provisionTimeout = 5 * time.Minute
+	seedTimeout      = 5 * time.Minute
+	httpTimeout      = 60 * time.Second
+	clusterName      = "vm-cluster-1"
 )
 
-func TestPlatformE2E(t *testing.T) {
-	ctx := context.Background()
+func clusterConfigPath() string {
+	if p := os.Getenv("CLUSTER_CONFIG"); p != "" {
+		return p
+	}
+	return "../../terraform/cluster.yaml"
+}
 
+func TestPlatformE2E(t *testing.T) {
 	t.Run("health", func(t *testing.T) {
 		resp, body, err := httpGetWithHost("http://localhost:8090/api/v1/regions", "")
 		if err != nil {
@@ -34,7 +39,7 @@ func TestPlatformE2E(t *testing.T) {
 	})
 
 	t.Run("cluster_bootstrap", func(t *testing.T) {
-		if err := hostctl.ClusterApply(clusterConfigPath, provisionTimeout); err != nil {
+		if err := hostctl.ClusterApply(clusterConfigPath(), provisionTimeout); err != nil {
 			t.Fatalf("cluster apply failed: %v", err)
 		}
 	})
@@ -53,44 +58,37 @@ func TestPlatformE2E(t *testing.T) {
 	})
 
 	t.Run("shared_storage", func(t *testing.T) {
-		containers := findAllContainersByEnv(ctx, t, "SHARD_ROLE", "web")
-		if len(containers) < 2 {
+		ips := findNodeIPs(t, clusterName, "web")
+		if len(ips) < 2 {
 			t.Skip("need at least 2 web nodes to test shared storage")
 		}
-		nodeA, nodeB := containers[0], containers[1]
-		t.Logf("node A: %s, node B: %s", nodeA[:12], nodeB[:12])
+		nodeA, nodeB := ips[0], ips[1]
+		t.Logf("node A: %s, node B: %s", nodeA, nodeB)
 
 		// Write a unique file on node A.
 		testFile := "/var/www/storage/.e2e-shared-storage-test"
 		marker := "shared-storage-ok"
-		execInContainer(ctx, t, nodeA, []string{
-			"bash", "-c", "echo '" + marker + "' > " + testFile,
-		})
+		sshExec(t, nodeA, "echo '"+marker+"' | sudo tee "+testFile)
 
 		// Read it from node B.
-		got := execInContainer(ctx, t, nodeB, []string{"cat", testFile})
+		got := sshExec(t, nodeB, "cat "+testFile)
 		if !strings.Contains(got, marker) {
 			t.Fatalf("file written on node A not visible on node B: got %q, want %q", got, marker)
 		}
 		t.Logf("cross-node read OK: %q", strings.TrimSpace(got))
 
 		// Clean up.
-		execInContainer(ctx, t, nodeA, []string{"rm", "-f", testFile})
+		sshExec(t, nodeA, "sudo rm -f "+testFile)
 	})
 
 	t.Run("web_traffic", func(t *testing.T) {
-		// With shared storage volumes, writing to one container is enough —
-		// all web nodes in the shard see the same /var/www/storage.
-		cid := findContainerByEnv(ctx, t, "SHARD_ROLE", "web")
-		t.Logf("writing index.php to container %s", cid[:12])
+		ips := findNodeIPs(t, clusterName, "web")
+		nodeIP := ips[0]
+		t.Logf("writing index.php to web node %s", nodeIP)
 
 		phpContent := `<?php echo "Hello from hosting platform"; ?>`
-		execInContainer(ctx, t, cid, []string{
-			"mkdir", "-p", "/var/www/storage/acme-corp/main-site/public",
-		})
-		execInContainer(ctx, t, cid, []string{
-			"bash", "-c", "echo '" + phpContent + "' > /var/www/storage/acme-corp/main-site/public/index.php",
-		})
+		sshExec(t, nodeIP, "sudo mkdir -p /var/www/storage/acme-corp/main-site/public")
+		sshExec(t, nodeIP, "echo '"+phpContent+"' | sudo tee /var/www/storage/acme-corp/main-site/public/index.php")
 
 		// Wait for the page to be served through HAProxy
 		resp, body := waitForHTTP(t, "http://localhost:80", "acme.hosting.localhost", httpTimeout)

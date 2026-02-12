@@ -211,7 +211,7 @@ func (a *CoreDB) GetShardByID(ctx context.Context, id string) (*model.Shard, err
 // GetNodesByClusterAndRole retrieves all nodes in a cluster with the specified role.
 func (a *CoreDB) GetNodesByClusterAndRole(ctx context.Context, clusterID string, role string) ([]model.Node, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, cluster_id, shard_id, hostname, ip_address::text, ip6_address::text, roles, grpc_address, status, created_at, updated_at
+		`SELECT id, cluster_id, shard_id, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at
 		 FROM nodes WHERE cluster_id = $1 AND $2 = ANY(roles) AND status = $3`, clusterID, role, model.StatusActive,
 	)
 	if err != nil {
@@ -222,7 +222,7 @@ func (a *CoreDB) GetNodesByClusterAndRole(ctx context.Context, clusterID string,
 	var nodes []model.Node
 	for rows.Next() {
 		var n model.Node
-		if err := rows.Scan(&n.ID, &n.ClusterID, &n.ShardID, &n.Hostname, &n.IPAddress, &n.IP6Address, &n.Roles, &n.GRPCAddress, &n.Status, &n.CreatedAt, &n.UpdatedAt); err != nil {
+		if err := rows.Scan(&n.ID, &n.ClusterID, &n.ShardID, &n.Hostname, &n.IPAddress, &n.IP6Address, &n.Roles, &n.Status, &n.CreatedAt, &n.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan node row: %w", err)
 		}
 		nodes = append(nodes, n)
@@ -294,7 +294,7 @@ func (a *CoreDB) ListTenantsByShard(ctx context.Context, shardID string) ([]mode
 // ListNodesByShard retrieves all nodes assigned to a shard.
 func (a *CoreDB) ListNodesByShard(ctx context.Context, shardID string) ([]model.Node, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, cluster_id, shard_id, hostname, ip_address::text, ip6_address::text, roles, grpc_address, status, created_at, updated_at
+		`SELECT id, cluster_id, shard_id, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at
 		 FROM nodes WHERE shard_id = $1 ORDER BY hostname`, shardID,
 	)
 	if err != nil {
@@ -305,7 +305,7 @@ func (a *CoreDB) ListNodesByShard(ctx context.Context, shardID string) ([]model.
 	var nodes []model.Node
 	for rows.Next() {
 		var n model.Node
-		if err := rows.Scan(&n.ID, &n.ClusterID, &n.ShardID, &n.Hostname, &n.IPAddress, &n.IP6Address, &n.Roles, &n.GRPCAddress, &n.Status, &n.CreatedAt, &n.UpdatedAt); err != nil {
+		if err := rows.Scan(&n.ID, &n.ClusterID, &n.ShardID, &n.Hostname, &n.IPAddress, &n.IP6Address, &n.Roles, &n.Status, &n.CreatedAt, &n.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan node row: %w", err)
 		}
 		nodes = append(nodes, n)
@@ -339,97 +339,16 @@ func (a *CoreDB) GetTenantServicesByTenantID(ctx context.Context, tenantID strin
 func (a *CoreDB) GetNodeByID(ctx context.Context, id string) (*model.Node, error) {
 	var n model.Node
 	err := a.db.QueryRow(ctx,
-		`SELECT id, cluster_id, shard_id, hostname, ip_address::text, ip6_address::text, roles, grpc_address, status, created_at, updated_at
+		`SELECT id, cluster_id, shard_id, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at
 		 FROM nodes WHERE id = $1`, id,
 	).Scan(&n.ID, &n.ClusterID, &n.ShardID, &n.Hostname, &n.IPAddress, &n.IP6Address,
-		&n.Roles, &n.GRPCAddress, &n.Status, &n.CreatedAt, &n.UpdatedAt)
+		&n.Roles, &n.Status, &n.CreatedAt, &n.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get node by id: %w", err)
 	}
 	return &n, nil
 }
 
-// GetHostMachineByID retrieves a host machine by its ID.
-func (a *CoreDB) GetHostMachineByID(ctx context.Context, id string) (*model.HostMachine, error) {
-	var h model.HostMachine
-	err := a.db.QueryRow(ctx,
-		`SELECT id, cluster_id, hostname, ip_address::text, docker_host, ca_cert_pem, client_cert_pem, client_key_pem, capacity, roles, status, created_at, updated_at
-		 FROM host_machines WHERE id = $1`, id,
-	).Scan(&h.ID, &h.ClusterID, &h.Hostname, &h.IPAddress, &h.DockerHost, &h.CACertPEM, &h.ClientCertPEM, &h.ClientKeyPEM, &h.Capacity, &h.Roles, &h.Status, &h.CreatedAt, &h.UpdatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("get host machine by id: %w", err)
-	}
-	return &h, nil
-}
-
-// GetNodeProfileByRole retrieves the first node profile matching a role.
-func (a *CoreDB) GetNodeProfileByRole(ctx context.Context, role string) (*model.NodeProfile, error) {
-	var p model.NodeProfile
-	err := a.db.QueryRow(ctx,
-		`SELECT id, name, role, image, env, volumes, ports, resources, health_check, privileged, network_mode, created_at, updated_at
-		 FROM node_profiles WHERE role = $1 ORDER BY created_at DESC LIMIT 1`, role,
-	).Scan(&p.ID, &p.Name, &p.Role, &p.Image, &p.Env, &p.Volumes, &p.Ports, &p.Resources, &p.HealthCheck, &p.Privileged, &p.NetworkMode, &p.CreatedAt, &p.UpdatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("get node profile by role: %w", err)
-	}
-	return &p, nil
-}
-
-// SelectHostForNodeParams holds parameters for SelectHostForNode.
-type SelectHostForNodeParams struct {
-	ClusterID string
-}
-
-// SelectHostForNode picks the host machine in a cluster with the fewest deployments.
-func (a *CoreDB) SelectHostForNode(ctx context.Context, params SelectHostForNodeParams) (*model.HostMachine, error) {
-	var h model.HostMachine
-	err := a.db.QueryRow(ctx,
-		`SELECT hm.id, hm.cluster_id, hm.hostname, hm.ip_address::text, hm.docker_host, hm.ca_cert_pem, hm.client_cert_pem, hm.client_key_pem, hm.capacity, hm.roles, hm.status, hm.created_at, hm.updated_at
-		 FROM host_machines hm
-		 LEFT JOIN node_deployments nd ON nd.host_machine_id = hm.id AND nd.status != $1
-		 WHERE hm.cluster_id = $2 AND hm.status = $3
-		 GROUP BY hm.id
-		 ORDER BY COUNT(nd.id) ASC
-		 LIMIT 1`, model.StatusDeleted, params.ClusterID, model.StatusActive,
-	).Scan(&h.ID, &h.ClusterID, &h.Hostname, &h.IPAddress, &h.DockerHost, &h.CACertPEM, &h.ClientCertPEM, &h.ClientKeyPEM, &h.Capacity, &h.Roles, &h.Status, &h.CreatedAt, &h.UpdatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("select host for node: %w", err)
-	}
-	return &h, nil
-}
-
-// CreateNodeDeployment inserts a new node deployment record.
-func (a *CoreDB) CreateNodeDeployment(ctx context.Context, d *model.NodeDeployment) error {
-	_, err := a.db.Exec(ctx,
-		`INSERT INTO node_deployments (id, node_id, host_machine_id, profile_id, container_id, container_name, image_digest, env_overrides, status, deployed_at, last_health_at, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-		d.ID, d.NodeID, d.HostMachineID, d.ProfileID, d.ContainerID, d.ContainerName, d.ImageDigest, d.EnvOverrides, d.Status, d.DeployedAt, d.LastHealthAt, d.CreatedAt, d.UpdatedAt,
-	)
-	return err
-}
-
-// UpdateNodeDeployment updates an existing node deployment record.
-func (a *CoreDB) UpdateNodeDeployment(ctx context.Context, d *model.NodeDeployment) error {
-	_, err := a.db.Exec(ctx,
-		`UPDATE node_deployments SET container_id = $1, image_digest = $2, env_overrides = $3, status = $4, deployed_at = $5, last_health_at = $6, updated_at = now()
-		 WHERE id = $7`,
-		d.ContainerID, d.ImageDigest, d.EnvOverrides, d.Status, d.DeployedAt, d.LastHealthAt, d.ID,
-	)
-	return err
-}
-
-// GetNodeDeploymentByNodeID retrieves a node deployment by its node ID.
-func (a *CoreDB) GetNodeDeploymentByNodeID(ctx context.Context, nodeID string) (*model.NodeDeployment, error) {
-	var d model.NodeDeployment
-	err := a.db.QueryRow(ctx,
-		`SELECT id, node_id, host_machine_id, profile_id, container_id, container_name, image_digest, env_overrides, status, deployed_at, last_health_at, created_at, updated_at
-		 FROM node_deployments WHERE node_id = $1`, nodeID,
-	).Scan(&d.ID, &d.NodeID, &d.HostMachineID, &d.ProfileID, &d.ContainerID, &d.ContainerName, &d.ImageDigest, &d.EnvOverrides, &d.Status, &d.DeployedAt, &d.LastHealthAt, &d.CreatedAt, &d.UpdatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("get node deployment by node id: %w", err)
-	}
-	return &d, nil
-}
 
 // UpdateTenantShardID updates the shard assignment for a tenant.
 func (a *CoreDB) UpdateTenantShardID(ctx context.Context, tenantID string, shardID string) error {
@@ -535,27 +454,6 @@ func (a *CoreDB) CountActiveEmailAccountsByFQDN(ctx context.Context, fqdnID stri
 	return count, nil
 }
 
-// ListHostMachinesByCluster retrieves all host machines in a cluster.
-func (a *CoreDB) ListHostMachinesByCluster(ctx context.Context, clusterID string) ([]model.HostMachine, error) {
-	rows, err := a.db.Query(ctx,
-		`SELECT id, cluster_id, hostname, ip_address::text, docker_host, ca_cert_pem, client_cert_pem, client_key_pem, capacity, roles, status, created_at, updated_at
-		 FROM host_machines WHERE cluster_id = $1 AND status = $2 ORDER BY hostname`, clusterID, model.StatusActive,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("list host machines by cluster: %w", err)
-	}
-	defer rows.Close()
-
-	var hosts []model.HostMachine
-	for rows.Next() {
-		var h model.HostMachine
-		if err := rows.Scan(&h.ID, &h.ClusterID, &h.Hostname, &h.IPAddress, &h.DockerHost, &h.CACertPEM, &h.ClientCertPEM, &h.ClientKeyPEM, &h.Capacity, &h.Roles, &h.Status, &h.CreatedAt, &h.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan host machine row: %w", err)
-		}
-		hosts = append(hosts, h)
-	}
-	return hosts, rows.Err()
-}
 
 // CreateShard inserts a new shard record.
 func (a *CoreDB) CreateShard(ctx context.Context, s *model.Shard) error {
@@ -570,32 +468,13 @@ func (a *CoreDB) CreateShard(ctx context.Context, s *model.Shard) error {
 // CreateNode inserts a new node record.
 func (a *CoreDB) CreateNode(ctx context.Context, n *model.Node) error {
 	_, err := a.db.Exec(ctx,
-		`INSERT INTO nodes (id, cluster_id, shard_id, hostname, ip_address, ip6_address, roles, grpc_address, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-		n.ID, n.ClusterID, n.ShardID, n.Hostname, n.IPAddress, n.IP6Address, n.Roles, n.GRPCAddress, n.Status, n.CreatedAt, n.UpdatedAt,
+		`INSERT INTO nodes (id, cluster_id, shard_id, hostname, ip_address, ip6_address, roles, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		n.ID, n.ClusterID, n.ShardID, n.Hostname, n.IPAddress, n.IP6Address, n.Roles, n.Status, n.CreatedAt, n.UpdatedAt,
 	)
 	return err
 }
 
-// CreateInfrastructureService inserts a new infrastructure service record.
-func (a *CoreDB) CreateInfrastructureService(ctx context.Context, svc *model.InfrastructureService) error {
-	_, err := a.db.Exec(ctx,
-		`INSERT INTO infrastructure_services (id, cluster_id, host_machine_id, service_type, container_id, container_name, image, config, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-		svc.ID, svc.ClusterID, svc.HostMachineID, svc.ServiceType, svc.ContainerID, svc.ContainerName, svc.Image, svc.Config, svc.Status, svc.CreatedAt, svc.UpdatedAt,
-	)
-	return err
-}
-
-// UpdateInfrastructureService updates an existing infrastructure service record.
-func (a *CoreDB) UpdateInfrastructureService(ctx context.Context, svc *model.InfrastructureService) error {
-	_, err := a.db.Exec(ctx,
-		`UPDATE infrastructure_services SET container_id = $1, container_name = $2, image = $3, config = $4, status = $5, updated_at = now()
-		 WHERE id = $6`,
-		svc.ContainerID, svc.ContainerName, svc.Image, svc.Config, svc.Status, svc.ID,
-	)
-	return err
-}
 
 // ListDatabasesByShard retrieves all databases assigned to a shard (excluding deleted).
 func (a *CoreDB) ListDatabasesByShard(ctx context.Context, shardID string) ([]model.Database, error) {

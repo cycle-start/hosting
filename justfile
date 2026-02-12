@@ -10,7 +10,7 @@ default:
 build:
     go build ./cmd/...
 
-# Build Docker images
+# Build Docker images (control plane only)
 build-docker:
     docker compose build
 
@@ -39,7 +39,7 @@ test-pkg pkg:
 test-integration:
     go test ./... -tags integration -count=1
 
-# Run e2e tests
+# Run e2e tests (requires VMs running)
 test-e2e:
     go test ./tests/e2e/... -tags e2e -count=1 -timeout 10m -v
 
@@ -58,7 +58,7 @@ vet:
 
 # --- Docker ---
 
-# Start all services
+# Start all control plane services
 up:
     docker compose up -d
 
@@ -128,13 +128,13 @@ migrate-status:
 
 # --- Local Development ---
 
-# Start infra, run migrations, then start platform services
+# Start Docker infra + control plane, run migrations, then create VMs
 dev: up-infra
     @echo "Waiting for databases to be ready..."
     @sleep 5
     just migrate
     @echo "Starting platform services..."
-    docker compose up -d core-api worker node-agent
+    docker compose up -d core-api worker
     @echo ""
     @echo "Services running:"
     @echo "  Core API:      http://localhost:8090"
@@ -147,40 +147,12 @@ dev: up-infra
     @echo "  Grafana:       http://localhost:3000"
     @echo "  Loki:          http://localhost:3100"
 
-# --- Node Images ---
-
-# Build all node role Docker images
-build-node-images:
-    docker build -t localhost:5000/hosting/web-node:latest -f docker/web-node.Dockerfile .
-    docker build -t localhost:5000/hosting/db-node:latest -f docker/db-node.Dockerfile .
-    docker build -t localhost:5000/hosting/dns-node:latest -f docker/dns-node.Dockerfile .
-    docker build -t localhost:5000/hosting/valkey-node:latest -f docker/valkey-node.Dockerfile .
-    docker build -t localhost:5000/hosting/email-node:latest -f docker/email-node.Dockerfile .
-
-# Push node images to local registry
-push-node-images:
-    docker push localhost:5000/hosting/web-node:latest
-    docker push localhost:5000/hosting/db-node:latest
-    docker push localhost:5000/hosting/dns-node:latest
-    docker push localhost:5000/hosting/valkey-node:latest
-    docker push localhost:5000/hosting/email-node:latest
-
-# Build and push node images
-build-push-node-images: build-node-images push-node-images
-
-# Full dev setup: start infra, migrate, build node images, push to registry
-dev-up: up-infra
-    @echo "Waiting for services to be healthy..."
-    sleep 10
-    just migrate
-    just build-push-node-images
-    docker compose up -d core-api worker
-    @echo ""
-    @echo "Ready! Bootstrap a cluster with:"
-    @echo "  go run ./cmd/hostctl cluster apply -f clusters/dev.yaml"
+# Full dev setup with VMs
+dev-vm: dev
+    just vm-up
 
 # Full dev setup + e2e tests
-dev-e2e: dev-up
+dev-e2e: dev-vm
     @echo "Running e2e tests..."
     just test-e2e
 
@@ -218,15 +190,15 @@ ceph-status:
 
 # Update HAProxy map entry (e.g. just lb-set www.example.com shard-web-a)
 lb-set fqdn backend:
-    echo "set map /var/lib/haproxy/maps/fqdn-to-shard.map {{fqdn}} {{backend}}" | docker compose exec -T haproxy socat stdio /var/run/haproxy/admin.sock
+    echo "set map /var/lib/haproxy/maps/fqdn-to-shard.map {{fqdn}} {{backend}}" | nc localhost 9999
 
 # Delete HAProxy map entry
 lb-del fqdn:
-    echo "del map /var/lib/haproxy/maps/fqdn-to-shard.map {{fqdn}}" | docker compose exec -T haproxy socat stdio /var/run/haproxy/admin.sock
+    echo "del map /var/lib/haproxy/maps/fqdn-to-shard.map {{fqdn}}" | nc localhost 9999
 
 # Show HAProxy map
 lb-show:
-    echo "show map /var/lib/haproxy/maps/fqdn-to-shard.map" | docker compose exec -T haproxy socat stdio /var/run/haproxy/admin.sock
+    echo "show map /var/lib/haproxy/maps/fqdn-to-shard.map" | nc localhost 9999
 
 # --- VM Infrastructure ---
 
@@ -237,7 +209,7 @@ build-node-agent:
 # Create VMs with Terraform and register them with the platform
 vm-up: build-node-agent
     cd terraform && terraform apply -auto-approve
-    go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml
+    go run ./cmd/hostctl cluster apply -f terraform/cluster.yaml
 
 # Destroy VMs
 vm-down:

@@ -155,32 +155,3 @@ func (h *Cluster) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Cluster) Provision(w http.ResponseWriter, r *http.Request) {
-	id, err := request.RequireID(chi.URLParam(r, "id"))
-	if err != nil {
-		response.WriteError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	if err := h.svc.Provision(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	w.WriteHeader(http.StatusAccepted)
-}
-
-func (h *Cluster) Decommission(w http.ResponseWriter, r *http.Request) {
-	id, err := request.RequireID(chi.URLParam(r, "id"))
-	if err != nil {
-		response.WriteError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	if err := h.svc.Decommission(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	w.WriteHeader(http.StatusAccepted)
-}

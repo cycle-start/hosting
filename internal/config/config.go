@@ -9,9 +9,8 @@ type Config struct {
 	ServiceDatabaseURL string
 	TemporalAddress    string
 	HTTPListenAddr     string
-	MySQLDSN           string
-	Deployer           string
-	RegistryURL        string
+	MySQLDSN    string
+	RegistryURL string
 	LogLevel           string
 	StalwartAdminToken string
 	// NodeID is the unique identifier for this node when running as a Temporal worker.
@@ -25,9 +24,8 @@ func Load() (*Config, error) {
 		ServiceDatabaseURL: getEnv("SERVICE_DATABASE_URL", ""),
 		TemporalAddress:    getEnv("TEMPORAL_ADDRESS", "localhost:7233"),
 		HTTPListenAddr:     getEnv("HTTP_LISTEN_ADDR", ":8090"),
-		MySQLDSN:           getEnv("MYSQL_DSN", ""),
-		Deployer:           getEnv("DEPLOYER", "docker"),
-		RegistryURL:        getEnv("REGISTRY_URL", "registry.localhost:5000"),
+		MySQLDSN:    getEnv("MYSQL_DSN", ""),
+		RegistryURL: getEnv("REGISTRY_URL", "registry.localhost:5000"),
 		LogLevel:           getEnv("LOG_LEVEL", "info"),
 		StalwartAdminToken: getEnv("STALWART_ADMIN_TOKEN", ""),
 		NodeID:             getEnv("NODE_ID", ""),

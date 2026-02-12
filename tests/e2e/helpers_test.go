@@ -3,104 +3,112 @@
 package e2e
 
 import (
-	"bytes"
-	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/stdcopy"
 )
 
-// findAllContainersByEnv finds all running containers that have the given
-// environment variable set to the given value.
-func findAllContainersByEnv(ctx context.Context, t *testing.T, key, value string) []string {
+const coreAPIURL = "http://localhost:8090/api/v1"
+
+// sshExec runs a command on a VM via SSH and returns stdout.
+func sshExec(t *testing.T, ip string, cmd string) string {
 	t.Helper()
 
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		t.Fatalf("create docker client: %v", err)
-	}
-	defer cli.Close()
-
-	containers, err := cli.ContainerList(ctx, container.ListOptions{All: false})
-	if err != nil {
-		t.Fatalf("list containers: %v", err)
+	keyPath := os.Getenv("SSH_KEY_PATH")
+	if keyPath == "" {
+		keyPath = os.ExpandEnv("${HOME}/.ssh/hosting-dev")
 	}
 
-	target := key + "=" + value
-	var ids []string
-	for _, c := range containers {
-		info, err := cli.ContainerInspect(ctx, c.ID)
-		if err != nil {
+	args := []string{
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "UserKnownHostsFile=/dev/null",
+		"-o", "ConnectTimeout=10",
+		"-i", keyPath,
+		"ubuntu@" + ip,
+		cmd,
+	}
+	out, err := exec.Command("ssh", args...).CombinedOutput()
+	if err != nil {
+		t.Fatalf("ssh %s %q: %v\n%s", ip, cmd, err, string(out))
+	}
+	return string(out)
+}
+
+// findNodeIPs queries the core API for node IPs matching a shard role.
+func findNodeIPs(t *testing.T, clusterName, role string) []string {
+	t.Helper()
+
+	// Find cluster ID by listing regions/clusters
+	resp, body, err := httpGetWithHost(coreAPIURL+"/regions", "")
+	if err != nil || resp.StatusCode != 200 {
+		t.Fatalf("list regions: %v (status=%d body=%s)", err, resp.StatusCode, body)
+	}
+
+	var regions []struct {
+		ID string `json:"id"`
+	}
+	json.Unmarshal([]byte(body), &regions)
+
+	var clusterID string
+	for _, r := range regions {
+		cResp, cBody, err := httpGetWithHost(fmt.Sprintf("%s/regions/%s/clusters", coreAPIURL, r.ID), "")
+		if err != nil || cResp.StatusCode != 200 {
 			continue
 		}
-		for _, env := range info.Config.Env {
-			if env == target {
-				ids = append(ids, c.ID)
+		var clusters []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		}
+		json.Unmarshal([]byte(cBody), &clusters)
+		for _, c := range clusters {
+			if c.Name == clusterName {
+				clusterID = c.ID
+				break
+			}
+		}
+		if clusterID != "" {
+			break
+		}
+	}
+	if clusterID == "" {
+		t.Fatalf("cluster %q not found", clusterName)
+	}
+
+	// List nodes in the cluster
+	nResp, nBody, err := httpGetWithHost(fmt.Sprintf("%s/clusters/%s/nodes", coreAPIURL, clusterID), "")
+	if err != nil || nResp.StatusCode != 200 {
+		t.Fatalf("list nodes: %v", err)
+	}
+
+	var nodes []struct {
+		IPAddress *string  `json:"ip_address"`
+		Roles     []string `json:"roles"`
+	}
+	json.Unmarshal([]byte(nBody), &nodes)
+
+	var ips []string
+	for _, n := range nodes {
+		if n.IPAddress == nil {
+			continue
+		}
+		for _, r := range n.Roles {
+			if r == role {
+				ips = append(ips, *n.IPAddress)
 				break
 			}
 		}
 	}
 
-	if len(ids) == 0 {
-		t.Fatalf("no running container with %s=%s", key, value)
+	if len(ips) == 0 {
+		t.Fatalf("no nodes with role %q found in cluster %q", role, clusterName)
 	}
-	return ids
-}
-
-// findContainerByEnv finds the first running container that has the given
-// environment variable set to the given value.
-func findContainerByEnv(ctx context.Context, t *testing.T, key, value string) string {
-	t.Helper()
-	ids := findAllContainersByEnv(ctx, t, key, value)
-	return ids[0]
-}
-
-// execInContainer runs a command inside a container and returns stdout.
-func execInContainer(ctx context.Context, t *testing.T, containerID string, cmd []string) string {
-	t.Helper()
-
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		t.Fatalf("create docker client: %v", err)
-	}
-	defer cli.Close()
-
-	execID, err := cli.ContainerExecCreate(ctx, containerID, container.ExecOptions{
-		Cmd:          cmd,
-		AttachStdout: true,
-		AttachStderr: true,
-	})
-	if err != nil {
-		t.Fatalf("exec create: %v", err)
-	}
-
-	resp, err := cli.ContainerExecAttach(ctx, execID.ID, container.ExecAttachOptions{})
-	if err != nil {
-		t.Fatalf("exec attach: %v", err)
-	}
-	defer resp.Close()
-
-	var stdout, stderr bytes.Buffer
-	if _, err := stdcopy.StdCopy(&stdout, &stderr, resp.Reader); err != nil {
-		t.Fatalf("exec read output: %v", err)
-	}
-
-	inspectResp, err := cli.ContainerExecInspect(ctx, execID.ID)
-	if err != nil {
-		t.Fatalf("exec inspect: %v", err)
-	}
-	if inspectResp.ExitCode != 0 {
-		t.Fatalf("exec exited %d: stdout=%s stderr=%s", inspectResp.ExitCode, stdout.String(), stderr.String())
-	}
-
-	return stdout.String()
+	return ips
 }
 
 // noRedirectClient is an HTTP client that does not follow redirects.

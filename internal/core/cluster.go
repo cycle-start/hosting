@@ -5,20 +5,14 @@ import (
 	"fmt"
 
 	"github.com/edvin/hosting/internal/model"
-	temporalclient "go.temporal.io/sdk/client"
 )
 
 type ClusterService struct {
 	db DB
-	tc temporalclient.Client
 }
 
-func NewClusterService(db DB, tc ...temporalclient.Client) *ClusterService {
-	s := &ClusterService{db: db}
-	if len(tc) > 0 {
-		s.tc = tc[0]
-	}
-	return s
+func NewClusterService(db DB, tc ...any) *ClusterService {
+	return &ClusterService{db: db}
 }
 
 func (s *ClusterService) Create(ctx context.Context, cluster *model.Cluster) error {
@@ -92,26 +86,3 @@ func (s *ClusterService) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *ClusterService) Provision(ctx context.Context, id string) error {
-	workflowID := fmt.Sprintf("cluster-provision-%s", id)
-	_, err := s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "ProvisionClusterWorkflow", id)
-	if err != nil {
-		return fmt.Errorf("start ProvisionClusterWorkflow: %w", err)
-	}
-	return nil
-}
-
-func (s *ClusterService) Decommission(ctx context.Context, id string) error {
-	workflowID := fmt.Sprintf("cluster-decommission-%s", id)
-	_, err := s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "DecommissionClusterWorkflow", id)
-	if err != nil {
-		return fmt.Errorf("start DecommissionClusterWorkflow: %w", err)
-	}
-	return nil
-}

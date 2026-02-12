@@ -52,49 +52,11 @@ func ClusterApply(configPath string, timeout time.Duration) error {
 		fmt.Printf("Cluster %q: %s (exists)\n", cfg.Cluster.Name, clusterID)
 	}
 
-	// 3. Register node profiles
-	for _, p := range cfg.NodeProfiles {
-		profileID, err := findOrCreateNodeProfile(client, p)
-		if err != nil {
-			return fmt.Errorf("node profile %q: %w", p.Name, err)
-		}
-		fmt.Printf("Node profile %q (role=%s): %s\n", p.Name, p.Role, profileID)
-	}
-
-	// 4. Register host machines
-	for _, h := range cfg.Hosts {
-		hostID, err := findOrCreateHost(client, clusterID, h)
-		if err != nil {
-			return fmt.Errorf("host %q: %w", h.Hostname, err)
-		}
-		fmt.Printf("Host %q: %s\n", h.Hostname, hostID)
-	}
-
-	if cfg.Cluster.Provisioner == "external" {
-		// External provisioner: nodes are managed outside (e.g. Terraform VMs).
-		// Create nodes via API with pre-assigned IDs and set them active immediately.
-		return applyExternalNodes(client, clusterID, cfg.Cluster)
-	}
-
-	// 5. Provision cluster (Docker provisioner)
-	fmt.Println("Provisioning cluster...")
-	_, err = client.Post(fmt.Sprintf("/clusters/%s/provision", clusterID), nil)
-	if err != nil {
-		return fmt.Errorf("provision cluster: %w", err)
-	}
-
-	// 6. Wait for cluster to become active
-	fmt.Printf("Waiting for cluster (timeout: %s)...\n", timeout)
-	if err := client.WaitForStatus(fmt.Sprintf("/clusters/%s", clusterID), "active", timeout); err != nil {
-		return fmt.Errorf("wait for cluster: %w", err)
-	}
-	fmt.Println("Cluster is active!")
-
-	// 7. Print summary
-	return printClusterSummary(client, clusterID)
+	// 3. Apply nodes (create via API with shard assignment, converge)
+	return applyNodes(client, clusterID, cfg.Cluster)
 }
 
-func applyExternalNodes(client *Client, clusterID string, def ClusterDef) error {
+func applyNodes(client *Client, clusterID string, def ClusterDef) error {
 	// Build shard name -> shard ID map.
 	resp, err := client.Get(fmt.Sprintf("/clusters/%s/shards", clusterID))
 	if err != nil {
@@ -112,8 +74,8 @@ func applyExternalNodes(client *Client, clusterID string, def ClusterDef) error 
 		shardMap[s.Name] = s.ID
 	}
 
-	// For each external node, ensure it exists with the correct shard assignment.
-	for _, node := range def.ExternalNodes {
+	// For each node, ensure it exists with the correct shard assignment.
+	for _, node := range def.Nodes {
 		shardID, ok := shardMap[node.ShardName]
 		if !ok {
 			return fmt.Errorf("shard %q not found for node %s", node.ShardName, node.ID)
@@ -122,7 +84,7 @@ func applyExternalNodes(client *Client, clusterID string, def ClusterDef) error 
 		// Try to find existing node by ID.
 		_, err := client.Get(fmt.Sprintf("/nodes/%s", node.ID))
 		if err == nil {
-			fmt.Printf("External node %s: exists (shard=%s)\n", node.ID, node.ShardName)
+			fmt.Printf("Node %s: exists (shard=%s)\n", node.ID, node.ShardName)
 			continue
 		}
 
@@ -133,14 +95,14 @@ func applyExternalNodes(client *Client, clusterID string, def ClusterDef) error 
 			"status":   "active",
 		})
 		if err != nil {
-			return fmt.Errorf("create external node %s: %w", node.ID, err)
+			return fmt.Errorf("create node %s: %w", node.ID, err)
 		}
-		fmt.Printf("External node %s: created (shard=%s, ip=%s)\n", node.ID, node.ShardName, node.IPAddress)
+		fmt.Printf("Node %s: created (shard=%s, ip=%s)\n", node.ID, node.ShardName, node.IPAddress)
 	}
 
-	// Trigger convergence for each shard that has external nodes.
+	// Trigger convergence for each shard that has nodes.
 	convergedShards := make(map[string]bool)
-	for _, node := range def.ExternalNodes {
+	for _, node := range def.Nodes {
 		shardID := shardMap[node.ShardName]
 		if convergedShards[shardID] {
 			continue
@@ -154,7 +116,7 @@ func applyExternalNodes(client *Client, clusterID string, def ClusterDef) error 
 		}
 	}
 
-	fmt.Println("External nodes applied!")
+	fmt.Println("Nodes applied!")
 	return printClusterSummary(client, clusterID)
 }
 
@@ -228,82 +190,6 @@ func findOrCreateCluster(client *Client, regionID string, def ClusterDef) (strin
 
 	id, err = extractID(resp)
 	return id, true, err
-}
-
-func findOrCreateHost(client *Client, clusterID string, def HostDef) (string, error) {
-	id, err := client.FindHostByHostname(clusterID, def.Hostname)
-	if err == nil {
-		return id, nil
-	}
-
-	body := map[string]any{
-		"hostname":    def.Hostname,
-		"ip_address":  def.IPAddress,
-		"docker_host": def.DockerHost,
-	}
-	if def.Capacity.MaxNodes > 0 {
-		body["capacity"] = map[string]any{
-			"max_nodes": def.Capacity.MaxNodes,
-		}
-	}
-	if len(def.Roles) > 0 {
-		body["roles"] = def.Roles
-	}
-
-	resp, err := client.Post(fmt.Sprintf("/clusters/%s/hosts", clusterID), body)
-	if err != nil {
-		return "", err
-	}
-
-	return extractID(resp)
-}
-
-func findOrCreateNodeProfile(client *Client, def NodeProfileDef) (string, error) {
-	id, err := client.findByName("/node-profiles", def.Name)
-	if err == nil {
-		return id, nil
-	}
-
-	body := map[string]any{
-		"name":  def.Name,
-		"role":  def.Role,
-		"image": def.Image,
-	}
-	if def.Env != nil {
-		body["env"] = def.Env
-	}
-	if len(def.Volumes) > 0 {
-		body["volumes"] = def.Volumes
-	}
-	if len(def.Ports) > 0 {
-		ports := make([]map[string]int, len(def.Ports))
-		for i, p := range def.Ports {
-			ports[i] = map[string]int{"host": p.Host, "container": p.Container}
-		}
-		body["ports"] = ports
-	}
-	if def.Resources != (ResourcesDef{}) {
-		body["resources"] = map[string]any{
-			"memory_mb":  def.Resources.MemoryMB,
-			"cpu_shares": def.Resources.CPUShares,
-		}
-	}
-	if def.HealthCheck != nil {
-		body["health_check"] = def.HealthCheck
-	}
-	if def.Privileged {
-		body["privileged"] = true
-	}
-	if def.NetworkMode != "" {
-		body["network_mode"] = def.NetworkMode
-	}
-
-	resp, err := client.Post("/node-profiles", body)
-	if err != nil {
-		return "", err
-	}
-
-	return extractID(resp)
 }
 
 func printClusterSummary(client *Client, clusterID string) error {

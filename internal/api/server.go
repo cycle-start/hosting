@@ -74,8 +74,6 @@ func (s *Server) setupRoutes() {
 		r.Get("/clusters/{id}", cluster.Get)
 		r.Put("/clusters/{id}", cluster.Update)
 		r.Delete("/clusters/{id}", cluster.Delete)
-		r.Post("/clusters/{id}/provision", cluster.Provision)
-		r.Post("/clusters/{id}/decommission", cluster.Decommission)
 
 		// Cluster LB addresses
 		clusterLBAddress := handler.NewClusterLBAddressHandler(s.services.ClusterLBAddress)
@@ -93,14 +91,6 @@ func (s *Server) setupRoutes() {
 		r.Delete("/shards/{id}", shard.Delete)
 		r.Post("/shards/{id}/converge", shard.Converge)
 
-		// Host machines
-		hostMachine := handler.NewHostMachine(s.services.HostMachine)
-		r.Get("/clusters/{clusterID}/hosts", hostMachine.ListByCluster)
-		r.Post("/clusters/{clusterID}/hosts", hostMachine.Create)
-		r.Get("/hosts/{id}", hostMachine.Get)
-		r.Put("/hosts/{id}", hostMachine.Update)
-		r.Delete("/hosts/{id}", hostMachine.Delete)
-
 		// Nodes
 		node := handler.NewNode(s.services.Node)
 		r.Get("/clusters/{clusterID}/nodes", node.ListByCluster)
@@ -108,21 +98,6 @@ func (s *Server) setupRoutes() {
 		r.Get("/nodes/{id}", node.Get)
 		r.Put("/nodes/{id}", node.Update)
 		r.Delete("/nodes/{id}", node.Delete)
-		r.Post("/nodes/{id}/provision", node.Provision)
-		r.Post("/nodes/{id}/decommission", node.Decommission)
-
-		// Node profiles
-		nodeProfile := handler.NewNodeProfile(s.services.NodeProfile)
-		r.Get("/node-profiles", nodeProfile.List)
-		r.Post("/node-profiles", nodeProfile.Create)
-		r.Get("/node-profiles/{id}", nodeProfile.Get)
-		r.Put("/node-profiles/{id}", nodeProfile.Update)
-		r.Delete("/node-profiles/{id}", nodeProfile.Delete)
-
-		// Node deployments
-		nodeDeployment := handler.NewNodeDeployment(s.services.NodeDeployment)
-		r.Get("/nodes/{nodeID}/deployment", nodeDeployment.GetByNode)
-		r.Get("/hosts/{hostID}/deployments", nodeDeployment.ListByHost)
 
 		// Tenants
 		tenant := handler.NewTenant(s.services.Tenant)
