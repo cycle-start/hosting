@@ -1,9 +1,13 @@
 # Binaries
+/bin/
 /core-api
 /worker
 /node-agent
 /hostctl
 *.exe
+
+# Local cluster state
+/clusters/
 
 # IDE
 .idea/
