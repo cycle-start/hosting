@@ -255,13 +255,10 @@ services:
         condition: service_healthy
       temporal:
         condition: service_started
-      node-agent:
-        condition: service_started
     environment:
       - CORE_DATABASE_URL=postgres://hosting:hosting@core-db:5432/hosting_core
       - SERVICE_DATABASE_URL=postgres://hosting:hosting@service-db:5432/hosting_service
       - TEMPORAL_ADDRESS=temporal:7233
-      - NODE_AGENT_ADDR=node-agent:9090
       - REGISTRY_URL=registry:5000
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -273,16 +270,15 @@ services:
       dockerfile: docker/node-agent.Dockerfile
     privileged: true
     depends_on:
-      service-db:
-        condition: service_healthy
+      temporal:
+        condition: service_started
       mysql:
         condition: service_healthy
     environment:
-      - SERVICE_DATABASE_URL=postgres://hosting:hosting@service-db:5432/hosting_service
+      - TEMPORAL_ADDRESS=temporal:7233
+      - NODE_ID=dev-node-1
+      - SHARD_NAME=web-1
       - MYSQL_DSN=root:rootpassword@tcp(mysql:3306)/
-      - GRPC_LISTEN_ADDR=:9090
-    ports:
-      - "9090:9090"
 
 volumes:
   core-db-data:

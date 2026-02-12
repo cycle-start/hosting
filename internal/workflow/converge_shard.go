@@ -34,21 +34,15 @@ func ConvergeShardWorkflow(ctx workflow.Context, params ConvergeShardParams) err
 		return fmt.Errorf("get shard: %w", err)
 	}
 
-	// List all nodes in the shard and filter to those with a gRPC address.
-	var allNodes []model.Node
-	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", params.ShardID).Get(ctx, &allNodes)
+	// List all nodes in the shard.
+	var nodes []model.Node
+	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", params.ShardID).Get(ctx, &nodes)
 	if err != nil {
 		return fmt.Errorf("list nodes: %w", err)
 	}
 
-	var nodes []model.Node
-	for _, n := range allNodes {
-		if n.GRPCAddress != "" {
-			nodes = append(nodes, n)
-		}
-	}
 	if len(nodes) == 0 {
-		return fmt.Errorf("shard %s has no active nodes with gRPC addresses", params.ShardID)
+		return fmt.Errorf("shard %s has no nodes", params.ShardID)
 	}
 
 	switch shard.Role {
@@ -79,14 +73,12 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 
 		// Create tenant on each node.
 		for _, node := range nodes {
-			err = workflow.ExecuteActivity(ctx, "CreateTenantOnNode", activity.CreateTenantOnNodeParams{
-				NodeAddress: node.GRPCAddress,
-				Tenant: activity.CreateTenantParams{
-					ID:          tenant.ID,
-					Name:        tenant.Name,
-					UID:         tenant.UID,
-					SFTPEnabled: tenant.SFTPEnabled,
-				},
+			nodeCtx := nodeActivityCtx(ctx, node.ID)
+			err = workflow.ExecuteActivity(nodeCtx, "CreateTenant", activity.CreateTenantParams{
+				ID:          tenant.ID,
+				Name:        tenant.Name,
+				UID:         tenant.UID,
+				SFTPEnabled: tenant.SFTPEnabled,
 			}).Get(ctx, nil)
 			if err != nil {
 				return fmt.Errorf("create tenant %s on node %s: %w", tenant.ID, node.ID, err)
@@ -126,18 +118,16 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 
 			// Create webroot on each node.
 			for _, node := range nodes {
-				err = workflow.ExecuteActivity(ctx, "CreateWebrootOnNode", activity.CreateWebrootOnNodeParams{
-					NodeAddress: node.GRPCAddress,
-					Webroot: activity.CreateWebrootParams{
-						ID:             webroot.ID,
-						TenantName:     tenant.Name,
-						Name:           webroot.Name,
-						Runtime:        webroot.Runtime,
-						RuntimeVersion: webroot.RuntimeVersion,
-						RuntimeConfig:  string(webroot.RuntimeConfig),
-						PublicFolder:   webroot.PublicFolder,
-						FQDNs:          fqdnParams,
-					},
+				nodeCtx := nodeActivityCtx(ctx, node.ID)
+				err = workflow.ExecuteActivity(nodeCtx, "CreateWebroot", activity.CreateWebrootParams{
+					ID:             webroot.ID,
+					TenantName:     tenant.Name,
+					Name:           webroot.Name,
+					Runtime:        webroot.Runtime,
+					RuntimeVersion: webroot.RuntimeVersion,
+					RuntimeConfig:  string(webroot.RuntimeConfig),
+					PublicFolder:   webroot.PublicFolder,
+					FQDNs:          fqdnParams,
 				}).Get(ctx, nil)
 				if err != nil {
 					return fmt.Errorf("create webroot %s on node %s: %w", webroot.ID, node.ID, err)
@@ -148,7 +138,8 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 
 	// Reload nginx on all nodes.
 	for _, node := range nodes {
-		err := workflow.ExecuteActivity(ctx, "ReloadNginxOnNode", node.GRPCAddress).Get(ctx, nil)
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		err := workflow.ExecuteActivity(nodeCtx, "ReloadNginx").Get(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("reload nginx on node %s: %w", node.ID, err)
 		}
@@ -172,10 +163,8 @@ func convergeDatabaseShard(ctx workflow.Context, shardID string, nodes []model.N
 
 		// Create database on each node.
 		for _, node := range nodes {
-			err = workflow.ExecuteActivity(ctx, "CreateDatabaseOnNode", activity.CreateDatabaseOnNodeParams{
-				NodeAddress: node.GRPCAddress,
-				Name:        database.Name,
-			}).Get(ctx, nil)
+			nodeCtx := nodeActivityCtx(ctx, node.ID)
+			err = workflow.ExecuteActivity(nodeCtx, "CreateDatabase", database.Name).Get(ctx, nil)
 			if err != nil {
 				return fmt.Errorf("create database %s on node %s: %w", database.ID, node.ID, err)
 			}
@@ -195,14 +184,12 @@ func convergeDatabaseShard(ctx workflow.Context, shardID string, nodes []model.N
 
 			// Create user on each node.
 			for _, node := range nodes {
-				err = workflow.ExecuteActivity(ctx, "CreateDatabaseUserOnNode", activity.CreateDatabaseUserOnNodeParams{
-					NodeAddress: node.GRPCAddress,
-					User: activity.CreateDatabaseUserParams{
-						DatabaseName: database.Name,
-						Username:     user.Username,
-						Password:     user.Password,
-						Privileges:   user.Privileges,
-					},
+				nodeCtx := nodeActivityCtx(ctx, node.ID)
+				err = workflow.ExecuteActivity(nodeCtx, "CreateDatabaseUser", activity.CreateDatabaseUserParams{
+					DatabaseName: database.Name,
+					Username:     user.Username,
+					Password:     user.Password,
+					Privileges:   user.Privileges,
 				}).Get(ctx, nil)
 				if err != nil {
 					return fmt.Errorf("create db user %s on node %s: %w", user.ID, node.ID, err)
@@ -229,14 +216,12 @@ func convergeValkeyShard(ctx workflow.Context, shardID string, nodes []model.Nod
 
 		// Create instance on each node.
 		for _, node := range nodes {
-			err = workflow.ExecuteActivity(ctx, "CreateValkeyInstanceOnNode", activity.CreateValkeyInstanceOnNodeParams{
-				NodeAddress: node.GRPCAddress,
-				Instance: activity.CreateValkeyInstanceParams{
-					Name:        instance.Name,
-					Port:        instance.Port,
-					Password:    instance.Password,
-					MaxMemoryMB: instance.MaxMemoryMB,
-				},
+			nodeCtx := nodeActivityCtx(ctx, node.ID)
+			err = workflow.ExecuteActivity(nodeCtx, "CreateValkeyInstance", activity.CreateValkeyInstanceParams{
+				Name:        instance.Name,
+				Port:        instance.Port,
+				Password:    instance.Password,
+				MaxMemoryMB: instance.MaxMemoryMB,
 			}).Get(ctx, nil)
 			if err != nil {
 				return fmt.Errorf("create valkey instance %s on node %s: %w", instance.ID, node.ID, err)
@@ -257,16 +242,14 @@ func convergeValkeyShard(ctx workflow.Context, shardID string, nodes []model.Nod
 
 			// Create user on each node.
 			for _, node := range nodes {
-				err = workflow.ExecuteActivity(ctx, "CreateValkeyUserOnNode", activity.CreateValkeyUserOnNodeParams{
-					NodeAddress: node.GRPCAddress,
-					User: activity.CreateValkeyUserParams{
-						InstanceName: instance.Name,
-						Port:         instance.Port,
-						Username:     user.Username,
-						Password:     user.Password,
-						Privileges:   user.Privileges,
-						KeyPattern:   user.KeyPattern,
-					},
+				nodeCtx := nodeActivityCtx(ctx, node.ID)
+				err = workflow.ExecuteActivity(nodeCtx, "CreateValkeyUser", activity.CreateValkeyUserParams{
+					InstanceName: instance.Name,
+					Port:         instance.Port,
+					Username:     user.Username,
+					Password:     user.Password,
+					Privileges:   user.Privileges,
+					KeyPattern:   user.KeyPattern,
 				}).Get(ctx, nil)
 				if err != nil {
 					return fmt.Errorf("create valkey user %s on node %s: %w", user.ID, node.ID, err)

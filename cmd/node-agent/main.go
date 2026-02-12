@@ -1,17 +1,15 @@
 package main
 
 import (
-	"net"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc"
+	temporalclient "go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/worker"
 
+	"github.com/edvin/hosting/internal/activity"
 	"github.com/edvin/hosting/internal/agent"
 	"github.com/edvin/hosting/internal/config"
-	agentv1 "github.com/edvin/hosting/proto/agent/v1"
 )
 
 func main() {
@@ -20,6 +18,10 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to load config")
+	}
+
+	if cfg.NodeID == "" {
+		logger.Fatal().Msg("NODE_ID is required")
 	}
 
 	agentCfg := agent.Config{
@@ -36,27 +38,36 @@ func main() {
 
 	srv := agent.NewServer(logger, agentCfg)
 
-	grpcServer := grpc.NewServer()
-	agentv1.RegisterNodeAgentServer(grpcServer, srv)
-
-	lis, err := net.Listen("tcp", cfg.GRPCListenAddr)
+	tc, err := temporalclient.Dial(temporalclient.Options{
+		HostPort: cfg.TemporalAddress,
+	})
 	if err != nil {
-		logger.Fatal().Err(err).Str("addr", cfg.GRPCListenAddr).Msg("failed to listen")
+		logger.Fatal().Err(err).Msg("failed to connect to temporal")
 	}
+	defer tc.Close()
 
-	go func() {
-		logger.Info().Str("addr", cfg.GRPCListenAddr).Msg("starting node agent gRPC server")
-		if err := grpcServer.Serve(lis); err != nil {
-			logger.Fatal().Err(err).Msg("grpc server failed")
-		}
-	}()
+	taskQueue := "node-" + cfg.NodeID
+	w := worker.New(tc, taskQueue, worker.Options{})
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	nodeActs := activity.NewNodeLocal(
+		logger,
+		srv.TenantManager(),
+		srv.WebrootManager(),
+		srv.NginxManager(),
+		srv.DatabaseManager(),
+		srv.ValkeyManager(),
+		srv.Runtimes(),
+	)
+	w.RegisterActivity(nodeActs)
 
-	logger.Info().Msg("shutting down node agent")
-	grpcServer.GracefulStop()
+	logger.Info().
+		Str("nodeID", cfg.NodeID).
+		Str("taskQueue", taskQueue).
+		Msg("starting node agent temporal worker")
+
+	if err := w.Run(worker.InterruptCh()); err != nil {
+		logger.Fatal().Err(err).Msg("worker failed")
+	}
 }
 
 func getEnv(key, fallback string) string {

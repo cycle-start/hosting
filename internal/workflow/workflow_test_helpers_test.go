@@ -13,8 +13,7 @@ import (
 // serialization/deserialization of activity parameters and return values.
 func registerActivities(env *testsuite.TestWorkflowEnvironment) {
 	env.RegisterActivity(&activity.CoreDB{})
-	env.RegisterActivity(&activity.NodeGRPC{})
-	env.RegisterActivity(&activity.NodeGRPCDynamic{})
+	env.RegisterActivity(&activity.NodeLocal{})
 	env.RegisterActivity(&activity.ServiceDB{})
 	env.RegisterActivity(&activity.DNS{})
 	env.RegisterActivity(&activity.CertificateActivity{})

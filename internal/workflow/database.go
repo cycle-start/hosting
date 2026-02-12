@@ -54,13 +54,8 @@ func CreateDatabaseWorkflow(ctx workflow.Context, databaseID string) error {
 
 	// Create database on each node in the shard.
 	for _, node := range nodes {
-		if node.GRPCAddress == "" {
-			continue
-		}
-		err = workflow.ExecuteActivity(ctx, "CreateDatabaseOnNode", activity.CreateDatabaseOnNodeParams{
-			NodeAddress: node.GRPCAddress,
-			Name:        database.Name,
-		}).Get(ctx, nil)
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		err = workflow.ExecuteActivity(nodeCtx, "CreateDatabase", database.Name).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "databases", databaseID)
 			return err
@@ -103,11 +98,27 @@ func DeleteDatabaseWorkflow(ctx workflow.Context, databaseID string) error {
 		return err
 	}
 
-	// Delete database on node agent.
-	err = workflow.ExecuteActivity(ctx, "DeleteDatabase", database.Name).Get(ctx, nil)
+	// Look up nodes in the database's shard.
+	if database.ShardID == nil {
+		_ = setResourceFailed(ctx, "databases", databaseID)
+		return fmt.Errorf("database %s has no shard assigned", databaseID)
+	}
+
+	var nodes []model.Node
+	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *database.ShardID).Get(ctx, &nodes)
 	if err != nil {
 		_ = setResourceFailed(ctx, "databases", databaseID)
 		return err
+	}
+
+	// Delete database on each node in the shard.
+	for _, node := range nodes {
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		err = workflow.ExecuteActivity(nodeCtx, "DeleteDatabase", database.Name).Get(ctx, nil)
+		if err != nil {
+			_ = setResourceFailed(ctx, "databases", databaseID)
+			return err
+		}
 	}
 
 	// Set status to deleted.

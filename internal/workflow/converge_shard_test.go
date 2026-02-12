@@ -38,8 +38,8 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 		Role: model.ShardRoleWeb,
 	}
 	nodes := []model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
-		{ID: "node-2", GRPCAddress: "node2:9090"},
+		{ID: "node-1"},
+		{ID: "node-2"},
 	}
 	tenants := []model.Tenant{
 		{ID: "tenant-1", Name: "example", ShardID: &tenantShardID, UID: 1000, SFTPEnabled: true, Status: model.StatusActive},
@@ -55,42 +55,24 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("ListTenantsByShard", mock.Anything, shardID).Return(tenants, nil)
 
-	// CreateTenantOnNode for each node
-	s.env.OnActivity("CreateTenantOnNode", mock.Anything, activity.CreateTenantOnNodeParams{
-		NodeAddress: "node1:9090",
-		Tenant:      activity.CreateTenantParams{ID: "tenant-1", Name: "example", UID: 1000, SFTPEnabled: true},
-	}).Return(nil)
-	s.env.OnActivity("CreateTenantOnNode", mock.Anything, activity.CreateTenantOnNodeParams{
-		NodeAddress: "node2:9090",
-		Tenant:      activity.CreateTenantParams{ID: "tenant-1", Name: "example", UID: 1000, SFTPEnabled: true},
+	// CreateTenant for each node
+	s.env.OnActivity("CreateTenant", mock.Anything, activity.CreateTenantParams{
+		ID: "tenant-1", Name: "example", UID: 1000, SFTPEnabled: true,
 	}).Return(nil)
 
 	s.env.OnActivity("ListWebrootsByTenantID", mock.Anything, "tenant-1").Return(webroots, nil)
 	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, "wr-1").Return(fqdns, nil)
 
-	// CreateWebrootOnNode for each node
-	s.env.OnActivity("CreateWebrootOnNode", mock.Anything, activity.CreateWebrootOnNodeParams{
-		NodeAddress: "node1:9090",
-		Webroot: activity.CreateWebrootParams{
-			ID: "wr-1", TenantName: "example", Name: "main",
-			Runtime: "php", RuntimeVersion: "8.5", RuntimeConfig: "{}",
-			PublicFolder: "public",
-			FQDNs:        []activity.FQDNParam{{FQDN: "example.com", WebrootID: "wr-1", SSLEnabled: true}},
-		},
-	}).Return(nil)
-	s.env.OnActivity("CreateWebrootOnNode", mock.Anything, activity.CreateWebrootOnNodeParams{
-		NodeAddress: "node2:9090",
-		Webroot: activity.CreateWebrootParams{
-			ID: "wr-1", TenantName: "example", Name: "main",
-			Runtime: "php", RuntimeVersion: "8.5", RuntimeConfig: "{}",
-			PublicFolder: "public",
-			FQDNs:        []activity.FQDNParam{{FQDN: "example.com", WebrootID: "wr-1", SSLEnabled: true}},
-		},
+	// CreateWebroot for each node
+	s.env.OnActivity("CreateWebroot", mock.Anything, activity.CreateWebrootParams{
+		ID: "wr-1", TenantName: "example", Name: "main",
+		Runtime: "php", RuntimeVersion: "8.5", RuntimeConfig: "{}",
+		PublicFolder: "public",
+		FQDNs:        []activity.FQDNParam{{FQDN: "example.com", WebrootID: "wr-1", SSLEnabled: true}},
 	}).Return(nil)
 
-	// ReloadNginxOnNode for each node
-	s.env.OnActivity("ReloadNginxOnNode", mock.Anything, "node1:9090").Return(nil)
-	s.env.OnActivity("ReloadNginxOnNode", mock.Anything, "node2:9090").Return(nil)
+	// ReloadNginx for each node
+	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
 
 	s.env.ExecuteWorkflow(ConvergeShardWorkflow, ConvergeShardParams{ShardID: shardID})
 	s.True(s.env.IsWorkflowCompleted())
@@ -104,7 +86,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestDatabaseShard() {
 		Role: model.ShardRoleDatabase,
 	}
 	nodes := []model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
+		{ID: "node-1"},
 	}
 	databases := []model.Database{
 		{ID: "db-1", Name: "mydb", ShardID: &shardID, Status: model.StatusActive},
@@ -116,19 +98,13 @@ func (s *ConvergeShardWorkflowTestSuite) TestDatabaseShard() {
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("ListDatabasesByShard", mock.Anything, shardID).Return(databases, nil)
-	s.env.OnActivity("CreateDatabaseOnNode", mock.Anything, activity.CreateDatabaseOnNodeParams{
-		NodeAddress: "node1:9090",
-		Name:        "mydb",
-	}).Return(nil)
+	s.env.OnActivity("CreateDatabase", mock.Anything, "mydb").Return(nil)
 	s.env.OnActivity("ListDatabaseUsersByDatabaseID", mock.Anything, "db-1").Return(users, nil)
-	s.env.OnActivity("CreateDatabaseUserOnNode", mock.Anything, activity.CreateDatabaseUserOnNodeParams{
-		NodeAddress: "node1:9090",
-		User: activity.CreateDatabaseUserParams{
-			DatabaseName: "mydb",
-			Username:     "admin",
-			Password:     "pass",
-			Privileges:   []string{"ALL"},
-		},
+	s.env.OnActivity("CreateDatabaseUser", mock.Anything, activity.CreateDatabaseUserParams{
+		DatabaseName: "mydb",
+		Username:     "admin",
+		Password:     "pass",
+		Privileges:   []string{"ALL"},
 	}).Return(nil)
 
 	s.env.ExecuteWorkflow(ConvergeShardWorkflow, ConvergeShardParams{ShardID: shardID})
@@ -143,7 +119,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestValkeyShard() {
 		Role: model.ShardRoleValkey,
 	}
 	nodes := []model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
+		{ID: "node-1"},
 	}
 	instances := []model.ValkeyInstance{
 		{ID: "vk-1", Name: "cache", ShardID: &shardID, Port: 6379, Password: "vkpass", MaxMemoryMB: 128, Status: model.StatusActive},
@@ -155,26 +131,20 @@ func (s *ConvergeShardWorkflowTestSuite) TestValkeyShard() {
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("ListValkeyInstancesByShard", mock.Anything, shardID).Return(instances, nil)
-	s.env.OnActivity("CreateValkeyInstanceOnNode", mock.Anything, activity.CreateValkeyInstanceOnNodeParams{
-		NodeAddress: "node1:9090",
-		Instance: activity.CreateValkeyInstanceParams{
-			Name:        "cache",
-			Port:        6379,
-			Password:    "vkpass",
-			MaxMemoryMB: 128,
-		},
+	s.env.OnActivity("CreateValkeyInstance", mock.Anything, activity.CreateValkeyInstanceParams{
+		Name:        "cache",
+		Port:        6379,
+		Password:    "vkpass",
+		MaxMemoryMB: 128,
 	}).Return(nil)
 	s.env.OnActivity("ListValkeyUsersByInstanceID", mock.Anything, "vk-1").Return(users, nil)
-	s.env.OnActivity("CreateValkeyUserOnNode", mock.Anything, activity.CreateValkeyUserOnNodeParams{
-		NodeAddress: "node1:9090",
-		User: activity.CreateValkeyUserParams{
-			InstanceName: "cache",
-			Port:         6379,
-			Username:     "app",
-			Password:     "apppass",
-			Privileges:   []string{"allcommands"},
-			KeyPattern:   "*",
-		},
+	s.env.OnActivity("CreateValkeyUser", mock.Anything, activity.CreateValkeyUserParams{
+		InstanceName: "cache",
+		Port:         6379,
+		Username:     "app",
+		Password:     "apppass",
+		Privileges:   []string{"allcommands"},
+		KeyPattern:   "*",
 	}).Return(nil)
 
 	s.env.ExecuteWorkflow(ConvergeShardWorkflow, ConvergeShardParams{ShardID: shardID})
@@ -182,19 +152,15 @@ func (s *ConvergeShardWorkflowTestSuite) TestValkeyShard() {
 	s.NoError(s.env.GetWorkflowError())
 }
 
-func (s *ConvergeShardWorkflowTestSuite) TestNoActiveNodes() {
+func (s *ConvergeShardWorkflowTestSuite) TestNoNodes() {
 	shardID := "shard-empty"
 	shard := model.Shard{
 		ID:   shardID,
 		Role: model.ShardRoleWeb,
 	}
-	// Nodes with no gRPC address.
-	nodes := []model.Node{
-		{ID: "node-1", GRPCAddress: ""},
-	}
 
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return([]model.Node{}, nil)
 
 	s.env.ExecuteWorkflow(ConvergeShardWorkflow, ConvergeShardParams{ShardID: shardID})
 	s.True(s.env.IsWorkflowCompleted())
@@ -208,7 +174,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestSkipsInactiveResources() {
 		Role: model.ShardRoleWeb,
 	}
 	nodes := []model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
+		{ID: "node-1"},
 	}
 	// A provisioning tenant should be skipped.
 	tenants := []model.Tenant{
@@ -220,14 +186,13 @@ func (s *ConvergeShardWorkflowTestSuite) TestSkipsInactiveResources() {
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("ListTenantsByShard", mock.Anything, shardID).Return(tenants, nil)
 
-	// Only the active tenant gets CreateTenantOnNode.
-	s.env.OnActivity("CreateTenantOnNode", mock.Anything, activity.CreateTenantOnNodeParams{
-		NodeAddress: "node1:9090",
-		Tenant:      activity.CreateTenantParams{ID: "tenant-active", Name: "active", UID: 1000},
+	// Only the active tenant gets CreateTenant.
+	s.env.OnActivity("CreateTenant", mock.Anything, activity.CreateTenantParams{
+		ID: "tenant-active", Name: "active", UID: 1000,
 	}).Return(nil)
 
 	s.env.OnActivity("ListWebrootsByTenantID", mock.Anything, "tenant-active").Return([]model.Webroot{}, nil)
-	s.env.OnActivity("ReloadNginxOnNode", mock.Anything, "node1:9090").Return(nil)
+	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
 
 	s.env.ExecuteWorkflow(ConvergeShardWorkflow, ConvergeShardParams{ShardID: shardID})
 	s.True(s.env.IsWorkflowCompleted())

@@ -14,10 +14,18 @@ type RegionDef struct {
 }
 
 type ClusterDef struct {
-	Name        string           `yaml:"name"`
-	LBAddresses []LBAddressDef   `yaml:"lb_addresses"`
-	Config      map[string]any   `yaml:"config"`
-	Spec        ClusterSpecDef   `yaml:"spec"`
+	Name          string            `yaml:"name"`
+	Provisioner   string            `yaml:"provisioner"` // "docker" (default) or "external"
+	LBAddresses   []LBAddressDef    `yaml:"lb_addresses"`
+	Config        map[string]any    `yaml:"config"`
+	Spec          ClusterSpecDef    `yaml:"spec"`
+	ExternalNodes []ExternalNodeDef `yaml:"external_nodes"`
+}
+
+type ExternalNodeDef struct {
+	ID        string `yaml:"id"`
+	ShardName string `yaml:"shard_name"`
+	IPAddress string `yaml:"ip_address"`
 }
 
 type LBAddressDef struct {

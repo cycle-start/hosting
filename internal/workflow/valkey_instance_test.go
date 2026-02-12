@@ -41,7 +41,7 @@ func (s *CreateValkeyInstanceWorkflowTestSuite) TestSuccess() {
 		MaxMemoryMB: 256,
 	}
 	nodes := []model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
+		{ID: "node-1"},
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -49,14 +49,11 @@ func (s *CreateValkeyInstanceWorkflowTestSuite) TestSuccess() {
 	}).Return(nil)
 	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(&instance, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("CreateValkeyInstanceOnNode", mock.Anything, activity.CreateValkeyInstanceOnNodeParams{
-		NodeAddress: "node1:9090",
-		Instance: activity.CreateValkeyInstanceParams{
-			Name:        "myvalkey",
-			Port:        6379,
-			Password:    "valkeypass",
-			MaxMemoryMB: 256,
-		},
+	s.env.OnActivity("CreateValkeyInstance", mock.Anything, activity.CreateValkeyInstanceParams{
+		Name:        "myvalkey",
+		Port:        6379,
+		Password:    "valkeypass",
+		MaxMemoryMB: 256,
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_instances", ID: instanceID, Status: model.StatusActive,
@@ -93,7 +90,7 @@ func (s *CreateValkeyInstanceWorkflowTestSuite) TestAgentFails_SetsStatusFailed(
 		MaxMemoryMB: 256,
 	}
 	nodes := []model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
+		{ID: "node-1"},
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -101,7 +98,7 @@ func (s *CreateValkeyInstanceWorkflowTestSuite) TestAgentFails_SetsStatusFailed(
 	}).Return(nil)
 	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(&instance, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("CreateValkeyInstanceOnNode", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
+	s.env.OnActivity("CreateValkeyInstance", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_instances", ID: instanceID, Status: model.StatusFailed,
 	}).Return(nil)
@@ -162,16 +159,20 @@ func (s *DeleteValkeyInstanceWorkflowTestSuite) AfterTest(suiteName, testName st
 
 func (s *DeleteValkeyInstanceWorkflowTestSuite) TestSuccess() {
 	instanceID := "test-valkey-1"
+	shardID := "test-shard-1"
 	instance := model.ValkeyInstance{
-		ID:   instanceID,
-		Name: "myvalkey",
-		Port: 6379,
+		ID:      instanceID,
+		Name:    "myvalkey",
+		Port:    6379,
+		ShardID: &shardID,
 	}
+	nodes := []model.Node{{ID: "node-1"}}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_instances", ID: instanceID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(&instance, nil)
+	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("DeleteValkeyInstance", mock.Anything, activity.DeleteValkeyInstanceParams{
 		Name: "myvalkey",
 		Port: 6379,
@@ -186,16 +187,20 @@ func (s *DeleteValkeyInstanceWorkflowTestSuite) TestSuccess() {
 
 func (s *DeleteValkeyInstanceWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	instanceID := "test-valkey-2"
+	shardID := "test-shard-2"
 	instance := model.ValkeyInstance{
-		ID:   instanceID,
-		Name: "myvalkey",
-		Port: 6379,
+		ID:      instanceID,
+		Name:    "myvalkey",
+		Port:    6379,
+		ShardID: &shardID,
 	}
+	nodes := []model.Node{{ID: "node-1"}}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_instances", ID: instanceID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(&instance, nil)
+	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("DeleteValkeyInstance", mock.Anything, activity.DeleteValkeyInstanceParams{
 		Name: "myvalkey",
 		Port: 6379,

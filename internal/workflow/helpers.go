@@ -1,6 +1,9 @@
 package workflow
 
 import (
+	"time"
+
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/edvin/hosting/internal/activity"
@@ -16,4 +19,17 @@ func setResourceFailed(ctx workflow.Context, table string, id string) error {
 		ID:     id,
 		Status: model.StatusFailed,
 	}).Get(ctx, nil)
+}
+
+// nodeActivityCtx returns a workflow context that routes activity execution
+// to a specific node's Temporal task queue. Activities dispatched with this
+// context will be picked up by the node-agent worker running on that node.
+func nodeActivityCtx(ctx workflow.Context, nodeID string) workflow.Context {
+	return workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		TaskQueue:           "node-" + nodeID,
+		StartToCloseTimeout: 2 * time.Minute,
+		RetryPolicy: &temporal.RetryPolicy{
+			MaximumAttempts: 3,
+		},
+	})
 }

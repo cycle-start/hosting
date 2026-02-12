@@ -11,7 +11,7 @@ import (
 	"github.com/edvin/hosting/internal/model"
 )
 
-// CreateWebrootWorkflow provisions a new webroot on the node agent.
+// CreateWebrootWorkflow provisions a new webroot on all nodes in the tenant's shard.
 func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -64,7 +64,7 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 		}
 	}
 
-	// Look up nodes in the tenant's shard to route gRPC calls.
+	// Look up nodes in the tenant's shard.
 	if tenant.ShardID == nil {
 		_ = setResourceFailed(ctx, "webroots", webrootID)
 		return fmt.Errorf("tenant %s has no shard assigned", webroot.TenantID)
@@ -79,21 +79,16 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 
 	// Create webroot on each node in the shard.
 	for _, node := range nodes {
-		if node.GRPCAddress == "" {
-			continue
-		}
-		err = workflow.ExecuteActivity(ctx, "CreateWebrootOnNode", activity.CreateWebrootOnNodeParams{
-			NodeAddress: node.GRPCAddress,
-			Webroot: activity.CreateWebrootParams{
-				ID:             webroot.ID,
-				TenantName:     tenant.Name,
-				Name:           webroot.Name,
-				Runtime:        webroot.Runtime,
-				RuntimeVersion: webroot.RuntimeVersion,
-				RuntimeConfig:  string(webroot.RuntimeConfig),
-				PublicFolder:   webroot.PublicFolder,
-				FQDNs:          fqdnParams,
-			},
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		err = workflow.ExecuteActivity(nodeCtx, "CreateWebroot", activity.CreateWebrootParams{
+			ID:             webroot.ID,
+			TenantName:     tenant.Name,
+			Name:           webroot.Name,
+			Runtime:        webroot.Runtime,
+			RuntimeVersion: webroot.RuntimeVersion,
+			RuntimeConfig:  string(webroot.RuntimeConfig),
+			PublicFolder:   webroot.PublicFolder,
+			FQDNs:          fqdnParams,
 		}).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "webroots", webrootID)
@@ -109,7 +104,7 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	}).Get(ctx, nil)
 }
 
-// UpdateWebrootWorkflow updates a webroot on the node agent.
+// UpdateWebrootWorkflow updates a webroot on all nodes in the tenant's shard.
 func UpdateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -162,20 +157,35 @@ func UpdateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 		}
 	}
 
-	// Update webroot on node agent.
-	err = workflow.ExecuteActivity(ctx, "UpdateWebroot", activity.UpdateWebrootParams{
-		ID:             webroot.ID,
-		TenantName:     tenant.Name,
-		Name:           webroot.Name,
-		Runtime:        webroot.Runtime,
-		RuntimeVersion: webroot.RuntimeVersion,
-		RuntimeConfig:  string(webroot.RuntimeConfig),
-		PublicFolder:   webroot.PublicFolder,
-		FQDNs:          fqdnParams,
-	}).Get(ctx, nil)
+	if tenant.ShardID == nil {
+		_ = setResourceFailed(ctx, "webroots", webrootID)
+		return fmt.Errorf("tenant %s has no shard assigned", webroot.TenantID)
+	}
+
+	var nodes []model.Node
+	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
 		_ = setResourceFailed(ctx, "webroots", webrootID)
 		return err
+	}
+
+	// Update webroot on each node in the shard.
+	for _, node := range nodes {
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		err = workflow.ExecuteActivity(nodeCtx, "UpdateWebroot", activity.UpdateWebrootParams{
+			ID:             webroot.ID,
+			TenantName:     tenant.Name,
+			Name:           webroot.Name,
+			Runtime:        webroot.Runtime,
+			RuntimeVersion: webroot.RuntimeVersion,
+			RuntimeConfig:  string(webroot.RuntimeConfig),
+			PublicFolder:   webroot.PublicFolder,
+			FQDNs:          fqdnParams,
+		}).Get(ctx, nil)
+		if err != nil {
+			_ = setResourceFailed(ctx, "webroots", webrootID)
+			return err
+		}
 	}
 
 	// Set status to active.
@@ -186,7 +196,7 @@ func UpdateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	}).Get(ctx, nil)
 }
 
-// DeleteWebrootWorkflow deletes a webroot from the node agent.
+// DeleteWebrootWorkflow deletes a webroot from all nodes in the tenant's shard.
 func DeleteWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -222,11 +232,26 @@ func DeleteWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 		return err
 	}
 
-	// Delete webroot on node agent.
-	err = workflow.ExecuteActivity(ctx, "DeleteWebroot", tenant.Name, webroot.Name).Get(ctx, nil)
+	if tenant.ShardID == nil {
+		_ = setResourceFailed(ctx, "webroots", webrootID)
+		return fmt.Errorf("tenant %s has no shard assigned", webroot.TenantID)
+	}
+
+	var nodes []model.Node
+	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
 		_ = setResourceFailed(ctx, "webroots", webrootID)
 		return err
+	}
+
+	// Delete webroot on each node in the shard.
+	for _, node := range nodes {
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		err = workflow.ExecuteActivity(nodeCtx, "DeleteWebroot", tenant.Name, webroot.Name).Get(ctx, nil)
+		if err != nil {
+			_ = setResourceFailed(ctx, "webroots", webrootID)
+			return err
+		}
 	}
 
 	// Set status to deleted.

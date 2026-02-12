@@ -89,10 +89,8 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 	}
 
 	for _, node := range nodes {
-		if node.GRPCAddress == "" {
-			continue
-		}
-		err = workflow.ExecuteActivity(ctx, "ReloadNginxOnNode", node.GRPCAddress).Get(ctx, nil)
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		err = workflow.ExecuteActivity(nodeCtx, "ReloadNginx").Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "fqdns", fqdnID)
 			return err
@@ -200,10 +198,8 @@ func UnbindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 		}
 
 		for _, node := range ubNodes {
-			if node.GRPCAddress == "" {
-				continue
-			}
-			err = workflow.ExecuteActivity(ctx, "ReloadNginxOnNode", node.GRPCAddress).Get(ctx, nil)
+			nodeCtx := nodeActivityCtx(ctx, node.ID)
+			err = workflow.ExecuteActivity(nodeCtx, "ReloadNginx").Get(ctx, nil)
 			if err != nil {
 				_ = setResourceFailed(ctx, "fqdns", fqdnID)
 				return err

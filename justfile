@@ -227,3 +227,26 @@ lb-del fqdn:
 # Show HAProxy map
 lb-show:
     echo "show map /var/lib/haproxy/maps/fqdn-to-shard.map" | docker compose exec -T haproxy socat stdio /var/run/haproxy/admin.sock
+
+# --- VM Infrastructure ---
+
+# Build the node-agent binary for Linux (for VM deployment)
+build-node-agent:
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/node-agent ./cmd/node-agent
+
+# Create VMs with Terraform and register them with the platform
+vm-up: build-node-agent
+    cd terraform && terraform apply -auto-approve
+    go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml
+
+# Destroy VMs
+vm-down:
+    cd terraform && terraform destroy -auto-approve
+
+# SSH into a VM (e.g. just vm-ssh web-1-node-0)
+vm-ssh name:
+    ssh -o StrictHostKeyChecking=no ubuntu@$(cd terraform && terraform output -json web_node_ips db_node_ips dns_node_ips valkey_node_ips 2>/dev/null | python3 -c "import sys,json; d={}; [d.update(json.load(sys.stdin)) for _ in range(4)]; print(d['{{name}}'])")
+
+# Expose HAProxy via ngrok for testing real domains
+vm-ngrok:
+    ngrok http 80

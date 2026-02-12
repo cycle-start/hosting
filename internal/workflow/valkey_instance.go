@@ -54,17 +54,12 @@ func CreateValkeyInstanceWorkflow(ctx workflow.Context, instanceID string) error
 
 	// Create instance on each node in the shard.
 	for _, node := range nodes {
-		if node.GRPCAddress == "" {
-			continue
-		}
-		err = workflow.ExecuteActivity(ctx, "CreateValkeyInstanceOnNode", activity.CreateValkeyInstanceOnNodeParams{
-			NodeAddress: node.GRPCAddress,
-			Instance: activity.CreateValkeyInstanceParams{
-				Name:        instance.Name,
-				Port:        instance.Port,
-				Password:    instance.Password,
-				MaxMemoryMB: instance.MaxMemoryMB,
-			},
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		err = workflow.ExecuteActivity(nodeCtx, "CreateValkeyInstance", activity.CreateValkeyInstanceParams{
+			Name:        instance.Name,
+			Port:        instance.Port,
+			Password:    instance.Password,
+			MaxMemoryMB: instance.MaxMemoryMB,
 		}).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "valkey_instances", instanceID)
@@ -108,14 +103,30 @@ func DeleteValkeyInstanceWorkflow(ctx workflow.Context, instanceID string) error
 		return err
 	}
 
-	// Delete instance on node agent.
-	err = workflow.ExecuteActivity(ctx, "DeleteValkeyInstance", activity.DeleteValkeyInstanceParams{
-		Name: instance.Name,
-		Port: instance.Port,
-	}).Get(ctx, nil)
+	// Look up nodes in the instance's shard.
+	if instance.ShardID == nil {
+		_ = setResourceFailed(ctx, "valkey_instances", instanceID)
+		return fmt.Errorf("valkey instance %s has no shard assigned", instanceID)
+	}
+
+	var nodes []model.Node
+	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *instance.ShardID).Get(ctx, &nodes)
 	if err != nil {
 		_ = setResourceFailed(ctx, "valkey_instances", instanceID)
 		return err
+	}
+
+	// Delete instance on each node in the shard.
+	for _, node := range nodes {
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		err = workflow.ExecuteActivity(nodeCtx, "DeleteValkeyInstance", activity.DeleteValkeyInstanceParams{
+			Name: instance.Name,
+			Port: instance.Port,
+		}).Get(ctx, nil)
+		if err != nil {
+			_ = setResourceFailed(ctx, "valkey_instances", instanceID)
+			return err
+		}
 	}
 
 	// Set status to deleted.

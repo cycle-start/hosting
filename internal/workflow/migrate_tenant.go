@@ -85,17 +85,12 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 
 	// Provision tenant on each target node.
 	for _, node := range targetNodes {
-		if node.GRPCAddress == "" {
-			continue
-		}
-		err = workflow.ExecuteActivity(ctx, "CreateTenantOnNode", activity.CreateTenantOnNodeParams{
-			NodeAddress: node.GRPCAddress,
-			Tenant: activity.CreateTenantParams{
-				ID:          tenant.ID,
-				Name:        tenant.Name,
-				UID:         tenant.UID,
-				SFTPEnabled: tenant.SFTPEnabled,
-			},
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		err = workflow.ExecuteActivity(nodeCtx, "CreateTenant", activity.CreateTenantParams{
+			ID:          tenant.ID,
+			Name:        tenant.Name,
+			UID:         tenant.UID,
+			SFTPEnabled: tenant.SFTPEnabled,
 		}).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "tenants", tenantID)
@@ -130,21 +125,16 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 		}
 
 		for _, node := range targetNodes {
-			if node.GRPCAddress == "" {
-				continue
-			}
-			err = workflow.ExecuteActivity(ctx, "CreateWebrootOnNode", activity.CreateWebrootOnNodeParams{
-				NodeAddress: node.GRPCAddress,
-				Webroot: activity.CreateWebrootParams{
-					ID:             webroot.ID,
-					TenantName:     tenant.Name,
-					Name:           webroot.Name,
-					Runtime:        webroot.Runtime,
-					RuntimeVersion: webroot.RuntimeVersion,
-					RuntimeConfig:  string(webroot.RuntimeConfig),
-					PublicFolder:   webroot.PublicFolder,
-					FQDNs:          fqdnParams,
-				},
+			nodeCtx := nodeActivityCtx(ctx, node.ID)
+			err = workflow.ExecuteActivity(nodeCtx, "CreateWebroot", activity.CreateWebrootParams{
+				ID:             webroot.ID,
+				TenantName:     tenant.Name,
+				Name:           webroot.Name,
+				Runtime:        webroot.Runtime,
+				RuntimeVersion: webroot.RuntimeVersion,
+				RuntimeConfig:  string(webroot.RuntimeConfig),
+				PublicFolder:   webroot.PublicFolder,
+				FQDNs:          fqdnParams,
 			}).Get(ctx, nil)
 			if err != nil {
 				_ = setResourceFailed(ctx, "tenants", tenantID)
@@ -189,22 +179,13 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 	}
 
 	for _, node := range sourceNodes {
-		if node.GRPCAddress == "" {
-			continue
-		}
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		// Delete webroots from source nodes.
 		for _, webroot := range webroots {
-			_ = workflow.ExecuteActivity(ctx, "DeleteWebrootOnNode", activity.DeleteWebrootOnNodeParams{
-				NodeAddress: node.GRPCAddress,
-				TenantName:  tenant.Name,
-				WebrootName: webroot.Name,
-			}).Get(ctx, nil)
+			_ = workflow.ExecuteActivity(nodeCtx, "DeleteWebroot", tenant.Name, webroot.Name).Get(ctx, nil)
 		}
 		// Delete tenant from source nodes.
-		_ = workflow.ExecuteActivity(ctx, "DeleteTenantOnNode", activity.DeleteTenantOnNodeParams{
-			NodeAddress: node.GRPCAddress,
-			TenantName:  tenant.Name,
-		}).Get(ctx, nil)
+		_ = workflow.ExecuteActivity(nodeCtx, "DeleteTenant", tenant.Name).Get(ctx, nil)
 	}
 
 	// Set tenant status to active.

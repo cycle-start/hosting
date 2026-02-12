@@ -70,7 +70,13 @@ func ClusterApply(configPath string, timeout time.Duration) error {
 		fmt.Printf("Host %q: %s\n", h.Hostname, hostID)
 	}
 
-	// 5. Provision cluster
+	if cfg.Cluster.Provisioner == "external" {
+		// External provisioner: nodes are managed outside (e.g. Terraform VMs).
+		// Create nodes via API with pre-assigned IDs and set them active immediately.
+		return applyExternalNodes(client, clusterID, cfg.Cluster)
+	}
+
+	// 5. Provision cluster (Docker provisioner)
 	fmt.Println("Provisioning cluster...")
 	_, err = client.Post(fmt.Sprintf("/clusters/%s/provision", clusterID), nil)
 	if err != nil {
@@ -85,6 +91,70 @@ func ClusterApply(configPath string, timeout time.Duration) error {
 	fmt.Println("Cluster is active!")
 
 	// 7. Print summary
+	return printClusterSummary(client, clusterID)
+}
+
+func applyExternalNodes(client *Client, clusterID string, def ClusterDef) error {
+	// Build shard name -> shard ID map.
+	resp, err := client.Get(fmt.Sprintf("/clusters/%s/shards", clusterID))
+	if err != nil {
+		return fmt.Errorf("list shards: %w", err)
+	}
+	var shards []struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(resp.Body, &shards); err != nil {
+		return fmt.Errorf("parse shards: %w", err)
+	}
+	shardMap := make(map[string]string)
+	for _, s := range shards {
+		shardMap[s.Name] = s.ID
+	}
+
+	// For each external node, ensure it exists with the correct shard assignment.
+	for _, node := range def.ExternalNodes {
+		shardID, ok := shardMap[node.ShardName]
+		if !ok {
+			return fmt.Errorf("shard %q not found for node %s", node.ShardName, node.ID)
+		}
+
+		// Try to find existing node by ID.
+		_, err := client.Get(fmt.Sprintf("/nodes/%s", node.ID))
+		if err == nil {
+			fmt.Printf("External node %s: exists (shard=%s)\n", node.ID, node.ShardName)
+			continue
+		}
+
+		// Create node with pre-assigned ID and shard.
+		_, err = client.Post(fmt.Sprintf("/clusters/%s/nodes", clusterID), map[string]any{
+			"id":       node.ID,
+			"shard_id": shardID,
+			"status":   "active",
+		})
+		if err != nil {
+			return fmt.Errorf("create external node %s: %w", node.ID, err)
+		}
+		fmt.Printf("External node %s: created (shard=%s, ip=%s)\n", node.ID, node.ShardName, node.IPAddress)
+	}
+
+	// Trigger convergence for each shard that has external nodes.
+	convergedShards := make(map[string]bool)
+	for _, node := range def.ExternalNodes {
+		shardID := shardMap[node.ShardName]
+		if convergedShards[shardID] {
+			continue
+		}
+		convergedShards[shardID] = true
+
+		fmt.Printf("Converging shard %q...\n", node.ShardName)
+		_, err := client.Post(fmt.Sprintf("/shards/%s/converge", shardID), nil)
+		if err != nil {
+			fmt.Printf("  Warning: convergence failed for shard %q: %v\n", node.ShardName, err)
+		}
+	}
+
+	fmt.Println("External nodes applied!")
 	return printClusterSummary(client, clusterID)
 }
 

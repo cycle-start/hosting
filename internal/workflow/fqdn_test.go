@@ -74,9 +74,9 @@ func (s *BindFQDNWorkflowTestSuite) TestSuccess_NoSSL() {
 		SourceFQDNID: fqdnID,
 	}).Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, mock.Anything).Return([]model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
+		{ID: "node-1"},
 	}, nil)
-	s.env.OnActivity("ReloadNginxOnNode", mock.Anything, "node1:9090").Return(nil)
+	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
 	s.env.OnActivity("SetLBMapEntry", mock.Anything, activity.SetLBMapEntryParams{
 		ClusterID: clusterID,
@@ -136,9 +136,9 @@ func (s *BindFQDNWorkflowTestSuite) TestSuccess_WithSSL() {
 		SourceFQDNID: fqdnID,
 	}).Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, mock.Anything).Return([]model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
+		{ID: "node-1"},
 	}, nil)
-	s.env.OnActivity("ReloadNginxOnNode", mock.Anything, "node1:9090").Return(nil)
+	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
 	// The child workflow for LE cert provisioning will be registered separately.
 	// Mock the child workflow to succeed.
 	s.env.OnWorkflow(ProvisionLECertWorkflow, mock.Anything, fqdnID).Return(nil)
@@ -197,9 +197,9 @@ func (s *BindFQDNWorkflowTestSuite) TestSuccess_SSLChildWorkflowFails_StillSucce
 	s.env.OnActivity("GetClusterLBAddresses", mock.Anything, clusterID).Return(lbAddresses, nil)
 	s.env.OnActivity("AutoCreateDNSRecords", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, mock.Anything).Return([]model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
+		{ID: "node-1"},
 	}, nil)
-	s.env.OnActivity("ReloadNginxOnNode", mock.Anything, "node1:9090").Return(nil)
+	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
 	// Child LE workflow fails -- but FQDN binding should still succeed.
 	s.env.OnWorkflow(ProvisionLECertWorkflow, mock.Anything, fqdnID).Return(fmt.Errorf("ACME failed"))
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
@@ -314,9 +314,9 @@ func (s *BindFQDNWorkflowTestSuite) TestSetLBMapEntryFails_SetsStatusFailed() {
 	s.env.OnActivity("GetClusterLBAddresses", mock.Anything, clusterID).Return(lbAddresses, nil)
 	s.env.OnActivity("AutoCreateDNSRecords", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, mock.Anything).Return([]model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
+		{ID: "node-1"},
 	}, nil)
-	s.env.OnActivity("ReloadNginxOnNode", mock.Anything, "node1:9090").Return(nil)
+	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
 	s.env.OnActivity("SetLBMapEntry", mock.Anything, activity.SetLBMapEntryParams{
 		ClusterID: clusterID,
@@ -360,9 +360,9 @@ func (s *BindFQDNWorkflowTestSuite) TestReloadNginxFails_SetsStatusFailed() {
 	s.env.OnActivity("GetClusterLBAddresses", mock.Anything, clusterID).Return(lbAddresses, nil)
 	s.env.OnActivity("AutoCreateDNSRecords", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return([]model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
+		{ID: "node-1"},
 	}, nil)
-	s.env.OnActivity("ReloadNginxOnNode", mock.Anything, "node1:9090").Return(fmt.Errorf("nginx error"))
+	s.env.OnActivity("ReloadNginx", mock.Anything).Return(fmt.Errorf("nginx error"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "fqdns", ID: fqdnID, Status: model.StatusFailed,
 	}).Return(nil)
@@ -411,9 +411,9 @@ func (s *UnbindFQDNWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("AutoDeleteDNSRecords", mock.Anything, "example.com").Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return([]model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
+		{ID: "node-1"},
 	}, nil)
-	s.env.OnActivity("ReloadNginxOnNode", mock.Anything, "node1:9090").Return(nil)
+	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
 	s.env.OnActivity("DeleteLBMapEntry", mock.Anything, activity.DeleteLBMapEntryParams{
 		ClusterID: clusterID,
 		FQDN:      "example.com",
@@ -491,9 +491,9 @@ func (s *UnbindFQDNWorkflowTestSuite) TestReloadNginxFails_SetsStatusFailed() {
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("AutoDeleteDNSRecords", mock.Anything, "example.com").Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return([]model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
+		{ID: "node-1"},
 	}, nil)
-	s.env.OnActivity("ReloadNginxOnNode", mock.Anything, "node1:9090").Return(fmt.Errorf("nginx error"))
+	s.env.OnActivity("ReloadNginx", mock.Anything).Return(fmt.Errorf("nginx error"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "fqdns", ID: fqdnID, Status: model.StatusFailed,
 	}).Return(nil)

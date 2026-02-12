@@ -54,17 +54,12 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 
 	// Create tenant on each node in the shard.
 	for _, node := range nodes {
-		if node.GRPCAddress == "" {
-			continue
-		}
-		err = workflow.ExecuteActivity(ctx, "CreateTenantOnNode", activity.CreateTenantOnNodeParams{
-			NodeAddress: node.GRPCAddress,
-			Tenant: activity.CreateTenantParams{
-				ID:          tenant.ID,
-				Name:        tenant.Name,
-				UID:         tenant.UID,
-				SFTPEnabled: tenant.SFTPEnabled,
-			},
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		err = workflow.ExecuteActivity(nodeCtx, "CreateTenant", activity.CreateTenantParams{
+			ID:          tenant.ID,
+			Name:        tenant.Name,
+			UID:         tenant.UID,
+			SFTPEnabled: tenant.SFTPEnabled,
 		}).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "tenants", tenantID)
@@ -80,7 +75,7 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	}).Get(ctx, nil)
 }
 
-// UpdateTenantWorkflow updates a tenant on the node agent.
+// UpdateTenantWorkflow updates a tenant on all nodes in the tenant's shard.
 func UpdateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -108,16 +103,31 @@ func UpdateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		return err
 	}
 
-	// Update tenant on node agent.
-	err = workflow.ExecuteActivity(ctx, "UpdateTenant", activity.UpdateTenantParams{
-		ID:          tenant.ID,
-		Name:        tenant.Name,
-		UID:         tenant.UID,
-		SFTPEnabled: tenant.SFTPEnabled,
-	}).Get(ctx, nil)
+	if tenant.ShardID == nil {
+		_ = setResourceFailed(ctx, "tenants", tenantID)
+		return fmt.Errorf("tenant %s has no shard assigned", tenantID)
+	}
+
+	var nodes []model.Node
+	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
 		_ = setResourceFailed(ctx, "tenants", tenantID)
 		return err
+	}
+
+	// Update tenant on each node in the shard.
+	for _, node := range nodes {
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		err = workflow.ExecuteActivity(nodeCtx, "UpdateTenant", activity.UpdateTenantParams{
+			ID:          tenant.ID,
+			Name:        tenant.Name,
+			UID:         tenant.UID,
+			SFTPEnabled: tenant.SFTPEnabled,
+		}).Get(ctx, nil)
+		if err != nil {
+			_ = setResourceFailed(ctx, "tenants", tenantID)
+			return err
+		}
 	}
 
 	// Set status to active.
@@ -128,7 +138,7 @@ func UpdateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	}).Get(ctx, nil)
 }
 
-// SuspendTenantWorkflow suspends a tenant on the node agent.
+// SuspendTenantWorkflow suspends a tenant on all nodes in the tenant's shard.
 func SuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -145,11 +155,26 @@ func SuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		return err
 	}
 
-	// Suspend tenant on node agent.
-	err = workflow.ExecuteActivity(ctx, "SuspendTenant", tenant.Name).Get(ctx, nil)
+	if tenant.ShardID == nil {
+		_ = setResourceFailed(ctx, "tenants", tenantID)
+		return fmt.Errorf("tenant %s has no shard assigned", tenantID)
+	}
+
+	var nodes []model.Node
+	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
 		_ = setResourceFailed(ctx, "tenants", tenantID)
 		return err
+	}
+
+	// Suspend tenant on each node in the shard.
+	for _, node := range nodes {
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		err = workflow.ExecuteActivity(nodeCtx, "SuspendTenant", tenant.Name).Get(ctx, nil)
+		if err != nil {
+			_ = setResourceFailed(ctx, "tenants", tenantID)
+			return err
+		}
 	}
 
 	// Set status to suspended.
@@ -160,7 +185,7 @@ func SuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	}).Get(ctx, nil)
 }
 
-// UnsuspendTenantWorkflow unsuspends a tenant on the node agent.
+// UnsuspendTenantWorkflow unsuspends a tenant on all nodes in the tenant's shard.
 func UnsuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -188,11 +213,26 @@ func UnsuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		return err
 	}
 
-	// Unsuspend tenant on node agent.
-	err = workflow.ExecuteActivity(ctx, "UnsuspendTenant", tenant.Name).Get(ctx, nil)
+	if tenant.ShardID == nil {
+		_ = setResourceFailed(ctx, "tenants", tenantID)
+		return fmt.Errorf("tenant %s has no shard assigned", tenantID)
+	}
+
+	var nodes []model.Node
+	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
 		_ = setResourceFailed(ctx, "tenants", tenantID)
 		return err
+	}
+
+	// Unsuspend tenant on each node in the shard.
+	for _, node := range nodes {
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		err = workflow.ExecuteActivity(nodeCtx, "UnsuspendTenant", tenant.Name).Get(ctx, nil)
+		if err != nil {
+			_ = setResourceFailed(ctx, "tenants", tenantID)
+			return err
+		}
 	}
 
 	// Set status to active.
@@ -203,7 +243,7 @@ func UnsuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	}).Get(ctx, nil)
 }
 
-// DeleteTenantWorkflow deletes a tenant from the node agent.
+// DeleteTenantWorkflow deletes a tenant from all nodes in the tenant's shard.
 func DeleteTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -231,11 +271,26 @@ func DeleteTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		return err
 	}
 
-	// Delete tenant on node agent.
-	err = workflow.ExecuteActivity(ctx, "DeleteTenant", tenant.Name).Get(ctx, nil)
+	if tenant.ShardID == nil {
+		_ = setResourceFailed(ctx, "tenants", tenantID)
+		return fmt.Errorf("tenant %s has no shard assigned", tenantID)
+	}
+
+	var nodes []model.Node
+	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
 		_ = setResourceFailed(ctx, "tenants", tenantID)
 		return err
+	}
+
+	// Delete tenant on each node in the shard.
+	for _, node := range nodes {
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		err = workflow.ExecuteActivity(nodeCtx, "DeleteTenant", tenant.Name).Get(ctx, nil)
+		if err != nil {
+			_ = setResourceFailed(ctx, "tenants", tenantID)
+			return err
+		}
 	}
 
 	// Set status to deleted.

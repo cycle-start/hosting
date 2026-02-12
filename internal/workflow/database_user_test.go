@@ -47,7 +47,7 @@ func (s *CreateDatabaseUserWorkflowTestSuite) TestSuccess() {
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
+		{ID: "node-1"},
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -56,14 +56,11 @@ func (s *CreateDatabaseUserWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("GetDatabaseUserByID", mock.Anything, userID).Return(&dbUser, nil)
 	s.env.OnActivity("GetDatabaseByID", mock.Anything, databaseID).Return(&database, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("CreateDatabaseUserOnNode", mock.Anything, activity.CreateDatabaseUserOnNodeParams{
-		NodeAddress: "node1:9090",
-		User: activity.CreateDatabaseUserParams{
-			DatabaseName: "mydb",
-			Username:     "appuser",
-			Password:     "secret123",
-			Privileges:   []string{"SELECT", "INSERT", "UPDATE"},
-		},
+	s.env.OnActivity("CreateDatabaseUser", mock.Anything, activity.CreateDatabaseUserParams{
+		DatabaseName: "mydb",
+		Username:     "appuser",
+		Password:     "secret123",
+		Privileges:   []string{"SELECT", "INSERT", "UPDATE"},
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "database_users", ID: userID, Status: model.StatusActive,
@@ -106,7 +103,7 @@ func (s *CreateDatabaseUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() 
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
+		{ID: "node-1"},
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -115,7 +112,7 @@ func (s *CreateDatabaseUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() 
 	s.env.OnActivity("GetDatabaseUserByID", mock.Anything, userID).Return(&dbUser, nil)
 	s.env.OnActivity("GetDatabaseByID", mock.Anything, databaseID).Return(&database, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("CreateDatabaseUserOnNode", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
+	s.env.OnActivity("CreateDatabaseUser", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "database_users", ID: userID, Status: model.StatusFailed,
 	}).Return(nil)
@@ -169,6 +166,7 @@ func (s *UpdateDatabaseUserWorkflowTestSuite) AfterTest(suiteName, testName stri
 func (s *UpdateDatabaseUserWorkflowTestSuite) TestSuccess() {
 	userID := "test-dbuser-1"
 	databaseID := "test-database-1"
+	shardID := "test-shard-1"
 
 	dbUser := model.DatabaseUser{
 		ID:         userID,
@@ -178,15 +176,18 @@ func (s *UpdateDatabaseUserWorkflowTestSuite) TestSuccess() {
 		Privileges: []string{"SELECT", "INSERT"},
 	}
 	database := model.Database{
-		ID:   databaseID,
-		Name: "mydb",
+		ID:      databaseID,
+		Name:    "mydb",
+		ShardID: &shardID,
 	}
+	nodes := []model.Node{{ID: "node-1"}}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "database_users", ID: userID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetDatabaseUserByID", mock.Anything, userID).Return(&dbUser, nil)
 	s.env.OnActivity("GetDatabaseByID", mock.Anything, databaseID).Return(&database, nil)
+	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("UpdateDatabaseUser", mock.Anything, activity.UpdateDatabaseUserParams{
 		DatabaseName: "mydb",
 		Username:     "appuser",
@@ -204,6 +205,7 @@ func (s *UpdateDatabaseUserWorkflowTestSuite) TestSuccess() {
 func (s *UpdateDatabaseUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	userID := "test-dbuser-2"
 	databaseID := "test-database-2"
+	shardID := "test-shard-2"
 
 	dbUser := model.DatabaseUser{
 		ID:         userID,
@@ -213,15 +215,18 @@ func (s *UpdateDatabaseUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() 
 		Privileges: []string{"SELECT"},
 	}
 	database := model.Database{
-		ID:   databaseID,
-		Name: "mydb",
+		ID:      databaseID,
+		Name:    "mydb",
+		ShardID: &shardID,
 	}
+	nodes := []model.Node{{ID: "node-1"}}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "database_users", ID: userID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetDatabaseUserByID", mock.Anything, userID).Return(&dbUser, nil)
 	s.env.OnActivity("GetDatabaseByID", mock.Anything, databaseID).Return(&database, nil)
+	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("UpdateDatabaseUser", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "database_users", ID: userID, Status: model.StatusFailed,
@@ -266,6 +271,7 @@ func (s *DeleteDatabaseUserWorkflowTestSuite) AfterTest(suiteName, testName stri
 func (s *DeleteDatabaseUserWorkflowTestSuite) TestSuccess() {
 	userID := "test-dbuser-1"
 	databaseID := "test-database-1"
+	shardID := "test-shard-1"
 
 	dbUser := model.DatabaseUser{
 		ID:         userID,
@@ -274,15 +280,18 @@ func (s *DeleteDatabaseUserWorkflowTestSuite) TestSuccess() {
 		Password:   "secret123",
 	}
 	database := model.Database{
-		ID:   databaseID,
-		Name: "mydb",
+		ID:      databaseID,
+		Name:    "mydb",
+		ShardID: &shardID,
 	}
+	nodes := []model.Node{{ID: "node-1"}}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "database_users", ID: userID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetDatabaseUserByID", mock.Anything, userID).Return(&dbUser, nil)
 	s.env.OnActivity("GetDatabaseByID", mock.Anything, databaseID).Return(&database, nil)
+	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("DeleteDatabaseUser", mock.Anything, "mydb", "appuser").Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "database_users", ID: userID, Status: model.StatusDeleted,
@@ -295,6 +304,7 @@ func (s *DeleteDatabaseUserWorkflowTestSuite) TestSuccess() {
 func (s *DeleteDatabaseUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	userID := "test-dbuser-2"
 	databaseID := "test-database-2"
+	shardID := "test-shard-2"
 
 	dbUser := model.DatabaseUser{
 		ID:         userID,
@@ -303,15 +313,18 @@ func (s *DeleteDatabaseUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() 
 		Password:   "secret123",
 	}
 	database := model.Database{
-		ID:   databaseID,
-		Name: "mydb",
+		ID:      databaseID,
+		Name:    "mydb",
+		ShardID: &shardID,
 	}
+	nodes := []model.Node{{ID: "node-1"}}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "database_users", ID: userID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetDatabaseUserByID", mock.Anything, userID).Return(&dbUser, nil)
 	s.env.OnActivity("GetDatabaseByID", mock.Anything, databaseID).Return(&database, nil)
+	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("DeleteDatabaseUser", mock.Anything, "mydb", "appuser").Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "database_users", ID: userID, Status: model.StatusFailed,

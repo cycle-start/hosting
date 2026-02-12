@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"fmt"
 	"time"
 
 	"go.temporal.io/sdk/temporal"
@@ -75,16 +76,46 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 		return err
 	}
 
-	// Install the certificate on the node.
-	err = workflow.ExecuteActivity(ctx, "InstallCertificate", activity.InstallCertificateParams{
-		FQDN:     fqdn.FQDN,
-		CertPEM:  "PLACEHOLDER_CERT_PEM",
-		KeyPEM:   "PLACEHOLDER_KEY_PEM",
-		ChainPEM: "PLACEHOLDER_CHAIN_PEM",
-	}).Get(ctx, nil)
+	// Look up the webroot and tenant to find the shard nodes.
+	var certWebroot model.Webroot
+	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", fqdn.WebrootID).Get(ctx, &certWebroot)
 	if err != nil {
 		_ = setResourceFailed(ctx, "certificates", certID)
 		return err
+	}
+
+	var certTenant model.Tenant
+	err = workflow.ExecuteActivity(ctx, "GetTenantByID", certWebroot.TenantID).Get(ctx, &certTenant)
+	if err != nil {
+		_ = setResourceFailed(ctx, "certificates", certID)
+		return err
+	}
+
+	if certTenant.ShardID == nil {
+		_ = setResourceFailed(ctx, "certificates", certID)
+		return fmt.Errorf("tenant %s has no shard assigned", certWebroot.TenantID)
+	}
+
+	var certNodes []model.Node
+	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *certTenant.ShardID).Get(ctx, &certNodes)
+	if err != nil {
+		_ = setResourceFailed(ctx, "certificates", certID)
+		return err
+	}
+
+	// Install the certificate on each node in the shard.
+	for _, node := range certNodes {
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		err = workflow.ExecuteActivity(nodeCtx, "InstallCertificate", activity.InstallCertificateParams{
+			FQDN:     fqdn.FQDN,
+			CertPEM:  "PLACEHOLDER_CERT_PEM",
+			KeyPEM:   "PLACEHOLDER_KEY_PEM",
+			ChainPEM: "PLACEHOLDER_CHAIN_PEM",
+		}).Get(ctx, nil)
+		if err != nil {
+			_ = setResourceFailed(ctx, "certificates", certID)
+			return err
+		}
 	}
 
 	// Deactivate other certificates for this FQDN.
@@ -147,16 +178,46 @@ func UploadCustomCertWorkflow(ctx workflow.Context, certID string) error {
 		return err
 	}
 
-	// Install the certificate on the node.
-	err = workflow.ExecuteActivity(ctx, "InstallCertificate", activity.InstallCertificateParams{
-		FQDN:     fqdn.FQDN,
-		CertPEM:  cert.CertPEM,
-		KeyPEM:   cert.KeyPEM,
-		ChainPEM: cert.ChainPEM,
-	}).Get(ctx, nil)
+	// Look up the webroot and tenant to find the shard nodes.
+	var ucWebroot model.Webroot
+	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", fqdn.WebrootID).Get(ctx, &ucWebroot)
 	if err != nil {
 		_ = setResourceFailed(ctx, "certificates", certID)
 		return err
+	}
+
+	var ucTenant model.Tenant
+	err = workflow.ExecuteActivity(ctx, "GetTenantByID", ucWebroot.TenantID).Get(ctx, &ucTenant)
+	if err != nil {
+		_ = setResourceFailed(ctx, "certificates", certID)
+		return err
+	}
+
+	if ucTenant.ShardID == nil {
+		_ = setResourceFailed(ctx, "certificates", certID)
+		return fmt.Errorf("tenant %s has no shard assigned", ucWebroot.TenantID)
+	}
+
+	var ucNodes []model.Node
+	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *ucTenant.ShardID).Get(ctx, &ucNodes)
+	if err != nil {
+		_ = setResourceFailed(ctx, "certificates", certID)
+		return err
+	}
+
+	// Install the certificate on each node in the shard.
+	for _, node := range ucNodes {
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		err = workflow.ExecuteActivity(nodeCtx, "InstallCertificate", activity.InstallCertificateParams{
+			FQDN:     fqdn.FQDN,
+			CertPEM:  cert.CertPEM,
+			KeyPEM:   cert.KeyPEM,
+			ChainPEM: cert.ChainPEM,
+		}).Get(ctx, nil)
+		if err != nil {
+			_ = setResourceFailed(ctx, "certificates", certID)
+			return err
+		}
 	}
 
 	// Deactivate other certificates for this FQDN.

@@ -61,12 +61,6 @@ func main() {
 	serviceDBActivities := activity.NewServiceDB(servicePool)
 	w.RegisterActivity(serviceDBActivities)
 
-	nodeGRPCActivities := activity.NewNodeGRPC(cfg.NodeAgentAddr)
-	w.RegisterActivity(nodeGRPCActivities)
-
-	nodeGRPCDynamicActivities := activity.NewNodeGRPCDynamic(corePool)
-	w.RegisterActivity(nodeGRPCDynamicActivities)
-
 	dnsActivities := activity.NewDNS(corePool, serviceDBActivities)
 	w.RegisterActivity(dnsActivities)
 

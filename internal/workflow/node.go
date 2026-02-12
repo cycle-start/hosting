@@ -207,23 +207,6 @@ func ProvisionNodeWorkflow(ctx workflow.Context, params ProvisionNodeParams) err
 		return err
 	}
 
-	// Set gRPC address. With Docker networking, use container name; otherwise use host IP + mapped port.
-	var grpcAddr string
-	if params.DockerNetwork != "" {
-		grpcAddr = fmt.Sprintf("%s:9090", containerName)
-	} else {
-		grpcPort := 9090
-		if actualPort, ok := createResult.Ports[9090]; ok {
-			grpcPort = actualPort
-		}
-		grpcAddr = fmt.Sprintf("%s:%d", host.IPAddress, grpcPort)
-	}
-	err = workflow.ExecuteActivity(ctx, "UpdateNodeGRPCAddress", nodeID, grpcAddr).Get(ctx, nil)
-	if err != nil {
-		_ = setResourceFailed(ctx, "nodes", nodeID)
-		return err
-	}
-
 	// Set node status to active.
 	err = workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
 		Table:  "nodes",

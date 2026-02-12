@@ -85,6 +85,24 @@ func NewServer(logger zerolog.Logger, cfg Config) *Server {
 	}
 }
 
+// TenantManager returns the server's tenant manager.
+func (s *Server) TenantManager() *TenantManager { return s.tenant }
+
+// WebrootManager returns the server's webroot manager.
+func (s *Server) WebrootManager() *WebrootManager { return s.webroot }
+
+// NginxManager returns the server's nginx manager.
+func (s *Server) NginxManager() *NginxManager { return s.nginx }
+
+// DatabaseManager returns the server's database manager.
+func (s *Server) DatabaseManager() *DatabaseManager { return s.database }
+
+// ValkeyManager returns the server's valkey manager.
+func (s *Server) ValkeyManager() *ValkeyManager { return s.valkey }
+
+// Runtimes returns the server's runtime managers.
+func (s *Server) Runtimes() map[string]runtime.Manager { return s.runtimes }
+
 // --------------------------------------------------------------------------
 // Tenant management
 // --------------------------------------------------------------------------

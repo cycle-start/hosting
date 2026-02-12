@@ -349,13 +349,6 @@ func (a *CoreDB) GetNodeByID(ctx context.Context, id string) (*model.Node, error
 	return &n, nil
 }
 
-// UpdateNodeGRPCAddress updates the gRPC address for a node.
-func (a *CoreDB) UpdateNodeGRPCAddress(ctx context.Context, id string, addr string) error {
-	_, err := a.db.Exec(ctx,
-		`UPDATE nodes SET grpc_address = $1, updated_at = now() WHERE id = $2`, addr, id)
-	return err
-}
-
 // GetHostMachineByID retrieves a host machine by its ID.
 func (a *CoreDB) GetHostMachineByID(ctx context.Context, id string) (*model.HostMachine, error) {
 	var h model.HostMachine

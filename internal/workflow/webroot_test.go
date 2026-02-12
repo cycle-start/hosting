@@ -55,7 +55,7 @@ func (s *CreateWebrootWorkflowTestSuite) TestSuccess() {
 		{ID: fqdnID, FQDN: "example.com", WebrootID: webrootID, SSLEnabled: true},
 	}
 	nodes := []model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
+		{ID: "node-1"},
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -65,19 +65,16 @@ func (s *CreateWebrootWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return(fqdns, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("CreateWebrootOnNode", mock.Anything, activity.CreateWebrootOnNodeParams{
-		NodeAddress: "node1:9090",
-		Webroot: activity.CreateWebrootParams{
-			ID:             webrootID,
-			TenantName:     "testuser",
-			Name:           "mysite",
-			Runtime:        "php",
-			RuntimeVersion: "8.2",
-			RuntimeConfig:  "{}",
-			PublicFolder:   "public",
-			FQDNs: []activity.FQDNParam{
-				{FQDN: "example.com", WebrootID: webrootID, SSLEnabled: true},
-			},
+	s.env.OnActivity("CreateWebroot", mock.Anything, activity.CreateWebrootParams{
+		ID:             webrootID,
+		TenantName:     "testuser",
+		Name:           "mysite",
+		Runtime:        "php",
+		RuntimeVersion: "8.2",
+		RuntimeConfig:  "{}",
+		PublicFolder:   "public",
+		FQDNs: []activity.FQDNParam{
+			{FQDN: "example.com", WebrootID: webrootID, SSLEnabled: true},
 		},
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -109,7 +106,7 @@ func (s *CreateWebrootWorkflowTestSuite) TestNoFQDNs_Success() {
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
+		{ID: "node-1"},
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -119,18 +116,15 @@ func (s *CreateWebrootWorkflowTestSuite) TestNoFQDNs_Success() {
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return([]model.FQDN{}, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("CreateWebrootOnNode", mock.Anything, activity.CreateWebrootOnNodeParams{
-		NodeAddress: "node1:9090",
-		Webroot: activity.CreateWebrootParams{
-			ID:             webrootID,
-			TenantName:     "testuser",
-			Name:           "mysite",
-			Runtime:        "static",
-			RuntimeVersion: "",
-			RuntimeConfig:  "{}",
-			PublicFolder:   ".",
-			FQDNs:          []activity.FQDNParam{},
-		},
+	s.env.OnActivity("CreateWebroot", mock.Anything, activity.CreateWebrootParams{
+		ID:             webrootID,
+		TenantName:     "testuser",
+		Name:           "mysite",
+		Runtime:        "static",
+		RuntimeVersion: "",
+		RuntimeConfig:  "{}",
+		PublicFolder:   ".",
+		FQDNs:          []activity.FQDNParam{},
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "webroots", ID: webrootID, Status: model.StatusActive,
@@ -161,7 +155,7 @@ func (s *CreateWebrootWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{
-		{ID: "node-1", GRPCAddress: "node1:9090"},
+		{ID: "node-1"},
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -171,7 +165,7 @@ func (s *CreateWebrootWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return([]model.FQDN{}, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("CreateWebrootOnNode", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
+	s.env.OnActivity("CreateWebroot", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "webroots", ID: webrootID, Status: model.StatusFailed,
 	}).Return(nil)
@@ -215,6 +209,7 @@ func (s *UpdateWebrootWorkflowTestSuite) AfterTest(suiteName, testName string) {
 func (s *UpdateWebrootWorkflowTestSuite) TestSuccess() {
 	webrootID := "test-webroot-1"
 	tenantID := "test-tenant-1"
+	shardID := "test-shard-1"
 
 	webroot := model.Webroot{
 		ID:             webrootID,
@@ -226,8 +221,12 @@ func (s *UpdateWebrootWorkflowTestSuite) TestSuccess() {
 		PublicFolder:   "public",
 	}
 	tenant := model.Tenant{
-		ID:   tenantID,
-		Name: "testuser",
+		ID:      tenantID,
+		Name:    "testuser",
+		ShardID: &shardID,
+	}
+	nodes := []model.Node{
+		{ID: "node-1"},
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -236,6 +235,7 @@ func (s *UpdateWebrootWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return([]model.FQDN{}, nil)
+	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("UpdateWebroot", mock.Anything, activity.UpdateWebrootParams{
 		ID:             webrootID,
 		TenantName:     "testuser",
@@ -257,6 +257,7 @@ func (s *UpdateWebrootWorkflowTestSuite) TestSuccess() {
 func (s *UpdateWebrootWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	webrootID := "test-webroot-2"
 	tenantID := "test-tenant-2"
+	shardID := "test-shard-2"
 
 	webroot := model.Webroot{
 		ID:             webrootID,
@@ -268,8 +269,12 @@ func (s *UpdateWebrootWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 		PublicFolder:   "public",
 	}
 	tenant := model.Tenant{
-		ID:   tenantID,
-		Name: "testuser",
+		ID:      tenantID,
+		Name:    "testuser",
+		ShardID: &shardID,
+	}
+	nodes := []model.Node{
+		{ID: "node-1"},
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -278,6 +283,7 @@ func (s *UpdateWebrootWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return([]model.FQDN{}, nil)
+	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("UpdateWebroot", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "webroots", ID: webrootID, Status: model.StatusFailed,
@@ -307,6 +313,7 @@ func (s *DeleteWebrootWorkflowTestSuite) AfterTest(suiteName, testName string) {
 func (s *DeleteWebrootWorkflowTestSuite) TestSuccess() {
 	webrootID := "test-webroot-1"
 	tenantID := "test-tenant-1"
+	shardID := "test-shard-1"
 
 	webroot := model.Webroot{
 		ID:       webrootID,
@@ -314,8 +321,12 @@ func (s *DeleteWebrootWorkflowTestSuite) TestSuccess() {
 		Name:     "mysite",
 	}
 	tenant := model.Tenant{
-		ID:   tenantID,
-		Name: "testuser",
+		ID:      tenantID,
+		Name:    "testuser",
+		ShardID: &shardID,
+	}
+	nodes := []model.Node{
+		{ID: "node-1"},
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -323,6 +334,7 @@ func (s *DeleteWebrootWorkflowTestSuite) TestSuccess() {
 	}).Return(nil)
 	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
+	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("DeleteWebroot", mock.Anything, "testuser", "mysite").Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "webroots", ID: webrootID, Status: model.StatusDeleted,
@@ -335,6 +347,7 @@ func (s *DeleteWebrootWorkflowTestSuite) TestSuccess() {
 func (s *DeleteWebrootWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	webrootID := "test-webroot-2"
 	tenantID := "test-tenant-2"
+	shardID := "test-shard-2"
 
 	webroot := model.Webroot{
 		ID:       webrootID,
@@ -342,8 +355,12 @@ func (s *DeleteWebrootWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 		Name:     "mysite",
 	}
 	tenant := model.Tenant{
-		ID:   tenantID,
-		Name: "testuser",
+		ID:      tenantID,
+		Name:    "testuser",
+		ShardID: &shardID,
+	}
+	nodes := []model.Node{
+		{ID: "node-1"},
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -351,6 +368,7 @@ func (s *DeleteWebrootWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	}).Return(nil)
 	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
+	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("DeleteWebroot", mock.Anything, "testuser", "mysite").Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "webroots", ID: webrootID, Status: model.StatusFailed,
