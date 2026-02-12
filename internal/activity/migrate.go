@@ -16,20 +16,6 @@ func NewMigrate(db DB) *Migrate {
 	return &Migrate{db: db}
 }
 
-// MigrateMySQLDatabaseParams holds parameters for MigrateMySQLDatabase.
-type MigrateMySQLDatabaseParams struct {
-	DatabaseName  string `json:"database_name"`
-	SourceShardID string `json:"source_shard_id"`
-	TargetShardID string `json:"target_shard_id"`
-}
-
-// MigrateMySQLDatabase performs a mysqldump from source shard and imports to target shard.
-// This is a stub that will be implemented when cross-shard database migration is needed.
-func (a *Migrate) MigrateMySQLDatabase(ctx context.Context, params MigrateMySQLDatabaseParams) error {
-	log.Printf("migrating MySQL database %s from shard %s to shard %s", params.DatabaseName, params.SourceShardID, params.TargetShardID)
-	return nil
-}
-
 // ValidateMigrationPreconditionsParams holds parameters for ValidateMigrationPreconditions.
 type ValidateMigrationPreconditionsParams struct {
 	TenantID      string `json:"tenant_id"`
@@ -64,6 +50,94 @@ func (a *Migrate) ValidateMigrationPreconditions(ctx context.Context, params Val
 
 	if targetRole != "web" {
 		return fmt.Errorf("target shard role is %s, expected web", targetRole)
+	}
+
+	if targetStatus != "active" {
+		return fmt.Errorf("target shard status is %s, expected active", targetStatus)
+	}
+
+	return nil
+}
+
+// ValidateDatabaseMigrationParams holds parameters for ValidateDatabaseMigration.
+type ValidateDatabaseMigrationParams struct {
+	DatabaseID    string `json:"database_id"`
+	TargetShardID string `json:"target_shard_id"`
+}
+
+// ValidateDatabaseMigration checks that a database migration can proceed.
+func (a *Migrate) ValidateDatabaseMigration(ctx context.Context, params ValidateDatabaseMigrationParams) error {
+	var sourceClusterID string
+	var sourceShardID *string
+
+	// Get the database's current shard and cluster.
+	err := a.db.QueryRow(ctx,
+		`SELECT d.shard_id, s.cluster_id FROM databases d JOIN shards s ON d.shard_id = s.id WHERE d.id = $1`,
+		params.DatabaseID,
+	).Scan(&sourceShardID, &sourceClusterID)
+	if err != nil {
+		return fmt.Errorf("get database shard: %w", err)
+	}
+
+	// Get target shard info.
+	var targetClusterID, targetRole, targetStatus string
+	err = a.db.QueryRow(ctx,
+		`SELECT cluster_id, role, status FROM shards WHERE id = $1`, params.TargetShardID,
+	).Scan(&targetClusterID, &targetRole, &targetStatus)
+	if err != nil {
+		return fmt.Errorf("get target shard: %w", err)
+	}
+
+	if sourceClusterID != targetClusterID {
+		return fmt.Errorf("source cluster %s != target cluster %s: cross-cluster migration not supported", sourceClusterID, targetClusterID)
+	}
+
+	if targetRole != "database" {
+		return fmt.Errorf("target shard role is %s, expected database", targetRole)
+	}
+
+	if targetStatus != "active" {
+		return fmt.Errorf("target shard status is %s, expected active", targetStatus)
+	}
+
+	return nil
+}
+
+// ValidateValkeyMigrationParams holds parameters for ValidateValkeyMigration.
+type ValidateValkeyMigrationParams struct {
+	InstanceID    string `json:"instance_id"`
+	TargetShardID string `json:"target_shard_id"`
+}
+
+// ValidateValkeyMigration checks that a Valkey instance migration can proceed.
+func (a *Migrate) ValidateValkeyMigration(ctx context.Context, params ValidateValkeyMigrationParams) error {
+	var sourceClusterID string
+	var sourceShardID *string
+
+	// Get the instance's current shard and cluster.
+	err := a.db.QueryRow(ctx,
+		`SELECT v.shard_id, s.cluster_id FROM valkey_instances v JOIN shards s ON v.shard_id = s.id WHERE v.id = $1`,
+		params.InstanceID,
+	).Scan(&sourceShardID, &sourceClusterID)
+	if err != nil {
+		return fmt.Errorf("get valkey instance shard: %w", err)
+	}
+
+	// Get target shard info.
+	var targetClusterID, targetRole, targetStatus string
+	err = a.db.QueryRow(ctx,
+		`SELECT cluster_id, role, status FROM shards WHERE id = $1`, params.TargetShardID,
+	).Scan(&targetClusterID, &targetRole, &targetStatus)
+	if err != nil {
+		return fmt.Errorf("get target shard: %w", err)
+	}
+
+	if sourceClusterID != targetClusterID {
+		return fmt.Errorf("source cluster %s != target cluster %s: cross-cluster migration not supported", sourceClusterID, targetClusterID)
+	}
+
+	if targetRole != "valkey" {
+		return fmt.Errorf("target shard role is %s, expected valkey", targetRole)
 	}
 
 	if targetStatus != "active" {

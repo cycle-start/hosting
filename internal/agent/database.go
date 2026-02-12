@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -283,6 +285,72 @@ func (m *DatabaseManager) UpdateUser(ctx context.Context, dbName, username, pass
 	}
 
 	return m.execMySQL(ctx, "FLUSH PRIVILEGES")
+}
+
+// DumpDatabase runs mysqldump and compresses the output to a gzipped file.
+func (m *DatabaseManager) DumpDatabase(ctx context.Context, name, dumpPath string) error {
+	if err := validateName(name); err != nil {
+		return err
+	}
+
+	m.logger.Info().Str("database", name).Str("path", dumpPath).Msg("dumping database")
+
+	// Create parent directory.
+	if err := os.MkdirAll(filepath.Dir(dumpPath), 0750); err != nil {
+		return status.Errorf(codes.Internal, "create dump directory: %v", err)
+	}
+
+	baseArgs, err := m.mysqlArgs()
+	if err != nil {
+		return status.Errorf(codes.Internal, "parse mysql DSN: %v", err)
+	}
+
+	// Build: mysqldump {auth args} {dbname} | gzip > {dumpPath}
+	dumpArgs := append(baseArgs, "--single-transaction", "--routines", "--triggers", name)
+	shell := fmt.Sprintf("mysqldump %s | gzip > %s", strings.Join(quoteArgs(dumpArgs), " "), dumpPath)
+	cmd := exec.CommandContext(ctx, "bash", "-c", shell)
+	m.logger.Debug().Str("shell", shell).Msg("executing mysqldump")
+
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return status.Errorf(codes.Internal, "mysqldump failed: %s: %v", string(output), err)
+	}
+
+	return nil
+}
+
+// ImportDatabase imports a gzipped SQL dump into a MySQL database.
+func (m *DatabaseManager) ImportDatabase(ctx context.Context, name, dumpPath string) error {
+	if err := validateName(name); err != nil {
+		return err
+	}
+
+	m.logger.Info().Str("database", name).Str("path", dumpPath).Msg("importing database")
+
+	baseArgs, err := m.mysqlArgs()
+	if err != nil {
+		return status.Errorf(codes.Internal, "parse mysql DSN: %v", err)
+	}
+
+	// Build: gunzip -c {dumpPath} | mysql {auth args} {dbname}
+	importArgs := append(baseArgs, name)
+	shell := fmt.Sprintf("gunzip -c %s | mysql %s", dumpPath, strings.Join(quoteArgs(importArgs), " "))
+	cmd := exec.CommandContext(ctx, "bash", "-c", shell)
+	m.logger.Debug().Str("shell", shell).Msg("executing mysql import")
+
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return status.Errorf(codes.Internal, "mysql import failed: %s: %v", string(output), err)
+	}
+
+	return nil
+}
+
+// quoteArgs wraps each argument in single quotes for safe shell usage.
+func quoteArgs(args []string) []string {
+	quoted := make([]string, len(args))
+	for i, a := range args {
+		quoted[i] = "'" + strings.ReplaceAll(a, "'", "'\\''") + "'"
+	}
+	return quoted
 }
 
 // DeleteUser drops a MySQL user.

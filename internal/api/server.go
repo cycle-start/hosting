@@ -205,6 +205,13 @@ func (s *Server) setupRoutes() {
 		r.Put("/valkey-users/{id}", valkeyUser.Update)
 		r.Delete("/valkey-users/{id}", valkeyUser.Delete)
 
+		// SFTP keys
+		sftpKey := handler.NewSFTPKey(s.services.SFTPKey)
+		r.Get("/tenants/{tenantID}/sftp-keys", sftpKey.ListByTenant)
+		r.Post("/tenants/{tenantID}/sftp-keys", sftpKey.Create)
+		r.Get("/sftp-keys/{id}", sftpKey.Get)
+		r.Delete("/sftp-keys/{id}", sftpKey.Delete)
+
 		// Email accounts
 		emailAccount := handler.NewEmailAccount(s.services.EmailAccount)
 		r.Get("/fqdns/{fqdnID}/email-accounts", emailAccount.ListByFQDN)
@@ -231,6 +238,14 @@ func (s *Server) setupRoutes() {
 		r.Get("/email-accounts/{id}/autoreply", emailAutoReply.Get)
 		r.Put("/email-accounts/{id}/autoreply", emailAutoReply.Put)
 		r.Delete("/email-accounts/{id}/autoreply", emailAutoReply.Delete)
+
+		// Backups
+		backup := handler.NewBackup(s.services.Backup, s.services.Webroot, s.services.Database)
+		r.Get("/tenants/{tenantID}/backups", backup.ListByTenant)
+		r.Post("/tenants/{tenantID}/backups", backup.Create)
+		r.Get("/backups/{id}", backup.Get)
+		r.Delete("/backups/{id}", backup.Delete)
+		r.Post("/backups/{id}/restore", backup.Restore)
 	})
 }
 

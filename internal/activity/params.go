@@ -122,3 +122,68 @@ type InstallCertificateParams struct {
 	KeyPEM   string
 	ChainPEM string
 }
+
+// SyncSFTPKeysParams holds parameters for syncing SFTP authorized keys on a node.
+type SyncSFTPKeysParams struct {
+	TenantName string
+	PublicKeys []string
+}
+
+// DumpMySQLDatabaseParams holds parameters for dumping a MySQL database on a node.
+type DumpMySQLDatabaseParams struct {
+	DatabaseName string
+	DumpPath     string
+}
+
+// ImportMySQLDatabaseParams holds parameters for importing a MySQL database dump on a node.
+type ImportMySQLDatabaseParams struct {
+	DatabaseName string
+	DumpPath     string
+}
+
+// DumpValkeyDataParams holds parameters for dumping Valkey data on a node.
+type DumpValkeyDataParams struct {
+	Name     string
+	Port     int
+	Password string
+	DumpPath string
+}
+
+// ImportValkeyDataParams holds parameters for importing Valkey data on a node.
+type ImportValkeyDataParams struct {
+	Name     string
+	Port     int
+	DumpPath string
+}
+
+// CreateWebBackupParams holds parameters for creating a web backup on a node.
+type CreateWebBackupParams struct {
+	TenantName  string
+	WebrootName string
+	BackupPath  string // e.g. /var/backups/hosting/{tenant}/{backup-id}.tar.gz
+}
+
+// RestoreWebBackupParams holds parameters for restoring a web backup on a node.
+type RestoreWebBackupParams struct {
+	TenantName  string
+	WebrootName string
+	BackupPath  string
+}
+
+// CreateMySQLBackupParams holds parameters for creating a MySQL backup on a node.
+type CreateMySQLBackupParams struct {
+	DatabaseName string
+	BackupPath   string // e.g. /var/backups/hosting/{tenant}/{backup-id}.sql.gz
+}
+
+// RestoreMySQLBackupParams holds parameters for restoring a MySQL backup on a node.
+type RestoreMySQLBackupParams struct {
+	DatabaseName string
+	BackupPath   string
+}
+
+// BackupResult holds the result of a backup operation.
+type BackupResult struct {
+	StoragePath string
+	SizeBytes   int64
+}

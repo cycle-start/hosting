@@ -122,6 +122,8 @@ func main() {
 	w.RegisterWorkflow(workflow.DeleteDatabaseUserWorkflow)
 	w.RegisterWorkflow(workflow.UpdateServiceHostnamesWorkflow)
 	w.RegisterWorkflow(workflow.MigrateTenantWorkflow)
+	w.RegisterWorkflow(workflow.MigrateDatabaseWorkflow)
+	w.RegisterWorkflow(workflow.MigrateValkeyInstanceWorkflow)
 	w.RegisterWorkflow(workflow.CreateEmailAccountWorkflow)
 	w.RegisterWorkflow(workflow.DeleteEmailAccountWorkflow)
 	w.RegisterWorkflow(workflow.CreateEmailAliasWorkflow)
@@ -135,7 +137,12 @@ func main() {
 	w.RegisterWorkflow(workflow.CreateValkeyUserWorkflow)
 	w.RegisterWorkflow(workflow.UpdateValkeyUserWorkflow)
 	w.RegisterWorkflow(workflow.DeleteValkeyUserWorkflow)
+	w.RegisterWorkflow(workflow.AddSFTPKeyWorkflow)
+	w.RegisterWorkflow(workflow.RemoveSFTPKeyWorkflow)
 	w.RegisterWorkflow(workflow.ConvergeShardWorkflow)
+	w.RegisterWorkflow(workflow.CreateBackupWorkflow)
+	w.RegisterWorkflow(workflow.RestoreBackupWorkflow)
+	w.RegisterWorkflow(workflow.DeleteBackupWorkflow)
 
 	go func() {
 		logger.Info().Str("taskQueue", taskQueue).Msg("starting temporal worker")

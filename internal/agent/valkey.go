@@ -7,7 +7,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -149,6 +151,121 @@ func (m *ValkeyManager) DeleteInstance(ctx context.Context, name string, port in
 	dataPath := filepath.Join(m.dataDir, name)
 	if err := os.RemoveAll(dataPath); err != nil {
 		return status.Errorf(codes.Internal, "remove data dir: %v", err)
+	}
+
+	return nil
+}
+
+// DumpData triggers a Valkey BGSAVE and copies the RDB file to the dump path.
+func (m *ValkeyManager) DumpData(ctx context.Context, name string, port int, password, dumpPath string) error {
+	if err := validateName(name); err != nil {
+		return err
+	}
+
+	m.logger.Info().Str("instance", name).Int("port", port).Str("path", dumpPath).Msg("dumping valkey data")
+
+	// Create parent directory.
+	if err := os.MkdirAll(filepath.Dir(dumpPath), 0750); err != nil {
+		return status.Errorf(codes.Internal, "create dump directory: %v", err)
+	}
+
+	// Record LASTSAVE before BGSAVE.
+	beforeSave, err := m.execValkeyCLI(ctx, port, password, "LASTSAVE")
+	if err != nil {
+		return fmt.Errorf("LASTSAVE before: %w", err)
+	}
+	beforeTS, err := strconv.ParseInt(beforeSave, 10, 64)
+	if err != nil {
+		return fmt.Errorf("parse LASTSAVE timestamp %q: %w", beforeSave, err)
+	}
+
+	// Trigger BGSAVE.
+	if _, err := m.execValkeyCLI(ctx, port, password, "BGSAVE"); err != nil {
+		return fmt.Errorf("BGSAVE: %w", err)
+	}
+
+	// Poll LASTSAVE until the timestamp changes, meaning BGSAVE completed.
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(500 * time.Millisecond):
+		}
+
+		afterSave, err := m.execValkeyCLI(ctx, port, password, "LASTSAVE")
+		if err != nil {
+			return fmt.Errorf("LASTSAVE poll: %w", err)
+		}
+		afterTS, err := strconv.ParseInt(afterSave, 10, 64)
+		if err != nil {
+			return fmt.Errorf("parse LASTSAVE timestamp %q: %w", afterSave, err)
+		}
+		if afterTS > beforeTS {
+			break
+		}
+	}
+
+	// Copy the RDB file to the dump path.
+	dataPath := filepath.Join(m.dataDir, name)
+	rdbPath := filepath.Join(dataPath, "dump.rdb")
+	cmd := exec.CommandContext(ctx, "cp", rdbPath, dumpPath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return status.Errorf(codes.Internal, "copy RDB: %s: %v", string(output), err)
+	}
+
+	return nil
+}
+
+// ImportData stops the Valkey instance, replaces the RDB file, and restarts it.
+func (m *ValkeyManager) ImportData(ctx context.Context, name string, port int, dumpPath string) error {
+	if err := validateName(name); err != nil {
+		return err
+	}
+
+	m.logger.Info().Str("instance", name).Int("port", port).Str("path", dumpPath).Msg("importing valkey data")
+
+	// Stop the instance.
+	serviceName := fmt.Sprintf("valkey@%s.service", name)
+	instancePassword, err := m.readInstancePassword(name)
+	if err == nil {
+		if _, shutdownErr := m.execValkeyCLI(ctx, port, instancePassword, "SHUTDOWN", "NOSAVE"); shutdownErr != nil {
+			m.logger.Warn().Err(shutdownErr).Msg("valkey SHUTDOWN failed, trying service manager")
+		}
+	}
+	if stopErr := m.svcMgr.Stop(ctx, serviceName); stopErr != nil {
+		m.logger.Warn().Err(stopErr).Msg("service manager stop failed during import")
+	}
+
+	// Wait briefly for process to exit.
+	time.Sleep(1 * time.Second)
+
+	// Replace the RDB file.
+	dataPath := filepath.Join(m.dataDir, name)
+	rdbPath := filepath.Join(dataPath, "dump.rdb")
+	cmd := exec.CommandContext(ctx, "cp", dumpPath, rdbPath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return status.Errorf(codes.Internal, "copy RDB: %s: %v", string(output), err)
+	}
+
+	// Remove the AOF so Valkey loads from the RDB on startup.
+	aofPath := filepath.Join(dataPath, "appendonly.aof")
+	if err := os.Remove(aofPath); err != nil && !os.IsNotExist(err) {
+		m.logger.Warn().Err(err).Str("path", aofPath).Msg("remove AOF failed")
+	}
+	// Also remove any appendonlydir if present.
+	aofDir := filepath.Join(dataPath, "appendonlydir")
+	if err := os.RemoveAll(aofDir); err != nil {
+		m.logger.Warn().Err(err).Str("path", aofDir).Msg("remove AOF dir failed")
+	}
+
+	// Restart the instance.
+	startCmd := exec.CommandContext(ctx, "valkey-server", m.configPath(name), "--daemonize", "yes")
+	if output, err := startCmd.CombinedOutput(); err != nil {
+		return status.Errorf(codes.Internal, "valkey-server restart: %s: %v", string(output), err)
+	}
+
+	if err := m.svcMgr.Start(ctx, serviceName); err != nil {
+		m.logger.Warn().Err(err).Str("service", serviceName).Msg("systemd start failed after import")
 	}
 
 	return nil

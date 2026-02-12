@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -166,4 +167,253 @@ func waitForHTTP(t *testing.T, url, host string, timeout time.Duration) (*http.R
 
 	t.Fatalf("timed out waiting for %s (Host: %s): %v", url, host, lastErr)
 	return nil, ""
+}
+
+// httpPost performs an HTTP POST with a JSON body, returns the response and body string.
+func httpPost(t *testing.T, url string, body interface{}) (*http.Response, string) {
+	t.Helper()
+	var reqBody io.Reader
+	if body != nil {
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			t.Fatalf("marshal POST body: %v", err)
+		}
+		reqBody = bytes.NewReader(jsonBody)
+	}
+	req, err := http.NewRequest(http.MethodPost, url, reqBody)
+	if err != nil {
+		t.Fatalf("create POST request %s: %v", url, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST %s: %v", url, err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp, string(b)
+}
+
+// httpPut performs an HTTP PUT with a JSON body.
+func httpPut(t *testing.T, url string, body interface{}) (*http.Response, string) {
+	t.Helper()
+	var reqBody io.Reader
+	if body != nil {
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			t.Fatalf("marshal PUT body: %v", err)
+		}
+		reqBody = bytes.NewReader(jsonBody)
+	}
+	req, err := http.NewRequest(http.MethodPut, url, reqBody)
+	if err != nil {
+		t.Fatalf("create PUT request %s: %v", url, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("PUT %s: %v", url, err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp, string(b)
+}
+
+// httpDelete performs an HTTP DELETE.
+func httpDelete(t *testing.T, url string) (*http.Response, string) {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		t.Fatalf("create DELETE request %s: %v", url, err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("DELETE %s: %v", url, err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp, string(b)
+}
+
+// httpGet performs an HTTP GET and returns the response and body string.
+func httpGet(t *testing.T, url string) (*http.Response, string) {
+	t.Helper()
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("GET %s: %v", url, err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp, string(b)
+}
+
+// parseJSON unmarshals a JSON response body into a map.
+func parseJSON(t *testing.T, body string) map[string]interface{} {
+	t.Helper()
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(body), &result); err != nil {
+		t.Fatalf("parse JSON: %v\nbody: %s", err, body)
+	}
+	return result
+}
+
+// parseJSONArray unmarshals a JSON array response body.
+func parseJSONArray(t *testing.T, body string) []map[string]interface{} {
+	t.Helper()
+	var result []map[string]interface{}
+	if err := json.Unmarshal([]byte(body), &result); err != nil {
+		t.Fatalf("parse JSON array: %v\nbody: %s", err, body)
+	}
+	return result
+}
+
+// parsePaginatedItems extracts the "items" array from a paginated response.
+func parsePaginatedItems(t *testing.T, body string) []map[string]interface{} {
+	t.Helper()
+	wrapper := parseJSON(t, body)
+	items, ok := wrapper["items"]
+	if !ok {
+		t.Fatalf("paginated response missing 'items' key: %s", body)
+	}
+	// Re-marshal and unmarshal the items to get []map[string]interface{}
+	raw, _ := json.Marshal(items)
+	var result []map[string]interface{}
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatalf("parse paginated items: %v", err)
+	}
+	return result
+}
+
+// waitForStatus polls a resource URL until its "status" field matches the
+// desired value or the timeout elapses. Returns the final resource as a map.
+func waitForStatus(t *testing.T, url, wantStatus string, timeout time.Duration) map[string]interface{} {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	var lastStatus string
+	var lastBody string
+
+	for time.Now().Before(deadline) {
+		resp, body := httpGet(t, url)
+		if resp.StatusCode == http.StatusNotFound && wantStatus == "deleted" {
+			// 404 means the resource has been fully removed; treat as "deleted".
+			return map[string]interface{}{"status": "deleted"}
+		}
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			resource := parseJSON(t, body)
+			status, _ := resource["status"].(string)
+			lastStatus = status
+			lastBody = body
+			if status == wantStatus {
+				return resource
+			}
+			if status == "failed" && wantStatus != "failed" {
+				t.Fatalf("resource entered failed state while waiting for %q: %s", wantStatus, body)
+			}
+		}
+		time.Sleep(2 * time.Second)
+	}
+
+	t.Fatalf("timed out waiting for status %q at %s (last status=%q, body=%s)", wantStatus, url, lastStatus, lastBody)
+	return nil
+}
+
+// findFirstRegionID returns the ID of the first region from the API.
+func findFirstRegionID(t *testing.T) string {
+	t.Helper()
+	resp, body := httpGet(t, coreAPIURL+"/regions")
+	if resp.StatusCode != 200 {
+		t.Fatalf("list regions: status %d body=%s", resp.StatusCode, body)
+	}
+	regions := parsePaginatedItems(t, body)
+	if len(regions) == 0 {
+		t.Fatal("no regions found")
+	}
+	id, ok := regions[0]["id"].(string)
+	if !ok || id == "" {
+		t.Fatal("first region has no id")
+	}
+	return id
+}
+
+// findFirstCluster returns the ID of the first cluster in the given region.
+func findFirstCluster(t *testing.T, regionID string) map[string]interface{} {
+	t.Helper()
+	resp, body := httpGet(t, fmt.Sprintf("%s/regions/%s/clusters", coreAPIURL, regionID))
+	if resp.StatusCode != 200 {
+		t.Fatalf("list clusters: status %d body=%s", resp.StatusCode, body)
+	}
+	clusters := parsePaginatedItems(t, body)
+	if len(clusters) == 0 {
+		t.Fatal("no clusters found")
+	}
+	return clusters[0]
+}
+
+// findShardByRole returns the first shard with the given role in a cluster.
+func findShardByRole(t *testing.T, clusterID, role string) map[string]interface{} {
+	t.Helper()
+	resp, body := httpGet(t, fmt.Sprintf("%s/clusters/%s/shards", coreAPIURL, clusterID))
+	if resp.StatusCode != 200 {
+		t.Fatalf("list shards: status %d body=%s", resp.StatusCode, body)
+	}
+	shards := parsePaginatedItems(t, body)
+	for _, s := range shards {
+		if r, _ := s["role"].(string); r == role {
+			return s
+		}
+	}
+	t.Fatalf("no shard with role %q in cluster %s", role, clusterID)
+	return nil
+}
+
+// createTestTenant creates a tenant assigned to the first web shard and
+// waits for it to become active. It registers a cleanup function that
+// deletes the tenant when the test completes.
+func createTestTenant(t *testing.T, name string) (tenantID, regionID, clusterID, webShardID, dbShardID string) {
+	t.Helper()
+
+	regionID = findFirstRegionID(t)
+	cluster := findFirstCluster(t, regionID)
+	clusterID, _ = cluster["id"].(string)
+
+	webShard := findShardByRole(t, clusterID, "web")
+	webShardID, _ = webShard["id"].(string)
+
+	// Try to find a database shard; not all clusters have one.
+	resp, body := httpGet(t, fmt.Sprintf("%s/clusters/%s/shards", coreAPIURL, clusterID))
+	if resp.StatusCode == 200 {
+		shards := parsePaginatedItems(t, body)
+		for _, s := range shards {
+			if r, _ := s["role"].(string); r == "database" {
+				dbShardID, _ = s["id"].(string)
+				break
+			}
+		}
+	}
+
+	createResp, createBody := httpPost(t, coreAPIURL+"/tenants", map[string]interface{}{
+		"name":       name,
+		"region_id":  regionID,
+		"cluster_id": clusterID,
+		"shard_id":   webShardID,
+	})
+	if createResp.StatusCode != 202 {
+		t.Fatalf("create tenant %q: status %d body=%s", name, createResp.StatusCode, createBody)
+	}
+	tenant := parseJSON(t, createBody)
+	tenantID, _ = tenant["id"].(string)
+
+	t.Cleanup(func() {
+		// Best-effort delete; ignore errors.
+		httpDelete(t, coreAPIURL+"/tenants/"+tenantID)
+	})
+
+	waitForStatus(t, coreAPIURL+"/tenants/"+tenantID, "active", provisionTimeout)
+	t.Logf("tenant %q active: %s", name, tenantID)
+
+	return tenantID, regionID, clusterID, webShardID, dbShardID
 }

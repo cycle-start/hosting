@@ -25,6 +25,8 @@ type Services struct {
 	EmailAutoReply   *EmailAutoReplyService
 	ValkeyInstance   *ValkeyInstanceService
 	ValkeyUser       *ValkeyUserService
+	SFTPKey          *SFTPKeyService
+	Backup           *BackupService
 }
 
 func NewServices(db DB, tc temporalclient.Client) *Services {
@@ -49,5 +51,7 @@ func NewServices(db DB, tc temporalclient.Client) *Services {
 		EmailAutoReply:   NewEmailAutoReplyService(db, tc),
 		ValkeyInstance:   NewValkeyInstanceService(db, tc),
 		ValkeyUser:       NewValkeyUserService(db, tc),
+		SFTPKey:          NewSFTPKeyService(db, tc),
+		Backup:           NewBackupService(db, tc),
 	}
 }

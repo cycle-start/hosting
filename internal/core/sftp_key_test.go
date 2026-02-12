@@ -1,0 +1,280 @@
+package core
+
+import (
+	"context"
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/edvin/hosting/internal/model"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	temporalmocks "go.temporal.io/sdk/mocks"
+)
+
+func TestNewSFTPKeyService(t *testing.T) {
+	db := &mockDB{}
+	tc := &temporalmocks.Client{}
+	svc := NewSFTPKeyService(db, tc)
+
+	require.NotNil(t, svc)
+	assert.Equal(t, db, svc.db)
+	assert.Equal(t, tc, svc.tc)
+}
+
+// ---------- Create ----------
+
+func TestSFTPKeyService_Create_Success(t *testing.T) {
+	db := &mockDB{}
+	tc := &temporalmocks.Client{}
+	svc := NewSFTPKeyService(db, tc)
+	ctx := context.Background()
+
+	now := time.Now()
+	key := &model.SFTPKey{
+		ID:          "test-key-1",
+		TenantID:    "test-tenant-1",
+		Name:        "my-key",
+		PublicKey:   "ssh-ed25519 AAAAC3...",
+		Fingerprint: "SHA256:abc123",
+		Status:      model.StatusPending,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+
+	wfRun := &temporalmocks.WorkflowRun{}
+	wfRun.On("GetID").Return("mock-wf-id")
+	wfRun.On("GetRunID").Return("mock-run-id")
+	tc.On("ExecuteWorkflow", ctx, mock.Anything, "AddSFTPKeyWorkflow", mock.Anything).Return(wfRun, nil)
+
+	err := svc.Create(ctx, key)
+	require.NoError(t, err)
+	db.AssertExpectations(t)
+	tc.AssertExpectations(t)
+}
+
+func TestSFTPKeyService_Create_InsertError(t *testing.T) {
+	db := &mockDB{}
+	tc := &temporalmocks.Client{}
+	svc := NewSFTPKeyService(db, tc)
+	ctx := context.Background()
+
+	key := &model.SFTPKey{ID: "test-key-1", TenantID: "test-tenant-1"}
+
+	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
+
+	err := svc.Create(ctx, key)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "insert sftp key")
+	db.AssertExpectations(t)
+}
+
+func TestSFTPKeyService_Create_WorkflowError(t *testing.T) {
+	db := &mockDB{}
+	tc := &temporalmocks.Client{}
+	svc := NewSFTPKeyService(db, tc)
+	ctx := context.Background()
+
+	key := &model.SFTPKey{ID: "test-key-1", TenantID: "test-tenant-1"}
+
+	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+	tc.On("ExecuteWorkflow", ctx, mock.Anything, "AddSFTPKeyWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+
+	err := svc.Create(ctx, key)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "start AddSFTPKeyWorkflow")
+	db.AssertExpectations(t)
+	tc.AssertExpectations(t)
+}
+
+// ---------- GetByID ----------
+
+func TestSFTPKeyService_GetByID_Success(t *testing.T) {
+	db := &mockDB{}
+	tc := &temporalmocks.Client{}
+	svc := NewSFTPKeyService(db, tc)
+	ctx := context.Background()
+
+	keyID := "test-key-1"
+	tenantID := "test-tenant-1"
+	now := time.Now().Truncate(time.Microsecond)
+
+	row := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = keyID
+		*(dest[1].(*string)) = tenantID
+		*(dest[2].(*string)) = "my-key"
+		*(dest[3].(*string)) = "ssh-ed25519 AAAAC3..."
+		*(dest[4].(*string)) = "SHA256:abc123"
+		*(dest[5].(*string)) = model.StatusActive
+		*(dest[6].(*time.Time)) = now
+		*(dest[7].(*time.Time)) = now
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
+
+	result, err := svc.GetByID(ctx, keyID)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, keyID, result.ID)
+	assert.Equal(t, tenantID, result.TenantID)
+	assert.Equal(t, "my-key", result.Name)
+	assert.Equal(t, "SHA256:abc123", result.Fingerprint)
+	assert.Equal(t, model.StatusActive, result.Status)
+	db.AssertExpectations(t)
+}
+
+func TestSFTPKeyService_GetByID_NotFound(t *testing.T) {
+	db := &mockDB{}
+	tc := &temporalmocks.Client{}
+	svc := NewSFTPKeyService(db, tc)
+	ctx := context.Background()
+
+	row := &mockRow{scanFunc: func(dest ...any) error {
+		return errors.New("no rows in result set")
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
+
+	result, err := svc.GetByID(ctx, "nonexistent-key")
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "get sftp key")
+	db.AssertExpectations(t)
+}
+
+// ---------- ListByTenant ----------
+
+func TestSFTPKeyService_ListByTenant_Success(t *testing.T) {
+	db := &mockDB{}
+	tc := &temporalmocks.Client{}
+	svc := NewSFTPKeyService(db, tc)
+	ctx := context.Background()
+
+	tenantID := "test-tenant-1"
+	id1 := "test-key-1"
+	now := time.Now().Truncate(time.Microsecond)
+
+	rows := newMockRows(
+		func(dest ...any) error {
+			*(dest[0].(*string)) = id1
+			*(dest[1].(*string)) = tenantID
+			*(dest[2].(*string)) = "my-key"
+			*(dest[3].(*string)) = "ssh-ed25519 AAAAC3..."
+			*(dest[4].(*string)) = "SHA256:abc123"
+			*(dest[5].(*string)) = model.StatusActive
+			*(dest[6].(*time.Time)) = now
+			*(dest[7].(*time.Time)) = now
+			return nil
+		},
+	)
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
+
+	result, hasMore, err := svc.ListByTenant(ctx, tenantID, 50, "")
+	require.NoError(t, err)
+	assert.False(t, hasMore)
+	require.Len(t, result, 1)
+	assert.Equal(t, id1, result[0].ID)
+	assert.Equal(t, tenantID, result[0].TenantID)
+	db.AssertExpectations(t)
+}
+
+func TestSFTPKeyService_ListByTenant_Empty(t *testing.T) {
+	db := &mockDB{}
+	tc := &temporalmocks.Client{}
+	svc := NewSFTPKeyService(db, tc)
+	ctx := context.Background()
+
+	rows := newEmptyMockRows()
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
+
+	result, hasMore, err := svc.ListByTenant(ctx, "test-tenant-1", 50, "")
+	require.NoError(t, err)
+	assert.False(t, hasMore)
+	assert.Empty(t, result)
+	db.AssertExpectations(t)
+}
+
+func TestSFTPKeyService_ListByTenant_QueryError(t *testing.T) {
+	db := &mockDB{}
+	tc := &temporalmocks.Client{}
+	svc := NewSFTPKeyService(db, tc)
+	ctx := context.Background()
+
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("db error"))
+
+	result, _, err := svc.ListByTenant(ctx, "test-tenant-1", 50, "")
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "list sftp keys")
+	db.AssertExpectations(t)
+}
+
+func TestSFTPKeyService_ListByTenant_WithCursor(t *testing.T) {
+	db := &mockDB{}
+	tc := &temporalmocks.Client{}
+	svc := NewSFTPKeyService(db, tc)
+	ctx := context.Background()
+
+	rows := newEmptyMockRows()
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
+
+	result, hasMore, err := svc.ListByTenant(ctx, "test-tenant-1", 50, "cursor-id")
+	require.NoError(t, err)
+	assert.False(t, hasMore)
+	assert.Empty(t, result)
+	db.AssertExpectations(t)
+}
+
+// ---------- Delete ----------
+
+func TestSFTPKeyService_Delete_Success(t *testing.T) {
+	db := &mockDB{}
+	tc := &temporalmocks.Client{}
+	svc := NewSFTPKeyService(db, tc)
+	ctx := context.Background()
+
+	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+
+	wfRun := &temporalmocks.WorkflowRun{}
+	wfRun.On("GetID").Return("mock-wf-id")
+	wfRun.On("GetRunID").Return("mock-run-id")
+	tc.On("ExecuteWorkflow", ctx, mock.Anything, "RemoveSFTPKeyWorkflow", mock.Anything).Return(wfRun, nil)
+
+	err := svc.Delete(ctx, "test-key-1")
+	require.NoError(t, err)
+	db.AssertExpectations(t)
+	tc.AssertExpectations(t)
+}
+
+func TestSFTPKeyService_Delete_ExecError(t *testing.T) {
+	db := &mockDB{}
+	tc := &temporalmocks.Client{}
+	svc := NewSFTPKeyService(db, tc)
+	ctx := context.Background()
+
+	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
+
+	err := svc.Delete(ctx, "test-key-1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "set sftp key")
+	db.AssertExpectations(t)
+}
+
+func TestSFTPKeyService_Delete_WorkflowError(t *testing.T) {
+	db := &mockDB{}
+	tc := &temporalmocks.Client{}
+	svc := NewSFTPKeyService(db, tc)
+	ctx := context.Background()
+
+	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+	tc.On("ExecuteWorkflow", ctx, mock.Anything, "RemoveSFTPKeyWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+
+	err := svc.Delete(ctx, "test-key-1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "start RemoveSFTPKeyWorkflow")
+	db.AssertExpectations(t)
+	tc.AssertExpectations(t)
+}

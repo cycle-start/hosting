@@ -3,6 +3,7 @@ package activity
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -357,6 +358,20 @@ func (a *CoreDB) UpdateTenantShardID(ctx context.Context, tenantID string, shard
 	return err
 }
 
+// UpdateDatabaseShardID updates the shard assignment for a database.
+func (a *CoreDB) UpdateDatabaseShardID(ctx context.Context, databaseID string, shardID string) error {
+	_, err := a.db.Exec(ctx,
+		`UPDATE databases SET shard_id = $1, updated_at = now() WHERE id = $2`, shardID, databaseID)
+	return err
+}
+
+// UpdateValkeyInstanceShardID updates the shard assignment for a valkey instance.
+func (a *CoreDB) UpdateValkeyInstanceShardID(ctx context.Context, instanceID string, shardID string) error {
+	_, err := a.db.Exec(ctx,
+		`UPDATE valkey_instances SET shard_id = $1, updated_at = now() WHERE id = $2`, shardID, instanceID)
+	return err
+}
+
 // ListWebrootsByTenantID retrieves all webroots for a tenant.
 func (a *CoreDB) ListWebrootsByTenantID(ctx context.Context, tenantID string) ([]model.Webroot, error) {
 	rows, err := a.db.Query(ctx,
@@ -670,6 +685,43 @@ func (a *CoreDB) GetExpiredCerts(ctx context.Context, daysAfterExpiry int) ([]mo
 	return certs, rows.Err()
 }
 
+// GetSFTPKeyByID retrieves an SFTP key by its ID.
+func (a *CoreDB) GetSFTPKeyByID(ctx context.Context, id string) (*model.SFTPKey, error) {
+	var k model.SFTPKey
+	err := a.db.QueryRow(ctx,
+		`SELECT id, tenant_id, name, public_key, fingerprint, status, created_at, updated_at
+		 FROM sftp_keys WHERE id = $1`, id,
+	).Scan(&k.ID, &k.TenantID, &k.Name, &k.PublicKey, &k.Fingerprint,
+		&k.Status, &k.CreatedAt, &k.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get sftp key by id: %w", err)
+	}
+	return &k, nil
+}
+
+// GetSFTPKeysByTenant retrieves all active SFTP keys for a tenant.
+func (a *CoreDB) GetSFTPKeysByTenant(ctx context.Context, tenantID string) ([]model.SFTPKey, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, tenant_id, name, public_key, fingerprint, status, created_at, updated_at
+		 FROM sftp_keys WHERE tenant_id = $1 AND status = $2`, tenantID, model.StatusActive,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get sftp keys by tenant: %w", err)
+	}
+	defer rows.Close()
+
+	var keys []model.SFTPKey
+	for rows.Next() {
+		var k model.SFTPKey
+		if err := rows.Scan(&k.ID, &k.TenantID, &k.Name, &k.PublicKey, &k.Fingerprint,
+			&k.Status, &k.CreatedAt, &k.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan sftp key row: %w", err)
+		}
+		keys = append(keys, k)
+	}
+	return keys, rows.Err()
+}
+
 // GetPlatformConfig retrieves a platform configuration value by key.
 func (a *CoreDB) GetPlatformConfig(ctx context.Context, key string) (string, error) {
 	var value string
@@ -678,4 +730,40 @@ func (a *CoreDB) GetPlatformConfig(ctx context.Context, key string) (string, err
 		return "", fmt.Errorf("get platform config %q: %w", key, err)
 	}
 	return value, nil
+}
+
+// GetBackupByID retrieves a backup by its ID.
+func (a *CoreDB) GetBackupByID(ctx context.Context, id string) (*model.Backup, error) {
+	var b model.Backup
+	err := a.db.QueryRow(ctx,
+		`SELECT id, tenant_id, type, source_id, source_name, storage_path, size_bytes, status, started_at, completed_at, created_at, updated_at
+		 FROM backups WHERE id = $1`, id,
+	).Scan(&b.ID, &b.TenantID, &b.Type, &b.SourceID, &b.SourceName,
+		&b.StoragePath, &b.SizeBytes, &b.Status, &b.StartedAt,
+		&b.CompletedAt, &b.CreatedAt, &b.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get backup by id: %w", err)
+	}
+	return &b, nil
+}
+
+// UpdateBackupResultParams holds the parameters for UpdateBackupResult.
+type UpdateBackupResultParams struct {
+	ID          string
+	StoragePath string
+	SizeBytes   int64
+	StartedAt   time.Time
+	CompletedAt time.Time
+}
+
+// UpdateBackupResult updates a backup with its result after completion.
+func (a *CoreDB) UpdateBackupResult(ctx context.Context, params UpdateBackupResultParams) error {
+	_, err := a.db.Exec(ctx,
+		`UPDATE backups SET storage_path = $1, size_bytes = $2, started_at = $3, completed_at = $4, updated_at = now() WHERE id = $5`,
+		params.StoragePath, params.SizeBytes, params.StartedAt, params.CompletedAt, params.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("update backup result: %w", err)
+	}
+	return nil
 }

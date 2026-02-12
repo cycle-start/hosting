@@ -3,6 +3,9 @@ package activity
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 
 	"github.com/rs/zerolog"
 
@@ -341,6 +344,63 @@ func (a *NodeLocal) DeleteValkeyUser(ctx context.Context, params DeleteValkeyUse
 }
 
 // --------------------------------------------------------------------------
+// Migration activities
+// --------------------------------------------------------------------------
+
+// DumpMySQLDatabase runs mysqldump and compresses the output to a gzipped file.
+func (a *NodeLocal) DumpMySQLDatabase(ctx context.Context, params DumpMySQLDatabaseParams) error {
+	a.logger.Info().Str("database", params.DatabaseName).Str("path", params.DumpPath).Msg("DumpMySQLDatabase")
+	return a.database.DumpDatabase(ctx, params.DatabaseName, params.DumpPath)
+}
+
+// ImportMySQLDatabase imports a gzipped SQL dump into a MySQL database.
+func (a *NodeLocal) ImportMySQLDatabase(ctx context.Context, params ImportMySQLDatabaseParams) error {
+	a.logger.Info().Str("database", params.DatabaseName).Str("path", params.DumpPath).Msg("ImportMySQLDatabase")
+	return a.database.ImportDatabase(ctx, params.DatabaseName, params.DumpPath)
+}
+
+// DumpValkeyData triggers a Valkey BGSAVE and copies the RDB file to the dump path.
+func (a *NodeLocal) DumpValkeyData(ctx context.Context, params DumpValkeyDataParams) error {
+	a.logger.Info().Str("instance", params.Name).Int("port", params.Port).Str("path", params.DumpPath).Msg("DumpValkeyData")
+	return a.valkey.DumpData(ctx, params.Name, params.Port, params.Password, params.DumpPath)
+}
+
+// ImportValkeyData stops the instance, replaces the RDB file, and restarts.
+func (a *NodeLocal) ImportValkeyData(ctx context.Context, params ImportValkeyDataParams) error {
+	a.logger.Info().Str("instance", params.Name).Int("port", params.Port).Str("path", params.DumpPath).Msg("ImportValkeyData")
+	return a.valkey.ImportData(ctx, params.Name, params.Port, params.DumpPath)
+}
+
+// CleanupMigrateFile removes a temporary migration file from the local filesystem.
+func (a *NodeLocal) CleanupMigrateFile(ctx context.Context, path string) error {
+	a.logger.Info().Str("path", path).Msg("CleanupMigrateFile")
+	return os.Remove(path)
+}
+
+// --------------------------------------------------------------------------
+// SFTP
+// --------------------------------------------------------------------------
+
+// SyncSFTPKeys writes all public keys to the tenant's authorized_keys file.
+func (a *NodeLocal) SyncSFTPKeys(ctx context.Context, params SyncSFTPKeysParams) error {
+	a.logger.Info().Str("tenant", params.TenantName).Int("key_count", len(params.PublicKeys)).Msg("SyncSFTPKeys")
+
+	homeDir := fmt.Sprintf("/var/www/storage/%s", params.TenantName)
+	authKeysPath := fmt.Sprintf("%s/.ssh/authorized_keys", homeDir)
+
+	content := ""
+	for _, key := range params.PublicKeys {
+		content += key + "\n"
+	}
+
+	if err := os.WriteFile(authKeysPath, []byte(content), 0600); err != nil {
+		return fmt.Errorf("write authorized_keys for %s: %w", params.TenantName, err)
+	}
+
+	return nil
+}
+
+// --------------------------------------------------------------------------
 // SSL
 // --------------------------------------------------------------------------
 
@@ -353,4 +413,96 @@ func (a *NodeLocal) InstallCertificate(ctx context.Context, params InstallCertif
 		KeyPem:   params.KeyPEM,
 		ChainPem: params.ChainPEM,
 	})
+}
+
+// --------------------------------------------------------------------------
+// Backup activities
+// --------------------------------------------------------------------------
+
+// CreateWebBackup creates a tar.gz backup of a webroot's storage directory.
+func (a *NodeLocal) CreateWebBackup(ctx context.Context, params CreateWebBackupParams) (*BackupResult, error) {
+	a.logger.Info().Str("tenant", params.TenantName).Str("webroot", params.WebrootName).Str("path", params.BackupPath).Msg("CreateWebBackup")
+
+	sourceDir := fmt.Sprintf("/var/www/storage/%s/%s", params.TenantName, params.WebrootName)
+
+	// Ensure backup directory exists.
+	if err := os.MkdirAll(filepath.Dir(params.BackupPath), 0755); err != nil {
+		return nil, fmt.Errorf("create backup directory: %w", err)
+	}
+
+	cmd := exec.CommandContext(ctx, "tar", "czf", params.BackupPath, "-C", sourceDir, ".")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("tar czf failed: %w: %s", err, string(out))
+	}
+
+	info, err := os.Stat(params.BackupPath)
+	if err != nil {
+		return nil, fmt.Errorf("stat backup file: %w", err)
+	}
+
+	return &BackupResult{
+		StoragePath: params.BackupPath,
+		SizeBytes:   info.Size(),
+	}, nil
+}
+
+// RestoreWebBackup extracts a tar.gz backup to a webroot's storage directory.
+func (a *NodeLocal) RestoreWebBackup(ctx context.Context, params RestoreWebBackupParams) error {
+	a.logger.Info().Str("tenant", params.TenantName).Str("webroot", params.WebrootName).Str("path", params.BackupPath).Msg("RestoreWebBackup")
+
+	targetDir := fmt.Sprintf("/var/www/storage/%s/%s", params.TenantName, params.WebrootName)
+
+	cmd := exec.CommandContext(ctx, "tar", "xzf", params.BackupPath, "-C", targetDir)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("tar xzf failed: %w: %s", err, string(out))
+	}
+
+	return nil
+}
+
+// CreateMySQLBackup runs mysqldump and stores the compressed output.
+func (a *NodeLocal) CreateMySQLBackup(ctx context.Context, params CreateMySQLBackupParams) (*BackupResult, error) {
+	a.logger.Info().Str("database", params.DatabaseName).Str("path", params.BackupPath).Msg("CreateMySQLBackup")
+
+	// Ensure backup directory exists.
+	if err := os.MkdirAll(filepath.Dir(params.BackupPath), 0755); err != nil {
+		return nil, fmt.Errorf("create backup directory: %w", err)
+	}
+
+	// Run: mysqldump {dbname} | gzip > {backupPath}
+	cmd := exec.CommandContext(ctx, "bash", "-c",
+		fmt.Sprintf("mysqldump %s | gzip > %s", params.DatabaseName, params.BackupPath))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("mysqldump failed: %w: %s", err, string(out))
+	}
+
+	info, err := os.Stat(params.BackupPath)
+	if err != nil {
+		return nil, fmt.Errorf("stat backup file: %w", err)
+	}
+
+	return &BackupResult{
+		StoragePath: params.BackupPath,
+		SizeBytes:   info.Size(),
+	}, nil
+}
+
+// RestoreMySQLBackup imports a gzipped mysqldump file into a database.
+func (a *NodeLocal) RestoreMySQLBackup(ctx context.Context, params RestoreMySQLBackupParams) error {
+	a.logger.Info().Str("database", params.DatabaseName).Str("path", params.BackupPath).Msg("RestoreMySQLBackup")
+
+	// Run: gunzip -c {backupPath} | mysql {dbname}
+	cmd := exec.CommandContext(ctx, "bash", "-c",
+		fmt.Sprintf("gunzip -c %s | mysql %s", params.BackupPath, params.DatabaseName))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("mysql restore failed: %w: %s", err, string(out))
+	}
+
+	return nil
+}
+
+// DeleteBackupFile removes a backup file from disk.
+func (a *NodeLocal) DeleteBackupFile(ctx context.Context, storagePath string) error {
+	a.logger.Info().Str("path", storagePath).Msg("DeleteBackupFile")
+	return os.Remove(storagePath)
 }
