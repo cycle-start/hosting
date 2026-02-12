@@ -53,13 +53,24 @@ func (s *WebrootService) GetByID(ctx context.Context, id string) (*model.Webroot
 	return &w, nil
 }
 
-func (s *WebrootService) ListByTenant(ctx context.Context, tenantID string) ([]model.Webroot, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, status, created_at, updated_at
-		 FROM webroots WHERE tenant_id = $1 ORDER BY name`, tenantID,
-	)
+func (s *WebrootService) ListByTenant(ctx context.Context, tenantID string, limit int, cursor string) ([]model.Webroot, bool, error) {
+	query := `SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, status, created_at, updated_at FROM webroots WHERE tenant_id = $1`
+	args := []any{tenantID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list webroots for tenant %s: %w", tenantID, err)
+		return nil, false, fmt.Errorf("list webroots for tenant %s: %w", tenantID, err)
 	}
 	defer rows.Close()
 
@@ -68,14 +79,19 @@ func (s *WebrootService) ListByTenant(ctx context.Context, tenantID string) ([]m
 		var w model.Webroot
 		if err := rows.Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion,
 			&w.RuntimeConfig, &w.PublicFolder, &w.Status, &w.CreatedAt, &w.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan webroot: %w", err)
+			return nil, false, fmt.Errorf("scan webroot: %w", err)
 		}
 		webroots = append(webroots, w)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate webroots: %w", err)
+		return nil, false, fmt.Errorf("iterate webroots: %w", err)
 	}
-	return webroots, nil
+
+	hasMore := len(webroots) > limit
+	if hasMore {
+		webroots = webroots[:limit]
+	}
+	return webroots, hasMore, nil
 }
 
 func (s *WebrootService) Update(ctx context.Context, webroot *model.Webroot) error {

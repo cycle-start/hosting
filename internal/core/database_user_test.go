@@ -181,8 +181,9 @@ func TestDatabaseUserService_ListByDatabase_Success(t *testing.T) {
 	)
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByDatabase(ctx, dbID)
+	result, hasMore, err := svc.ListByDatabase(ctx, dbID, 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	require.Len(t, result, 2)
 	assert.Equal(t, "admin", result[0].Username)
 	assert.Equal(t, "readonly", result[1].Username)
@@ -197,7 +198,7 @@ func TestDatabaseUserService_ListByDatabase_QueryError(t *testing.T) {
 
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("db error"))
 
-	result, err := svc.ListByDatabase(ctx, "test-database-1")
+	result, _, err := svc.ListByDatabase(ctx, "test-database-1", 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "list database users")

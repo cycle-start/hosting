@@ -70,7 +70,7 @@ func main() {
 	}
 	defer tc.Close()
 
-	srv := api.NewServer(logger, corePool, tc)
+	srv := api.NewServer(logger, corePool, tc, cfg)
 
 	httpServer := &http.Server{
 		Addr:         cfg.HTTPListenAddr,

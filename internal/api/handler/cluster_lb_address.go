@@ -24,12 +24,20 @@ func (h *ClusterLBAddressHandler) List(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	addrs, err := h.service.ListByCluster(r.Context(), clusterID)
+
+	pg := request.ParsePagination(r)
+
+	addrs, hasMore, err := h.service.ListByCluster(r.Context(), clusterID, pg.Limit, pg.Cursor)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, addrs)
+
+	var nextCursor string
+	if hasMore && len(addrs) > 0 {
+		nextCursor = addrs[len(addrs)-1].ID
+	}
+	response.WritePaginated(w, http.StatusOK, addrs, nextCursor, hasMore)
 }
 
 func (h *ClusterLBAddressHandler) Create(w http.ResponseWriter, r *http.Request) {

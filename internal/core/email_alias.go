@@ -51,13 +51,24 @@ func (s *EmailAliasService) GetByID(ctx context.Context, id string) (*model.Emai
 	return &a, nil
 }
 
-func (s *EmailAliasService) ListByAccountID(ctx context.Context, accountID string) ([]model.EmailAlias, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, email_account_id, address, status, created_at, updated_at
-		 FROM email_aliases WHERE email_account_id = $1 ORDER BY address`, accountID,
-	)
+func (s *EmailAliasService) ListByAccountID(ctx context.Context, accountID string, limit int, cursor string) ([]model.EmailAlias, bool, error) {
+	query := `SELECT id, email_account_id, address, status, created_at, updated_at FROM email_aliases WHERE email_account_id = $1`
+	args := []any{accountID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list email aliases for account %s: %w", accountID, err)
+		return nil, false, fmt.Errorf("list email aliases for account %s: %w", accountID, err)
 	}
 	defer rows.Close()
 
@@ -65,14 +76,19 @@ func (s *EmailAliasService) ListByAccountID(ctx context.Context, accountID strin
 	for rows.Next() {
 		var a model.EmailAlias
 		if err := rows.Scan(&a.ID, &a.EmailAccountID, &a.Address, &a.Status, &a.CreatedAt, &a.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan email alias: %w", err)
+			return nil, false, fmt.Errorf("scan email alias: %w", err)
 		}
 		aliases = append(aliases, a)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate email aliases: %w", err)
+		return nil, false, fmt.Errorf("iterate email aliases: %w", err)
 	}
-	return aliases, nil
+
+	hasMore := len(aliases) > limit
+	if hasMore {
+		aliases = aliases[:limit]
+	}
+	return aliases, hasMore, nil
 }
 
 func (s *EmailAliasService) Delete(ctx context.Context, id string) error {

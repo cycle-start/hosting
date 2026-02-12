@@ -51,13 +51,24 @@ func (s *EmailAccountService) GetByID(ctx context.Context, id string) (*model.Em
 	return &a, nil
 }
 
-func (s *EmailAccountService) ListByFQDN(ctx context.Context, fqdnID string) ([]model.EmailAccount, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, fqdn_id, address, display_name, quota_bytes, status, created_at, updated_at
-		 FROM email_accounts WHERE fqdn_id = $1 ORDER BY address`, fqdnID,
-	)
+func (s *EmailAccountService) ListByFQDN(ctx context.Context, fqdnID string, limit int, cursor string) ([]model.EmailAccount, bool, error) {
+	query := `SELECT id, fqdn_id, address, display_name, quota_bytes, status, created_at, updated_at FROM email_accounts WHERE fqdn_id = $1`
+	args := []any{fqdnID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list email accounts for fqdn %s: %w", fqdnID, err)
+		return nil, false, fmt.Errorf("list email accounts for fqdn %s: %w", fqdnID, err)
 	}
 	defer rows.Close()
 
@@ -65,14 +76,19 @@ func (s *EmailAccountService) ListByFQDN(ctx context.Context, fqdnID string) ([]
 	for rows.Next() {
 		var a model.EmailAccount
 		if err := rows.Scan(&a.ID, &a.FQDNID, &a.Address, &a.DisplayName, &a.QuotaBytes, &a.Status, &a.CreatedAt, &a.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan email account: %w", err)
+			return nil, false, fmt.Errorf("scan email account: %w", err)
 		}
 		accounts = append(accounts, a)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate email accounts: %w", err)
+		return nil, false, fmt.Errorf("iterate email accounts: %w", err)
 	}
-	return accounts, nil
+
+	hasMore := len(accounts) > limit
+	if hasMore {
+		accounts = accounts[:limit]
+	}
+	return accounts, hasMore, nil
 }
 
 func (s *EmailAccountService) Delete(ctx context.Context, id string) error {

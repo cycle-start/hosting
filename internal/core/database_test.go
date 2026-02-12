@@ -176,8 +176,9 @@ func TestDatabaseService_ListByTenant_Success(t *testing.T) {
 	)
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByTenant(ctx, tenantID)
+	result, hasMore, err := svc.ListByTenant(ctx, tenantID, 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	require.Len(t, result, 1)
 	assert.Equal(t, "mydb", result[0].Name)
 	db.AssertExpectations(t)
@@ -191,7 +192,7 @@ func TestDatabaseService_ListByTenant_QueryError(t *testing.T) {
 
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("connection lost"))
 
-	result, err := svc.ListByTenant(ctx, "test-tenant-1")
+	result, _, err := svc.ListByTenant(ctx, "test-tenant-1", 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "list databases")
@@ -238,8 +239,9 @@ func TestDatabaseService_ListByShard_Success(t *testing.T) {
 	)
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByShard(ctx, shardID)
+	result, hasMore, err := svc.ListByShard(ctx, shardID, 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	require.Len(t, result, 2)
 	assert.Equal(t, "db-alpha", result[0].Name)
 	assert.Equal(t, "db-beta", result[1].Name)
@@ -257,8 +259,9 @@ func TestDatabaseService_ListByShard_Empty(t *testing.T) {
 	rows := newEmptyMockRows()
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByShard(ctx, "test-shard-1")
+	result, hasMore, err := svc.ListByShard(ctx, "test-shard-1", 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	assert.Empty(t, result)
 	db.AssertExpectations(t)
 }
@@ -271,7 +274,7 @@ func TestDatabaseService_ListByShard_QueryError(t *testing.T) {
 
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("connection lost"))
 
-	result, err := svc.ListByShard(ctx, "test-shard-1")
+	result, _, err := svc.ListByShard(ctx, "test-shard-1", 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "list databases for shard")
@@ -288,7 +291,7 @@ func TestDatabaseService_ListByShard_RowsErr(t *testing.T) {
 	rows.err = errors.New("iteration failed")
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByShard(ctx, "test-shard-1")
+	result, _, err := svc.ListByShard(ctx, "test-shard-1", 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "iterate databases")

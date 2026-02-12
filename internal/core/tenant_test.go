@@ -295,10 +295,11 @@ func TestTenantService_List_Success(t *testing.T) {
 			return nil
 		},
 	)
-	db.On("Query", ctx, mock.AnythingOfType("string"), []any(nil)).Return(rows, nil)
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.List(ctx)
+	result, hasMore, err := svc.List(ctx, 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	require.Len(t, result, 2)
 	assert.Equal(t, "alpha", result[0].Name)
 	assert.Equal(t, "beta", result[1].Name)
@@ -314,10 +315,11 @@ func TestTenantService_List_Empty(t *testing.T) {
 	ctx := context.Background()
 
 	rows := newEmptyMockRows()
-	db.On("Query", ctx, mock.AnythingOfType("string"), []any(nil)).Return(rows, nil)
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.List(ctx)
+	result, hasMore, err := svc.List(ctx, 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	assert.Empty(t, result)
 	db.AssertExpectations(t)
 }
@@ -328,9 +330,9 @@ func TestTenantService_List_QueryError(t *testing.T) {
 	svc := NewTenantService(db, tc)
 	ctx := context.Background()
 
-	db.On("Query", ctx, mock.AnythingOfType("string"), []any(nil)).Return(nil, errors.New("connection lost"))
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("connection lost"))
 
-	result, err := svc.List(ctx)
+	result, _, err := svc.List(ctx, 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "list tenants")
@@ -345,9 +347,9 @@ func TestTenantService_List_RowsErr(t *testing.T) {
 
 	rows := newEmptyMockRows()
 	rows.err = errors.New("iteration failed")
-	db.On("Query", ctx, mock.AnythingOfType("string"), []any(nil)).Return(rows, nil)
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.List(ctx)
+	result, _, err := svc.List(ctx, 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "iterate tenants")
@@ -581,8 +583,9 @@ func TestTenantService_ListByShard_Success(t *testing.T) {
 	)
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByShard(ctx, shardID)
+	result, hasMore, err := svc.ListByShard(ctx, shardID, 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	require.Len(t, result, 2)
 	assert.Equal(t, "alpha", result[0].Name)
 	assert.Equal(t, "beta", result[1].Name)
@@ -602,8 +605,9 @@ func TestTenantService_ListByShard_Empty(t *testing.T) {
 	rows := newEmptyMockRows()
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByShard(ctx, "test-shard-1")
+	result, hasMore, err := svc.ListByShard(ctx, "test-shard-1", 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	assert.Empty(t, result)
 	db.AssertExpectations(t)
 }
@@ -616,7 +620,7 @@ func TestTenantService_ListByShard_QueryError(t *testing.T) {
 
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("connection lost"))
 
-	result, err := svc.ListByShard(ctx, "test-shard-1")
+	result, _, err := svc.ListByShard(ctx, "test-shard-1", 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "list tenants for shard")
@@ -633,7 +637,7 @@ func TestTenantService_ListByShard_RowsErr(t *testing.T) {
 	rows.err = errors.New("iteration failed")
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByShard(ctx, "test-shard-1")
+	result, _, err := svc.ListByShard(ctx, "test-shard-1", 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "iterate tenants")

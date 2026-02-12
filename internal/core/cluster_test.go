@@ -143,8 +143,9 @@ func TestClusterService_ListByRegion_Success(t *testing.T) {
 	)
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByRegion(ctx, regionID)
+	result, hasMore, err := svc.ListByRegion(ctx, regionID, 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	require.Len(t, result, 1)
 	assert.Equal(t, "prod-1", result[0].Name)
 	db.AssertExpectations(t)
@@ -158,8 +159,9 @@ func TestClusterService_ListByRegion_Empty(t *testing.T) {
 	rows := newEmptyMockRows()
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByRegion(ctx, "test-region-1")
+	result, hasMore, err := svc.ListByRegion(ctx, "test-region-1", 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	assert.Empty(t, result)
 	db.AssertExpectations(t)
 }
@@ -171,7 +173,7 @@ func TestClusterService_ListByRegion_QueryError(t *testing.T) {
 
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("connection lost"))
 
-	result, err := svc.ListByRegion(ctx, "test-region-1")
+	result, _, err := svc.ListByRegion(ctx, "test-region-1", 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "list clusters")

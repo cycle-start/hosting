@@ -48,13 +48,24 @@ func (s *ShardService) GetByID(ctx context.Context, id string) (*model.Shard, er
 	return &sh, nil
 }
 
-func (s *ShardService) ListByCluster(ctx context.Context, clusterID string) ([]model.Shard, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, cluster_id, name, role, lb_backend, config, status, created_at, updated_at
-		 FROM shards WHERE cluster_id = $1 ORDER BY name`, clusterID,
-	)
+func (s *ShardService) ListByCluster(ctx context.Context, clusterID string, limit int, cursor string) ([]model.Shard, bool, error) {
+	query := `SELECT id, cluster_id, name, role, lb_backend, config, status, created_at, updated_at FROM shards WHERE cluster_id = $1`
+	args := []any{clusterID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list shards for cluster %s: %w", clusterID, err)
+		return nil, false, fmt.Errorf("list shards for cluster %s: %w", clusterID, err)
 	}
 	defer rows.Close()
 
@@ -63,14 +74,19 @@ func (s *ShardService) ListByCluster(ctx context.Context, clusterID string) ([]m
 		var sh model.Shard
 		if err := rows.Scan(&sh.ID, &sh.ClusterID, &sh.Name, &sh.Role, &sh.LBBackend,
 			&sh.Config, &sh.Status, &sh.CreatedAt, &sh.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan shard: %w", err)
+			return nil, false, fmt.Errorf("scan shard: %w", err)
 		}
 		shards = append(shards, sh)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate shards: %w", err)
+		return nil, false, fmt.Errorf("iterate shards: %w", err)
 	}
-	return shards, nil
+
+	hasMore := len(shards) > limit
+	if hasMore {
+		shards = shards[:limit]
+	}
+	return shards, hasMore, nil
 }
 
 func (s *ShardService) Update(ctx context.Context, shard *model.Shard) error {

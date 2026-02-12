@@ -73,6 +73,9 @@ func main() {
 	)
 	w.RegisterActivity(nodeActs)
 
+	nodeACMEActs := activity.NewNodeACMEActivity()
+	w.RegisterActivity(nodeACMEActs)
+
 	logger.Info().
 		Str("nodeID", cfg.NodeID).
 		Str("taskQueue", taskQueue).

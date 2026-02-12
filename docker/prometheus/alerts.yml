@@ -1,0 +1,29 @@
+groups:
+  - name: hosting-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High API error rate (> 5%)"
+          description: "Error rate is {{ $value | humanizePercentage }}"
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API latency (P95 > 2s)"
+          description: "P95 latency is {{ $value }}s"
+
+      - alert: HAProxyBackendDown
+        expr: haproxy_backend_active_servers == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HAProxy backend has no active servers"
+          description: "Backend {{ $labels.proxy }} has 0 active servers"

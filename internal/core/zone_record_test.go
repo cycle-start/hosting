@@ -186,8 +186,9 @@ func TestZoneRecordService_ListByZone_Success(t *testing.T) {
 	)
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByZone(ctx, zoneID)
+	result, hasMore, err := svc.ListByZone(ctx, zoneID, 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	require.Len(t, result, 1)
 	assert.Equal(t, "A", result[0].Type)
 	assert.Equal(t, "@", result[0].Name)
@@ -202,7 +203,7 @@ func TestZoneRecordService_ListByZone_QueryError(t *testing.T) {
 
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("db error"))
 
-	result, err := svc.ListByZone(ctx, "test-zone-1")
+	result, _, err := svc.ListByZone(ctx, "test-zone-1", 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "list zone records")

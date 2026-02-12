@@ -28,13 +28,19 @@ func (h *Cluster) ListByRegion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clusters, err := h.svc.ListByRegion(r.Context(), regionID)
+	pg := request.ParsePagination(r)
+
+	clusters, hasMore, err := h.svc.ListByRegion(r.Context(), regionID, pg.Limit, pg.Cursor)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, clusters)
+	var nextCursor string
+	if hasMore && len(clusters) > 0 {
+		nextCursor = clusters[len(clusters)-1].ID
+	}
+	response.WritePaginated(w, http.StatusOK, clusters, nextCursor, hasMore)
 }
 
 func (h *Cluster) Create(w http.ResponseWriter, r *http.Request) {

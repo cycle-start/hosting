@@ -53,13 +53,24 @@ func (s *DatabaseService) GetByID(ctx context.Context, id string) (*model.Databa
 	return &d, nil
 }
 
-func (s *DatabaseService) ListByTenant(ctx context.Context, tenantID string) ([]model.Database, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, tenant_id, name, shard_id, node_id, status, created_at, updated_at
-		 FROM databases WHERE tenant_id = $1 ORDER BY name`, tenantID,
-	)
+func (s *DatabaseService) ListByTenant(ctx context.Context, tenantID string, limit int, cursor string) ([]model.Database, bool, error) {
+	query := `SELECT id, tenant_id, name, shard_id, node_id, status, created_at, updated_at FROM databases WHERE tenant_id = $1`
+	args := []any{tenantID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list databases for tenant %s: %w", tenantID, err)
+		return nil, false, fmt.Errorf("list databases for tenant %s: %w", tenantID, err)
 	}
 	defer rows.Close()
 
@@ -68,23 +79,39 @@ func (s *DatabaseService) ListByTenant(ctx context.Context, tenantID string) ([]
 		var d model.Database
 		if err := rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID,
 			&d.Status, &d.CreatedAt, &d.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan database: %w", err)
+			return nil, false, fmt.Errorf("scan database: %w", err)
 		}
 		databases = append(databases, d)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate databases: %w", err)
+		return nil, false, fmt.Errorf("iterate databases: %w", err)
 	}
-	return databases, nil
+
+	hasMore := len(databases) > limit
+	if hasMore {
+		databases = databases[:limit]
+	}
+	return databases, hasMore, nil
 }
 
-func (s *DatabaseService) ListByShard(ctx context.Context, shardID string) ([]model.Database, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, tenant_id, name, shard_id, node_id, status, created_at, updated_at
-		 FROM databases WHERE shard_id = $1 ORDER BY name`, shardID,
-	)
+func (s *DatabaseService) ListByShard(ctx context.Context, shardID string, limit int, cursor string) ([]model.Database, bool, error) {
+	query := `SELECT id, tenant_id, name, shard_id, node_id, status, created_at, updated_at FROM databases WHERE shard_id = $1`
+	args := []any{shardID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list databases for shard %s: %w", shardID, err)
+		return nil, false, fmt.Errorf("list databases for shard %s: %w", shardID, err)
 	}
 	defer rows.Close()
 
@@ -93,14 +120,19 @@ func (s *DatabaseService) ListByShard(ctx context.Context, shardID string) ([]mo
 		var d model.Database
 		if err := rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID,
 			&d.Status, &d.CreatedAt, &d.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan database: %w", err)
+			return nil, false, fmt.Errorf("scan database: %w", err)
 		}
 		databases = append(databases, d)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate databases: %w", err)
+		return nil, false, fmt.Errorf("iterate databases: %w", err)
 	}
-	return databases, nil
+
+	hasMore := len(databases) > limit
+	if hasMore {
+		databases = databases[:limit]
+	}
+	return databases, hasMore, nil
 }
 
 func (s *DatabaseService) Delete(ctx context.Context, id string) error {

@@ -27,7 +27,9 @@ func (h *Certificate) ListByFQDN(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	certs, err := h.svc.ListByFQDN(r.Context(), fqdnID)
+	pg := request.ParsePagination(r)
+
+	certs, hasMore, err := h.svc.ListByFQDN(r.Context(), fqdnID, pg.Limit, pg.Cursor)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -36,7 +38,11 @@ func (h *Certificate) ListByFQDN(w http.ResponseWriter, r *http.Request) {
 	for i := range certs {
 		certs[i].KeyPEM = ""
 	}
-	response.WriteJSON(w, http.StatusOK, certs)
+	var nextCursor string
+	if hasMore && len(certs) > 0 {
+		nextCursor = certs[len(certs)-1].ID
+	}
+	response.WritePaginated(w, http.StatusOK, certs, nextCursor, hasMore)
 }
 
 func (h *Certificate) Upload(w http.ResponseWriter, r *http.Request) {

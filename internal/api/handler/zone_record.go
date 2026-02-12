@@ -27,13 +27,19 @@ func (h *ZoneRecord) ListByZone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	records, err := h.svc.ListByZone(r.Context(), zoneID)
+	pg := request.ParsePagination(r)
+
+	records, hasMore, err := h.svc.ListByZone(r.Context(), zoneID, pg.Limit, pg.Cursor)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, records)
+	var nextCursor string
+	if hasMore && len(records) > 0 {
+		nextCursor = records[len(records)-1].ID
+	}
+	response.WritePaginated(w, http.StatusOK, records, nextCursor, hasMore)
 }
 
 func (h *ZoneRecord) Create(w http.ResponseWriter, r *http.Request) {

@@ -29,7 +29,9 @@ func (h *ValkeyInstance) ListByTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	instances, err := h.svc.ListByTenant(r.Context(), tenantID)
+	pg := request.ParsePagination(r)
+
+	instances, hasMore, err := h.svc.ListByTenant(r.Context(), tenantID, pg.Limit, pg.Cursor)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -38,7 +40,11 @@ func (h *ValkeyInstance) ListByTenant(w http.ResponseWriter, r *http.Request) {
 	for i := range instances {
 		instances[i].Password = ""
 	}
-	response.WriteJSON(w, http.StatusOK, instances)
+	var nextCursor string
+	if hasMore && len(instances) > 0 {
+		nextCursor = instances[len(instances)-1].ID
+	}
+	response.WritePaginated(w, http.StatusOK, instances, nextCursor, hasMore)
 }
 
 func (h *ValkeyInstance) Create(w http.ResponseWriter, r *http.Request) {

@@ -27,13 +27,19 @@ func (h *Database) ListByTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	databases, err := h.svc.ListByTenant(r.Context(), tenantID)
+	pg := request.ParsePagination(r)
+
+	databases, hasMore, err := h.svc.ListByTenant(r.Context(), tenantID, pg.Limit, pg.Cursor)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, databases)
+	var nextCursor string
+	if hasMore && len(databases) > 0 {
+		nextCursor = databases[len(databases)-1].ID
+	}
+	response.WritePaginated(w, http.StatusOK, databases, nextCursor, hasMore)
 }
 
 func (h *Database) Create(w http.ResponseWriter, r *http.Request) {

@@ -213,8 +213,9 @@ func TestCertificateService_ListByFQDN_Success(t *testing.T) {
 	)
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByFQDN(ctx, fqdnID)
+	result, hasMore, err := svc.ListByFQDN(ctx, fqdnID, 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	require.Len(t, result, 1)
 	assert.Equal(t, id1, result[0].ID)
 	assert.True(t, result[0].IsActive)
@@ -230,8 +231,9 @@ func TestCertificateService_ListByFQDN_Empty(t *testing.T) {
 	rows := newEmptyMockRows()
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByFQDN(ctx, "test-fqdn-1")
+	result, hasMore, err := svc.ListByFQDN(ctx, "test-fqdn-1", 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	assert.Empty(t, result)
 	db.AssertExpectations(t)
 }
@@ -244,7 +246,7 @@ func TestCertificateService_ListByFQDN_QueryError(t *testing.T) {
 
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("db error"))
 
-	result, err := svc.ListByFQDN(ctx, "test-fqdn-1")
+	result, _, err := svc.ListByFQDN(ctx, "test-fqdn-1", 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "list certificates")

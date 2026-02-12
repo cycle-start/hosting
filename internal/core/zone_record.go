@@ -55,13 +55,24 @@ func (s *ZoneRecordService) GetByID(ctx context.Context, id string) (*model.Zone
 	return &r, nil
 }
 
-func (s *ZoneRecordService) ListByZone(ctx context.Context, zoneID string) ([]model.ZoneRecord, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, zone_id, type, name, content, ttl, priority, managed_by, source_fqdn_id, status, created_at, updated_at
-		 FROM zone_records WHERE zone_id = $1 ORDER BY type, name`, zoneID,
-	)
+func (s *ZoneRecordService) ListByZone(ctx context.Context, zoneID string, limit int, cursor string) ([]model.ZoneRecord, bool, error) {
+	query := `SELECT id, zone_id, type, name, content, ttl, priority, managed_by, source_fqdn_id, status, created_at, updated_at FROM zone_records WHERE zone_id = $1`
+	args := []any{zoneID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list zone records for zone %s: %w", zoneID, err)
+		return nil, false, fmt.Errorf("list zone records for zone %s: %w", zoneID, err)
 	}
 	defer rows.Close()
 
@@ -71,14 +82,19 @@ func (s *ZoneRecordService) ListByZone(ctx context.Context, zoneID string) ([]mo
 		if err := rows.Scan(&r.ID, &r.ZoneID, &r.Type, &r.Name, &r.Content,
 			&r.TTL, &r.Priority, &r.ManagedBy, &r.SourceFQDNID,
 			&r.Status, &r.CreatedAt, &r.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan zone record: %w", err)
+			return nil, false, fmt.Errorf("scan zone record: %w", err)
 		}
 		records = append(records, r)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate zone records: %w", err)
+		return nil, false, fmt.Errorf("iterate zone records: %w", err)
 	}
-	return records, nil
+
+	hasMore := len(records) > limit
+	if hasMore {
+		records = records[:limit]
+	}
+	return records, hasMore, nil
 }
 
 func (s *ZoneRecordService) Update(ctx context.Context, record *model.ZoneRecord) error {

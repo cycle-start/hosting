@@ -136,10 +136,11 @@ func TestRegionService_List_Success(t *testing.T) {
 			return nil
 		},
 	)
-	db.On("Query", ctx, mock.AnythingOfType("string"), []any(nil)).Return(rows, nil)
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.List(ctx)
+	result, hasMore, err := svc.List(ctx, 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	require.Len(t, result, 2)
 	assert.Equal(t, "eu-west-1", result[0].Name)
 	assert.Equal(t, "us-east-1", result[1].Name)
@@ -152,10 +153,11 @@ func TestRegionService_List_Empty(t *testing.T) {
 	ctx := context.Background()
 
 	rows := newEmptyMockRows()
-	db.On("Query", ctx, mock.AnythingOfType("string"), []any(nil)).Return(rows, nil)
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.List(ctx)
+	result, hasMore, err := svc.List(ctx, 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	assert.Empty(t, result)
 	db.AssertExpectations(t)
 }
@@ -165,9 +167,9 @@ func TestRegionService_List_QueryError(t *testing.T) {
 	svc := NewRegionService(db)
 	ctx := context.Background()
 
-	db.On("Query", ctx, mock.AnythingOfType("string"), []any(nil)).Return(nil, errors.New("connection lost"))
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("connection lost"))
 
-	result, err := svc.List(ctx)
+	result, _, err := svc.List(ctx, 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "list regions")
@@ -262,8 +264,9 @@ func TestRegionService_ListRuntimes_Success(t *testing.T) {
 	)
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListRuntimes(ctx, regionID)
+	result, hasMore, err := svc.ListRuntimes(ctx, regionID, 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	require.Len(t, result, 2)
 	assert.Equal(t, model.RuntimePHP, result[0].Runtime)
 	assert.Equal(t, "8.2", result[0].Version)
@@ -280,8 +283,9 @@ func TestRegionService_ListRuntimes_Empty(t *testing.T) {
 	rows := newEmptyMockRows()
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListRuntimes(ctx, "test-region-1")
+	result, hasMore, err := svc.ListRuntimes(ctx, "test-region-1", 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	assert.Empty(t, result)
 	db.AssertExpectations(t)
 }
@@ -293,7 +297,7 @@ func TestRegionService_ListRuntimes_QueryError(t *testing.T) {
 
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("db error"))
 
-	result, err := svc.ListRuntimes(ctx, "test-region-1")
+	result, _, err := svc.ListRuntimes(ctx, "test-region-1", 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "list region runtimes")

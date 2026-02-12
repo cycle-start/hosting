@@ -27,13 +27,19 @@ func (h *EmailAccount) ListByFQDN(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accounts, err := h.svc.ListByFQDN(r.Context(), fqdnID)
+	pg := request.ParsePagination(r)
+
+	accounts, hasMore, err := h.svc.ListByFQDN(r.Context(), fqdnID, pg.Limit, pg.Cursor)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, accounts)
+	var nextCursor string
+	if hasMore && len(accounts) > 0 {
+		nextCursor = accounts[len(accounts)-1].ID
+	}
+	response.WritePaginated(w, http.StatusOK, accounts, nextCursor, hasMore)
 }
 
 func (h *EmailAccount) Create(w http.ResponseWriter, r *http.Request) {

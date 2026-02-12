@@ -21,13 +21,19 @@ func NewZone(svc *core.ZoneService) *Zone {
 }
 
 func (h *Zone) List(w http.ResponseWriter, r *http.Request) {
-	zones, err := h.svc.List(r.Context())
+	pg := request.ParsePagination(r)
+
+	zones, hasMore, err := h.svc.List(r.Context(), pg.Limit, pg.Cursor)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, zones)
+	var nextCursor string
+	if hasMore && len(zones) > 0 {
+		nextCursor = zones[len(zones)-1].ID
+	}
+	response.WritePaginated(w, http.StatusOK, zones, nextCursor, hasMore)
 }
 
 func (h *Zone) Create(w http.ResponseWriter, r *http.Request) {

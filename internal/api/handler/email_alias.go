@@ -27,13 +27,19 @@ func (h *EmailAlias) ListByAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	aliases, err := h.svc.ListByAccountID(r.Context(), id)
+	pg := request.ParsePagination(r)
+
+	aliases, hasMore, err := h.svc.ListByAccountID(r.Context(), id, pg.Limit, pg.Cursor)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, aliases)
+	var nextCursor string
+	if hasMore && len(aliases) > 0 {
+		nextCursor = aliases[len(aliases)-1].ID
+	}
+	response.WritePaginated(w, http.StatusOK, aliases, nextCursor, hasMore)
 }
 
 func (h *EmailAlias) Create(w http.ResponseWriter, r *http.Request) {

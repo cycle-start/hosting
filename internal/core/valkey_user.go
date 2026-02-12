@@ -53,13 +53,24 @@ func (s *ValkeyUserService) GetByID(ctx context.Context, id string) (*model.Valk
 	return &u, nil
 }
 
-func (s *ValkeyUserService) ListByInstance(ctx context.Context, instanceID string) ([]model.ValkeyUser, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, valkey_instance_id, username, password, privileges, key_pattern, status, created_at, updated_at
-		 FROM valkey_users WHERE valkey_instance_id = $1 ORDER BY username`, instanceID,
-	)
+func (s *ValkeyUserService) ListByInstance(ctx context.Context, instanceID string, limit int, cursor string) ([]model.ValkeyUser, bool, error) {
+	query := `SELECT id, valkey_instance_id, username, password, privileges, key_pattern, status, created_at, updated_at FROM valkey_users WHERE valkey_instance_id = $1`
+	args := []any{instanceID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list valkey users for instance %s: %w", instanceID, err)
+		return nil, false, fmt.Errorf("list valkey users for instance %s: %w", instanceID, err)
 	}
 	defer rows.Close()
 
@@ -68,14 +79,19 @@ func (s *ValkeyUserService) ListByInstance(ctx context.Context, instanceID strin
 		var u model.ValkeyUser
 		if err := rows.Scan(&u.ID, &u.ValkeyInstanceID, &u.Username, &u.Password,
 			&u.Privileges, &u.KeyPattern, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan valkey user: %w", err)
+			return nil, false, fmt.Errorf("scan valkey user: %w", err)
 		}
 		users = append(users, u)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate valkey users: %w", err)
+		return nil, false, fmt.Errorf("iterate valkey users: %w", err)
 	}
-	return users, nil
+
+	hasMore := len(users) > limit
+	if hasMore {
+		users = users[:limit]
+	}
+	return users, hasMore, nil
 }
 
 func (s *ValkeyUserService) Update(ctx context.Context, user *model.ValkeyUser) error {

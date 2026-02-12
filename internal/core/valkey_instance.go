@@ -64,13 +64,24 @@ func (s *ValkeyInstanceService) GetByID(ctx context.Context, id string) (*model.
 	return &v, nil
 }
 
-func (s *ValkeyInstanceService) ListByTenant(ctx context.Context, tenantID string) ([]model.ValkeyInstance, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, created_at, updated_at
-		 FROM valkey_instances WHERE tenant_id = $1 ORDER BY name`, tenantID,
-	)
+func (s *ValkeyInstanceService) ListByTenant(ctx context.Context, tenantID string, limit int, cursor string) ([]model.ValkeyInstance, bool, error) {
+	query := `SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, created_at, updated_at FROM valkey_instances WHERE tenant_id = $1`
+	args := []any{tenantID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list valkey instances for tenant %s: %w", tenantID, err)
+		return nil, false, fmt.Errorf("list valkey instances for tenant %s: %w", tenantID, err)
 	}
 	defer rows.Close()
 
@@ -79,14 +90,19 @@ func (s *ValkeyInstanceService) ListByTenant(ctx context.Context, tenantID strin
 		var v model.ValkeyInstance
 		if err := rows.Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB,
 			&v.Password, &v.Status, &v.CreatedAt, &v.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan valkey instance: %w", err)
+			return nil, false, fmt.Errorf("scan valkey instance: %w", err)
 		}
 		instances = append(instances, v)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate valkey instances: %w", err)
+		return nil, false, fmt.Errorf("iterate valkey instances: %w", err)
 	}
-	return instances, nil
+
+	hasMore := len(instances) > limit
+	if hasMore {
+		instances = instances[:limit]
+	}
+	return instances, hasMore, nil
 }
 
 func (s *ValkeyInstanceService) Delete(ctx context.Context, id string) error {

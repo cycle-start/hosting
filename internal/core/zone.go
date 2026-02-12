@@ -53,13 +53,24 @@ func (s *ZoneService) GetByID(ctx context.Context, id string) (*model.Zone, erro
 	return &z, nil
 }
 
-func (s *ZoneService) List(ctx context.Context) ([]model.Zone, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, tenant_id, name, region_id, status, created_at, updated_at
-		 FROM zones ORDER BY name`,
-	)
+func (s *ZoneService) List(ctx context.Context, limit int, cursor string) ([]model.Zone, bool, error) {
+	query := `SELECT id, tenant_id, name, region_id, status, created_at, updated_at FROM zones`
+	args := []any{}
+	argIdx := 1
+
+	if cursor != "" {
+		query += fmt.Sprintf(` WHERE id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list zones: %w", err)
+		return nil, false, fmt.Errorf("list zones: %w", err)
 	}
 	defer rows.Close()
 
@@ -68,14 +79,19 @@ func (s *ZoneService) List(ctx context.Context) ([]model.Zone, error) {
 		var z model.Zone
 		if err := rows.Scan(&z.ID, &z.TenantID, &z.Name, &z.RegionID, &z.Status,
 			&z.CreatedAt, &z.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan zone: %w", err)
+			return nil, false, fmt.Errorf("scan zone: %w", err)
 		}
 		zones = append(zones, z)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate zones: %w", err)
+		return nil, false, fmt.Errorf("iterate zones: %w", err)
 	}
-	return zones, nil
+
+	hasMore := len(zones) > limit
+	if hasMore {
+		zones = zones[:limit]
+	}
+	return zones, hasMore, nil
 }
 
 func (s *ZoneService) Update(ctx context.Context, zone *model.Zone) error {

@@ -55,13 +55,24 @@ func (s *CertificateService) GetByID(ctx context.Context, id string) (*model.Cer
 	return &c, nil
 }
 
-func (s *CertificateService) ListByFQDN(ctx context.Context, fqdnID string) ([]model.Certificate, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, fqdn_id, type, cert_pem, key_pem, chain_pem, issued_at, expires_at, status, is_active, created_at, updated_at
-		 FROM certificates WHERE fqdn_id = $1 ORDER BY created_at DESC`, fqdnID,
-	)
+func (s *CertificateService) ListByFQDN(ctx context.Context, fqdnID string, limit int, cursor string) ([]model.Certificate, bool, error) {
+	query := `SELECT id, fqdn_id, type, cert_pem, key_pem, chain_pem, issued_at, expires_at, status, is_active, created_at, updated_at FROM certificates WHERE fqdn_id = $1`
+	args := []any{fqdnID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list certificates for fqdn %s: %w", fqdnID, err)
+		return nil, false, fmt.Errorf("list certificates for fqdn %s: %w", fqdnID, err)
 	}
 	defer rows.Close()
 
@@ -70,12 +81,17 @@ func (s *CertificateService) ListByFQDN(ctx context.Context, fqdnID string) ([]m
 		var c model.Certificate
 		if err := rows.Scan(&c.ID, &c.FQDNID, &c.Type, &c.CertPEM, &c.KeyPEM, &c.ChainPEM,
 			&c.IssuedAt, &c.ExpiresAt, &c.Status, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan certificate: %w", err)
+			return nil, false, fmt.Errorf("scan certificate: %w", err)
 		}
 		certs = append(certs, c)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate certificates: %w", err)
+		return nil, false, fmt.Errorf("iterate certificates: %w", err)
 	}
-	return certs, nil
+
+	hasMore := len(certs) > limit
+	if hasMore {
+		certs = certs[:limit]
+	}
+	return certs, hasMore, nil
 }

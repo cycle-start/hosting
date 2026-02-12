@@ -12,11 +12,11 @@ import (
 	"github.com/edvin/hosting/internal/platform"
 )
 
-// ProvisionLECertWorkflow provisions a Let's Encrypt certificate for an FQDN.
-// The ACME challenge flow is stubbed; the certificate is created with placeholder data.
+// ProvisionLECertWorkflow provisions a Let's Encrypt certificate for an FQDN
+// using the ACME HTTP-01 challenge flow.
 func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 	ao := workflow.ActivityOptions{
-		StartToCloseTimeout: 30 * time.Second,
+		StartToCloseTimeout: 2 * time.Minute,
 		RetryPolicy: &temporal.RetryPolicy{
 			MaximumAttempts: 3,
 		},
@@ -58,24 +58,6 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 		return err
 	}
 
-	// ACME challenge stub: In production, this would perform the HTTP-01 or DNS-01 challenge
-	// and obtain the real certificate from Let's Encrypt. For now, we store placeholder data.
-	now := workflow.Now(ctx)
-	expiresAt := now.Add(90 * 24 * time.Hour) // LE certs are valid for 90 days.
-
-	err = workflow.ExecuteActivity(ctx, "StoreCertificate", activity.StoreCertParams{
-		ID:        certID,
-		CertPEM:   "PLACEHOLDER_CERT_PEM",
-		KeyPEM:    "PLACEHOLDER_KEY_PEM",
-		ChainPEM:  "PLACEHOLDER_CHAIN_PEM",
-		IssuedAt:  now,
-		ExpiresAt: expiresAt,
-	}).Get(ctx, nil)
-	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
-		return err
-	}
-
 	// Look up the webroot and tenant to find the shard nodes.
 	var certWebroot model.Webroot
 	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", fqdn.WebrootID).Get(ctx, &certWebroot)
@@ -103,14 +85,117 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 		return err
 	}
 
-	// Install the certificate on each node in the shard.
+	// Step 1: Create ACME order.
+	var orderResult activity.ACMEOrderResult
+	err = workflow.ExecuteActivity(ctx, "CreateOrder", activity.ACMEOrderParams{
+		FQDN: fqdn.FQDN,
+	}).Get(ctx, &orderResult)
+	if err != nil {
+		_ = setResourceFailed(ctx, "certificates", certID)
+		return err
+	}
+
+	// Step 2: For each authorization, get the HTTP-01 challenge.
+	// Typically there is one authz per domain; we handle them all.
+	webrootPath := fmt.Sprintf("/var/www/storage/%s/%s/%s", certTenant.Name, certWebroot.Name, certWebroot.PublicFolder)
+
+	for _, authzURL := range orderResult.AuthzURLs {
+		var challengeResult activity.ACMEChallengeResult
+		err = workflow.ExecuteActivity(ctx, "GetHTTP01Challenge", activity.ACMEChallengeParams{
+			AuthzURL:   authzURL,
+			AccountKey: orderResult.AccountKey,
+		}).Get(ctx, &challengeResult)
+		if err != nil {
+			_ = setResourceFailed(ctx, "certificates", certID)
+			return err
+		}
+
+		// Step 3: Place the challenge file on all shard nodes.
+		for _, node := range certNodes {
+			nodeCtx := nodeActivityCtx(ctx, node.ID)
+			err = workflow.ExecuteActivity(nodeCtx, "PlaceHTTP01Challenge", activity.PlaceHTTP01ChallengeParams{
+				WebrootPath: webrootPath,
+				Token:       challengeResult.Token,
+				KeyAuth:     challengeResult.KeyAuth,
+			}).Get(ctx, nil)
+			if err != nil {
+				_ = setResourceFailed(ctx, "certificates", certID)
+				return err
+			}
+		}
+
+		// Step 4: Tell the ACME server we're ready.
+		err = workflow.ExecuteActivity(ctx, "AcceptChallenge", activity.ACMEAcceptParams{
+			ChallengeURL: challengeResult.ChallengeURL,
+			AccountKey:   orderResult.AccountKey,
+		}).Get(ctx, nil)
+		if err != nil {
+			// Best-effort cleanup of challenge files.
+			for _, node := range certNodes {
+				nodeCtx := nodeActivityCtx(ctx, node.ID)
+				_ = workflow.ExecuteActivity(nodeCtx, "CleanupHTTP01Challenge", activity.CleanupHTTP01ChallengeParams{
+					WebrootPath: webrootPath,
+					Token:       challengeResult.Token,
+				}).Get(ctx, nil)
+			}
+			_ = setResourceFailed(ctx, "certificates", certID)
+			return err
+		}
+	}
+
+	// Step 5: Finalize the order and get the certificate.
+	var finalizeResult activity.ACMEFinalizeResult
+	err = workflow.ExecuteActivity(ctx, "FinalizeOrder", activity.ACMEFinalizeParams{
+		OrderURL:   orderResult.OrderURL,
+		FQDN:       fqdn.FQDN,
+		AccountKey: orderResult.AccountKey,
+	}).Get(ctx, &finalizeResult)
+	if err != nil {
+		_ = setResourceFailed(ctx, "certificates", certID)
+		return err
+	}
+
+	// Step 6: Cleanup challenge files on all nodes (best effort).
+	for _, authzURL := range orderResult.AuthzURLs {
+		// Re-derive the token from the challenge. Since we only need the token
+		// for cleanup and the authzURL loop is identical, we re-fetch.
+		var cleanupChallenge activity.ACMEChallengeResult
+		_ = workflow.ExecuteActivity(ctx, "GetHTTP01Challenge", activity.ACMEChallengeParams{
+			AuthzURL:   authzURL,
+			AccountKey: orderResult.AccountKey,
+		}).Get(ctx, &cleanupChallenge)
+
+		for _, node := range certNodes {
+			nodeCtx := nodeActivityCtx(ctx, node.ID)
+			_ = workflow.ExecuteActivity(nodeCtx, "CleanupHTTP01Challenge", activity.CleanupHTTP01ChallengeParams{
+				WebrootPath: webrootPath,
+				Token:       cleanupChallenge.Token,
+			}).Get(ctx, nil)
+		}
+	}
+
+	// Step 7: Store the real certificate data.
+	err = workflow.ExecuteActivity(ctx, "StoreCertificate", activity.StoreCertParams{
+		ID:        certID,
+		CertPEM:   finalizeResult.CertPEM,
+		KeyPEM:    finalizeResult.KeyPEM,
+		ChainPEM:  finalizeResult.ChainPEM,
+		IssuedAt:  finalizeResult.IssuedAt,
+		ExpiresAt: finalizeResult.ExpiresAt,
+	}).Get(ctx, nil)
+	if err != nil {
+		_ = setResourceFailed(ctx, "certificates", certID)
+		return err
+	}
+
+	// Step 8: Install the certificate on each node in the shard.
 	for _, node := range certNodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "InstallCertificate", activity.InstallCertificateParams{
 			FQDN:     fqdn.FQDN,
-			CertPEM:  "PLACEHOLDER_CERT_PEM",
-			KeyPEM:   "PLACEHOLDER_KEY_PEM",
-			ChainPEM: "PLACEHOLDER_CHAIN_PEM",
+			CertPEM:  finalizeResult.CertPEM,
+			KeyPEM:   finalizeResult.KeyPEM,
+			ChainPEM: finalizeResult.ChainPEM,
 		}).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "certificates", certID)
@@ -118,14 +203,14 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 		}
 	}
 
-	// Deactivate other certificates for this FQDN.
+	// Step 9: Deactivate other certificates for this FQDN.
 	err = workflow.ExecuteActivity(ctx, "DeactivateOtherCerts", fqdnID, certID).Get(ctx, nil)
 	if err != nil {
 		_ = setResourceFailed(ctx, "certificates", certID)
 		return err
 	}
 
-	// Activate this certificate.
+	// Step 10: Activate this certificate.
 	err = workflow.ExecuteActivity(ctx, "ActivateCertificate", certID).Get(ctx, nil)
 	if err != nil {
 		_ = setResourceFailed(ctx, "certificates", certID)
@@ -238,7 +323,8 @@ func UploadCustomCertWorkflow(ctx workflow.Context, certID string) error {
 }
 
 // RenewLECertWorkflow is a cron workflow that renews Let's Encrypt certificates
-// expiring within 30 days.
+// expiring within 30 days. For each expiring cert it starts a child
+// ProvisionLECertWorkflow to issue a fresh certificate via ACME.
 func RenewLECertWorkflow(ctx workflow.Context) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -248,26 +334,32 @@ func RenewLECertWorkflow(ctx workflow.Context) error {
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
 
-	// Stub: In production, this would query for certificates of type "lets_encrypt"
-	// with expires_at within 30 days, and for each one, start a child workflow
-	// to re-provision via ACME.
-	//
-	// var certsToRenew []model.Certificate
-	// err := workflow.ExecuteActivity(ctx, "GetExpiringLECerts", 30).Get(ctx, &certsToRenew)
-	// if err != nil { return err }
-	// for _, cert := range certsToRenew {
-	//     childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
-	//         WorkflowID: "renew-le-cert-" + cert.ID.String(),
-	//     })
-	//     _ = workflow.ExecuteChildWorkflow(childCtx, ProvisionLECertWorkflow, cert.FQDNID).Get(ctx, nil)
-	// }
+	var certsToRenew []model.Certificate
+	err := workflow.ExecuteActivity(ctx, "GetExpiringLECerts", 30).Get(ctx, &certsToRenew)
+	if err != nil {
+		return err
+	}
 
-	workflow.GetLogger(ctx).Info("RenewLECertWorkflow completed (stub)")
+	logger := workflow.GetLogger(ctx)
+	logger.Info("found expiring LE certificates", "count", len(certsToRenew))
+
+	for _, cert := range certsToRenew {
+		childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
+			WorkflowID: "renew-le-cert-" + cert.ID,
+		})
+		err := workflow.ExecuteChildWorkflow(childCtx, ProvisionLECertWorkflow, cert.FQDNID).Get(ctx, nil)
+		if err != nil {
+			logger.Error("failed to renew certificate", "certID", cert.ID, "fqdnID", cert.FQDNID, "error", err)
+			// Continue renewing other certs even if one fails.
+		}
+	}
+
 	return nil
 }
 
-// CleanupExpiredCertsWorkflow is a cron workflow that removes expired custom
-// certificates that have been expired for more than 30 days.
+// CleanupExpiredCertsWorkflow is a cron workflow that removes certificates
+// that have been expired for more than 30 days. It deactivates them and
+// clears their PEM data.
 func CleanupExpiredCertsWorkflow(ctx workflow.Context) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -277,20 +369,22 @@ func CleanupExpiredCertsWorkflow(ctx workflow.Context) error {
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
 
-	// Stub: In production, this would query for expired custom certificates
-	// with expires_at more than 30 days ago, deactivate and delete them.
-	//
-	// var expiredCerts []model.Certificate
-	// err := workflow.ExecuteActivity(ctx, "GetExpiredCustomCerts", 30).Get(ctx, &expiredCerts)
-	// if err != nil { return err }
-	// for _, cert := range expiredCerts {
-	//     _ = workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
-	//         Table:  "certificates",
-	//         ID:     cert.ID,
-	//         Status: model.StatusDeleted,
-	//     }).Get(ctx, nil)
-	// }
+	var expiredCerts []model.Certificate
+	err := workflow.ExecuteActivity(ctx, "GetExpiredCerts", 30).Get(ctx, &expiredCerts)
+	if err != nil {
+		return err
+	}
 
-	workflow.GetLogger(ctx).Info("CleanupExpiredCertsWorkflow completed (stub)")
+	logger := workflow.GetLogger(ctx)
+	logger.Info("found expired certificates to clean up", "count", len(expiredCerts))
+
+	for _, cert := range expiredCerts {
+		err := workflow.ExecuteActivity(ctx, "DeleteCertificate", cert.ID).Get(ctx, nil)
+		if err != nil {
+			logger.Error("failed to delete expired certificate", "certID", cert.ID, "error", err)
+			// Continue cleaning up other certs even if one fails.
+		}
+	}
+
 	return nil
 }

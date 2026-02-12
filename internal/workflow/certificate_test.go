@@ -3,6 +3,7 @@ package workflow
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -29,6 +30,49 @@ func (s *ProvisionLECertWorkflowTestSuite) AfterTest(suiteName, testName string)
 	s.env.AssertExpectations(s.T())
 }
 
+// setupACMESuccessMocks sets up the common mock expectations for a successful ACME flow.
+func (s *ProvisionLECertWorkflowTestSuite) setupACMESuccessMocks(
+	fqdnID, webrootID, tenantID, shardID string,
+	fqdn model.FQDN, webroot model.Webroot, tenant model.Tenant,
+	nodes []model.Node,
+) {
+	orderResult := &activity.ACMEOrderResult{
+		OrderURL:   "https://acme.example.com/order/123",
+		AuthzURLs:  []string{"https://acme.example.com/authz/456"},
+		AccountKey: []byte("FAKE_ACCOUNT_KEY_PEM"),
+	}
+	challengeResult := &activity.ACMEChallengeResult{
+		ChallengeURL: "https://acme.example.com/challenge/789",
+		Token:        "test-token-abc",
+		KeyAuth:      "test-token-abc.thumbprint",
+	}
+	now := time.Now()
+	finalizeResult := &activity.ACMEFinalizeResult{
+		CertPEM:   "REAL_CERT_PEM",
+		KeyPEM:    "REAL_KEY_PEM",
+		ChainPEM:  "REAL_CHAIN_PEM",
+		IssuedAt:  now,
+		ExpiresAt: now.Add(90 * 24 * time.Hour),
+	}
+
+	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(&fqdn, nil)
+	s.env.OnActivity("CreateCertificate", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
+	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
+	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("CreateOrder", mock.Anything, activity.ACMEOrderParams{FQDN: fqdn.FQDN}).Return(orderResult, nil)
+	s.env.OnActivity("GetHTTP01Challenge", mock.Anything, mock.Anything).Return(challengeResult, nil)
+	s.env.OnActivity("PlaceHTTP01Challenge", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("AcceptChallenge", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("FinalizeOrder", mock.Anything, mock.Anything).Return(finalizeResult, nil)
+	s.env.OnActivity("CleanupHTTP01Challenge", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("StoreCertificate", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("InstallCertificate", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("DeactivateOtherCerts", mock.Anything, fqdnID, mock.Anything).Return(nil)
+	s.env.OnActivity("ActivateCertificate", mock.Anything, mock.Anything).Return(nil)
+}
+
 func (s *ProvisionLECertWorkflowTestSuite) TestSuccess() {
 	fqdnID := "test-fqdn-1"
 	webrootID := "test-webroot-1"
@@ -40,25 +84,11 @@ func (s *ProvisionLECertWorkflowTestSuite) TestSuccess() {
 		WebrootID:  webrootID,
 		SSLEnabled: true,
 	}
-	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
+	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
 	tenant := model.Tenant{ID: tenantID, Name: "testuser", ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 
-	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(&fqdn, nil)
-	s.env.OnActivity("CreateCertificate", mock.Anything, mock.Anything).Return(nil)
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, mock.Anything).Return(nil)
-	s.env.OnActivity("StoreCertificate", mock.Anything, mock.Anything).Return(nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("InstallCertificate", mock.Anything, activity.InstallCertificateParams{
-		FQDN:     "secure.example.com",
-		CertPEM:  "PLACEHOLDER_CERT_PEM",
-		KeyPEM:   "PLACEHOLDER_KEY_PEM",
-		ChainPEM: "PLACEHOLDER_CHAIN_PEM",
-	}).Return(nil)
-	s.env.OnActivity("DeactivateOtherCerts", mock.Anything, fqdnID, mock.Anything).Return(nil)
-	s.env.OnActivity("ActivateCertificate", mock.Anything, mock.Anything).Return(nil)
+	s.setupACMESuccessMocks(fqdnID, webrootID, tenantID, shardID, fqdn, webroot, tenant, nodes)
 
 	s.env.ExecuteWorkflow(ProvisionLECertWorkflow, fqdnID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -75,18 +105,80 @@ func (s *ProvisionLECertWorkflowTestSuite) TestGetFQDNFails() {
 	s.Error(s.env.GetWorkflowError())
 }
 
-func (s *ProvisionLECertWorkflowTestSuite) TestStoreCertificateFails_SetsStatusFailed() {
+func (s *ProvisionLECertWorkflowTestSuite) TestCreateOrderFails_SetsStatusFailed() {
 	fqdnID := "test-fqdn-3"
+	webrootID := "test-webroot-3"
+	tenantID := "test-tenant-3"
+	shardID := "test-shard-3"
 	fqdn := model.FQDN{
 		ID:         fqdnID,
 		FQDN:       "secure.example.com",
-		WebrootID:  "test-webroot-3",
+		WebrootID:  webrootID,
 		SSLEnabled: true,
+	}
+	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
+	tenant := model.Tenant{ID: tenantID, Name: "testuser", ShardID: &shardID}
+	nodes := []model.Node{{ID: "node-1"}}
+
+	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(&fqdn, nil)
+	s.env.OnActivity("CreateCertificate", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
+	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
+	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("CreateOrder", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("ACME error"))
+
+	s.env.ExecuteWorkflow(ProvisionLECertWorkflow, fqdnID)
+	s.True(s.env.IsWorkflowCompleted())
+	s.Error(s.env.GetWorkflowError())
+}
+
+func (s *ProvisionLECertWorkflowTestSuite) TestStoreCertificateFails_SetsStatusFailed() {
+	fqdnID := "test-fqdn-4"
+	webrootID := "test-webroot-4"
+	tenantID := "test-tenant-4"
+	shardID := "test-shard-4"
+	fqdn := model.FQDN{
+		ID:         fqdnID,
+		FQDN:       "secure.example.com",
+		WebrootID:  webrootID,
+		SSLEnabled: true,
+	}
+	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
+	tenant := model.Tenant{ID: tenantID, Name: "testuser", ShardID: &shardID}
+	nodes := []model.Node{{ID: "node-1"}}
+
+	now := time.Now()
+	orderResult := &activity.ACMEOrderResult{
+		OrderURL:   "https://acme.example.com/order/123",
+		AuthzURLs:  []string{"https://acme.example.com/authz/456"},
+		AccountKey: []byte("FAKE_ACCOUNT_KEY_PEM"),
+	}
+	challengeResult := &activity.ACMEChallengeResult{
+		ChallengeURL: "https://acme.example.com/challenge/789",
+		Token:        "test-token-abc",
+		KeyAuth:      "test-token-abc.thumbprint",
+	}
+	finalizeResult := &activity.ACMEFinalizeResult{
+		CertPEM:   "REAL_CERT_PEM",
+		KeyPEM:    "REAL_KEY_PEM",
+		ChainPEM:  "REAL_CHAIN_PEM",
+		IssuedAt:  now,
+		ExpiresAt: now.Add(90 * 24 * time.Hour),
 	}
 
 	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(&fqdn, nil)
 	s.env.OnActivity("CreateCertificate", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
+	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
+	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("CreateOrder", mock.Anything, mock.Anything).Return(orderResult, nil)
+	s.env.OnActivity("GetHTTP01Challenge", mock.Anything, mock.Anything).Return(challengeResult, nil)
+	s.env.OnActivity("PlaceHTTP01Challenge", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("AcceptChallenge", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("FinalizeOrder", mock.Anything, mock.Anything).Return(finalizeResult, nil)
+	s.env.OnActivity("CleanupHTTP01Challenge", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("StoreCertificate", mock.Anything, mock.Anything).Return(fmt.Errorf("db error"))
 
 	s.env.ExecuteWorkflow(ProvisionLECertWorkflow, fqdnID)
@@ -95,25 +187,52 @@ func (s *ProvisionLECertWorkflowTestSuite) TestStoreCertificateFails_SetsStatusF
 }
 
 func (s *ProvisionLECertWorkflowTestSuite) TestInstallCertificateFails_SetsStatusFailed() {
-	fqdnID := "test-fqdn-4"
-	shardID := "test-shard-4"
+	fqdnID := "test-fqdn-5"
+	webrootID := "test-webroot-5"
+	tenantID := "test-tenant-5"
+	shardID := "test-shard-5"
 	fqdn := model.FQDN{
 		ID:         fqdnID,
 		FQDN:       "secure.example.com",
-		WebrootID:  "test-webroot-4",
+		WebrootID:  webrootID,
 		SSLEnabled: true,
 	}
-	webroot := model.Webroot{ID: "test-webroot-4", TenantID: "test-tenant-4"}
-	tenant := model.Tenant{ID: "test-tenant-4", Name: "testuser", ShardID: &shardID}
+	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
+	tenant := model.Tenant{ID: tenantID, Name: "testuser", ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
+
+	now := time.Now()
+	orderResult := &activity.ACMEOrderResult{
+		OrderURL:   "https://acme.example.com/order/123",
+		AuthzURLs:  []string{"https://acme.example.com/authz/456"},
+		AccountKey: []byte("FAKE_ACCOUNT_KEY_PEM"),
+	}
+	challengeResult := &activity.ACMEChallengeResult{
+		ChallengeURL: "https://acme.example.com/challenge/789",
+		Token:        "test-token-abc",
+		KeyAuth:      "test-token-abc.thumbprint",
+	}
+	finalizeResult := &activity.ACMEFinalizeResult{
+		CertPEM:   "REAL_CERT_PEM",
+		KeyPEM:    "REAL_KEY_PEM",
+		ChainPEM:  "REAL_CHAIN_PEM",
+		IssuedAt:  now,
+		ExpiresAt: now.Add(90 * 24 * time.Hour),
+	}
 
 	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(&fqdn, nil)
 	s.env.OnActivity("CreateCertificate", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, mock.Anything).Return(nil)
-	s.env.OnActivity("StoreCertificate", mock.Anything, mock.Anything).Return(nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, "test-webroot-4").Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, "test-tenant-4").Return(&tenant, nil)
+	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
+	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("CreateOrder", mock.Anything, mock.Anything).Return(orderResult, nil)
+	s.env.OnActivity("GetHTTP01Challenge", mock.Anything, mock.Anything).Return(challengeResult, nil)
+	s.env.OnActivity("PlaceHTTP01Challenge", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("AcceptChallenge", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("FinalizeOrder", mock.Anything, mock.Anything).Return(finalizeResult, nil)
+	s.env.OnActivity("CleanupHTTP01Challenge", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("StoreCertificate", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("InstallCertificate", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
 
 	s.env.ExecuteWorkflow(ProvisionLECertWorkflow, fqdnID)
@@ -122,25 +241,52 @@ func (s *ProvisionLECertWorkflowTestSuite) TestInstallCertificateFails_SetsStatu
 }
 
 func (s *ProvisionLECertWorkflowTestSuite) TestDeactivateOtherCertsFails_SetsStatusFailed() {
-	fqdnID := "test-fqdn-5"
-	shardID := "test-shard-5"
+	fqdnID := "test-fqdn-6"
+	webrootID := "test-webroot-6"
+	tenantID := "test-tenant-6"
+	shardID := "test-shard-6"
 	fqdn := model.FQDN{
 		ID:         fqdnID,
 		FQDN:       "secure.example.com",
-		WebrootID:  "test-webroot-5",
+		WebrootID:  webrootID,
 		SSLEnabled: true,
 	}
-	webroot := model.Webroot{ID: "test-webroot-5", TenantID: "test-tenant-5"}
-	tenant := model.Tenant{ID: "test-tenant-5", Name: "testuser", ShardID: &shardID}
+	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
+	tenant := model.Tenant{ID: tenantID, Name: "testuser", ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
+
+	now := time.Now()
+	orderResult := &activity.ACMEOrderResult{
+		OrderURL:   "https://acme.example.com/order/123",
+		AuthzURLs:  []string{"https://acme.example.com/authz/456"},
+		AccountKey: []byte("FAKE_ACCOUNT_KEY_PEM"),
+	}
+	challengeResult := &activity.ACMEChallengeResult{
+		ChallengeURL: "https://acme.example.com/challenge/789",
+		Token:        "test-token-abc",
+		KeyAuth:      "test-token-abc.thumbprint",
+	}
+	finalizeResult := &activity.ACMEFinalizeResult{
+		CertPEM:   "REAL_CERT_PEM",
+		KeyPEM:    "REAL_KEY_PEM",
+		ChainPEM:  "REAL_CHAIN_PEM",
+		IssuedAt:  now,
+		ExpiresAt: now.Add(90 * 24 * time.Hour),
+	}
 
 	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(&fqdn, nil)
 	s.env.OnActivity("CreateCertificate", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, mock.Anything).Return(nil)
-	s.env.OnActivity("StoreCertificate", mock.Anything, mock.Anything).Return(nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, "test-webroot-5").Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, "test-tenant-5").Return(&tenant, nil)
+	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
+	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("CreateOrder", mock.Anything, mock.Anything).Return(orderResult, nil)
+	s.env.OnActivity("GetHTTP01Challenge", mock.Anything, mock.Anything).Return(challengeResult, nil)
+	s.env.OnActivity("PlaceHTTP01Challenge", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("AcceptChallenge", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("FinalizeOrder", mock.Anything, mock.Anything).Return(finalizeResult, nil)
+	s.env.OnActivity("CleanupHTTP01Challenge", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("StoreCertificate", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("InstallCertificate", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("DeactivateOtherCerts", mock.Anything, fqdnID, mock.Anything).Return(fmt.Errorf("db error"))
 
@@ -150,25 +296,52 @@ func (s *ProvisionLECertWorkflowTestSuite) TestDeactivateOtherCertsFails_SetsSta
 }
 
 func (s *ProvisionLECertWorkflowTestSuite) TestActivateCertificateFails_SetsStatusFailed() {
-	fqdnID := "test-fqdn-6"
-	shardID := "test-shard-6"
+	fqdnID := "test-fqdn-7"
+	webrootID := "test-webroot-7"
+	tenantID := "test-tenant-7"
+	shardID := "test-shard-7"
 	fqdn := model.FQDN{
 		ID:         fqdnID,
 		FQDN:       "secure.example.com",
-		WebrootID:  "test-webroot-6",
+		WebrootID:  webrootID,
 		SSLEnabled: true,
 	}
-	webroot := model.Webroot{ID: "test-webroot-6", TenantID: "test-tenant-6"}
-	tenant := model.Tenant{ID: "test-tenant-6", Name: "testuser", ShardID: &shardID}
+	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
+	tenant := model.Tenant{ID: tenantID, Name: "testuser", ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
+
+	now := time.Now()
+	orderResult := &activity.ACMEOrderResult{
+		OrderURL:   "https://acme.example.com/order/123",
+		AuthzURLs:  []string{"https://acme.example.com/authz/456"},
+		AccountKey: []byte("FAKE_ACCOUNT_KEY_PEM"),
+	}
+	challengeResult := &activity.ACMEChallengeResult{
+		ChallengeURL: "https://acme.example.com/challenge/789",
+		Token:        "test-token-abc",
+		KeyAuth:      "test-token-abc.thumbprint",
+	}
+	finalizeResult := &activity.ACMEFinalizeResult{
+		CertPEM:   "REAL_CERT_PEM",
+		KeyPEM:    "REAL_KEY_PEM",
+		ChainPEM:  "REAL_CHAIN_PEM",
+		IssuedAt:  now,
+		ExpiresAt: now.Add(90 * 24 * time.Hour),
+	}
 
 	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(&fqdn, nil)
 	s.env.OnActivity("CreateCertificate", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, mock.Anything).Return(nil)
-	s.env.OnActivity("StoreCertificate", mock.Anything, mock.Anything).Return(nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, "test-webroot-6").Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, "test-tenant-6").Return(&tenant, nil)
+	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
+	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("CreateOrder", mock.Anything, mock.Anything).Return(orderResult, nil)
+	s.env.OnActivity("GetHTTP01Challenge", mock.Anything, mock.Anything).Return(challengeResult, nil)
+	s.env.OnActivity("PlaceHTTP01Challenge", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("AcceptChallenge", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("FinalizeOrder", mock.Anything, mock.Anything).Return(finalizeResult, nil)
+	s.env.OnActivity("CleanupHTTP01Challenge", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("StoreCertificate", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("InstallCertificate", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("DeactivateOtherCerts", mock.Anything, fqdnID, mock.Anything).Return(nil)
 	s.env.OnActivity("ActivateCertificate", mock.Anything, mock.Anything).Return(fmt.Errorf("db error"))
@@ -422,7 +595,7 @@ func (s *UploadCustomCertWorkflowTestSuite) TestSetProvisioningFails() {
 	s.Error(s.env.GetWorkflowError())
 }
 
-// ---------- RenewLECertWorkflow (stub) ----------
+// ---------- RenewLECertWorkflow ----------
 
 type RenewLECertWorkflowTestSuite struct {
 	suite.Suite
@@ -439,13 +612,59 @@ func (s *RenewLECertWorkflowTestSuite) AfterTest(suiteName, testName string) {
 	s.env.AssertExpectations(s.T())
 }
 
-func (s *RenewLECertWorkflowTestSuite) TestStub_Succeeds() {
+func (s *RenewLECertWorkflowTestSuite) TestSuccess_NoCerts() {
+	s.env.OnActivity("GetExpiringLECerts", mock.Anything, 30).Return([]model.Certificate{}, nil)
+
 	s.env.ExecuteWorkflow(RenewLECertWorkflow)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
 }
 
-// ---------- CleanupExpiredCertsWorkflow (stub) ----------
+func (s *RenewLECertWorkflowTestSuite) TestSuccess_RenewsExpiring() {
+	now := time.Now()
+	expiring := []model.Certificate{
+		{ID: "cert-1", FQDNID: "fqdn-1", ExpiresAt: timePtr(now.Add(20 * 24 * time.Hour))},
+		{ID: "cert-2", FQDNID: "fqdn-2", ExpiresAt: timePtr(now.Add(10 * 24 * time.Hour))},
+	}
+
+	s.env.OnActivity("GetExpiringLECerts", mock.Anything, 30).Return(expiring, nil)
+
+	// Expect child workflows for each cert
+	s.env.OnWorkflow(ProvisionLECertWorkflow, mock.Anything, "fqdn-1").Return(nil)
+	s.env.OnWorkflow(ProvisionLECertWorkflow, mock.Anything, "fqdn-2").Return(nil)
+
+	s.env.ExecuteWorkflow(RenewLECertWorkflow)
+	s.True(s.env.IsWorkflowCompleted())
+	s.NoError(s.env.GetWorkflowError())
+}
+
+func (s *RenewLECertWorkflowTestSuite) TestChildWorkflowFailure_ContinuesOthers() {
+	now := time.Now()
+	expiring := []model.Certificate{
+		{ID: "cert-1", FQDNID: "fqdn-1", ExpiresAt: timePtr(now.Add(20 * 24 * time.Hour))},
+		{ID: "cert-2", FQDNID: "fqdn-2", ExpiresAt: timePtr(now.Add(10 * 24 * time.Hour))},
+	}
+
+	s.env.OnActivity("GetExpiringLECerts", mock.Anything, 30).Return(expiring, nil)
+
+	// First child fails, second succeeds
+	s.env.OnWorkflow(ProvisionLECertWorkflow, mock.Anything, "fqdn-1").Return(fmt.Errorf("ACME error"))
+	s.env.OnWorkflow(ProvisionLECertWorkflow, mock.Anything, "fqdn-2").Return(nil)
+
+	s.env.ExecuteWorkflow(RenewLECertWorkflow)
+	s.True(s.env.IsWorkflowCompleted())
+	s.NoError(s.env.GetWorkflowError())
+}
+
+func (s *RenewLECertWorkflowTestSuite) TestGetExpiringFails() {
+	s.env.OnActivity("GetExpiringLECerts", mock.Anything, 30).Return(nil, fmt.Errorf("db error"))
+
+	s.env.ExecuteWorkflow(RenewLECertWorkflow)
+	s.True(s.env.IsWorkflowCompleted())
+	s.Error(s.env.GetWorkflowError())
+}
+
+// ---------- CleanupExpiredCertsWorkflow ----------
 
 type CleanupExpiredCertsWorkflowTestSuite struct {
 	suite.Suite
@@ -462,10 +681,56 @@ func (s *CleanupExpiredCertsWorkflowTestSuite) AfterTest(suiteName, testName str
 	s.env.AssertExpectations(s.T())
 }
 
-func (s *CleanupExpiredCertsWorkflowTestSuite) TestStub_Succeeds() {
+func (s *CleanupExpiredCertsWorkflowTestSuite) TestSuccess_NoCerts() {
+	s.env.OnActivity("GetExpiredCerts", mock.Anything, 30).Return([]model.Certificate{}, nil)
+
 	s.env.ExecuteWorkflow(CleanupExpiredCertsWorkflow)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
+}
+
+func (s *CleanupExpiredCertsWorkflowTestSuite) TestSuccess_DeletesExpired() {
+	now := time.Now()
+	expired := []model.Certificate{
+		{ID: "cert-1", FQDNID: "fqdn-1", ExpiresAt: timePtr(now.Add(-60 * 24 * time.Hour))},
+		{ID: "cert-2", FQDNID: "fqdn-2", ExpiresAt: timePtr(now.Add(-45 * 24 * time.Hour))},
+	}
+
+	s.env.OnActivity("GetExpiredCerts", mock.Anything, 30).Return(expired, nil)
+	s.env.OnActivity("DeleteCertificate", mock.Anything, "cert-1").Return(nil)
+	s.env.OnActivity("DeleteCertificate", mock.Anything, "cert-2").Return(nil)
+
+	s.env.ExecuteWorkflow(CleanupExpiredCertsWorkflow)
+	s.True(s.env.IsWorkflowCompleted())
+	s.NoError(s.env.GetWorkflowError())
+}
+
+func (s *CleanupExpiredCertsWorkflowTestSuite) TestDeleteFailure_ContinuesOthers() {
+	now := time.Now()
+	expired := []model.Certificate{
+		{ID: "cert-1", FQDNID: "fqdn-1", ExpiresAt: timePtr(now.Add(-60 * 24 * time.Hour))},
+		{ID: "cert-2", FQDNID: "fqdn-2", ExpiresAt: timePtr(now.Add(-45 * 24 * time.Hour))},
+	}
+
+	s.env.OnActivity("GetExpiredCerts", mock.Anything, 30).Return(expired, nil)
+	s.env.OnActivity("DeleteCertificate", mock.Anything, "cert-1").Return(fmt.Errorf("db error"))
+	s.env.OnActivity("DeleteCertificate", mock.Anything, "cert-2").Return(nil)
+
+	s.env.ExecuteWorkflow(CleanupExpiredCertsWorkflow)
+	s.True(s.env.IsWorkflowCompleted())
+	s.NoError(s.env.GetWorkflowError())
+}
+
+func (s *CleanupExpiredCertsWorkflowTestSuite) TestGetExpiredFails() {
+	s.env.OnActivity("GetExpiredCerts", mock.Anything, 30).Return(nil, fmt.Errorf("db error"))
+
+	s.env.ExecuteWorkflow(CleanupExpiredCertsWorkflow)
+	s.True(s.env.IsWorkflowCompleted())
+	s.Error(s.env.GetWorkflowError())
+}
+
+func timePtr(t time.Time) *time.Time {
+	return &t
 }
 
 // ---------- Run all suites ----------

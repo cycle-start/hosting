@@ -38,12 +38,24 @@ func (s *RegionService) GetByID(ctx context.Context, id string) (*model.Region, 
 	return &r, nil
 }
 
-func (s *RegionService) List(ctx context.Context) ([]model.Region, error) {
-	rows, err := s.db.Query(ctx,
-		"SELECT id, name, config, created_at, updated_at FROM regions ORDER BY name",
-	)
+func (s *RegionService) List(ctx context.Context, limit int, cursor string) ([]model.Region, bool, error) {
+	query := `SELECT id, name, config, created_at, updated_at FROM regions`
+	args := []any{}
+	argIdx := 1
+
+	if cursor != "" {
+		query += fmt.Sprintf(` WHERE id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list regions: %w", err)
+		return nil, false, fmt.Errorf("list regions: %w", err)
 	}
 	defer rows.Close()
 
@@ -51,14 +63,19 @@ func (s *RegionService) List(ctx context.Context) ([]model.Region, error) {
 	for rows.Next() {
 		var r model.Region
 		if err := rows.Scan(&r.ID, &r.Name, &r.Config, &r.CreatedAt, &r.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan region: %w", err)
+			return nil, false, fmt.Errorf("scan region: %w", err)
 		}
 		regions = append(regions, r)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate regions: %w", err)
+		return nil, false, fmt.Errorf("iterate regions: %w", err)
 	}
-	return regions, nil
+
+	hasMore := len(regions) > limit
+	if hasMore {
+		regions = regions[:limit]
+	}
+	return regions, hasMore, nil
 }
 
 func (s *RegionService) Update(ctx context.Context, region *model.Region) error {
@@ -80,13 +97,24 @@ func (s *RegionService) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *RegionService) ListRuntimes(ctx context.Context, regionID string) ([]model.RegionRuntime, error) {
-	rows, err := s.db.Query(ctx,
-		"SELECT region_id, runtime, version, available FROM region_runtimes WHERE region_id = $1 ORDER BY runtime, version",
-		regionID,
-	)
+func (s *RegionService) ListRuntimes(ctx context.Context, regionID string, limit int, cursor string) ([]model.RegionRuntime, bool, error) {
+	query := `SELECT region_id, runtime, version, available FROM region_runtimes WHERE region_id = $1`
+	args := []any{regionID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND runtime || '/' || version > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY runtime, version`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list region runtimes for %s: %w", regionID, err)
+		return nil, false, fmt.Errorf("list region runtimes for %s: %w", regionID, err)
 	}
 	defer rows.Close()
 
@@ -94,14 +122,19 @@ func (s *RegionService) ListRuntimes(ctx context.Context, regionID string) ([]mo
 	for rows.Next() {
 		var rt model.RegionRuntime
 		if err := rows.Scan(&rt.RegionID, &rt.Runtime, &rt.Version, &rt.Available); err != nil {
-			return nil, fmt.Errorf("scan region runtime: %w", err)
+			return nil, false, fmt.Errorf("scan region runtime: %w", err)
 		}
 		runtimes = append(runtimes, rt)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate region runtimes: %w", err)
+		return nil, false, fmt.Errorf("iterate region runtimes: %w", err)
 	}
-	return runtimes, nil
+
+	hasMore := len(runtimes) > limit
+	if hasMore {
+		runtimes = runtimes[:limit]
+	}
+	return runtimes, hasMore, nil
 }
 
 func (s *RegionService) AddRuntime(ctx context.Context, rt *model.RegionRuntime) error {

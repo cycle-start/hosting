@@ -27,13 +27,19 @@ func (h *EmailForward) ListByAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	forwards, err := h.svc.ListByAccountID(r.Context(), id)
+	pg := request.ParsePagination(r)
+
+	forwards, hasMore, err := h.svc.ListByAccountID(r.Context(), id, pg.Limit, pg.Cursor)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, forwards)
+	var nextCursor string
+	if hasMore && len(forwards) > 0 {
+		nextCursor = forwards[len(forwards)-1].ID
+	}
+	response.WritePaginated(w, http.StatusOK, forwards, nextCursor, hasMore)
 }
 
 func (h *EmailForward) Create(w http.ResponseWriter, r *http.Request) {

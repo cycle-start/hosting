@@ -27,7 +27,9 @@ func (h *DatabaseUser) ListByDatabase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users, err := h.svc.ListByDatabase(r.Context(), databaseID)
+	pg := request.ParsePagination(r)
+
+	users, hasMore, err := h.svc.ListByDatabase(r.Context(), databaseID, pg.Limit, pg.Cursor)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -36,7 +38,11 @@ func (h *DatabaseUser) ListByDatabase(w http.ResponseWriter, r *http.Request) {
 	for i := range users {
 		users[i].Password = ""
 	}
-	response.WriteJSON(w, http.StatusOK, users)
+	var nextCursor string
+	if hasMore && len(users) > 0 {
+		nextCursor = users[len(users)-1].ID
+	}
+	response.WritePaginated(w, http.StatusOK, users, nextCursor, hasMore)
 }
 
 func (h *DatabaseUser) Create(w http.ResponseWriter, r *http.Request) {

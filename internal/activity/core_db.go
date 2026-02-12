@@ -616,6 +616,60 @@ func (a *CoreDB) GetEmailAutoReplyByID(ctx context.Context, id string) (*model.E
 	return &ar, nil
 }
 
+// GetExpiringLECerts returns Let's Encrypt certificates expiring within the given number of days.
+func (a *CoreDB) GetExpiringLECerts(ctx context.Context, daysBeforeExpiry int) ([]model.Certificate, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, fqdn_id, type, cert_pem, key_pem, chain_pem, issued_at, expires_at, status, is_active, created_at, updated_at
+		 FROM certificates
+		 WHERE type = $1 AND status = $2 AND is_active = true
+		   AND expires_at <= now() + make_interval(days => $3)
+		 ORDER BY expires_at ASC`,
+		model.CertTypeLetsEncrypt, model.StatusActive, daysBeforeExpiry,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get expiring LE certs: %w", err)
+	}
+	defer rows.Close()
+
+	var certs []model.Certificate
+	for rows.Next() {
+		var c model.Certificate
+		if err := rows.Scan(&c.ID, &c.FQDNID, &c.Type, &c.CertPEM, &c.KeyPEM, &c.ChainPEM,
+			&c.IssuedAt, &c.ExpiresAt, &c.Status, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan expiring cert: %w", err)
+		}
+		certs = append(certs, c)
+	}
+	return certs, rows.Err()
+}
+
+// GetExpiredCerts returns certificates that have been expired for more than the given number of days.
+func (a *CoreDB) GetExpiredCerts(ctx context.Context, daysAfterExpiry int) ([]model.Certificate, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, fqdn_id, type, cert_pem, key_pem, chain_pem, issued_at, expires_at, status, is_active, created_at, updated_at
+		 FROM certificates
+		 WHERE status = $1
+		   AND expires_at < now() - make_interval(days => $2)
+		 ORDER BY expires_at ASC`,
+		model.StatusActive, daysAfterExpiry,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get expired certs: %w", err)
+	}
+	defer rows.Close()
+
+	var certs []model.Certificate
+	for rows.Next() {
+		var c model.Certificate
+		if err := rows.Scan(&c.ID, &c.FQDNID, &c.Type, &c.CertPEM, &c.KeyPEM, &c.ChainPEM,
+			&c.IssuedAt, &c.ExpiresAt, &c.Status, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan expired cert: %w", err)
+		}
+		certs = append(certs, c)
+	}
+	return certs, rows.Err()
+}
+
 // GetPlatformConfig retrieves a platform configuration value by key.
 func (a *CoreDB) GetPlatformConfig(ctx context.Context, key string) (string, error) {
 	var value string

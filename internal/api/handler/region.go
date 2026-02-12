@@ -21,13 +21,19 @@ func NewRegion(svc *core.RegionService) *Region {
 }
 
 func (h *Region) List(w http.ResponseWriter, r *http.Request) {
-	regions, err := h.svc.List(r.Context())
+	pg := request.ParsePagination(r)
+
+	regions, hasMore, err := h.svc.List(r.Context(), pg.Limit, pg.Cursor)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, regions)
+	var nextCursor string
+	if hasMore && len(regions) > 0 {
+		nextCursor = regions[len(regions)-1].ID
+	}
+	response.WritePaginated(w, http.StatusOK, regions, nextCursor, hasMore)
 }
 
 func (h *Region) Create(w http.ResponseWriter, r *http.Request) {
@@ -138,13 +144,19 @@ func (h *Region) ListRuntimes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	runtimes, err := h.svc.ListRuntimes(r.Context(), id)
+	pg := request.ParsePagination(r)
+
+	runtimes, hasMore, err := h.svc.ListRuntimes(r.Context(), id, pg.Limit, pg.Cursor)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, runtimes)
+	var nextCursor string
+	if hasMore && len(runtimes) > 0 {
+		nextCursor = runtimes[len(runtimes)-1].Runtime + "/" + runtimes[len(runtimes)-1].Version
+	}
+	response.WritePaginated(w, http.StatusOK, runtimes, nextCursor, hasMore)
 }
 
 func (h *Region) AddRuntime(w http.ResponseWriter, r *http.Request) {

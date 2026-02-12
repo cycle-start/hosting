@@ -51,13 +51,24 @@ func (s *EmailForwardService) GetByID(ctx context.Context, id string) (*model.Em
 	return &f, nil
 }
 
-func (s *EmailForwardService) ListByAccountID(ctx context.Context, accountID string) ([]model.EmailForward, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, email_account_id, destination, keep_copy, status, created_at, updated_at
-		 FROM email_forwards WHERE email_account_id = $1 ORDER BY destination`, accountID,
-	)
+func (s *EmailForwardService) ListByAccountID(ctx context.Context, accountID string, limit int, cursor string) ([]model.EmailForward, bool, error) {
+	query := `SELECT id, email_account_id, destination, keep_copy, status, created_at, updated_at FROM email_forwards WHERE email_account_id = $1`
+	args := []any{accountID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list email forwards for account %s: %w", accountID, err)
+		return nil, false, fmt.Errorf("list email forwards for account %s: %w", accountID, err)
 	}
 	defer rows.Close()
 
@@ -65,14 +76,19 @@ func (s *EmailForwardService) ListByAccountID(ctx context.Context, accountID str
 	for rows.Next() {
 		var f model.EmailForward
 		if err := rows.Scan(&f.ID, &f.EmailAccountID, &f.Destination, &f.KeepCopy, &f.Status, &f.CreatedAt, &f.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan email forward: %w", err)
+			return nil, false, fmt.Errorf("scan email forward: %w", err)
 		}
 		forwards = append(forwards, f)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate email forwards: %w", err)
+		return nil, false, fmt.Errorf("iterate email forwards: %w", err)
 	}
-	return forwards, nil
+
+	hasMore := len(forwards) > limit
+	if hasMore {
+		forwards = forwards[:limit]
+	}
+	return forwards, hasMore, nil
 }
 
 func (s *EmailForwardService) Delete(ctx context.Context, id string) error {

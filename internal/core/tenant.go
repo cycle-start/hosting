@@ -59,13 +59,24 @@ func (s *TenantService) GetByID(ctx context.Context, id string) (*model.Tenant, 
 	return &t, nil
 }
 
-func (s *TenantService) List(ctx context.Context) ([]model.Tenant, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, name, region_id, cluster_id, shard_id, uid, sftp_enabled, status, created_at, updated_at
-		 FROM tenants ORDER BY name`,
-	)
+func (s *TenantService) List(ctx context.Context, limit int, cursor string) ([]model.Tenant, bool, error) {
+	query := `SELECT id, name, region_id, cluster_id, shard_id, uid, sftp_enabled, status, created_at, updated_at FROM tenants`
+	args := []any{}
+	argIdx := 1
+
+	if cursor != "" {
+		query += fmt.Sprintf(` WHERE id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list tenants: %w", err)
+		return nil, false, fmt.Errorf("list tenants: %w", err)
 	}
 	defer rows.Close()
 
@@ -74,23 +85,39 @@ func (s *TenantService) List(ctx context.Context) ([]model.Tenant, error) {
 		var t model.Tenant
 		if err := rows.Scan(&t.ID, &t.Name, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID,
 			&t.SFTPEnabled, &t.Status, &t.CreatedAt, &t.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan tenant: %w", err)
+			return nil, false, fmt.Errorf("scan tenant: %w", err)
 		}
 		tenants = append(tenants, t)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate tenants: %w", err)
+		return nil, false, fmt.Errorf("iterate tenants: %w", err)
 	}
-	return tenants, nil
+
+	hasMore := len(tenants) > limit
+	if hasMore {
+		tenants = tenants[:limit]
+	}
+	return tenants, hasMore, nil
 }
 
-func (s *TenantService) ListByShard(ctx context.Context, shardID string) ([]model.Tenant, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, name, region_id, cluster_id, shard_id, uid, sftp_enabled, status, created_at, updated_at
-		 FROM tenants WHERE shard_id = $1 ORDER BY name`, shardID,
-	)
+func (s *TenantService) ListByShard(ctx context.Context, shardID string, limit int, cursor string) ([]model.Tenant, bool, error) {
+	query := `SELECT id, name, region_id, cluster_id, shard_id, uid, sftp_enabled, status, created_at, updated_at FROM tenants WHERE shard_id = $1`
+	args := []any{shardID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list tenants for shard %s: %w", shardID, err)
+		return nil, false, fmt.Errorf("list tenants for shard %s: %w", shardID, err)
 	}
 	defer rows.Close()
 
@@ -99,14 +126,19 @@ func (s *TenantService) ListByShard(ctx context.Context, shardID string) ([]mode
 		var t model.Tenant
 		if err := rows.Scan(&t.ID, &t.Name, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID,
 			&t.SFTPEnabled, &t.Status, &t.CreatedAt, &t.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan tenant: %w", err)
+			return nil, false, fmt.Errorf("scan tenant: %w", err)
 		}
 		tenants = append(tenants, t)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate tenants: %w", err)
+		return nil, false, fmt.Errorf("iterate tenants: %w", err)
 	}
-	return tenants, nil
+
+	hasMore := len(tenants) > limit
+	if hasMore {
+		tenants = tenants[:limit]
+	}
+	return tenants, hasMore, nil
 }
 
 func (s *TenantService) Update(ctx context.Context, tenant *model.Tenant) error {

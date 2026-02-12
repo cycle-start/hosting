@@ -41,13 +41,24 @@ func (s *ClusterService) GetByID(ctx context.Context, id string) (*model.Cluster
 	return &c, nil
 }
 
-func (s *ClusterService) ListByRegion(ctx context.Context, regionID string) ([]model.Cluster, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, region_id, name, config, status, spec, created_at, updated_at
-		 FROM clusters WHERE region_id = $1 ORDER BY name`, regionID,
-	)
+func (s *ClusterService) ListByRegion(ctx context.Context, regionID string, limit int, cursor string) ([]model.Cluster, bool, error) {
+	query := `SELECT id, region_id, name, config, status, spec, created_at, updated_at FROM clusters WHERE region_id = $1`
+	args := []any{regionID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list clusters for region %s: %w", regionID, err)
+		return nil, false, fmt.Errorf("list clusters for region %s: %w", regionID, err)
 	}
 	defer rows.Close()
 
@@ -56,14 +67,19 @@ func (s *ClusterService) ListByRegion(ctx context.Context, regionID string) ([]m
 		var c model.Cluster
 		if err := rows.Scan(&c.ID, &c.RegionID, &c.Name,
 			&c.Config, &c.Status, &c.Spec, &c.CreatedAt, &c.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan cluster: %w", err)
+			return nil, false, fmt.Errorf("scan cluster: %w", err)
 		}
 		clusters = append(clusters, c)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate clusters: %w", err)
+		return nil, false, fmt.Errorf("iterate clusters: %w", err)
 	}
-	return clusters, nil
+
+	hasMore := len(clusters) > limit
+	if hasMore {
+		clusters = clusters[:limit]
+	}
+	return clusters, hasMore, nil
 }
 
 func (s *ClusterService) Update(ctx context.Context, cluster *model.Cluster) error {

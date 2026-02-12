@@ -170,10 +170,11 @@ func TestZoneService_List_Success(t *testing.T) {
 			return nil
 		},
 	)
-	db.On("Query", ctx, mock.AnythingOfType("string"), []any(nil)).Return(rows, nil)
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.List(ctx)
+	result, hasMore, err := svc.List(ctx, 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	require.Len(t, result, 1)
 	assert.Equal(t, "example.com", result[0].Name)
 	db.AssertExpectations(t)
@@ -185,9 +186,9 @@ func TestZoneService_List_QueryError(t *testing.T) {
 	svc := NewZoneService(db, tc)
 	ctx := context.Background()
 
-	db.On("Query", ctx, mock.AnythingOfType("string"), []any(nil)).Return(nil, errors.New("connection lost"))
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("connection lost"))
 
-	result, err := svc.List(ctx)
+	result, _, err := svc.List(ctx, 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "list zones")

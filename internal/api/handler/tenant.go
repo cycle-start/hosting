@@ -21,13 +21,19 @@ func NewTenant(svc *core.TenantService) *Tenant {
 }
 
 func (h *Tenant) List(w http.ResponseWriter, r *http.Request) {
-	tenants, err := h.svc.List(r.Context())
+	pg := request.ParsePagination(r)
+
+	tenants, hasMore, err := h.svc.List(r.Context(), pg.Limit, pg.Cursor)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, tenants)
+	var nextCursor string
+	if hasMore && len(tenants) > 0 {
+		nextCursor = tenants[len(tenants)-1].ID
+	}
+	response.WritePaginated(w, http.StatusOK, tenants, nextCursor, hasMore)
 }
 
 func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {

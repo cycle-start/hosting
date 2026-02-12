@@ -41,13 +41,24 @@ func (s *NodeService) GetByID(ctx context.Context, id string) (*model.Node, erro
 	return &n, nil
 }
 
-func (s *NodeService) ListByCluster(ctx context.Context, clusterID string) ([]model.Node, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, cluster_id, shard_id, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at
-		 FROM nodes WHERE cluster_id = $1 ORDER BY hostname`, clusterID,
-	)
+func (s *NodeService) ListByCluster(ctx context.Context, clusterID string, limit int, cursor string) ([]model.Node, bool, error) {
+	query := `SELECT id, cluster_id, shard_id, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at FROM nodes WHERE cluster_id = $1`
+	args := []any{clusterID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list nodes for cluster %s: %w", clusterID, err)
+		return nil, false, fmt.Errorf("list nodes for cluster %s: %w", clusterID, err)
 	}
 	defer rows.Close()
 
@@ -56,23 +67,39 @@ func (s *NodeService) ListByCluster(ctx context.Context, clusterID string) ([]mo
 		var n model.Node
 		if err := rows.Scan(&n.ID, &n.ClusterID, &n.ShardID, &n.Hostname, &n.IPAddress, &n.IP6Address,
 			&n.Roles, &n.Status, &n.CreatedAt, &n.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan node: %w", err)
+			return nil, false, fmt.Errorf("scan node: %w", err)
 		}
 		nodes = append(nodes, n)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate nodes: %w", err)
+		return nil, false, fmt.Errorf("iterate nodes: %w", err)
 	}
-	return nodes, nil
+
+	hasMore := len(nodes) > limit
+	if hasMore {
+		nodes = nodes[:limit]
+	}
+	return nodes, hasMore, nil
 }
 
-func (s *NodeService) ListByShard(ctx context.Context, shardID string) ([]model.Node, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, cluster_id, shard_id, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at
-		 FROM nodes WHERE shard_id = $1 ORDER BY hostname`, shardID,
-	)
+func (s *NodeService) ListByShard(ctx context.Context, shardID string, limit int, cursor string) ([]model.Node, bool, error) {
+	query := `SELECT id, cluster_id, shard_id, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at FROM nodes WHERE shard_id = $1`
+	args := []any{shardID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list nodes for shard %s: %w", shardID, err)
+		return nil, false, fmt.Errorf("list nodes for shard %s: %w", shardID, err)
 	}
 	defer rows.Close()
 
@@ -81,14 +108,19 @@ func (s *NodeService) ListByShard(ctx context.Context, shardID string) ([]model.
 		var n model.Node
 		if err := rows.Scan(&n.ID, &n.ClusterID, &n.ShardID, &n.Hostname, &n.IPAddress, &n.IP6Address,
 			&n.Roles, &n.Status, &n.CreatedAt, &n.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan node: %w", err)
+			return nil, false, fmt.Errorf("scan node: %w", err)
 		}
 		nodes = append(nodes, n)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate nodes: %w", err)
+		return nil, false, fmt.Errorf("iterate nodes: %w", err)
 	}
-	return nodes, nil
+
+	hasMore := len(nodes) > limit
+	if hasMore {
+		nodes = nodes[:limit]
+	}
+	return nodes, hasMore, nil
 }
 
 func (s *NodeService) Update(ctx context.Context, node *model.Node) error {

@@ -225,7 +225,7 @@ vm-down:
 
 # SSH into a VM (e.g. just vm-ssh web-1-node-0)
 vm-ssh name:
-    ssh -o StrictHostKeyChecking=no ubuntu@$(cd terraform && terraform output -json web_node_ips db_node_ips dns_node_ips valkey_node_ips 2>/dev/null | python3 -c "import sys,json; d={}; [d.update(json.load(sys.stdin)) for _ in range(4)]; print(d['{{name}}'])")
+    ssh -o StrictHostKeyChecking=no ubuntu@$(cd terraform && terraform output -json 2>/dev/null | python3 -c "import sys,json; o=json.load(sys.stdin); d={}; [d.update(v['value']) for k,v in o.items() if k.endswith('_ips')]; print(d['{{name}}'])")
 
 # Expose HAProxy via ngrok for testing real domains
 vm-ngrok:

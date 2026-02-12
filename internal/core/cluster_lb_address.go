@@ -55,23 +55,40 @@ func (s *ClusterLBAddressService) GetByID(ctx context.Context, id string) (*mode
 	return &addr, nil
 }
 
-func (s *ClusterLBAddressService) ListByCluster(ctx context.Context, clusterID string) ([]model.ClusterLBAddress, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, cluster_id, address::text, family, label, created_at
-		 FROM cluster_lb_addresses WHERE cluster_id = $1 ORDER BY family, address`, clusterID)
+func (s *ClusterLBAddressService) ListByCluster(ctx context.Context, clusterID string, limit int, cursor string) ([]model.ClusterLBAddress, bool, error) {
+	query := `SELECT id, cluster_id, address::text, family, label, created_at FROM cluster_lb_addresses WHERE cluster_id = $1`
+	args := []any{clusterID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list cluster LB addresses: %w", err)
+		return nil, false, fmt.Errorf("list cluster LB addresses: %w", err)
 	}
 	defer rows.Close()
 	var addrs []model.ClusterLBAddress
 	for rows.Next() {
 		var a model.ClusterLBAddress
 		if err := rows.Scan(&a.ID, &a.ClusterID, &a.Address, &a.Family, &a.Label, &a.CreatedAt); err != nil {
-			return nil, fmt.Errorf("scan cluster LB address: %w", err)
+			return nil, false, fmt.Errorf("scan cluster LB address: %w", err)
 		}
 		addrs = append(addrs, a)
 	}
-	return addrs, nil
+
+	hasMore := len(addrs) > limit
+	if hasMore {
+		addrs = addrs[:limit]
+	}
+	return addrs, hasMore, nil
 }
 
 func (s *ClusterLBAddressService) Delete(ctx context.Context, id string) error {

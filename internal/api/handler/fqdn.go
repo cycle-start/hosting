@@ -27,13 +27,19 @@ func (h *FQDN) ListByWebroot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fqdns, err := h.svc.ListByWebroot(r.Context(), webrootID)
+	pg := request.ParsePagination(r)
+
+	fqdns, hasMore, err := h.svc.ListByWebroot(r.Context(), webrootID, pg.Limit, pg.Cursor)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, fqdns)
+	var nextCursor string
+	if hasMore && len(fqdns) > 0 {
+		nextCursor = fqdns[len(fqdns)-1].ID
+	}
+	response.WritePaginated(w, http.StatusOK, fqdns, nextCursor, hasMore)
 }
 
 func (h *FQDN) Create(w http.ResponseWriter, r *http.Request) {

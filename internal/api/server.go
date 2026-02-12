@@ -14,7 +14,8 @@ import (
 	temporalclient "go.temporal.io/sdk/client"
 
 	"github.com/edvin/hosting/internal/api/handler"
-	metricsMiddleware "github.com/edvin/hosting/internal/api/middleware"
+	mw "github.com/edvin/hosting/internal/api/middleware"
+	"github.com/edvin/hosting/internal/config"
 	"github.com/edvin/hosting/internal/core"
 )
 
@@ -24,10 +25,13 @@ type Server struct {
 	services       *core.Services
 	corePool       *pgxpool.Pool
 	temporalClient temporalclient.Client
+	cfg            *config.Config
+	auditLogger    *mw.AuditLogger
 }
 
-func NewServer(logger zerolog.Logger, coreDB *pgxpool.Pool, temporalClient temporalclient.Client) *Server {
+func NewServer(logger zerolog.Logger, coreDB *pgxpool.Pool, temporalClient temporalclient.Client, cfg *config.Config) *Server {
 	services := core.NewServices(coreDB, temporalClient)
+	auditLogger := mw.NewAuditLogger(coreDB, logger)
 
 	s := &Server{
 		router:         chi.NewRouter(),
@@ -35,6 +39,8 @@ func NewServer(logger zerolog.Logger, coreDB *pgxpool.Pool, temporalClient tempo
 		services:       services,
 		corePool:       coreDB,
 		temporalClient: temporalClient,
+		cfg:            cfg,
+		auditLogger:    auditLogger,
 	}
 
 	s.setupMiddleware()
@@ -46,9 +52,9 @@ func NewServer(logger zerolog.Logger, coreDB *pgxpool.Pool, temporalClient tempo
 func (s *Server) setupMiddleware() {
 	s.router.Use(middleware.RequestID)
 	s.router.Use(middleware.RealIP)
-	s.router.Use(metricsMiddleware.RequestLogger(s.logger))
+	s.router.Use(mw.RequestLogger(s.logger))
 	s.router.Use(middleware.Recoverer)
-	s.router.Use(metricsMiddleware.Metrics)
+	s.router.Use(mw.Metrics)
 }
 
 func (s *Server) setupRoutes() {
@@ -60,6 +66,15 @@ func (s *Server) setupRoutes() {
 	s.router.Get("/readyz", s.handleReadyz)
 
 	s.router.Route("/api/v1", func(r chi.Router) {
+		if s.cfg.AuthEnabled {
+			r.Use(mw.Auth(s.corePool))
+		}
+		r.Use(s.auditLogger.Middleware)
+
+		// Audit logs
+		audit := handler.NewAudit(s.corePool)
+		r.Get("/audit-logs", audit.List)
+
 		// Platform config
 		platformCfg := handler.NewPlatformConfig(s.services.PlatformConfig)
 		r.Get("/platform/config", platformCfg.Get)

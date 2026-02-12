@@ -28,13 +28,19 @@ func (h *Webroot) ListByTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	webroots, err := h.svc.ListByTenant(r.Context(), tenantID)
+	pg := request.ParsePagination(r)
+
+	webroots, hasMore, err := h.svc.ListByTenant(r.Context(), tenantID, pg.Limit, pg.Cursor)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, webroots)
+	var nextCursor string
+	if hasMore && len(webroots) > 0 {
+		nextCursor = webroots[len(webroots)-1].ID
+	}
+	response.WritePaginated(w, http.StatusOK, webroots, nextCursor, hasMore)
 }
 
 func (h *Webroot) Create(w http.ResponseWriter, r *http.Request) {

@@ -130,3 +130,18 @@ func (a *CertificateActivity) ActivateCertificate(ctx context.Context, certID st
 	}
 	return nil
 }
+
+// DeleteCertificate deactivates a certificate, clears its PEM data, and marks it deleted.
+func (a *CertificateActivity) DeleteCertificate(ctx context.Context, certID string) error {
+	_, err := a.coreDB.Exec(ctx,
+		`UPDATE certificates
+		 SET is_active = false, status = 'deleted',
+		     cert_pem = '', key_pem = '', chain_pem = '',
+		     updated_at = now()
+		 WHERE id = $1`, certID,
+	)
+	if err != nil {
+		return fmt.Errorf("delete certificate: %w", err)
+	}
+	return nil
+}

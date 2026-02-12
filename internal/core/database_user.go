@@ -53,13 +53,24 @@ func (s *DatabaseUserService) GetByID(ctx context.Context, id string) (*model.Da
 	return &u, nil
 }
 
-func (s *DatabaseUserService) ListByDatabase(ctx context.Context, dbID string) ([]model.DatabaseUser, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, database_id, username, password, privileges, status, created_at, updated_at
-		 FROM database_users WHERE database_id = $1 ORDER BY username`, dbID,
-	)
+func (s *DatabaseUserService) ListByDatabase(ctx context.Context, dbID string, limit int, cursor string) ([]model.DatabaseUser, bool, error) {
+	query := `SELECT id, database_id, username, password, privileges, status, created_at, updated_at FROM database_users WHERE database_id = $1`
+	args := []any{dbID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list database users for database %s: %w", dbID, err)
+		return nil, false, fmt.Errorf("list database users for database %s: %w", dbID, err)
 	}
 	defer rows.Close()
 
@@ -68,14 +79,19 @@ func (s *DatabaseUserService) ListByDatabase(ctx context.Context, dbID string) (
 		var u model.DatabaseUser
 		if err := rows.Scan(&u.ID, &u.DatabaseID, &u.Username, &u.Password,
 			&u.Privileges, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan database user: %w", err)
+			return nil, false, fmt.Errorf("scan database user: %w", err)
 		}
 		users = append(users, u)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate database users: %w", err)
+		return nil, false, fmt.Errorf("iterate database users: %w", err)
 	}
-	return users, nil
+
+	hasMore := len(users) > limit
+	if hasMore {
+		users = users[:limit]
+	}
+	return users, hasMore, nil
 }
 
 func (s *DatabaseUserService) Update(ctx context.Context, user *model.DatabaseUser) error {

@@ -181,8 +181,9 @@ func TestFQDNService_ListByWebroot_Success(t *testing.T) {
 	)
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByWebroot(ctx, webrootID)
+	result, hasMore, err := svc.ListByWebroot(ctx, webrootID, 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	require.Len(t, result, 2)
 	assert.Equal(t, "alpha.example.com", result[0].FQDN)
 	assert.Equal(t, "beta.example.com", result[1].FQDN)
@@ -198,8 +199,9 @@ func TestFQDNService_ListByWebroot_Empty(t *testing.T) {
 	rows := newEmptyMockRows()
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByWebroot(ctx, "test-webroot-1")
+	result, hasMore, err := svc.ListByWebroot(ctx, "test-webroot-1", 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	assert.Empty(t, result)
 	db.AssertExpectations(t)
 }
@@ -212,7 +214,7 @@ func TestFQDNService_ListByWebroot_QueryError(t *testing.T) {
 
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("connection lost"))
 
-	result, err := svc.ListByWebroot(ctx, "test-webroot-1")
+	result, _, err := svc.ListByWebroot(ctx, "test-webroot-1", 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "list fqdns")

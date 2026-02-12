@@ -28,13 +28,19 @@ func (h *Shard) ListByCluster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shards, err := h.svc.ListByCluster(r.Context(), clusterID)
+	pg := request.ParsePagination(r)
+
+	shards, hasMore, err := h.svc.ListByCluster(r.Context(), clusterID, pg.Limit, pg.Cursor)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, shards)
+	var nextCursor string
+	if hasMore && len(shards) > 0 {
+		nextCursor = shards[len(shards)-1].ID
+	}
+	response.WritePaginated(w, http.StatusOK, shards, nextCursor, hasMore)
 }
 
 func (h *Shard) Create(w http.ResponseWriter, r *http.Request) {

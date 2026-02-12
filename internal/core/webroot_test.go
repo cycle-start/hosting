@@ -183,8 +183,9 @@ func TestWebrootService_ListByTenant_Success(t *testing.T) {
 	)
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByTenant(ctx, tenantID)
+	result, hasMore, err := svc.ListByTenant(ctx, tenantID, 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	require.Len(t, result, 1)
 	assert.Equal(t, "site-a", result[0].Name)
 	db.AssertExpectations(t)
@@ -198,7 +199,7 @@ func TestWebrootService_ListByTenant_QueryError(t *testing.T) {
 
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("connection lost"))
 
-	result, err := svc.ListByTenant(ctx, "test-tenant-1")
+	result, _, err := svc.ListByTenant(ctx, "test-tenant-1", 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "list webroots")

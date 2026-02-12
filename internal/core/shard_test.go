@@ -183,8 +183,9 @@ func TestShardService_ListByCluster_Success(t *testing.T) {
 	)
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByCluster(ctx, clusterID)
+	result, hasMore, err := svc.ListByCluster(ctx, clusterID, 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	require.Len(t, result, 2)
 	assert.Equal(t, "db-shard-01", result[0].Name)
 	assert.Equal(t, "web-shard-01", result[1].Name)
@@ -199,8 +200,9 @@ func TestShardService_ListByCluster_Empty(t *testing.T) {
 	rows := newEmptyMockRows()
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, err := svc.ListByCluster(ctx, "test-cluster-1")
+	result, hasMore, err := svc.ListByCluster(ctx, "test-cluster-1", 50, "")
 	require.NoError(t, err)
+	assert.False(t, hasMore)
 	assert.Empty(t, result)
 	db.AssertExpectations(t)
 }
@@ -212,7 +214,7 @@ func TestShardService_ListByCluster_QueryError(t *testing.T) {
 
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("connection lost"))
 
-	result, err := svc.ListByCluster(ctx, "test-cluster-1")
+	result, _, err := svc.ListByCluster(ctx, "test-cluster-1", 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "list shards")

@@ -53,13 +53,24 @@ func (s *FQDNService) GetByID(ctx context.Context, id string) (*model.FQDN, erro
 	return &f, nil
 }
 
-func (s *FQDNService) ListByWebroot(ctx context.Context, webrootID string) ([]model.FQDN, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, fqdn, webroot_id, ssl_enabled, status, created_at, updated_at
-		 FROM fqdns WHERE webroot_id = $1 ORDER BY fqdn`, webrootID,
-	)
+func (s *FQDNService) ListByWebroot(ctx context.Context, webrootID string, limit int, cursor string) ([]model.FQDN, bool, error) {
+	query := `SELECT id, fqdn, webroot_id, ssl_enabled, status, created_at, updated_at FROM fqdns WHERE webroot_id = $1`
+	args := []any{webrootID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list fqdns for webroot %s: %w", webrootID, err)
+		return nil, false, fmt.Errorf("list fqdns for webroot %s: %w", webrootID, err)
 	}
 	defer rows.Close()
 
@@ -68,14 +79,19 @@ func (s *FQDNService) ListByWebroot(ctx context.Context, webrootID string) ([]mo
 		var f model.FQDN
 		if err := rows.Scan(&f.ID, &f.FQDN, &f.WebrootID, &f.SSLEnabled, &f.Status,
 			&f.CreatedAt, &f.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan fqdn: %w", err)
+			return nil, false, fmt.Errorf("scan fqdn: %w", err)
 		}
 		fqdns = append(fqdns, f)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate fqdns: %w", err)
+		return nil, false, fmt.Errorf("iterate fqdns: %w", err)
 	}
-	return fqdns, nil
+
+	hasMore := len(fqdns) > limit
+	if hasMore {
+		fqdns = fqdns[:limit]
+	}
+	return fqdns, hasMore, nil
 }
 
 func (s *FQDNService) Delete(ctx context.Context, id string) error {
