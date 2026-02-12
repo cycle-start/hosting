@@ -1,14 +1,12 @@
 resource "libvirt_network" "hosting" {
-  name      = "hosting"
-  mode      = "nat"
-  domain    = "hosting.local"
-  addresses = [var.network_cidr]
+  name    = "hosting"
+  forward = { mode = "nat" }
+  domain  = { name = "hosting.local" }
 
-  dns {
-    enabled = true
-  }
+  ips = [{
+    address = var.gateway_ip
+    netmask = cidrnetmask(var.network_cidr)
+  }]
 
-  dhcp {
-    enabled = false
-  }
+  dns = { enable = "yes" }
 }

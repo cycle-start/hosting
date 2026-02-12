@@ -7,13 +7,13 @@ variable "libvirt_uri" {
 variable "network_cidr" {
   description = "CIDR for the libvirt NAT network"
   type        = string
-  default     = "192.168.122.0/24"
+  default     = "10.10.10.0/24"
 }
 
 variable "gateway_ip" {
   description = "Gateway IP (WSL host) on the libvirt network"
   type        = string
-  default     = "192.168.122.1"
+  default     = "10.10.10.1"
 }
 
 variable "temporal_port" {
@@ -31,7 +31,7 @@ variable "base_image_url" {
 variable "ssh_public_key_path" {
   description = "Path to SSH public key for VM access"
   type        = string
-  default     = "~/.ssh/id_ed25519.pub"
+  default     = "~/.ssh/id_rsa.pub"
 }
 
 variable "node_agent_binary" {
@@ -51,8 +51,8 @@ variable "web_nodes" {
     vcpus  = optional(number, 2)
   }))
   default = [
-    { name = "web-1-node-0", ip = "192.168.122.10" },
-    { name = "web-1-node-1", ip = "192.168.122.11" },
+    { name = "web-1-node-0", ip = "10.10.10.10" },
+    { name = "web-1-node-1", ip = "10.10.10.11" },
   ]
 }
 
@@ -73,7 +73,7 @@ variable "db_nodes" {
     vcpus  = optional(number, 2)
   }))
   default = [
-    { name = "db-1-node-0", ip = "192.168.122.20" },
+    { name = "db-1-node-0", ip = "10.10.10.20" },
   ]
 }
 
@@ -94,7 +94,7 @@ variable "dns_nodes" {
     vcpus  = optional(number, 1)
   }))
   default = [
-    { name = "dns-1-node-0", ip = "192.168.122.30" },
+    { name = "dns-1-node-0", ip = "10.10.10.30" },
   ]
 }
 
@@ -115,7 +115,7 @@ variable "valkey_nodes" {
     vcpus  = optional(number, 1)
   }))
   default = [
-    { name = "valkey-1-node-0", ip = "192.168.122.40" },
+    { name = "valkey-1-node-0", ip = "10.10.10.40" },
   ]
 }
 
