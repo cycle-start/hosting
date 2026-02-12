@@ -199,8 +199,8 @@ func findOrCreateCluster(client *Client, regionID string, def ClusterDef) (strin
 		if def.Spec.Infrastructure.HAProxy {
 			infra["haproxy"] = true
 		}
-		if def.Spec.Infrastructure.ServiceDB {
-			infra["service_db"] = true
+		if def.Spec.Infrastructure.PowerDNS {
+			infra["powerdns"] = true
 		}
 		if def.Spec.Infrastructure.Valkey {
 			infra["valkey"] = true

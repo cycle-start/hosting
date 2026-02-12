@@ -22,7 +22,7 @@ cluster:
         node_count: 1
     infrastructure:
       haproxy: true
-      service_db: true
+      powerdns: true
 
 hosts:
   - hostname: host-1.dev.local

@@ -10,7 +10,7 @@ import (
 	"github.com/edvin/hosting/internal/model"
 )
 
-// CreateZoneRecordWorkflow writes a DNS record to the service DB (PowerDNS).
+// CreateZoneRecordWorkflow writes a DNS record to the PowerDNS database.
 func CreateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -54,7 +54,7 @@ func CreateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 		return err
 	}
 
-	// Write the record to service DB.
+	// Write the record to PowerDNS DB.
 	err = workflow.ExecuteActivity(ctx, "WriteDNSRecord", activity.WriteDNSRecordParams{
 		DomainID: domainID,
 		Name:     record.Name,
@@ -76,7 +76,7 @@ func CreateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	}).Get(ctx, nil)
 }
 
-// UpdateZoneRecordWorkflow updates a DNS record in the service DB (PowerDNS).
+// UpdateZoneRecordWorkflow updates a DNS record in the PowerDNS database.
 func UpdateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -120,7 +120,7 @@ func UpdateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 		return err
 	}
 
-	// Update the record in service DB.
+	// Update the record in PowerDNS DB.
 	err = workflow.ExecuteActivity(ctx, "UpdateDNSRecord", activity.UpdateDNSRecordParams{
 		DomainID: domainID,
 		Name:     record.Name,
@@ -142,7 +142,7 @@ func UpdateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	}).Get(ctx, nil)
 }
 
-// DeleteZoneRecordWorkflow removes a DNS record from the service DB (PowerDNS).
+// DeleteZoneRecordWorkflow removes a DNS record from the PowerDNS database.
 func DeleteZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -186,7 +186,7 @@ func DeleteZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 		return err
 	}
 
-	// Delete the record from service DB.
+	// Delete the record from PowerDNS DB.
 	err = workflow.ExecuteActivity(ctx, "DeleteDNSRecord", activity.DeleteDNSRecordParams{
 		DomainID: domainID,
 		Name:     record.Name,

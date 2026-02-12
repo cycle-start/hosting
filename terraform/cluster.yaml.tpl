@@ -40,7 +40,7 @@ cluster:
 %{ endfor ~}
     infrastructure:
       haproxy: false
-      service_db: false
+      powerdns: false
       valkey: false
 
   nodes:

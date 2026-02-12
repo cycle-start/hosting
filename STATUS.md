@@ -3,8 +3,8 @@
 ## Current Status Summary
 
 **Build:** Compiles clean, `go vet` passes, all test packages pass.
-**Infrastructure:** Docker Compose for control plane (core-db, service-db, temporal, temporal-ui, platform-valkey, mysql, powerdns, ceph, haproxy, local registry, stalwart, prometheus, grafana, loki, promtail, core-api, worker). Nodes run on VMs provisioned by Terraform/libvirt.
-**Migrations:** All core + service DB migrations applied.
+**Infrastructure:** Docker Compose for control plane (core-db, powerdns-db, temporal, temporal-ui, platform-valkey, mysql, powerdns, ceph, haproxy, local registry, stalwart, prometheus, grafana, loki, promtail, core-api, worker). Nodes run on VMs provisioned by Terraform/libvirt.
+**Migrations:** All core + PowerDNS DB migrations applied.
 **CLI:** `hostctl cluster apply` bootstraps a full cluster; `hostctl seed` populates tenant data; `hostctl converge-shard` triggers manual shard convergence.
 **E2E tests:** Full pipeline: health check, cluster bootstrap, tenant seeding, shared storage verification, web traffic through HAProxy.
 
@@ -74,7 +74,7 @@ Runs on each VM node, connecting to Temporal via a node-specific task queue:
 
 ### DNS (PowerDNS)
 
-- Service DB stores PowerDNS domains/records tables
+- PowerDNS DB stores domains/records tables
 - Workflows auto-create A/AAAA records when binding FQDNs (if zone exists)
 - Platform-managed vs user-managed record tracking
 - SOA + NS records auto-created on zone creation from platform config

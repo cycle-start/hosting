@@ -13,12 +13,12 @@ import (
 // DNS contains activities for automatic DNS record management.
 type DNS struct {
 	coreDB    *pgxpool.Pool
-	serviceDB *ServiceDB
+	powerdnsDB *PowerDNSDB
 }
 
 // NewDNS creates a new DNS activity struct.
-func NewDNS(coreDB *pgxpool.Pool, serviceDB *ServiceDB) *DNS {
-	return &DNS{coreDB: coreDB, serviceDB: serviceDB}
+func NewDNS(coreDB *pgxpool.Pool, powerdnsDB *PowerDNSDB) *DNS {
+	return &DNS{coreDB: coreDB, powerdnsDB: powerdnsDB}
 }
 
 // AutoCreateDNSRecordsParams holds parameters for auto-creating DNS records.
@@ -42,7 +42,7 @@ func (a *DNS) AutoCreateDNSRecords(ctx context.Context, params AutoCreateDNSReco
 	}
 
 	// Get the PowerDNS domain ID for this zone.
-	domainID, err := a.serviceDB.GetDNSZoneIDByName(ctx, zoneName)
+	domainID, err := a.powerdnsDB.GetDNSZoneIDByName(ctx, zoneName)
 	if err != nil {
 		return fmt.Errorf("get dns zone id: %w", err)
 	}
@@ -68,7 +68,7 @@ func (a *DNS) AutoCreateDNSRecords(ctx context.Context, params AutoCreateDNSReco
 			continue
 		}
 
-		if err := a.serviceDB.WriteDNSRecord(ctx, WriteDNSRecordParams{
+		if err := a.powerdnsDB.WriteDNSRecord(ctx, WriteDNSRecordParams{
 			DomainID: domainID,
 			Name:     params.FQDN,
 			Type:     recordType,
@@ -95,7 +95,7 @@ func (a *DNS) AutoCreateDNSRecords(ctx context.Context, params AutoCreateDNSReco
 }
 
 // AutoDeleteDNSRecords removes platform-managed DNS records for an FQDN
-// from both the service DB (PowerDNS) and core DB.
+// from both the PowerDNS database and core DB.
 func (a *DNS) AutoDeleteDNSRecords(ctx context.Context, fqdn string) error {
 	zoneName, err := a.findZoneForFQDN(ctx, fqdn)
 	if err != nil {
@@ -105,13 +105,13 @@ func (a *DNS) AutoDeleteDNSRecords(ctx context.Context, fqdn string) error {
 		return nil
 	}
 
-	domainID, err := a.serviceDB.GetDNSZoneIDByName(ctx, zoneName)
+	domainID, err := a.powerdnsDB.GetDNSZoneIDByName(ctx, zoneName)
 	if err != nil {
 		return fmt.Errorf("get dns zone id: %w", err)
 	}
 
 	// Delete A record from PowerDNS.
-	if err := a.serviceDB.DeleteDNSRecord(ctx, DeleteDNSRecordParams{
+	if err := a.powerdnsDB.DeleteDNSRecord(ctx, DeleteDNSRecordParams{
 		DomainID: domainID,
 		Name:     fqdn,
 		Type:     "A",
@@ -120,7 +120,7 @@ func (a *DNS) AutoDeleteDNSRecords(ctx context.Context, fqdn string) error {
 	}
 
 	// Delete AAAA record from PowerDNS.
-	if err := a.serviceDB.DeleteDNSRecord(ctx, DeleteDNSRecordParams{
+	if err := a.powerdnsDB.DeleteDNSRecord(ctx, DeleteDNSRecordParams{
 		DomainID: domainID,
 		Name:     fqdn,
 		Type:     "AAAA",
@@ -165,7 +165,7 @@ func (a *DNS) CreateServiceHostnameRecords(ctx context.Context, params ServiceHo
 		return nil
 	}
 
-	domainID, err := a.serviceDB.GetDNSZoneIDByName(ctx, zoneName)
+	domainID, err := a.powerdnsDB.GetDNSZoneIDByName(ctx, zoneName)
 	if err != nil {
 		return fmt.Errorf("get dns zone id: %w", err)
 	}
@@ -174,7 +174,7 @@ func (a *DNS) CreateServiceHostnameRecords(ctx context.Context, params ServiceHo
 		hostname := fmt.Sprintf("%s.%s.%s", svc.Service, params.TenantName, params.BaseHostname)
 
 		if svc.IP != "" {
-			if err := a.serviceDB.WriteDNSRecord(ctx, WriteDNSRecordParams{
+			if err := a.powerdnsDB.WriteDNSRecord(ctx, WriteDNSRecordParams{
 				DomainID: domainID,
 				Name:     hostname,
 				Type:     "A",
@@ -186,7 +186,7 @@ func (a *DNS) CreateServiceHostnameRecords(ctx context.Context, params ServiceHo
 		}
 
 		if svc.IP6 != "" {
-			if err := a.serviceDB.WriteDNSRecord(ctx, WriteDNSRecordParams{
+			if err := a.powerdnsDB.WriteDNSRecord(ctx, WriteDNSRecordParams{
 				DomainID: domainID,
 				Name:     hostname,
 				Type:     "AAAA",
@@ -256,14 +256,14 @@ func (a *DNS) AutoCreateEmailDNSRecords(ctx context.Context, params AutoCreateEm
 		return nil
 	}
 
-	domainID, err := a.serviceDB.GetDNSZoneIDByName(ctx, zoneName)
+	domainID, err := a.powerdnsDB.GetDNSZoneIDByName(ctx, zoneName)
 	if err != nil {
 		return fmt.Errorf("get dns zone id: %w", err)
 	}
 
 	// Create MX record pointing to the cluster's mail hostname.
 	mxPriority := 10
-	if err := a.serviceDB.WriteDNSRecord(ctx, WriteDNSRecordParams{
+	if err := a.powerdnsDB.WriteDNSRecord(ctx, WriteDNSRecordParams{
 		DomainID: domainID,
 		Name:     params.FQDN,
 		Type:     "MX",
@@ -275,7 +275,7 @@ func (a *DNS) AutoCreateEmailDNSRecords(ctx context.Context, params AutoCreateEm
 	}
 
 	// Create SPF TXT record.
-	if err := a.serviceDB.WriteDNSRecord(ctx, WriteDNSRecordParams{
+	if err := a.powerdnsDB.WriteDNSRecord(ctx, WriteDNSRecordParams{
 		DomainID: domainID,
 		Name:     params.FQDN,
 		Type:     "TXT",
@@ -313,7 +313,7 @@ func (a *DNS) AutoCreateEmailDNSRecords(ctx context.Context, params AutoCreateEm
 }
 
 // AutoDeleteEmailDNSRecords removes platform-managed email DNS records (MX, TXT)
-// for an FQDN from both the service DB (PowerDNS) and core DB.
+// for an FQDN from both the PowerDNS database and core DB.
 func (a *DNS) AutoDeleteEmailDNSRecords(ctx context.Context, fqdn string) error {
 	zoneName, err := a.findZoneForFQDN(ctx, fqdn)
 	if err != nil {
@@ -323,13 +323,13 @@ func (a *DNS) AutoDeleteEmailDNSRecords(ctx context.Context, fqdn string) error 
 		return nil
 	}
 
-	domainID, err := a.serviceDB.GetDNSZoneIDByName(ctx, zoneName)
+	domainID, err := a.powerdnsDB.GetDNSZoneIDByName(ctx, zoneName)
 	if err != nil {
 		return fmt.Errorf("get dns zone id: %w", err)
 	}
 
 	// Delete MX record from PowerDNS.
-	if err := a.serviceDB.DeleteDNSRecord(ctx, DeleteDNSRecordParams{
+	if err := a.powerdnsDB.DeleteDNSRecord(ctx, DeleteDNSRecordParams{
 		DomainID: domainID,
 		Name:     fqdn,
 		Type:     "MX",
@@ -338,7 +338,7 @@ func (a *DNS) AutoDeleteEmailDNSRecords(ctx context.Context, fqdn string) error 
 	}
 
 	// Delete SPF TXT record from PowerDNS.
-	if err := a.serviceDB.DeleteDNSRecord(ctx, DeleteDNSRecordParams{
+	if err := a.powerdnsDB.DeleteDNSRecord(ctx, DeleteDNSRecordParams{
 		DomainID: domainID,
 		Name:     fqdn,
 		Type:     "TXT",

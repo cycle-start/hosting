@@ -13,6 +13,6 @@ type ClusterShardSpec struct {
 
 type ClusterInfrastructureSpec struct {
 	HAProxy   bool `json:"haproxy"`
-	ServiceDB bool `json:"service_db"`
+	PowerDNS bool `json:"powerdns"`
 	Valkey    bool `json:"valkey"`
 }

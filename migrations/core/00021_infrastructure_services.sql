@@ -3,7 +3,7 @@ CREATE TABLE infrastructure_services (
     id              TEXT PRIMARY KEY,
     cluster_id      TEXT NOT NULL REFERENCES clusters(id),
     host_machine_id TEXT NOT NULL REFERENCES host_machines(id),
-    service_type    TEXT NOT NULL,       -- 'haproxy', 'service_db', 'redis'
+    service_type    TEXT NOT NULL,       -- 'haproxy', 'powerdns', 'valkey'
     container_id    TEXT NOT NULL DEFAULT '',
     container_name  TEXT NOT NULL,
     image           TEXT NOT NULL,

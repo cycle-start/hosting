@@ -35,7 +35,7 @@ func TestLoad_Defaults(t *testing.T) {
 	os.Unsetenv("HTTP_LISTEN_ADDR")
 	os.Unsetenv("LOG_LEVEL")
 	os.Unsetenv("MYSQL_DSN")
-	os.Unsetenv("SERVICE_DATABASE_URL")
+	os.Unsetenv("POWERDNS_DATABASE_URL")
 
 	cfg, err := Load()
 	require.NoError(t, err)
@@ -44,12 +44,12 @@ func TestLoad_Defaults(t *testing.T) {
 	assert.Equal(t, ":8090", cfg.HTTPListenAddr)
 	assert.Equal(t, "info", cfg.LogLevel)
 	assert.Equal(t, "", cfg.MySQLDSN)
-	assert.Equal(t, "", cfg.ServiceDatabaseURL)
+	assert.Equal(t, "", cfg.PowerDNSDatabaseURL)
 }
 
 func TestLoad_AllEnvVars(t *testing.T) {
 	t.Setenv("CORE_DATABASE_URL", "postgres://core:5432/coredb")
-	t.Setenv("SERVICE_DATABASE_URL", "postgres://svc:5432/svcdb")
+	t.Setenv("POWERDNS_DATABASE_URL", "postgres://svc:5432/svcdb")
 	t.Setenv("TEMPORAL_ADDRESS", "temporal.example.com:7233")
 	t.Setenv("HTTP_LISTEN_ADDR", ":7071")
 	t.Setenv("MYSQL_DSN", "root:pass@tcp(localhost:3306)/")
@@ -60,7 +60,7 @@ func TestLoad_AllEnvVars(t *testing.T) {
 	require.NotNil(t, cfg)
 
 	assert.Equal(t, "postgres://core:5432/coredb", cfg.CoreDatabaseURL)
-	assert.Equal(t, "postgres://svc:5432/svcdb", cfg.ServiceDatabaseURL)
+	assert.Equal(t, "postgres://svc:5432/svcdb", cfg.PowerDNSDatabaseURL)
 	assert.Equal(t, "temporal.example.com:7233", cfg.TemporalAddress)
 	assert.Equal(t, ":7071", cfg.HTTPListenAddr)
 	assert.Equal(t, "root:pass@tcp(localhost:3306)/", cfg.MySQLDSN)
@@ -81,7 +81,7 @@ func TestValidate_Worker_MissingFields(t *testing.T) {
 	err := cfg.Validate("worker")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "CORE_DATABASE_URL")
-	assert.Contains(t, err.Error(), "SERVICE_DATABASE_URL")
+	assert.Contains(t, err.Error(), "POWERDNS_DATABASE_URL")
 	assert.Contains(t, err.Error(), "TEMPORAL_ADDRESS")
 }
 
@@ -108,7 +108,7 @@ func TestValidate_TLS_MismatchedCertKey(t *testing.T) {
 func TestValidate_AllPresent(t *testing.T) {
 	cfg := &Config{
 		CoreDatabaseURL:    "postgres://localhost/db",
-		ServiceDatabaseURL: "postgres://localhost/svc",
+		PowerDNSDatabaseURL: "postgres://localhost/svc",
 		TemporalAddress:    "localhost:7233",
 		HTTPListenAddr:     ":8090",
 		NodeID:             "node-1",

@@ -104,31 +104,31 @@ ps:
 migrate-core:
     goose -dir migrations/core postgres "postgres://hosting:hosting@localhost:5432/hosting_core?sslmode=disable" up
 
-# Run service DB migrations
-migrate-service:
-    goose -dir migrations/service postgres "postgres://hosting:hosting@localhost:5433/hosting_service?sslmode=disable" up
+# Run PowerDNS DB migrations
+migrate-powerdns:
+    goose -dir migrations/powerdns postgres "postgres://hosting:hosting@localhost:5433/hosting_powerdns?sslmode=disable" up
 
 # Run all migrations
-migrate: migrate-core migrate-service
+migrate: migrate-core migrate-powerdns
 
 # Reset core DB (drop all tables and goose version tracking)
 reset-core:
     docker compose exec -T core-db psql -U hosting hosting_core -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 
-# Reset service DB (drop all tables and goose version tracking)
-reset-service:
-    docker compose exec -T service-db psql -U hosting hosting_service -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+# Reset PowerDNS DB (drop all tables and goose version tracking)
+reset-powerdns:
+    docker compose exec -T powerdns-db psql -U hosting hosting_powerdns -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 
 # Reset all databases
-reset-db: reset-core reset-service
+reset-db: reset-core reset-powerdns
 
 # Migration status
 migrate-status:
     @echo "=== Core DB ==="
     goose -dir migrations/core postgres "postgres://hosting:hosting@localhost:5432/hosting_core?sslmode=disable" status
     @echo ""
-    @echo "=== Service DB ==="
-    goose -dir migrations/service postgres "postgres://hosting:hosting@localhost:5433/hosting_service?sslmode=disable" status
+    @echo "=== PowerDNS DB ==="
+    goose -dir migrations/powerdns postgres "postgres://hosting:hosting@localhost:5433/hosting_powerdns?sslmode=disable" status
 
 # --- Local Development ---
 
@@ -184,9 +184,9 @@ gen-certs:
 db-core:
     psql "postgres://hosting:hosting@localhost:5432/hosting_core?sslmode=disable"
 
-# Connect to service DB via psql
-db-service:
-    psql "postgres://hosting:hosting@localhost:5433/hosting_service?sslmode=disable"
+# Connect to PowerDNS DB via psql
+db-powerdns:
+    psql "postgres://hosting:hosting@localhost:5433/hosting_powerdns?sslmode=disable"
 
 # Connect to MySQL
 db-mysql:

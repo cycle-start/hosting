@@ -9,7 +9,7 @@ import (
 
 type Config struct {
 	CoreDatabaseURL    string
-	ServiceDatabaseURL string
+	PowerDNSDatabaseURL string
 	TemporalAddress    string
 	HTTPListenAddr     string
 	MySQLDSN           string
@@ -39,7 +39,7 @@ type Config struct {
 func Load() (*Config, error) {
 	cfg := &Config{
 		CoreDatabaseURL:       getEnv("CORE_DATABASE_URL", ""),
-		ServiceDatabaseURL:    getEnv("SERVICE_DATABASE_URL", ""),
+		PowerDNSDatabaseURL:   getEnv("POWERDNS_DATABASE_URL", ""),
 		TemporalAddress:       getEnv("TEMPORAL_ADDRESS", "localhost:7233"),
 		HTTPListenAddr:        getEnv("HTTP_LISTEN_ADDR", ":8090"),
 		MySQLDSN:              getEnv("MYSQL_DSN", ""),
@@ -80,8 +80,8 @@ func (c *Config) Validate(binary string) error {
 		if c.CoreDatabaseURL == "" {
 			missing = append(missing, "CORE_DATABASE_URL")
 		}
-		if c.ServiceDatabaseURL == "" {
-			missing = append(missing, "SERVICE_DATABASE_URL")
+		if c.PowerDNSDatabaseURL == "" {
+			missing = append(missing, "POWERDNS_DATABASE_URL")
 		}
 		if c.TemporalAddress == "" {
 			missing = append(missing, "TEMPORAL_ADDRESS")

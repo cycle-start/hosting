@@ -44,6 +44,6 @@ type ShardSpecDef struct {
 
 type InfrastructureSpecDef struct {
 	HAProxy   bool `yaml:"haproxy"`
-	ServiceDB bool `yaml:"service_db"`
+	PowerDNS bool `yaml:"powerdns"`
 	Valkey    bool `yaml:"valkey"`
 }

@@ -14,7 +14,7 @@ import (
 func registerActivities(env *testsuite.TestWorkflowEnvironment) {
 	env.RegisterActivity(&activity.CoreDB{})
 	env.RegisterActivity(&activity.NodeLocal{})
-	env.RegisterActivity(&activity.ServiceDB{})
+	env.RegisterActivity(&activity.PowerDNSDB{})
 	env.RegisterActivity(&activity.DNS{})
 	env.RegisterActivity(&activity.CertificateActivity{})
 	env.RegisterActivity(&activity.ACMEActivity{})

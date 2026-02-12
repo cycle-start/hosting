@@ -11,7 +11,7 @@ import (
 	"github.com/edvin/hosting/internal/model"
 )
 
-// CreateZoneWorkflow creates a DNS zone in the service DB (PowerDNS)
+// CreateZoneWorkflow creates a DNS zone in the PowerDNS database
 // along with default SOA and NS records.
 func CreateZoneWorkflow(ctx workflow.Context, zoneID string) error {
 	ao := workflow.ActivityOptions{
@@ -62,7 +62,7 @@ func CreateZoneWorkflow(ctx workflow.Context, zoneID string) error {
 		return err
 	}
 
-	// Write zone to service DB (PowerDNS domains table).
+	// Write zone to PowerDNS DB (PowerDNS domains table).
 	var domainID int
 	err = workflow.ExecuteActivity(ctx, "WriteDNSZone", activity.WriteDNSZoneParams{
 		Name: zone.Name,
@@ -121,7 +121,7 @@ func CreateZoneWorkflow(ctx workflow.Context, zoneID string) error {
 	}).Get(ctx, nil)
 }
 
-// DeleteZoneWorkflow removes a DNS zone from the service DB (PowerDNS).
+// DeleteZoneWorkflow removes a DNS zone from the PowerDNS database.
 func DeleteZoneWorkflow(ctx workflow.Context, zoneID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -164,7 +164,7 @@ func DeleteZoneWorkflow(ctx workflow.Context, zoneID string) error {
 		return err
 	}
 
-	// Delete the zone from service DB.
+	// Delete the zone from PowerDNS DB.
 	err = workflow.ExecuteActivity(ctx, "DeleteDNSZone", zone.Name).Get(ctx, nil)
 	if err != nil {
 		_ = setResourceFailed(ctx, "zones", zoneID)

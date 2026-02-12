@@ -19,20 +19,20 @@ services:
       timeout: 5s
       retries: 5
 
-  service-db:
-    container_name: hosting-service-db
+  powerdns-db:
+    container_name: hosting-powerdns-db
     image: postgres:16
     profiles: ["infra", "platform"]
     environment:
-      POSTGRES_DB: hosting_service
+      POSTGRES_DB: hosting_powerdns
       POSTGRES_USER: hosting
       POSTGRES_PASSWORD: hosting
     ports:
       - "5433:5432"
     volumes:
-      - service-db-data:/var/lib/postgresql/data
+      - powerdns-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hosting -d hosting_service"]
+      test: ["CMD-SHELL", "pg_isready -U hosting -d hosting_powerdns"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -97,7 +97,7 @@ services:
     image: powerdns/pdns-auth-48:latest
     profiles: ["infra", "platform"]
     depends_on:
-      service-db:
+      powerdns-db:
         condition: service_healthy
     environment:
       - PDNS_AUTH_API_KEY=secret
@@ -246,13 +246,13 @@ services:
     depends_on:
       core-db:
         condition: service_healthy
-      service-db:
+      powerdns-db:
         condition: service_healthy
       temporal:
         condition: service_started
     environment:
       - CORE_DATABASE_URL=postgres://hosting:hosting@core-db:5432/hosting_core
-      - SERVICE_DATABASE_URL=postgres://hosting:hosting@service-db:5432/hosting_service
+      - POWERDNS_DATABASE_URL=postgres://hosting:hosting@powerdns-db:5432/hosting_powerdns
       - TEMPORAL_ADDRESS=temporal:7233
       - HTTP_LISTEN_ADDR=:8090
       - REGISTRY_URL=registry:5000
@@ -269,18 +269,18 @@ services:
     depends_on:
       core-db:
         condition: service_healthy
-      service-db:
+      powerdns-db:
         condition: service_healthy
       temporal:
         condition: service_started
     environment:
       - CORE_DATABASE_URL=postgres://hosting:hosting@core-db:5432/hosting_core
-      - SERVICE_DATABASE_URL=postgres://hosting:hosting@service-db:5432/hosting_service
+      - POWERDNS_DATABASE_URL=postgres://hosting:hosting@powerdns-db:5432/hosting_powerdns
       - TEMPORAL_ADDRESS=temporal:7233
       - REGISTRY_URL=registry:5000
 volumes:
   core-db-data:
-  service-db-data:
+  powerdns-db-data:
   mysql-data:
   ceph-data:
   ceph-etc:

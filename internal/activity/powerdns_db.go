@@ -7,14 +7,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// ServiceDB contains activities that write to the service DB (PowerDNS tables).
-type ServiceDB struct {
+// PowerDNSDB contains activities that write to the PowerDNS database.
+type PowerDNSDB struct {
 	db *pgxpool.Pool
 }
 
-// NewServiceDB creates a new ServiceDB activity struct.
-func NewServiceDB(db *pgxpool.Pool) *ServiceDB {
-	return &ServiceDB{db: db}
+// NewPowerDNSDB creates a new PowerDNSDB activity struct.
+func NewPowerDNSDB(db *pgxpool.Pool) *PowerDNSDB {
+	return &PowerDNSDB{db: db}
 }
 
 // WriteDNSZoneParams holds parameters for creating a DNS zone.
@@ -24,7 +24,7 @@ type WriteDNSZoneParams struct {
 }
 
 // WriteDNSZone inserts a new zone into the PowerDNS domains table and returns its ID.
-func (a *ServiceDB) WriteDNSZone(ctx context.Context, params WriteDNSZoneParams) (int, error) {
+func (a *PowerDNSDB) WriteDNSZone(ctx context.Context, params WriteDNSZoneParams) (int, error) {
 	var id int
 	err := a.db.QueryRow(ctx,
 		`INSERT INTO domains (name, type) VALUES ($1, $2) RETURNING id`,
@@ -37,7 +37,7 @@ func (a *ServiceDB) WriteDNSZone(ctx context.Context, params WriteDNSZoneParams)
 }
 
 // DeleteDNSZone removes a zone from the PowerDNS domains table by name.
-func (a *ServiceDB) DeleteDNSZone(ctx context.Context, domainName string) error {
+func (a *PowerDNSDB) DeleteDNSZone(ctx context.Context, domainName string) error {
 	_, err := a.db.Exec(ctx, `DELETE FROM domains WHERE name = $1`, domainName)
 	if err != nil {
 		return fmt.Errorf("delete dns zone: %w", err)
@@ -56,7 +56,7 @@ type WriteDNSRecordParams struct {
 }
 
 // WriteDNSRecord inserts a new record into the PowerDNS records table.
-func (a *ServiceDB) WriteDNSRecord(ctx context.Context, params WriteDNSRecordParams) error {
+func (a *PowerDNSDB) WriteDNSRecord(ctx context.Context, params WriteDNSRecordParams) error {
 	_, err := a.db.Exec(ctx,
 		`INSERT INTO records (domain_id, name, type, content, ttl, prio) VALUES ($1, $2, $3, $4, $5, $6)`,
 		params.DomainID, params.Name, params.Type, params.Content, params.TTL, params.Priority,
@@ -78,7 +78,7 @@ type UpdateDNSRecordParams struct {
 }
 
 // UpdateDNSRecord updates an existing record in the PowerDNS records table.
-func (a *ServiceDB) UpdateDNSRecord(ctx context.Context, params UpdateDNSRecordParams) error {
+func (a *PowerDNSDB) UpdateDNSRecord(ctx context.Context, params UpdateDNSRecordParams) error {
 	_, err := a.db.Exec(ctx,
 		`UPDATE records SET content = $1, ttl = $2, prio = $3 WHERE domain_id = $4 AND name = $5 AND type = $6`,
 		params.Content, params.TTL, params.Priority, params.DomainID, params.Name, params.Type,
@@ -97,7 +97,7 @@ type DeleteDNSRecordParams struct {
 }
 
 // DeleteDNSRecord removes a record from the PowerDNS records table by name, type, and domain ID.
-func (a *ServiceDB) DeleteDNSRecord(ctx context.Context, params DeleteDNSRecordParams) error {
+func (a *PowerDNSDB) DeleteDNSRecord(ctx context.Context, params DeleteDNSRecordParams) error {
 	_, err := a.db.Exec(ctx,
 		`DELETE FROM records WHERE domain_id = $1 AND name = $2 AND type = $3`,
 		params.DomainID, params.Name, params.Type,
@@ -109,7 +109,7 @@ func (a *ServiceDB) DeleteDNSRecord(ctx context.Context, params DeleteDNSRecordP
 }
 
 // DeleteDNSRecordsByDomain removes all records for a given domain ID.
-func (a *ServiceDB) DeleteDNSRecordsByDomain(ctx context.Context, domainID int) error {
+func (a *PowerDNSDB) DeleteDNSRecordsByDomain(ctx context.Context, domainID int) error {
 	_, err := a.db.Exec(ctx, `DELETE FROM records WHERE domain_id = $1`, domainID)
 	if err != nil {
 		return fmt.Errorf("delete dns records by domain: %w", err)
@@ -118,7 +118,7 @@ func (a *ServiceDB) DeleteDNSRecordsByDomain(ctx context.Context, domainID int) 
 }
 
 // GetDNSZoneIDByName looks up a PowerDNS domain ID by its name.
-func (a *ServiceDB) GetDNSZoneIDByName(ctx context.Context, name string) (int, error) {
+func (a *PowerDNSDB) GetDNSZoneIDByName(ctx context.Context, name string) (int, error) {
 	var id int
 	err := a.db.QueryRow(ctx, `SELECT id FROM domains WHERE name = $1`, name).Scan(&id)
 	if err != nil {

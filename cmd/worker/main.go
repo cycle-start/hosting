@@ -46,12 +46,12 @@ func main() {
 	}
 	defer corePool.Close()
 
-	servicePool, err := db.NewServicePool(ctx, cfg.ServiceDatabaseURL)
+	powerdnsPool, err := db.NewPowerDNSPool(ctx, cfg.PowerDNSDatabaseURL)
 	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to connect to service database")
+		logger.Fatal().Err(err).Msg("failed to connect to powerdns database")
 	}
-	if servicePool != nil {
-		defer servicePool.Close()
+	if powerdnsPool != nil {
+		defer powerdnsPool.Close()
 	}
 
 	tlsConfig, err := cfg.TemporalTLS()
@@ -75,10 +75,10 @@ func main() {
 	coreDBActivities := activity.NewCoreDB(corePool)
 	w.RegisterActivity(coreDBActivities)
 
-	serviceDBActivities := activity.NewServiceDB(servicePool)
-	w.RegisterActivity(serviceDBActivities)
+	powerdnsDBActivities := activity.NewPowerDNSDB(powerdnsPool)
+	w.RegisterActivity(powerdnsDBActivities)
 
-	dnsActivities := activity.NewDNS(corePool, serviceDBActivities)
+	dnsActivities := activity.NewDNS(corePool, powerdnsDBActivities)
 	w.RegisterActivity(dnsActivities)
 
 	certActivities := activity.NewCertificateActivity(corePool)

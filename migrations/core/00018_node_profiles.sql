@@ -18,7 +18,7 @@ CREATE TABLE node_profiles (
 -- Seed default profiles
 INSERT INTO node_profiles (id, name, role, image, env, volumes, ports, resources, health_check, privileged, network_mode) VALUES
 ('profile-web-default', 'web-default', 'web', 'registry.localhost:5000/hosting/web-node:latest',
- '{"SERVICE_DATABASE_URL": ""}',
+ '{"POWERDNS_DATABASE_URL": ""}',
  '["/ceph/hosting:/srv/hosting:rw"]',
  '[{"host": 0, "container": 80}, {"host": 0, "container": 443}, {"host": 0, "container": 9090}]',
  '{"memory_mb": 2048, "cpu_shares": 1024}',
@@ -32,7 +32,7 @@ INSERT INTO node_profiles (id, name, role, image, env, volumes, ports, resources
  '{"test": ["CMD", "mysqladmin", "ping", "-h", "localhost"], "interval": "10s", "timeout": "5s", "retries": 3}',
  false, 'bridge'),
 ('profile-dns-default', 'dns-default', 'dns', 'registry.localhost:5000/hosting/dns-node:latest',
- '{"PDNS_API_KEY": "secret", "PDNS_GPGSQL_HOST": "hosting-service-db", "PDNS_GPGSQL_PORT": "5432", "PDNS_GPGSQL_DBNAME": "hosting_service", "PDNS_GPGSQL_USER": "hosting", "PDNS_GPGSQL_PASSWORD": "hosting"}',
+ '{"PDNS_API_KEY": "secret", "PDNS_GPGSQL_HOST": "hosting-powerdns-db", "PDNS_GPGSQL_PORT": "5432", "PDNS_GPGSQL_DBNAME": "hosting_powerdns", "PDNS_GPGSQL_USER": "hosting", "PDNS_GPGSQL_PASSWORD": "hosting"}',
  '[]',
  '[{"host": 0, "container": 53}, {"host": 0, "container": 9090}]',
  '{"memory_mb": 1024, "cpu_shares": 512}',
