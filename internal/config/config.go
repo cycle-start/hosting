@@ -1,7 +1,9 @@
 package config
 
 import (
+	"fmt"
 	"os"
+	"strings"
 )
 
 type Config struct {
@@ -9,29 +11,85 @@ type Config struct {
 	ServiceDatabaseURL string
 	TemporalAddress    string
 	HTTPListenAddr     string
-	MySQLDSN    string
-	RegistryURL string
+	MySQLDSN           string
+	RegistryURL        string
 	LogLevel           string
 	StalwartAdminToken string
 	// NodeID is the unique identifier for this node when running as a Temporal worker.
 	// Used to register on the "node-{id}" task queue.
 	NodeID string
+
+	// Temporal mTLS
+	TemporalTLSCert       string // TEMPORAL_TLS_CERT — path to client cert
+	TemporalTLSKey        string // TEMPORAL_TLS_KEY — path to client key
+	TemporalTLSCACert     string // TEMPORAL_TLS_CA_CERT — path to CA cert
+	TemporalTLSServerName string // TEMPORAL_TLS_SERVER_NAME — SNI override
 }
 
 func Load() (*Config, error) {
 	cfg := &Config{
-		CoreDatabaseURL:    getEnv("CORE_DATABASE_URL", ""),
-		ServiceDatabaseURL: getEnv("SERVICE_DATABASE_URL", ""),
-		TemporalAddress:    getEnv("TEMPORAL_ADDRESS", "localhost:7233"),
-		HTTPListenAddr:     getEnv("HTTP_LISTEN_ADDR", ":8090"),
-		MySQLDSN:    getEnv("MYSQL_DSN", ""),
-		RegistryURL: getEnv("REGISTRY_URL", "registry.localhost:5000"),
-		LogLevel:           getEnv("LOG_LEVEL", "info"),
-		StalwartAdminToken: getEnv("STALWART_ADMIN_TOKEN", ""),
-		NodeID:             getEnv("NODE_ID", ""),
+		CoreDatabaseURL:       getEnv("CORE_DATABASE_URL", ""),
+		ServiceDatabaseURL:    getEnv("SERVICE_DATABASE_URL", ""),
+		TemporalAddress:       getEnv("TEMPORAL_ADDRESS", "localhost:7233"),
+		HTTPListenAddr:        getEnv("HTTP_LISTEN_ADDR", ":8090"),
+		MySQLDSN:              getEnv("MYSQL_DSN", ""),
+		RegistryURL:           getEnv("REGISTRY_URL", "registry.localhost:5000"),
+		LogLevel:              getEnv("LOG_LEVEL", "info"),
+		StalwartAdminToken:    getEnv("STALWART_ADMIN_TOKEN", ""),
+		NodeID:                getEnv("NODE_ID", ""),
+		TemporalTLSCert:       getEnv("TEMPORAL_TLS_CERT", ""),
+		TemporalTLSKey:        getEnv("TEMPORAL_TLS_KEY", ""),
+		TemporalTLSCACert:     getEnv("TEMPORAL_TLS_CA_CERT", ""),
+		TemporalTLSServerName: getEnv("TEMPORAL_TLS_SERVER_NAME", ""),
 	}
 
 	return cfg, nil
+}
+
+// Validate checks that all required config fields are set for the given binary.
+func (c *Config) Validate(binary string) error {
+	var missing []string
+
+	switch binary {
+	case "core-api":
+		if c.CoreDatabaseURL == "" {
+			missing = append(missing, "CORE_DATABASE_URL")
+		}
+		if c.TemporalAddress == "" {
+			missing = append(missing, "TEMPORAL_ADDRESS")
+		}
+		if c.HTTPListenAddr == "" {
+			missing = append(missing, "HTTP_LISTEN_ADDR")
+		}
+	case "worker":
+		if c.CoreDatabaseURL == "" {
+			missing = append(missing, "CORE_DATABASE_URL")
+		}
+		if c.ServiceDatabaseURL == "" {
+			missing = append(missing, "SERVICE_DATABASE_URL")
+		}
+		if c.TemporalAddress == "" {
+			missing = append(missing, "TEMPORAL_ADDRESS")
+		}
+	case "node-agent":
+		if c.NodeID == "" {
+			missing = append(missing, "NODE_ID")
+		}
+		if c.TemporalAddress == "" {
+			missing = append(missing, "TEMPORAL_ADDRESS")
+		}
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required config: %s", strings.Join(missing, ", "))
+	}
+
+	// Cross-field: cert and key must both be set or both unset.
+	if (c.TemporalTLSCert != "") != (c.TemporalTLSKey != "") {
+		return fmt.Errorf("TEMPORAL_TLS_CERT and TEMPORAL_TLS_KEY must both be set or both unset")
+	}
+
+	return nil
 }
 
 func getEnv(key, fallback string) string {

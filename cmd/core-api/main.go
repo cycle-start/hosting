@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,11 +18,32 @@ import (
 )
 
 func main() {
+	migrateFlag := flag.Bool("migrate", false, "Run database migrations before starting")
+	migrateDirFlag := flag.String("migrate-dir", "migrations/core", "Migration files directory")
+	flag.Parse()
+
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 	cfg, err := config.Load()
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to load config")
+	}
+
+	if err := cfg.Validate("core-api"); err != nil {
+		logger.Fatal().Err(err).Msg("invalid config")
+	}
+
+	level, err := zerolog.ParseLevel(cfg.LogLevel)
+	if err != nil {
+		logger.Fatal().Str("level", cfg.LogLevel).Msg("invalid log level")
+	}
+	logger = logger.Level(level)
+
+	if *migrateFlag {
+		logger.Info().Str("dir", *migrateDirFlag).Msg("running database migrations")
+		if err := db.RunMigrations(cfg.CoreDatabaseURL, *migrateDirFlag); err != nil {
+			logger.Fatal().Err(err).Msg("migration failed")
+		}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -33,9 +55,16 @@ func main() {
 	}
 	defer corePool.Close()
 
-	tc, err := temporalclient.Dial(temporalclient.Options{
-		HostPort: cfg.TemporalAddress,
-	})
+	tlsConfig, err := cfg.TemporalTLS()
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to configure temporal TLS")
+	}
+	dialOpts := temporalclient.Options{HostPort: cfg.TemporalAddress}
+	if tlsConfig != nil {
+		dialOpts.ConnectionOptions = temporalclient.ConnectionOptions{TLS: tlsConfig}
+		logger.Info().Msg("temporal mTLS enabled")
+	}
+	tc, err := temporalclient.Dial(dialOpts)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to connect to temporal")
 	}

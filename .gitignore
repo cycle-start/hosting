@@ -22,6 +22,9 @@
 .DS_Store
 Thumbs.db
 
+# Certificates
+certs/
+
 # Test/build artifacts
 coverage.out
 *.prof

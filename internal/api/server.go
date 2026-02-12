@@ -1,7 +1,10 @@
 package api
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -16,18 +19,22 @@ import (
 )
 
 type Server struct {
-	router   chi.Router
-	logger   zerolog.Logger
-	services *core.Services
+	router         chi.Router
+	logger         zerolog.Logger
+	services       *core.Services
+	corePool       *pgxpool.Pool
+	temporalClient temporalclient.Client
 }
 
 func NewServer(logger zerolog.Logger, coreDB *pgxpool.Pool, temporalClient temporalclient.Client) *Server {
 	services := core.NewServices(coreDB, temporalClient)
 
 	s := &Server{
-		router:   chi.NewRouter(),
-		logger:   logger,
-		services: services,
+		router:         chi.NewRouter(),
+		logger:         logger,
+		services:       services,
+		corePool:       coreDB,
+		temporalClient: temporalClient,
 	}
 
 	s.setupMiddleware()
@@ -39,14 +46,18 @@ func NewServer(logger zerolog.Logger, coreDB *pgxpool.Pool, temporalClient tempo
 func (s *Server) setupMiddleware() {
 	s.router.Use(middleware.RequestID)
 	s.router.Use(middleware.RealIP)
+	s.router.Use(metricsMiddleware.RequestLogger(s.logger))
 	s.router.Use(middleware.Recoverer)
-	s.router.Use(middleware.Heartbeat("/health"))
 	s.router.Use(metricsMiddleware.Metrics)
 }
 
 func (s *Server) setupRoutes() {
 	// Prometheus metrics endpoint
 	s.router.Handle("/metrics", promhttp.Handler())
+
+	// Health check endpoints
+	s.router.Get("/healthz", s.handleHealthz)
+	s.router.Get("/readyz", s.handleReadyz)
 
 	s.router.Route("/api/v1", func(r chi.Router) {
 		// Platform config
@@ -206,6 +217,42 @@ func (s *Server) setupRoutes() {
 		r.Put("/email-accounts/{id}/autoreply", emailAutoReply.Put)
 		r.Delete("/email-accounts/{id}/autoreply", emailAutoReply.Delete)
 	})
+}
+
+func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+
+	checks := map[string]string{}
+	healthy := true
+
+	if err := s.corePool.Ping(ctx); err != nil {
+		checks["core_db"] = err.Error()
+		healthy = false
+	} else {
+		checks["core_db"] = "ok"
+	}
+
+	if _, err := s.temporalClient.CheckHealth(ctx, &temporalclient.CheckHealthRequest{}); err != nil {
+		checks["temporal"] = err.Error()
+		healthy = false
+	} else {
+		checks["temporal"] = "ok"
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if healthy {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	json.NewEncoder(w).Encode(checks)
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

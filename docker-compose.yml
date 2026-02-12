@@ -4,6 +4,7 @@ services:
   core-db:
     container_name: hosting-core-db
     image: postgres:16
+    profiles: ["infra", "platform"]
     environment:
       POSTGRES_DB: hosting_core
       POSTGRES_USER: hosting
@@ -21,6 +22,7 @@ services:
   service-db:
     container_name: hosting-service-db
     image: postgres:16
+    profiles: ["infra", "platform"]
     environment:
       POSTGRES_DB: hosting_service
       POSTGRES_USER: hosting
@@ -38,6 +40,7 @@ services:
   temporal:
     container_name: hosting-temporal
     image: temporalio/auto-setup:latest
+    profiles: ["infra", "platform"]
     depends_on:
       core-db:
         condition: service_healthy
@@ -53,6 +56,7 @@ services:
   temporal-ui:
     container_name: hosting-temporal-ui
     image: temporalio/ui:latest
+    profiles: ["infra", "platform"]
     depends_on:
       - temporal
     environment:
@@ -63,6 +67,7 @@ services:
   platform-valkey:
     container_name: hosting-platform-valkey
     image: valkey/valkey:8-alpine
+    profiles: ["infra", "platform"]
     ports:
       - "6379:6379"
     healthcheck:
@@ -74,6 +79,7 @@ services:
   mysql:
     container_name: hosting-mysql
     image: mysql:8.4
+    profiles: ["infra", "platform"]
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
     ports:
@@ -89,6 +95,7 @@ services:
   powerdns:
     container_name: hosting-powerdns
     image: powerdns/pdns-auth-48:latest
+    profiles: ["infra", "platform"]
     depends_on:
       service-db:
         condition: service_healthy
@@ -102,6 +109,7 @@ services:
   stalwart:
     container_name: hosting-stalwart
     image: stalwartlabs/stalwart:latest
+    profiles: ["infra", "platform"]
     ports:
       - "2525:25"
       - "5870:587"
@@ -121,6 +129,7 @@ services:
   ceph:
     container_name: hosting-ceph
     image: quay.io/ceph/demo:latest
+    profiles: ["infra", "platform"]
     environment:
       MON_IP: "172.20.0.50"
       CEPH_PUBLIC_NETWORK: "172.20.0.0/16"
@@ -147,6 +156,7 @@ services:
     container_name: hosting-haproxy
     build:
       context: ./docker/haproxy
+    profiles: ["infra", "platform"]
     user: root
     ports:
       - "80:80"
@@ -169,6 +179,7 @@ services:
   registry:
     container_name: hosting-registry
     image: registry:2
+    profiles: ["infra", "platform"]
     ports:
       - "5000:5000"
     volumes:
@@ -179,17 +190,17 @@ services:
   prometheus:
     container_name: hosting-prometheus
     image: prom/prometheus:latest
+    profiles: ["monitoring"]
     ports:
       - "9091:9090"
     volumes:
       - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
-    depends_on:
-      - core-api
 
   grafana:
     container_name: hosting-grafana
     image: grafana/grafana:latest
+    profiles: ["monitoring"]
     ports:
       - "3000:3000"
     environment:
@@ -206,6 +217,7 @@ services:
   loki:
     container_name: hosting-loki
     image: grafana/loki:latest
+    profiles: ["monitoring"]
     ports:
       - "3100:3100"
     volumes:
@@ -215,6 +227,7 @@ services:
   promtail:
     container_name: hosting-promtail
     image: grafana/promtail:latest
+    profiles: ["monitoring"]
     volumes:
       - ./docker/promtail/promtail.yml:/etc/promtail/config.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -228,6 +241,7 @@ services:
     build:
       context: .
       dockerfile: docker/core-api.Dockerfile
+    profiles: ["platform"]
     depends_on:
       core-db:
         condition: service_healthy
@@ -241,6 +255,7 @@ services:
       - TEMPORAL_ADDRESS=temporal:7233
       - HTTP_LISTEN_ADDR=:8090
       - REGISTRY_URL=registry:5000
+    command: ["--migrate", "--migrate-dir", "/migrations/core"]
     ports:
       - "8090:8090"
 
@@ -249,6 +264,7 @@ services:
     build:
       context: .
       dockerfile: docker/worker.Dockerfile
+    profiles: ["platform"]
     depends_on:
       core-db:
         condition: service_healthy

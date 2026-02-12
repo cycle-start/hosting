@@ -26,6 +26,16 @@ func main() {
 		logger.Fatal().Err(err).Msg("failed to load config")
 	}
 
+	if err := cfg.Validate("worker"); err != nil {
+		logger.Fatal().Err(err).Msg("invalid config")
+	}
+
+	level, err := zerolog.ParseLevel(cfg.LogLevel)
+	if err != nil {
+		logger.Fatal().Str("level", cfg.LogLevel).Msg("invalid log level")
+	}
+	logger = logger.Level(level)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -43,9 +53,16 @@ func main() {
 		defer servicePool.Close()
 	}
 
-	tc, err := temporalclient.Dial(temporalclient.Options{
-		HostPort: cfg.TemporalAddress,
-	})
+	tlsConfig, err := cfg.TemporalTLS()
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to configure temporal TLS")
+	}
+	dialOpts := temporalclient.Options{HostPort: cfg.TemporalAddress}
+	if tlsConfig != nil {
+		dialOpts.ConnectionOptions = temporalclient.ConnectionOptions{TLS: tlsConfig}
+		logger.Info().Msg("temporal mTLS enabled")
+	}
+	tc, err := temporalclient.Dial(dialOpts)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to connect to temporal")
 	}

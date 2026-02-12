@@ -66,3 +66,57 @@ func TestLoad_AllEnvVars(t *testing.T) {
 	assert.Equal(t, "root:pass@tcp(localhost:3306)/", cfg.MySQLDSN)
 	assert.Equal(t, "debug", cfg.LogLevel)
 }
+
+func TestValidate_CoreAPI_MissingFields(t *testing.T) {
+	cfg := &Config{}
+	err := cfg.Validate("core-api")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "CORE_DATABASE_URL")
+	assert.Contains(t, err.Error(), "TEMPORAL_ADDRESS")
+	assert.Contains(t, err.Error(), "HTTP_LISTEN_ADDR")
+}
+
+func TestValidate_Worker_MissingFields(t *testing.T) {
+	cfg := &Config{}
+	err := cfg.Validate("worker")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "CORE_DATABASE_URL")
+	assert.Contains(t, err.Error(), "SERVICE_DATABASE_URL")
+	assert.Contains(t, err.Error(), "TEMPORAL_ADDRESS")
+}
+
+func TestValidate_NodeAgent_MissingFields(t *testing.T) {
+	cfg := &Config{}
+	err := cfg.Validate("node-agent")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "NODE_ID")
+	assert.Contains(t, err.Error(), "TEMPORAL_ADDRESS")
+}
+
+func TestValidate_TLS_MismatchedCertKey(t *testing.T) {
+	cfg := &Config{
+		CoreDatabaseURL: "postgres://localhost/db",
+		TemporalAddress: "localhost:7233",
+		HTTPListenAddr:  ":8090",
+		TemporalTLSCert: "/path/to/cert.pem",
+	}
+	err := cfg.Validate("core-api")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "TEMPORAL_TLS_CERT and TEMPORAL_TLS_KEY must both be set")
+}
+
+func TestValidate_AllPresent(t *testing.T) {
+	cfg := &Config{
+		CoreDatabaseURL:    "postgres://localhost/db",
+		ServiceDatabaseURL: "postgres://localhost/svc",
+		TemporalAddress:    "localhost:7233",
+		HTTPListenAddr:     ":8090",
+		NodeID:             "node-1",
+		TemporalTLSCert:    "/path/to/cert.pem",
+		TemporalTLSKey:     "/path/to/key.pem",
+	}
+
+	assert.NoError(t, cfg.Validate("core-api"))
+	assert.NoError(t, cfg.Validate("worker"))
+	assert.NoError(t, cfg.Validate("node-agent"))
+}

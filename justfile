@@ -58,21 +58,25 @@ vet:
 
 # --- Docker ---
 
-# Start all control plane services
+# Start all services (infra + monitoring + platform)
 up:
-    docker compose up -d
+    docker compose --profile infra --profile monitoring --profile platform up -d
 
-# Start infrastructure only (databases, temporal, ceph, haproxy, registry, stalwart)
+# Start infrastructure only
 up-infra:
-    docker compose up -d core-db service-db temporal temporal-ui platform-valkey mysql powerdns ceph haproxy registry stalwart
+    docker compose --profile infra up -d
+
+# Start with Temporal mTLS
+up-tls:
+    docker compose -f docker-compose.yml -f docker-compose.tls.yml --profile infra --profile platform up -d
 
 # Stop all services
 down:
-    docker compose down
+    docker compose --profile infra --profile monitoring --profile platform down
 
 # Stop all services and remove volumes
 down-clean:
-    docker compose down -v
+    docker compose --profile infra --profile monitoring --profile platform down -v
 
 # View logs for all services
 logs:
@@ -134,7 +138,7 @@ dev: up-infra
     @sleep 5
     just migrate
     @echo "Starting platform services..."
-    docker compose up -d core-api worker
+    docker compose --profile platform up -d
     @echo ""
     @echo "Services running:"
     @echo "  Core API:      http://localhost:8090"
@@ -164,11 +168,15 @@ registry-list:
 
 # Start monitoring stack only
 up-monitoring:
-    docker compose up -d prometheus grafana loki promtail
+    docker compose --profile monitoring up -d
 
 # Open Grafana dashboard
 grafana:
     @echo "Grafana: http://localhost:3000 (admin/admin)"
+
+# Generate Temporal mTLS certificates
+gen-certs:
+    bash scripts/gen-temporal-certs.sh
 
 # --- Utilities ---
 
