@@ -27,6 +27,7 @@ type Services struct {
 	ValkeyUser       *ValkeyUserService
 	SFTPKey          *SFTPKeyService
 	Backup           *BackupService
+	APIKey           *APIKeyService
 }
 
 func NewServices(db DB, tc temporalclient.Client) *Services {
@@ -53,5 +54,6 @@ func NewServices(db DB, tc temporalclient.Client) *Services {
 		ValkeyUser:       NewValkeyUserService(db, tc),
 		SFTPKey:          NewSFTPKeyService(db, tc),
 		Backup:           NewBackupService(db, tc),
+		APIKey:           NewAPIKeyService(db),
 	}
 }

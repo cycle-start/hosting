@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/rs/zerolog"
@@ -143,6 +144,8 @@ func main() {
 	w.RegisterWorkflow(workflow.CreateBackupWorkflow)
 	w.RegisterWorkflow(workflow.RestoreBackupWorkflow)
 	w.RegisterWorkflow(workflow.DeleteBackupWorkflow)
+	w.RegisterWorkflow(workflow.CleanupAuditLogsWorkflow)
+	w.RegisterWorkflow(workflow.CleanupOldBackupsWorkflow)
 
 	go func() {
 		logger.Info().Str("taskQueue", taskQueue).Msg("starting temporal worker")
@@ -151,10 +154,74 @@ func main() {
 		}
 	}()
 
+	// Register cron schedules. Errors for already-existing schedules are
+	// ignored so that re-deploys do not fail.
+	registerCronSchedules(ctx, tc, taskQueue, logger)
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	logger.Info().Msg("shutting down worker")
 	cancel()
+}
+
+type cronSchedule struct {
+	id       string
+	cron     string
+	workflow interface{}
+	args     []interface{}
+}
+
+func registerCronSchedules(ctx context.Context, tc temporalclient.Client, taskQueue string, logger zerolog.Logger) {
+	schedules := []cronSchedule{
+		{
+			id:       "cert-renewal-cron",
+			cron:     "0 2 * * *",
+			workflow: workflow.RenewLECertWorkflow,
+		},
+		{
+			id:       "cert-cleanup-cron",
+			cron:     "0 3 * * *",
+			workflow: workflow.CleanupExpiredCertsWorkflow,
+		},
+		{
+			id:       "audit-log-retention-cron",
+			cron:     "0 4 * * *",
+			workflow: workflow.CleanupAuditLogsWorkflow,
+			args:     []interface{}{90},
+		},
+		{
+			id:       "backup-retention-cron",
+			cron:     "0 5 * * *",
+			workflow: workflow.CleanupOldBackupsWorkflow,
+			args:     []interface{}{30},
+		},
+	}
+
+	scheduleClient := tc.ScheduleClient()
+
+	for _, s := range schedules {
+		_, err := scheduleClient.Create(ctx, temporalclient.ScheduleOptions{
+			ID: s.id,
+			Spec: temporalclient.ScheduleSpec{
+				CronExpressions: []string{s.cron},
+			},
+			Action: &temporalclient.ScheduleWorkflowAction{
+				ID:        s.id,
+				Workflow:  s.workflow,
+				Args:      s.args,
+				TaskQueue: taskQueue,
+			},
+		})
+		if err != nil {
+			if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "AlreadyExists") {
+				logger.Info().Str("id", s.id).Msg("cron schedule already exists, skipping")
+			} else {
+				logger.Fatal().Err(err).Str("id", s.id).Msg("failed to create cron schedule")
+			}
+		} else {
+			logger.Info().Str("id", s.id).Str("cron", s.cron).Msg("created cron schedule")
+		}
+	}
 }

@@ -767,3 +767,42 @@ func (a *CoreDB) UpdateBackupResult(ctx context.Context, params UpdateBackupResu
 	}
 	return nil
 }
+
+// DeleteOldAuditLogs deletes audit log entries older than the specified number of days
+// and returns the count of deleted rows.
+func (a *CoreDB) DeleteOldAuditLogs(ctx context.Context, retentionDays int) (int64, error) {
+	tag, err := a.db.Exec(ctx,
+		"DELETE FROM audit_logs WHERE created_at < now() - make_interval(days => $1)", retentionDays)
+	if err != nil {
+		return 0, fmt.Errorf("delete old audit logs: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
+// GetOldBackups returns active backups that are older than the specified number of days.
+func (a *CoreDB) GetOldBackups(ctx context.Context, retentionDays int) ([]model.Backup, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, tenant_id, type, source_id, source_name, storage_path, size_bytes, status, started_at, completed_at, created_at, updated_at
+		 FROM backups
+		 WHERE status = $1
+		   AND created_at < now() - make_interval(days => $2)
+		 ORDER BY created_at ASC`,
+		model.StatusActive, retentionDays,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get old backups: %w", err)
+	}
+	defer rows.Close()
+
+	var backups []model.Backup
+	for rows.Next() {
+		var b model.Backup
+		if err := rows.Scan(&b.ID, &b.TenantID, &b.Type, &b.SourceID, &b.SourceName,
+			&b.StoragePath, &b.SizeBytes, &b.Status, &b.StartedAt,
+			&b.CompletedAt, &b.CreatedAt, &b.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan old backup: %w", err)
+		}
+		backups = append(backups, b)
+	}
+	return backups, rows.Err()
+}

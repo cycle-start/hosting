@@ -385,8 +385,8 @@ func (a *NodeLocal) CleanupMigrateFile(ctx context.Context, path string) error {
 func (a *NodeLocal) SyncSFTPKeys(ctx context.Context, params SyncSFTPKeysParams) error {
 	a.logger.Info().Str("tenant", params.TenantName).Int("key_count", len(params.PublicKeys)).Msg("SyncSFTPKeys")
 
-	homeDir := fmt.Sprintf("/var/www/storage/%s", params.TenantName)
-	authKeysPath := fmt.Sprintf("%s/.ssh/authorized_keys", homeDir)
+	homeDir := filepath.Join(a.tenant.HomeBaseDir(), params.TenantName)
+	authKeysPath := filepath.Join(homeDir, ".ssh", "authorized_keys")
 
 	content := ""
 	for _, key := range params.PublicKeys {

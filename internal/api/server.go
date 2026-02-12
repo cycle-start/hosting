@@ -179,6 +179,7 @@ func (s *Server) setupRoutes() {
 		r.Post("/tenants/{tenantID}/databases", database.Create)
 		r.Get("/databases/{id}", database.Get)
 		r.Delete("/databases/{id}", database.Delete)
+		r.Post("/databases/{id}/migrate", database.Migrate)
 		r.Put("/databases/{id}/tenant", database.ReassignTenant)
 
 		// Database users
@@ -195,6 +196,7 @@ func (s *Server) setupRoutes() {
 		r.Post("/tenants/{tenantID}/valkey-instances", valkeyInstance.Create)
 		r.Get("/valkey-instances/{id}", valkeyInstance.Get)
 		r.Delete("/valkey-instances/{id}", valkeyInstance.Delete)
+		r.Post("/valkey-instances/{id}/migrate", valkeyInstance.Migrate)
 		r.Put("/valkey-instances/{id}/tenant", valkeyInstance.ReassignTenant)
 
 		// Valkey users
@@ -246,6 +248,13 @@ func (s *Server) setupRoutes() {
 		r.Get("/backups/{id}", backup.Get)
 		r.Delete("/backups/{id}", backup.Delete)
 		r.Post("/backups/{id}/restore", backup.Restore)
+
+		// API keys
+		apiKey := handler.NewAPIKey(s.services.APIKey)
+		r.Get("/api-keys", apiKey.List)
+		r.Post("/api-keys", apiKey.Create)
+		r.Get("/api-keys/{id}", apiKey.Get)
+		r.Delete("/api-keys/{id}", apiKey.Revoke)
 	})
 }
 

@@ -6,8 +6,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/edvin/hosting/internal/core"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	temporalmocks "go.temporal.io/sdk/mocks"
 )
 
 func newDatabaseHandler() *Database {
@@ -229,6 +233,62 @@ func TestDatabaseReassignTenant_EmptyBody(t *testing.T) {
 	h.ReassignTenant(rec, r)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+// --- Migrate ---
+
+func TestDatabaseMigrate_Success(t *testing.T) {
+	db := &handlerMockDB{}
+	tc := &temporalmocks.Client{}
+	svc := core.NewDatabaseService(db, tc)
+	h := NewDatabase(svc)
+
+	db.On("Exec", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+
+	wfRun := &temporalmocks.WorkflowRun{}
+	wfRun.On("GetID").Return("mock-wf-id")
+	wfRun.On("GetRunID").Return("mock-run-id")
+	tc.On("ExecuteWorkflow", mock.Anything, mock.Anything, "MigrateDatabaseWorkflow", mock.Anything).Return(wfRun, nil)
+
+	rec := httptest.NewRecorder()
+	r := newRequest(http.MethodPost, "/databases/"+validID+"/migrate", map[string]any{
+		"target_shard_id": "test-shard-2",
+	})
+	r = withChiURLParam(r, "id", validID)
+
+	h.Migrate(rec, r)
+
+	assert.Equal(t, http.StatusAccepted, rec.Code)
+	db.AssertExpectations(t)
+	tc.AssertExpectations(t)
+}
+
+func TestDatabaseMigrate_BadID(t *testing.T) {
+	h := newDatabaseHandler()
+	rec := httptest.NewRecorder()
+	r := newRequest(http.MethodPost, "/databases//migrate", map[string]any{
+		"target_shard_id": "test-shard-2",
+	})
+	r = withChiURLParam(r, "id", "")
+
+	h.Migrate(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	body := decodeErrorResponse(rec)
+	assert.Contains(t, body["error"], "missing required ID")
+}
+
+func TestDatabaseMigrate_MissingTargetShard(t *testing.T) {
+	h := newDatabaseHandler()
+	rec := httptest.NewRecorder()
+	r := newRequest(http.MethodPost, "/databases/"+validID+"/migrate", map[string]any{})
+	r = withChiURLParam(r, "id", validID)
+
+	h.Migrate(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	body := decodeErrorResponse(rec)
+	assert.Contains(t, body["error"], "validation error")
 }
 
 // --- Error response format ---

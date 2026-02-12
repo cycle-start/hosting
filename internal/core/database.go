@@ -156,6 +156,36 @@ func (s *DatabaseService) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+func (s *DatabaseService) Migrate(ctx context.Context, id string, targetShardID string) error {
+	_, err := s.db.Exec(ctx,
+		"UPDATE databases SET status = $1, updated_at = now() WHERE id = $2",
+		model.StatusProvisioning, id,
+	)
+	if err != nil {
+		return fmt.Errorf("set database %s status to provisioning: %w", id, err)
+	}
+
+	workflowID := fmt.Sprintf("migrate-database-%s", id)
+	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
+		ID:        workflowID,
+		TaskQueue: "hosting-tasks",
+	}, "MigrateDatabaseWorkflow", MigrateDatabaseParams{
+		DatabaseID:    id,
+		TargetShardID: targetShardID,
+	})
+	if err != nil {
+		return fmt.Errorf("start MigrateDatabaseWorkflow: %w", err)
+	}
+
+	return nil
+}
+
+// MigrateDatabaseParams holds parameters for the MigrateDatabaseWorkflow.
+type MigrateDatabaseParams struct {
+	DatabaseID    string `json:"database_id"`
+	TargetShardID string `json:"target_shard_id"`
+}
+
 func (s *DatabaseService) ReassignTenant(ctx context.Context, id string, tenantID *string) error {
 	_, err := s.db.Exec(ctx,
 		"UPDATE databases SET tenant_id = $1, updated_at = now() WHERE id = $2",

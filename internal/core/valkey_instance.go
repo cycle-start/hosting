@@ -8,6 +8,12 @@ import (
 	temporalclient "go.temporal.io/sdk/client"
 )
 
+// MigrateValkeyInstanceParams holds parameters for the MigrateValkeyInstanceWorkflow.
+type MigrateValkeyInstanceParams struct {
+	InstanceID    string `json:"instance_id"`
+	TargetShardID string `json:"target_shard_id"`
+}
+
 type ValkeyInstanceService struct {
 	db DB
 	tc temporalclient.Client
@@ -121,6 +127,30 @@ func (s *ValkeyInstanceService) Delete(ctx context.Context, id string) error {
 	}, "DeleteValkeyInstanceWorkflow", id)
 	if err != nil {
 		return fmt.Errorf("start DeleteValkeyInstanceWorkflow: %w", err)
+	}
+
+	return nil
+}
+
+func (s *ValkeyInstanceService) Migrate(ctx context.Context, id string, targetShardID string) error {
+	_, err := s.db.Exec(ctx,
+		"UPDATE valkey_instances SET status = $1, updated_at = now() WHERE id = $2",
+		model.StatusProvisioning, id,
+	)
+	if err != nil {
+		return fmt.Errorf("set valkey instance %s status to provisioning: %w", id, err)
+	}
+
+	workflowID := fmt.Sprintf("migrate-valkey-instance-%s", id)
+	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
+		ID:        workflowID,
+		TaskQueue: "hosting-tasks",
+	}, "MigrateValkeyInstanceWorkflow", MigrateValkeyInstanceParams{
+		InstanceID:    id,
+		TargetShardID: targetShardID,
+	})
+	if err != nil {
+		return fmt.Errorf("start MigrateValkeyInstanceWorkflow: %w", err)
 	}
 
 	return nil

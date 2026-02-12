@@ -29,6 +29,11 @@ func NewTenantManager(logger zerolog.Logger, cfg Config) *TenantManager {
 	}
 }
 
+// HomeBaseDir returns the base directory for tenant home directories.
+func (m *TenantManager) HomeBaseDir() string {
+	return m.homeBaseDir
+}
+
 // Create provisions a new Linux user account and sets up the directory structure.
 // This operation is idempotent: if the user already exists, it ensures the
 // directory structure and permissions converge to the desired state.

@@ -106,6 +106,27 @@ func (h *Database) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+func (h *Database) Migrate(w http.ResponseWriter, r *http.Request) {
+	id, err := request.RequireID(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	var req request.MigrateDatabase
+	if err := request.Decode(r, &req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if err := h.svc.Migrate(r.Context(), id, req.TargetShardID); err != nil {
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
 func (h *Database) ReassignTenant(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
