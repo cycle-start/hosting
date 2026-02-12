@@ -50,6 +50,7 @@ func (h *Node) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
+		ID         string   `json:"id"`
 		Hostname   string   `json:"hostname" validate:"required"`
 		IPAddress  *string  `json:"ip_address"`
 		IP6Address *string  `json:"ip6_address"`
@@ -61,9 +62,14 @@ func (h *Node) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	nodeID := req.ID
+	if nodeID == "" {
+		nodeID = platform.NewID()
+	}
+
 	now := time.Now()
 	node := &model.Node{
-		ID:         platform.NewID(),
+		ID:         nodeID,
 		ClusterID:  clusterID,
 		ShardID:    req.ShardID,
 		Hostname:   req.Hostname,

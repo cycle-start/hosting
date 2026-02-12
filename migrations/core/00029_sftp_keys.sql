@@ -1,7 +1,7 @@
 -- +goose Up
 CREATE TABLE sftp_keys (
-    id UUID PRIMARY KEY,
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL REFERENCES tenants(id),
     name TEXT NOT NULL,
     public_key TEXT NOT NULL,
     fingerprint TEXT NOT NULL,

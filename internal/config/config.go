@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -23,6 +24,10 @@ type Config struct {
 
 	ACMEEmail        string // ACME_EMAIL — contact email for Let's Encrypt
 	ACMEDirectoryURL string // ACME_DIRECTORY_URL — defaults to LE production
+
+	// Retention
+	AuditLogRetentionDays int // AUDIT_LOG_RETENTION_DAYS — default 90
+	BackupRetentionDays   int // BACKUP_RETENTION_DAYS — default 30
 
 	// Temporal mTLS
 	TemporalTLSCert       string // TEMPORAL_TLS_CERT — path to client cert
@@ -45,6 +50,8 @@ func Load() (*Config, error) {
 		AuthEnabled:           getEnv("AUTH_ENABLED", "") == "true",
 		ACMEEmail:             getEnv("ACME_EMAIL", ""),
 		ACMEDirectoryURL:      getEnv("ACME_DIRECTORY_URL", "https://acme-v02.api.letsencrypt.org/directory"),
+		AuditLogRetentionDays: getEnvInt("AUDIT_LOG_RETENTION_DAYS", 90),
+		BackupRetentionDays:   getEnvInt("BACKUP_RETENTION_DAYS", 30),
 		TemporalTLSCert:       getEnv("TEMPORAL_TLS_CERT", ""),
 		TemporalTLSKey:        getEnv("TEMPORAL_TLS_KEY", ""),
 		TemporalTLSCACert:     getEnv("TEMPORAL_TLS_CA_CERT", ""),
@@ -103,6 +110,15 @@ func (c *Config) Validate(binary string) error {
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return fallback
+}
+
+func getEnvInt(key string, fallback int) int {
+	if v := os.Getenv(key); v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			return i
+		}
 	}
 	return fallback
 }

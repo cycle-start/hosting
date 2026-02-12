@@ -48,6 +48,18 @@ func ClusterApply(configPath string, timeout time.Duration) error {
 			}
 			fmt.Printf("  LB address %q: created\n", lb.Address)
 		}
+
+		// 2c. Create shards from spec
+		for _, s := range cfg.Cluster.Spec.Shards {
+			_, err := client.Post(fmt.Sprintf("/clusters/%s/shards", clusterID), map[string]any{
+				"name": s.Name,
+				"role": s.Role,
+			})
+			if err != nil {
+				return fmt.Errorf("create shard %q: %w", s.Name, err)
+			}
+			fmt.Printf("  Shard %q (role=%s): created\n", s.Name, s.Role)
+		}
 	} else {
 		fmt.Printf("Cluster %q: %s (exists)\n", cfg.Cluster.Name, clusterID)
 	}
@@ -62,16 +74,23 @@ func applyNodes(client *Client, clusterID string, def ClusterDef) error {
 	if err != nil {
 		return fmt.Errorf("list shards: %w", err)
 	}
+	items, err := resp.Items()
+	if err != nil {
+		return fmt.Errorf("parse shards: %w", err)
+	}
 	var shards []struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
+		Role string `json:"role"`
 	}
-	if err := json.Unmarshal(resp.Body, &shards); err != nil {
+	if err := json.Unmarshal(items, &shards); err != nil {
 		return fmt.Errorf("parse shards: %w", err)
 	}
 	shardMap := make(map[string]string)
+	shardRoleMap := make(map[string]string)
 	for _, s := range shards {
 		shardMap[s.Name] = s.ID
+		shardRoleMap[s.Name] = s.Role
 	}
 
 	// For each node, ensure it exists with the correct shard assignment.
@@ -89,10 +108,13 @@ func applyNodes(client *Client, clusterID string, def ClusterDef) error {
 		}
 
 		// Create node with pre-assigned ID and shard.
+		role := shardRoleMap[node.ShardName]
 		_, err = client.Post(fmt.Sprintf("/clusters/%s/nodes", clusterID), map[string]any{
-			"id":       node.ID,
-			"shard_id": shardID,
-			"status":   "active",
+			"id":         node.ID,
+			"hostname":   node.ID, // node-agent registers by ID
+			"ip_address": node.IPAddress,
+			"shard_id":   shardID,
+			"roles":      []string{role},
 		})
 		if err != nil {
 			return fmt.Errorf("create node %s: %w", node.ID, err)
@@ -148,7 +170,13 @@ func findOrCreateCluster(client *Client, regionID string, def ClusterDef) (strin
 		return id, false, nil
 	}
 
+	clusterID := def.ID
+	if clusterID == "" {
+		clusterID = def.Name
+	}
+
 	body := map[string]any{
+		"id":   clusterID,
 		"name": def.Name,
 	}
 	if def.Config != nil {
@@ -199,12 +227,16 @@ func printClusterSummary(client *Client, clusterID string) error {
 		return err
 	}
 
+	shardItems, err := resp.Items()
+	if err != nil {
+		return fmt.Errorf("parse shards: %w", err)
+	}
 	var shards []struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
 		Role string `json:"role"`
 	}
-	if err := json.Unmarshal(resp.Body, &shards); err != nil {
+	if err := json.Unmarshal(shardItems, &shards); err != nil {
 		return fmt.Errorf("parse shards: %w", err)
 	}
 
@@ -219,13 +251,17 @@ func printClusterSummary(client *Client, clusterID string) error {
 		return err
 	}
 
+	nodeItems, err := resp.Items()
+	if err != nil {
+		return fmt.Errorf("parse nodes: %w", err)
+	}
 	var nodes []struct {
 		ID       string  `json:"id"`
 		ShardID  *string `json:"shard_id"`
 		Hostname string  `json:"hostname"`
 		Status   string  `json:"status"`
 	}
-	if err := json.Unmarshal(resp.Body, &nodes); err != nil {
+	if err := json.Unmarshal(nodeItems, &nodes); err != nil {
 		return fmt.Errorf("parse nodes: %w", err)
 	}
 

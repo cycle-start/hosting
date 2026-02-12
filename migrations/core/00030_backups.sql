@@ -1,7 +1,7 @@
 -- +goose Up
 CREATE TABLE backups (
-    id UUID PRIMARY KEY,
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL REFERENCES tenants(id),
     type TEXT NOT NULL, -- 'web' or 'database'
     source_id TEXT NOT NULL, -- webroot_id or database_id
     source_name TEXT NOT NULL, -- human-readable name for display

@@ -5,11 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/edvin/hosting/internal/api/response"
 	"github.com/edvin/hosting/internal/api/request"
+	"github.com/edvin/hosting/internal/api/response"
 	"github.com/edvin/hosting/internal/core"
 	"github.com/edvin/hosting/internal/model"
-	"github.com/edvin/hosting/internal/platform"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -51,6 +50,7 @@ func (h *Cluster) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
+		ID     string          `json:"id" validate:"required,slug"`
 		Name   string          `json:"name" validate:"required,slug"`
 		Config json.RawMessage `json:"config"`
 		Spec   json.RawMessage `json:"spec"`
@@ -71,7 +71,7 @@ func (h *Cluster) Create(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	cluster := &model.Cluster{
-		ID:        platform.NewID(),
+		ID:        req.ID,
 		RegionID:  regionID,
 		Name:      req.Name,
 		Config:    cfg,

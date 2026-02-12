@@ -156,7 +156,7 @@ func main() {
 
 	// Register cron schedules. Errors for already-existing schedules are
 	// ignored so that re-deploys do not fail.
-	registerCronSchedules(ctx, tc, taskQueue, logger)
+	registerCronSchedules(ctx, tc, taskQueue, cfg, logger)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -173,7 +173,7 @@ type cronSchedule struct {
 	args     []interface{}
 }
 
-func registerCronSchedules(ctx context.Context, tc temporalclient.Client, taskQueue string, logger zerolog.Logger) {
+func registerCronSchedules(ctx context.Context, tc temporalclient.Client, taskQueue string, cfg *config.Config, logger zerolog.Logger) {
 	schedules := []cronSchedule{
 		{
 			id:       "cert-renewal-cron",
@@ -189,13 +189,13 @@ func registerCronSchedules(ctx context.Context, tc temporalclient.Client, taskQu
 			id:       "audit-log-retention-cron",
 			cron:     "0 4 * * *",
 			workflow: workflow.CleanupAuditLogsWorkflow,
-			args:     []interface{}{90},
+			args:     []interface{}{cfg.AuditLogRetentionDays},
 		},
 		{
 			id:       "backup-retention-cron",
 			cron:     "0 5 * * *",
 			workflow: workflow.CleanupOldBackupsWorkflow,
-			args:     []interface{}{30},
+			args:     []interface{}{cfg.BackupRetentionDays},
 		},
 	}
 
@@ -215,7 +215,7 @@ func registerCronSchedules(ctx context.Context, tc temporalclient.Client, taskQu
 			},
 		})
 		if err != nil {
-			if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "AlreadyExists") {
+			if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "AlreadyExists") || strings.Contains(err.Error(), "already registered") {
 				logger.Info().Str("id", s.id).Msg("cron schedule already exists, skipping")
 			} else {
 				logger.Fatal().Err(err).Str("id", s.id).Msg("failed to create cron schedule")

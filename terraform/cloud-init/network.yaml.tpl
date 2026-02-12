@@ -1,9 +1,13 @@
 version: 2
 ethernets:
-  ens3:
+  eth0:
+    match:
+      driver: virtio_net
     addresses:
       - ${ip_address}/24
-    gateway4: ${gateway}
+    routes:
+      - to: default
+        via: ${gateway}
     nameservers:
       addresses:
         - ${gateway}

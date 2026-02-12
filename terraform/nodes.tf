@@ -207,6 +207,7 @@ resource "libvirt_domain" "web_node" {
             volume = libvirt_volume.web_node[count.index].name
           }
         }
+        driver = { type = "qcow2" }
         target = { dev = "vda", bus = "virtio" }
       },
       {
@@ -216,6 +217,7 @@ resource "libvirt_domain" "web_node" {
             volume = libvirt_volume.web_node_seed[count.index].name
           }
         }
+        driver = { type = "raw" }
         target = { dev = "vdb", bus = "virtio" }
       },
     ]
@@ -223,6 +225,7 @@ resource "libvirt_domain" "web_node" {
     interfaces = [{
       type   = "network"
       source = { network = { network = libvirt_network.hosting.name } }
+      model  = { type = "virtio" }
     }]
 
     filesystems = [{
@@ -260,6 +263,7 @@ resource "libvirt_domain" "db_node" {
             volume = libvirt_volume.db_node[count.index].name
           }
         }
+        driver = { type = "qcow2" }
         target = { dev = "vda", bus = "virtio" }
       },
       {
@@ -269,6 +273,7 @@ resource "libvirt_domain" "db_node" {
             volume = libvirt_volume.db_node_seed[count.index].name
           }
         }
+        driver = { type = "raw" }
         target = { dev = "vdb", bus = "virtio" }
       },
     ]
@@ -276,6 +281,7 @@ resource "libvirt_domain" "db_node" {
     interfaces = [{
       type   = "network"
       source = { network = { network = libvirt_network.hosting.name } }
+      model  = { type = "virtio" }
     }]
 
     filesystems = [{
@@ -313,6 +319,7 @@ resource "libvirt_domain" "dns_node" {
             volume = libvirt_volume.dns_node[count.index].name
           }
         }
+        driver = { type = "qcow2" }
         target = { dev = "vda", bus = "virtio" }
       },
       {
@@ -322,6 +329,7 @@ resource "libvirt_domain" "dns_node" {
             volume = libvirt_volume.dns_node_seed[count.index].name
           }
         }
+        driver = { type = "raw" }
         target = { dev = "vdb", bus = "virtio" }
       },
     ]
@@ -329,6 +337,7 @@ resource "libvirt_domain" "dns_node" {
     interfaces = [{
       type   = "network"
       source = { network = { network = libvirt_network.hosting.name } }
+      model  = { type = "virtio" }
     }]
 
     filesystems = [{
@@ -366,6 +375,7 @@ resource "libvirt_domain" "valkey_node" {
             volume = libvirt_volume.valkey_node[count.index].name
           }
         }
+        driver = { type = "qcow2" }
         target = { dev = "vda", bus = "virtio" }
       },
       {
@@ -375,6 +385,7 @@ resource "libvirt_domain" "valkey_node" {
             volume = libvirt_volume.valkey_node_seed[count.index].name
           }
         }
+        driver = { type = "raw" }
         target = { dev = "vdb", bus = "virtio" }
       },
     ]
@@ -382,6 +393,7 @@ resource "libvirt_domain" "valkey_node" {
     interfaces = [{
       type   = "network"
       source = { network = { network = libvirt_network.hosting.name } }
+      model  = { type = "virtio" }
     }]
 
     filesystems = [{

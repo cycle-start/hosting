@@ -83,3 +83,14 @@ func (c *Client) do(method, path string, body any) (*Response, error) {
 
 	return r, nil
 }
+
+// Items extracts the "items" array from a paginated API response.
+func (r *Response) Items() (json.RawMessage, error) {
+	var page struct {
+		Items json.RawMessage `json:"items"`
+	}
+	if err := json.Unmarshal(r.Body, &page); err != nil {
+		return nil, fmt.Errorf("parse paginated response: %w", err)
+	}
+	return page.Items, nil
+}

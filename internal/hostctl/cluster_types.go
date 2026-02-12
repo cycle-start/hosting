@@ -12,6 +12,7 @@ type RegionDef struct {
 }
 
 type ClusterDef struct {
+	ID          string            `yaml:"id"`
 	Name        string            `yaml:"name"`
 	LBAddresses []LBAddressDef   `yaml:"lb_addresses"`
 	Config      map[string]any    `yaml:"config"`

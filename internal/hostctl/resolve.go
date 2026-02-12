@@ -32,8 +32,13 @@ func (c *Client) findByName(path, name string) (string, error) {
 		return "", err
 	}
 
+	items, err := resp.Items()
+	if err != nil {
+		return "", fmt.Errorf("parse resources from %s: %w", path, err)
+	}
+
 	var resources []namedResource
-	if err := json.Unmarshal(resp.Body, &resources); err != nil {
+	if err := json.Unmarshal(items, &resources); err != nil {
 		return "", fmt.Errorf("parse resources from %s: %w", path, err)
 	}
 
