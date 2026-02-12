@@ -1,0 +1,168 @@
+syntax = "proto3";
+
+package agent.v1;
+
+option go_package = "github.com/edvin/hosting/proto/agent/v1;agentv1";
+
+import "agent/v1/types.proto";
+
+service NodeAgent {
+  // Tenant management
+  rpc CreateTenant(CreateTenantRequest) returns (CreateTenantResponse);
+  rpc UpdateTenant(UpdateTenantRequest) returns (UpdateTenantResponse);
+  rpc SuspendTenant(SuspendTenantRequest) returns (SuspendTenantResponse);
+  rpc UnsuspendTenant(UnsuspendTenantRequest) returns (UnsuspendTenantResponse);
+  rpc DeleteTenant(DeleteTenantRequest) returns (DeleteTenantResponse);
+
+  // Webroot management
+  rpc CreateWebroot(CreateWebrootRequest) returns (CreateWebrootResponse);
+  rpc UpdateWebroot(UpdateWebrootRequest) returns (UpdateWebrootResponse);
+  rpc DeleteWebroot(DeleteWebrootRequest) returns (DeleteWebrootResponse);
+
+  // Runtime management
+  rpc ConfigureRuntime(ConfigureRuntimeRequest) returns (ConfigureRuntimeResponse);
+  rpc ReloadNginx(ReloadNginxRequest) returns (ReloadNginxResponse);
+
+  // Database management
+  rpc CreateDatabase(CreateDatabaseRequest) returns (CreateDatabaseResponse);
+  rpc DeleteDatabase(DeleteDatabaseRequest) returns (DeleteDatabaseResponse);
+  rpc CreateDatabaseUser(CreateDatabaseUserRequest) returns (CreateDatabaseUserResponse);
+  rpc UpdateDatabaseUser(UpdateDatabaseUserRequest) returns (UpdateDatabaseUserResponse);
+  rpc DeleteDatabaseUser(DeleteDatabaseUserRequest) returns (DeleteDatabaseUserResponse);
+
+  // Valkey management
+  rpc CreateValkeyInstance(CreateValkeyInstanceRequest) returns (CreateValkeyInstanceResponse);
+  rpc DeleteValkeyInstance(DeleteValkeyInstanceRequest) returns (DeleteValkeyInstanceResponse);
+  rpc CreateValkeyUser(CreateValkeyUserRequest) returns (CreateValkeyUserResponse);
+  rpc UpdateValkeyUser(UpdateValkeyUserRequest) returns (UpdateValkeyUserResponse);
+  rpc DeleteValkeyUser(DeleteValkeyUserRequest) returns (DeleteValkeyUserResponse);
+
+  // SSL
+  rpc InstallCertificate(InstallCertificateRequest) returns (InstallCertificateResponse);
+
+  // Health
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// Tenant messages
+message CreateTenantRequest {
+  TenantInfo tenant = 1;
+}
+message CreateTenantResponse {}
+
+message UpdateTenantRequest {
+  TenantInfo tenant = 1;
+}
+message UpdateTenantResponse {}
+
+message SuspendTenantRequest {
+  string tenant_name = 1;
+}
+message SuspendTenantResponse {}
+
+message UnsuspendTenantRequest {
+  string tenant_name = 1;
+}
+message UnsuspendTenantResponse {}
+
+message DeleteTenantRequest {
+  string tenant_name = 1;
+}
+message DeleteTenantResponse {}
+
+// Webroot messages
+message CreateWebrootRequest {
+  WebrootInfo webroot = 1;
+  repeated FQDNInfo fqdns = 2;
+}
+message CreateWebrootResponse {}
+
+message UpdateWebrootRequest {
+  WebrootInfo webroot = 1;
+  repeated FQDNInfo fqdns = 2;
+}
+message UpdateWebrootResponse {}
+
+message DeleteWebrootRequest {
+  string tenant_name = 1;
+  string webroot_name = 2;
+}
+message DeleteWebrootResponse {}
+
+// Runtime messages
+message ConfigureRuntimeRequest {
+  WebrootInfo webroot = 1;
+}
+message ConfigureRuntimeResponse {}
+
+message ReloadNginxRequest {}
+message ReloadNginxResponse {}
+
+// Database messages
+message CreateDatabaseRequest {
+  DatabaseInfo database = 1;
+}
+message CreateDatabaseResponse {}
+
+message DeleteDatabaseRequest {
+  string database_name = 1;
+}
+message DeleteDatabaseResponse {}
+
+message CreateDatabaseUserRequest {
+  DatabaseUserInfo user = 1;
+}
+message CreateDatabaseUserResponse {}
+
+message UpdateDatabaseUserRequest {
+  DatabaseUserInfo user = 1;
+}
+message UpdateDatabaseUserResponse {}
+
+message DeleteDatabaseUserRequest {
+  string database_name = 1;
+  string username = 2;
+}
+message DeleteDatabaseUserResponse {}
+
+// Valkey messages
+message CreateValkeyInstanceRequest {
+  ValkeyInstanceInfo instance = 1;
+}
+message CreateValkeyInstanceResponse {}
+
+message DeleteValkeyInstanceRequest {
+  string instance_name = 1;
+  int32 port = 2;
+}
+message DeleteValkeyInstanceResponse {}
+
+message CreateValkeyUserRequest {
+  ValkeyUserInfo user = 1;
+}
+message CreateValkeyUserResponse {}
+
+message UpdateValkeyUserRequest {
+  ValkeyUserInfo user = 1;
+}
+message UpdateValkeyUserResponse {}
+
+message DeleteValkeyUserRequest {
+  string instance_name = 1;
+  int32 port = 2;
+  string username = 3;
+}
+message DeleteValkeyUserResponse {}
+
+// SSL messages
+message InstallCertificateRequest {
+  CertificateInfo certificate = 1;
+}
+message InstallCertificateResponse {}
+
+// Health messages
+message HealthCheckRequest {}
+message HealthCheckResponse {
+  bool healthy = 1;
+  string message = 2;
+}

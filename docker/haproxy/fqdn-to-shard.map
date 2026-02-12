@@ -1,0 +1,3 @@
+# FQDN to shard backend mapping
+# Managed via HAProxy Runtime API (set map / del map)
+# Format: <fqdn> <backend-name>

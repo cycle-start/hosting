@@ -1,0 +1,238 @@
+package api
+
+import (
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/zerolog"
+	temporalclient "go.temporal.io/sdk/client"
+
+	"github.com/edvin/hosting/internal/api/handler"
+	metricsMiddleware "github.com/edvin/hosting/internal/api/middleware"
+	"github.com/edvin/hosting/internal/core"
+)
+
+type Server struct {
+	router   chi.Router
+	logger   zerolog.Logger
+	services *core.Services
+}
+
+func NewServer(logger zerolog.Logger, coreDB *pgxpool.Pool, temporalClient temporalclient.Client) *Server {
+	services := core.NewServices(coreDB, temporalClient)
+
+	s := &Server{
+		router:   chi.NewRouter(),
+		logger:   logger,
+		services: services,
+	}
+
+	s.setupMiddleware()
+	s.setupRoutes()
+
+	return s
+}
+
+func (s *Server) setupMiddleware() {
+	s.router.Use(middleware.RequestID)
+	s.router.Use(middleware.RealIP)
+	s.router.Use(middleware.Recoverer)
+	s.router.Use(middleware.Heartbeat("/health"))
+	s.router.Use(metricsMiddleware.Metrics)
+}
+
+func (s *Server) setupRoutes() {
+	// Prometheus metrics endpoint
+	s.router.Handle("/metrics", promhttp.Handler())
+
+	s.router.Route("/api/v1", func(r chi.Router) {
+		// Platform config
+		platformCfg := handler.NewPlatformConfig(s.services.PlatformConfig)
+		r.Get("/platform/config", platformCfg.Get)
+		r.Put("/platform/config", platformCfg.Update)
+
+		// Regions
+		region := handler.NewRegion(s.services.Region)
+		r.Get("/regions", region.List)
+		r.Post("/regions", region.Create)
+		r.Get("/regions/{id}", region.Get)
+		r.Put("/regions/{id}", region.Update)
+		r.Delete("/regions/{id}", region.Delete)
+
+		// Region runtimes
+		r.Get("/regions/{id}/runtimes", region.ListRuntimes)
+		r.Post("/regions/{id}/runtimes", region.AddRuntime)
+		r.Delete("/regions/{id}/runtimes", region.RemoveRuntime)
+
+		// Clusters
+		cluster := handler.NewCluster(s.services.Cluster)
+		r.Get("/regions/{regionID}/clusters", cluster.ListByRegion)
+		r.Post("/regions/{regionID}/clusters", cluster.Create)
+		r.Get("/clusters/{id}", cluster.Get)
+		r.Put("/clusters/{id}", cluster.Update)
+		r.Delete("/clusters/{id}", cluster.Delete)
+		r.Post("/clusters/{id}/provision", cluster.Provision)
+		r.Post("/clusters/{id}/decommission", cluster.Decommission)
+
+		// Cluster LB addresses
+		clusterLBAddress := handler.NewClusterLBAddressHandler(s.services.ClusterLBAddress)
+		r.Get("/clusters/{clusterID}/lb-addresses", clusterLBAddress.List)
+		r.Post("/clusters/{clusterID}/lb-addresses", clusterLBAddress.Create)
+		r.Get("/lb-addresses/{id}", clusterLBAddress.Get)
+		r.Delete("/lb-addresses/{id}", clusterLBAddress.Delete)
+
+		// Shards
+		shard := handler.NewShard(s.services.Shard)
+		r.Get("/clusters/{clusterID}/shards", shard.ListByCluster)
+		r.Post("/clusters/{clusterID}/shards", shard.Create)
+		r.Get("/shards/{id}", shard.Get)
+		r.Put("/shards/{id}", shard.Update)
+		r.Delete("/shards/{id}", shard.Delete)
+		r.Post("/shards/{id}/converge", shard.Converge)
+
+		// Host machines
+		hostMachine := handler.NewHostMachine(s.services.HostMachine)
+		r.Get("/clusters/{clusterID}/hosts", hostMachine.ListByCluster)
+		r.Post("/clusters/{clusterID}/hosts", hostMachine.Create)
+		r.Get("/hosts/{id}", hostMachine.Get)
+		r.Put("/hosts/{id}", hostMachine.Update)
+		r.Delete("/hosts/{id}", hostMachine.Delete)
+
+		// Nodes
+		node := handler.NewNode(s.services.Node)
+		r.Get("/clusters/{clusterID}/nodes", node.ListByCluster)
+		r.Post("/clusters/{clusterID}/nodes", node.Create)
+		r.Get("/nodes/{id}", node.Get)
+		r.Put("/nodes/{id}", node.Update)
+		r.Delete("/nodes/{id}", node.Delete)
+		r.Post("/nodes/{id}/provision", node.Provision)
+		r.Post("/nodes/{id}/decommission", node.Decommission)
+
+		// Node profiles
+		nodeProfile := handler.NewNodeProfile(s.services.NodeProfile)
+		r.Get("/node-profiles", nodeProfile.List)
+		r.Post("/node-profiles", nodeProfile.Create)
+		r.Get("/node-profiles/{id}", nodeProfile.Get)
+		r.Put("/node-profiles/{id}", nodeProfile.Update)
+		r.Delete("/node-profiles/{id}", nodeProfile.Delete)
+
+		// Node deployments
+		nodeDeployment := handler.NewNodeDeployment(s.services.NodeDeployment)
+		r.Get("/nodes/{nodeID}/deployment", nodeDeployment.GetByNode)
+		r.Get("/hosts/{hostID}/deployments", nodeDeployment.ListByHost)
+
+		// Tenants
+		tenant := handler.NewTenant(s.services.Tenant)
+		r.Get("/tenants", tenant.List)
+		r.Post("/tenants", tenant.Create)
+		r.Get("/tenants/{id}", tenant.Get)
+		r.Put("/tenants/{id}", tenant.Update)
+		r.Delete("/tenants/{id}", tenant.Delete)
+		r.Post("/tenants/{id}/suspend", tenant.Suspend)
+		r.Post("/tenants/{id}/unsuspend", tenant.Unsuspend)
+		r.Post("/tenants/{id}/migrate", tenant.Migrate)
+
+		// Webroots
+		webroot := handler.NewWebroot(s.services.Webroot)
+		r.Get("/tenants/{tenantID}/webroots", webroot.ListByTenant)
+		r.Post("/tenants/{tenantID}/webroots", webroot.Create)
+		r.Get("/webroots/{id}", webroot.Get)
+		r.Put("/webroots/{id}", webroot.Update)
+		r.Delete("/webroots/{id}", webroot.Delete)
+
+		// FQDNs
+		fqdn := handler.NewFQDN(s.services.FQDN)
+		r.Get("/webroots/{webrootID}/fqdns", fqdn.ListByWebroot)
+		r.Post("/webroots/{webrootID}/fqdns", fqdn.Create)
+		r.Get("/fqdns/{id}", fqdn.Get)
+		r.Delete("/fqdns/{id}", fqdn.Delete)
+
+		// Certificates
+		cert := handler.NewCertificate(s.services.Certificate)
+		r.Get("/fqdns/{fqdnID}/certificates", cert.ListByFQDN)
+		r.Post("/fqdns/{fqdnID}/certificates", cert.Upload)
+
+		// Zones
+		zone := handler.NewZone(s.services.Zone)
+		r.Get("/zones", zone.List)
+		r.Post("/zones", zone.Create)
+		r.Get("/zones/{id}", zone.Get)
+		r.Put("/zones/{id}", zone.Update)
+		r.Delete("/zones/{id}", zone.Delete)
+		r.Put("/zones/{id}/tenant", zone.ReassignTenant)
+
+		// Zone records
+		zoneRecord := handler.NewZoneRecord(s.services.ZoneRecord)
+		r.Get("/zones/{zoneID}/records", zoneRecord.ListByZone)
+		r.Post("/zones/{zoneID}/records", zoneRecord.Create)
+		r.Get("/zone-records/{id}", zoneRecord.Get)
+		r.Put("/zone-records/{id}", zoneRecord.Update)
+		r.Delete("/zone-records/{id}", zoneRecord.Delete)
+
+		// Databases
+		database := handler.NewDatabase(s.services.Database)
+		r.Get("/tenants/{tenantID}/databases", database.ListByTenant)
+		r.Post("/tenants/{tenantID}/databases", database.Create)
+		r.Get("/databases/{id}", database.Get)
+		r.Delete("/databases/{id}", database.Delete)
+		r.Put("/databases/{id}/tenant", database.ReassignTenant)
+
+		// Database users
+		dbUser := handler.NewDatabaseUser(s.services.DatabaseUser)
+		r.Get("/databases/{databaseID}/users", dbUser.ListByDatabase)
+		r.Post("/databases/{databaseID}/users", dbUser.Create)
+		r.Get("/database-users/{id}", dbUser.Get)
+		r.Put("/database-users/{id}", dbUser.Update)
+		r.Delete("/database-users/{id}", dbUser.Delete)
+
+		// Valkey instances
+		valkeyInstance := handler.NewValkeyInstance(s.services.ValkeyInstance)
+		r.Get("/tenants/{tenantID}/valkey-instances", valkeyInstance.ListByTenant)
+		r.Post("/tenants/{tenantID}/valkey-instances", valkeyInstance.Create)
+		r.Get("/valkey-instances/{id}", valkeyInstance.Get)
+		r.Delete("/valkey-instances/{id}", valkeyInstance.Delete)
+		r.Put("/valkey-instances/{id}/tenant", valkeyInstance.ReassignTenant)
+
+		// Valkey users
+		valkeyUser := handler.NewValkeyUser(s.services.ValkeyUser)
+		r.Get("/valkey-instances/{instanceID}/users", valkeyUser.ListByInstance)
+		r.Post("/valkey-instances/{instanceID}/users", valkeyUser.Create)
+		r.Get("/valkey-users/{id}", valkeyUser.Get)
+		r.Put("/valkey-users/{id}", valkeyUser.Update)
+		r.Delete("/valkey-users/{id}", valkeyUser.Delete)
+
+		// Email accounts
+		emailAccount := handler.NewEmailAccount(s.services.EmailAccount)
+		r.Get("/fqdns/{fqdnID}/email-accounts", emailAccount.ListByFQDN)
+		r.Post("/fqdns/{fqdnID}/email-accounts", emailAccount.Create)
+		r.Get("/email-accounts/{id}", emailAccount.Get)
+		r.Delete("/email-accounts/{id}", emailAccount.Delete)
+
+		// Email aliases
+		emailAlias := handler.NewEmailAlias(s.services.EmailAlias)
+		r.Get("/email-accounts/{id}/aliases", emailAlias.ListByAccount)
+		r.Post("/email-accounts/{id}/aliases", emailAlias.Create)
+		r.Get("/email-aliases/{aliasID}", emailAlias.Get)
+		r.Delete("/email-aliases/{aliasID}", emailAlias.Delete)
+
+		// Email forwards
+		emailForward := handler.NewEmailForward(s.services.EmailForward)
+		r.Get("/email-accounts/{id}/forwards", emailForward.ListByAccount)
+		r.Post("/email-accounts/{id}/forwards", emailForward.Create)
+		r.Get("/email-forwards/{forwardID}", emailForward.Get)
+		r.Delete("/email-forwards/{forwardID}", emailForward.Delete)
+
+		// Email auto-reply
+		emailAutoReply := handler.NewEmailAutoReply(s.services.EmailAutoReply)
+		r.Get("/email-accounts/{id}/autoreply", emailAutoReply.Get)
+		r.Put("/email-accounts/{id}/autoreply", emailAutoReply.Put)
+		r.Delete("/email-accounts/{id}/autoreply", emailAutoReply.Delete)
+	})
+}
+
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.router.ServeHTTP(w, r)
+}

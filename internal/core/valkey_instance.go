@@ -1,0 +1,122 @@
+package core
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/edvin/hosting/internal/model"
+	temporalclient "go.temporal.io/sdk/client"
+)
+
+type ValkeyInstanceService struct {
+	db DB
+	tc temporalclient.Client
+}
+
+func NewValkeyInstanceService(db DB, tc temporalclient.Client) *ValkeyInstanceService {
+	return &ValkeyInstanceService{db: db, tc: tc}
+}
+
+func (s *ValkeyInstanceService) Create(ctx context.Context, instance *model.ValkeyInstance) error {
+	// Allocate port: MAX(port) + 1 within shard, starting from 6380.
+	var nextPort int
+	err := s.db.QueryRow(ctx,
+		`SELECT COALESCE(MAX(port), 6379) + 1 FROM valkey_instances WHERE shard_id = $1`,
+		instance.ShardID,
+	).Scan(&nextPort)
+	if err != nil {
+		return fmt.Errorf("allocate valkey port: %w", err)
+	}
+	instance.Port = nextPort
+
+	_, err = s.db.Exec(ctx,
+		`INSERT INTO valkey_instances (id, tenant_id, name, shard_id, port, max_memory_mb, password, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		instance.ID, instance.TenantID, instance.Name, instance.ShardID, instance.Port,
+		instance.MaxMemoryMB, instance.Password, instance.Status, instance.CreatedAt, instance.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("insert valkey instance: %w", err)
+	}
+
+	workflowID := fmt.Sprintf("valkey-instance-%s", instance.ID)
+	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
+		ID:        workflowID,
+		TaskQueue: "hosting-tasks",
+	}, "CreateValkeyInstanceWorkflow", instance.ID)
+	if err != nil {
+		return fmt.Errorf("start CreateValkeyInstanceWorkflow: %w", err)
+	}
+
+	return nil
+}
+
+func (s *ValkeyInstanceService) GetByID(ctx context.Context, id string) (*model.ValkeyInstance, error) {
+	var v model.ValkeyInstance
+	err := s.db.QueryRow(ctx,
+		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, created_at, updated_at
+		 FROM valkey_instances WHERE id = $1`, id,
+	).Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB,
+		&v.Password, &v.Status, &v.CreatedAt, &v.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get valkey instance %s: %w", id, err)
+	}
+	return &v, nil
+}
+
+func (s *ValkeyInstanceService) ListByTenant(ctx context.Context, tenantID string) ([]model.ValkeyInstance, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, created_at, updated_at
+		 FROM valkey_instances WHERE tenant_id = $1 ORDER BY name`, tenantID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list valkey instances for tenant %s: %w", tenantID, err)
+	}
+	defer rows.Close()
+
+	var instances []model.ValkeyInstance
+	for rows.Next() {
+		var v model.ValkeyInstance
+		if err := rows.Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB,
+			&v.Password, &v.Status, &v.CreatedAt, &v.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan valkey instance: %w", err)
+		}
+		instances = append(instances, v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate valkey instances: %w", err)
+	}
+	return instances, nil
+}
+
+func (s *ValkeyInstanceService) Delete(ctx context.Context, id string) error {
+	_, err := s.db.Exec(ctx,
+		"UPDATE valkey_instances SET status = $1, updated_at = now() WHERE id = $2",
+		model.StatusDeleting, id,
+	)
+	if err != nil {
+		return fmt.Errorf("set valkey instance %s status to deleting: %w", id, err)
+	}
+
+	workflowID := fmt.Sprintf("valkey-instance-%s", id)
+	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
+		ID:        workflowID,
+		TaskQueue: "hosting-tasks",
+	}, "DeleteValkeyInstanceWorkflow", id)
+	if err != nil {
+		return fmt.Errorf("start DeleteValkeyInstanceWorkflow: %w", err)
+	}
+
+	return nil
+}
+
+func (s *ValkeyInstanceService) ReassignTenant(ctx context.Context, id string, tenantID *string) error {
+	_, err := s.db.Exec(ctx,
+		"UPDATE valkey_instances SET tenant_id = $1, updated_at = now() WHERE id = $2",
+		tenantID, id,
+	)
+	if err != nil {
+		return fmt.Errorf("reassign valkey instance %s to tenant: %w", id, err)
+	}
+	return nil
+}

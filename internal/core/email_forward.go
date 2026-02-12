@@ -1,0 +1,97 @@
+package core
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/edvin/hosting/internal/model"
+	temporalclient "go.temporal.io/sdk/client"
+)
+
+type EmailForwardService struct {
+	db DB
+	tc temporalclient.Client
+}
+
+func NewEmailForwardService(db DB, tc temporalclient.Client) *EmailForwardService {
+	return &EmailForwardService{db: db, tc: tc}
+}
+
+func (s *EmailForwardService) Create(ctx context.Context, f *model.EmailForward) error {
+	_, err := s.db.Exec(ctx,
+		`INSERT INTO email_forwards (id, email_account_id, destination, keep_copy, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		f.ID, f.EmailAccountID, f.Destination, f.KeepCopy, f.Status, f.CreatedAt, f.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("insert email forward: %w", err)
+	}
+
+	workflowID := fmt.Sprintf("email-forward-%s", f.ID)
+	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
+		ID:        workflowID,
+		TaskQueue: "hosting-tasks",
+	}, "CreateEmailForwardWorkflow", f.ID)
+	if err != nil {
+		return fmt.Errorf("start CreateEmailForwardWorkflow: %w", err)
+	}
+
+	return nil
+}
+
+func (s *EmailForwardService) GetByID(ctx context.Context, id string) (*model.EmailForward, error) {
+	var f model.EmailForward
+	err := s.db.QueryRow(ctx,
+		`SELECT id, email_account_id, destination, keep_copy, status, created_at, updated_at
+		 FROM email_forwards WHERE id = $1`, id,
+	).Scan(&f.ID, &f.EmailAccountID, &f.Destination, &f.KeepCopy, &f.Status, &f.CreatedAt, &f.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get email forward %s: %w", id, err)
+	}
+	return &f, nil
+}
+
+func (s *EmailForwardService) ListByAccountID(ctx context.Context, accountID string) ([]model.EmailForward, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT id, email_account_id, destination, keep_copy, status, created_at, updated_at
+		 FROM email_forwards WHERE email_account_id = $1 ORDER BY destination`, accountID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list email forwards for account %s: %w", accountID, err)
+	}
+	defer rows.Close()
+
+	var forwards []model.EmailForward
+	for rows.Next() {
+		var f model.EmailForward
+		if err := rows.Scan(&f.ID, &f.EmailAccountID, &f.Destination, &f.KeepCopy, &f.Status, &f.CreatedAt, &f.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan email forward: %w", err)
+		}
+		forwards = append(forwards, f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate email forwards: %w", err)
+	}
+	return forwards, nil
+}
+
+func (s *EmailForwardService) Delete(ctx context.Context, id string) error {
+	_, err := s.db.Exec(ctx,
+		"UPDATE email_forwards SET status = $1, updated_at = now() WHERE id = $2",
+		model.StatusDeleting, id,
+	)
+	if err != nil {
+		return fmt.Errorf("set email forward %s status to deleting: %w", id, err)
+	}
+
+	workflowID := fmt.Sprintf("email-forward-%s", id)
+	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
+		ID:        workflowID,
+		TaskQueue: "hosting-tasks",
+	}, "DeleteEmailForwardWorkflow", id)
+	if err != nil {
+		return fmt.Errorf("start DeleteEmailForwardWorkflow: %w", err)
+	}
+
+	return nil
+}

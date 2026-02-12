@@ -1,0 +1,27 @@
+# Binaries
+/core-api
+/worker
+/node-agent
+/hostctl
+*.exe
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Claude Code
+.claude/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test/build artifacts
+coverage.out
+*.prof

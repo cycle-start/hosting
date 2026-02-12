@@ -1,0 +1,87 @@
+api_url: http://localhost:8090/api/v1
+
+region:
+  name: dev
+  id: dev
+
+cluster:
+  name: dev-cluster-1
+  lb_addresses:
+    - address: "127.0.0.1"
+    - address: "::1"
+  spec:
+    shards:
+      - name: web-1
+        role: web
+        node_count: 2
+      - name: db-1
+        role: database
+        node_count: 1
+      - name: valkey-1
+        role: valkey
+        node_count: 1
+    infrastructure:
+      haproxy: true
+      service_db: true
+
+hosts:
+  - hostname: host-1.dev.local
+    ip_address: 172.20.0.10
+    docker_host: unix:///var/run/docker.sock
+    capacity:
+      max_nodes: 10
+    roles: [web, database, valkey]
+
+node_profiles:
+  - name: web-node
+    role: web
+    image: hosting-web:latest
+    network_mode: host
+    privileged: true
+    env:
+      NGINX_CONFIG_DIR: /etc/nginx
+      WEB_STORAGE_DIR: /var/www
+      HOME_BASE_DIR: /home
+      CERT_DIR: /etc/ssl/hosting
+      SHARD_NAME: web-1
+    resources:
+      memory_mb: 2048
+      cpu_shares: 1024
+    health_check:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  - name: database-node
+    role: database
+    image: hosting-database:latest
+    network_mode: host
+    privileged: true
+    env:
+      MYSQL_DSN: "root:rootpass@tcp(127.0.0.1:3306)/"
+    resources:
+      memory_mb: 2048
+      cpu_shares: 1024
+    health_check:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  - name: valkey-node
+    role: valkey
+    image: hosting-valkey:latest
+    network_mode: host
+    privileged: true
+    env:
+      VALKEY_CONFIG_DIR: /etc/valkey
+      VALKEY_DATA_DIR: /var/lib/valkey
+    resources:
+      memory_mb: 1024
+      cpu_shares: 512
+    health_check:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3

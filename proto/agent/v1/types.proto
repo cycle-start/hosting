@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package agent.v1;
+
+option go_package = "github.com/edvin/hosting/proto/agent/v1;agentv1";
+
+message TenantInfo {
+  string id = 1;
+  string name = 2;
+  int32 uid = 3;
+  bool sftp_enabled = 4;
+}
+
+message WebrootInfo {
+  string id = 1;
+  string tenant_name = 2;
+  string name = 3;
+  string runtime = 4;
+  string runtime_version = 5;
+  string runtime_config = 6; // JSON string
+  string public_folder = 7;
+}
+
+message FQDNInfo {
+  string fqdn = 1;
+  string webroot_id = 2;
+  bool ssl_enabled = 3;
+}
+
+message CertificateInfo {
+  string fqdn = 1;
+  string cert_pem = 2;
+  string key_pem = 3;
+  string chain_pem = 4;
+}
+
+message DatabaseInfo {
+  string name = 1;
+}
+
+message DatabaseUserInfo {
+  string database_name = 1;
+  string username = 2;
+  string password = 3;
+  repeated string privileges = 4;
+}
+
+message ValkeyInstanceInfo {
+  string name = 1;
+  int32 port = 2;
+  string password = 3;
+  int32 max_memory_mb = 4;
+}
+
+message ValkeyUserInfo {
+  string instance_name = 1;
+  int32 port = 2;
+  string username = 3;
+  string password = 4;
+  repeated string privileges = 5;
+  string key_pattern = 6;
+}

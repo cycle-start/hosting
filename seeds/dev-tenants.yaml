@@ -1,0 +1,61 @@
+api_url: http://localhost:8090/api/v1
+
+region: dev
+cluster: dev-cluster-1
+
+zones:
+  - name: example.com
+    tenant: acme-corp
+
+tenants:
+  - name: acme-corp
+    shard: web-1
+    sftp_enabled: true
+    webroots:
+      - name: main-site
+        runtime: php
+        runtime_version: "8.5"
+        public_folder: public
+        fqdns:
+          - fqdn: acme.hosting.localhost
+            ssl_enabled: false
+          - fqdn: www.acme.hosting.localhost
+            ssl_enabled: false
+    databases:
+      - name: acme_db
+        shard: db-1
+        users:
+          - username: acme_user
+            password: dev-password-123
+            privileges: [ALL]
+    valkey_instances:
+      - name: acme_cache
+        shard: valkey-1
+        max_memory_mb: 128
+        users:
+          - username: acme_app
+            password: dev-valkey-123
+            privileges: ["+@all"]
+            key_pattern: "~*"
+    email_accounts:
+      - fqdn: acme.hosting.localhost
+        address: info@acme.hosting.localhost
+        display_name: Acme Info
+        aliases:
+          - address: contact@acme.hosting.localhost
+          - address: hello@acme.hosting.localhost
+        forwards:
+          - destination: admin@example.com
+            keep_copy: true
+        autoreply:
+          subject: "Thanks for reaching out!"
+          body: "We received your message and will get back to you shortly."
+          enabled: true
+      - fqdn: acme.hosting.localhost
+        address: support@acme.hosting.localhost
+        display_name: Acme Support
+        forwards:
+          - destination: helpdesk@example.com
+            keep_copy: false
+          - destination: backup@example.com
+            keep_copy: true

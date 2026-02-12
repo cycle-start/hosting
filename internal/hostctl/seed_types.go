@@ -1,0 +1,89 @@
+package hostctl
+
+type SeedConfig struct {
+	APIURL  string      `yaml:"api_url"`
+	Region  string      `yaml:"region"`
+	Cluster string      `yaml:"cluster"`
+	Zones   []ZoneDef   `yaml:"zones"`
+	Tenants []TenantDef `yaml:"tenants"`
+}
+
+type ZoneDef struct {
+	Name   string `yaml:"name"`
+	Tenant string `yaml:"tenant"`
+}
+
+type TenantDef struct {
+	Name             string              `yaml:"name"`
+	Shard            string              `yaml:"shard"`
+	SFTPEnabled      bool                `yaml:"sftp_enabled"`
+	Webroots         []WebrootDef        `yaml:"webroots"`
+	Databases        []DatabaseDef       `yaml:"databases"`
+	ValkeyInstances  []ValkeyInstanceDef `yaml:"valkey_instances"`
+	EmailAccounts    []EmailAcctDef      `yaml:"email_accounts"`
+}
+
+type WebrootDef struct {
+	Name           string         `yaml:"name"`
+	Runtime        string         `yaml:"runtime"`
+	RuntimeVersion string         `yaml:"runtime_version"`
+	RuntimeConfig  map[string]any `yaml:"runtime_config"`
+	PublicFolder   string         `yaml:"public_folder"`
+	FQDNs          []FQDNDef      `yaml:"fqdns"`
+}
+
+type FQDNDef struct {
+	FQDN       string `yaml:"fqdn"`
+	SSLEnabled bool   `yaml:"ssl_enabled"`
+}
+
+type DatabaseDef struct {
+	Name  string          `yaml:"name"`
+	Shard string          `yaml:"shard"`
+	Users []DatabaseUserDef `yaml:"users"`
+}
+
+type DatabaseUserDef struct {
+	Username   string   `yaml:"username"`
+	Password   string   `yaml:"password"`
+	Privileges []string `yaml:"privileges"`
+}
+
+type ValkeyInstanceDef struct {
+	Name        string          `yaml:"name"`
+	Shard       string          `yaml:"shard"`
+	MaxMemoryMB int             `yaml:"max_memory_mb"`
+	Users       []ValkeyUserDef `yaml:"users"`
+}
+
+type ValkeyUserDef struct {
+	Username   string   `yaml:"username"`
+	Password   string   `yaml:"password"`
+	Privileges []string `yaml:"privileges"`
+	KeyPattern string   `yaml:"key_pattern"`
+}
+
+type EmailAcctDef struct {
+	FQDN        string              `yaml:"fqdn"`
+	Address     string              `yaml:"address"`
+	DisplayName string              `yaml:"display_name"`
+	QuotaBytes  int64               `yaml:"quota_bytes"`
+	Aliases     []EmailAliasDef     `yaml:"aliases"`
+	Forwards    []EmailForwardDef   `yaml:"forwards"`
+	AutoReply   *EmailAutoReplyDef  `yaml:"autoreply"`
+}
+
+type EmailAliasDef struct {
+	Address string `yaml:"address"`
+}
+
+type EmailForwardDef struct {
+	Destination string `yaml:"destination"`
+	KeepCopy    *bool  `yaml:"keep_copy"`
+}
+
+type EmailAutoReplyDef struct {
+	Subject string `yaml:"subject"`
+	Body    string `yaml:"body"`
+	Enabled bool   `yaml:"enabled"`
+}

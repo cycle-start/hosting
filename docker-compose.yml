@@ -1,0 +1,303 @@
+services:
+  # --- Infrastructure ---
+
+  core-db:
+    container_name: hosting-core-db
+    image: postgres:16
+    environment:
+      POSTGRES_DB: hosting_core
+      POSTGRES_USER: hosting
+      POSTGRES_PASSWORD: hosting
+    ports:
+      - "5432:5432"
+    volumes:
+      - core-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hosting -d hosting_core"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  service-db:
+    container_name: hosting-service-db
+    image: postgres:16
+    environment:
+      POSTGRES_DB: hosting_service
+      POSTGRES_USER: hosting
+      POSTGRES_PASSWORD: hosting
+    ports:
+      - "5433:5432"
+    volumes:
+      - service-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hosting -d hosting_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  temporal:
+    container_name: hosting-temporal
+    image: temporalio/auto-setup:latest
+    depends_on:
+      core-db:
+        condition: service_healthy
+    environment:
+      - DB=postgres12_pgx
+      - DB_PORT=5432
+      - POSTGRES_USER=hosting
+      - POSTGRES_PWD=hosting
+      - POSTGRES_SEEDS=core-db
+    ports:
+      - "7233:7233"
+
+  temporal-ui:
+    container_name: hosting-temporal-ui
+    image: temporalio/ui:latest
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    ports:
+      - "8080:8080"
+
+  platform-valkey:
+    container_name: hosting-platform-valkey
+    image: valkey/valkey:8-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mysql:
+    container_name: hosting-mysql
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  powerdns:
+    container_name: hosting-powerdns
+    image: powerdns/pdns-auth-48:latest
+    depends_on:
+      service-db:
+        condition: service_healthy
+    environment:
+      - PDNS_AUTH_API_KEY=secret
+    ports:
+      - "5300:53/udp"
+      - "5300:53/tcp"
+      - "8081:8081"
+
+  stalwart:
+    container_name: hosting-stalwart
+    image: stalwartlabs/stalwart:latest
+    ports:
+      - "2525:25"
+      - "5870:587"
+      - "9930:993"
+      - "4430:443"
+      - "8082:8080"
+    volumes:
+      - stalwart-data:/opt/stalwart-mail
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Storage ---
+
+  ceph:
+    container_name: hosting-ceph
+    image: quay.io/ceph/demo:latest
+    environment:
+      MON_IP: "172.20.0.50"
+      CEPH_PUBLIC_NETWORK: "172.20.0.0/16"
+      CEPH_DEMO_UID: "1000"
+      CEPH_DEMO_ACCESS_KEY: "demo"
+      CEPH_DEMO_SECRET_KEY: "demo"
+      DEMO_DAEMONS: "mon,osd,mds"
+    volumes:
+      - ceph-data:/var/lib/ceph
+      - ceph-etc:/etc/ceph
+    networks:
+      default:
+        ipv4_address: 172.20.0.50
+    healthcheck:
+      test: ["CMD", "ceph", "health"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  # --- Load Balancer ---
+
+  haproxy:
+    container_name: hosting-haproxy
+    build:
+      context: ./docker/haproxy
+    user: root
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8404:8404"   # stats UI
+    volumes:
+      - ./docker/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+      - ./docker/haproxy/fqdn-to-shard.map:/var/lib/haproxy/maps/fqdn-to-shard.map
+    tmpfs:
+      - /var/run/haproxy:mode=770,uid=99,gid=99
+    healthcheck:
+      test: ["CMD", "haproxy", "-c", "-f", "/usr/local/etc/haproxy/haproxy.cfg"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # --- Registry ---
+
+  registry:
+    container_name: hosting-registry
+    image: registry:2
+    ports:
+      - "5000:5000"
+    volumes:
+      - registry-data:/var/lib/registry
+
+  # --- Monitoring ---
+
+  prometheus:
+    container_name: hosting-prometheus
+    image: prom/prometheus:latest
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - core-api
+
+  grafana:
+    container_name: hosting-grafana
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+
+  loki:
+    container_name: hosting-loki
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./docker/loki/loki.yml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+
+  promtail:
+    container_name: hosting-promtail
+    image: grafana/promtail:latest
+    volumes:
+      - ./docker/promtail/promtail.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+
+  # --- Platform Services ---
+
+  core-api:
+    container_name: hosting-core-api
+    build:
+      context: .
+      dockerfile: docker/core-api.Dockerfile
+    depends_on:
+      core-db:
+        condition: service_healthy
+      service-db:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    environment:
+      - CORE_DATABASE_URL=postgres://hosting:hosting@core-db:5432/hosting_core
+      - SERVICE_DATABASE_URL=postgres://hosting:hosting@service-db:5432/hosting_service
+      - TEMPORAL_ADDRESS=temporal:7233
+      - HTTP_LISTEN_ADDR=:8090
+      - REGISTRY_URL=registry:5000
+    ports:
+      - "8090:8090"
+
+  worker:
+    container_name: hosting-worker
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    depends_on:
+      core-db:
+        condition: service_healthy
+      service-db:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+      node-agent:
+        condition: service_started
+    environment:
+      - CORE_DATABASE_URL=postgres://hosting:hosting@core-db:5432/hosting_core
+      - SERVICE_DATABASE_URL=postgres://hosting:hosting@service-db:5432/hosting_service
+      - TEMPORAL_ADDRESS=temporal:7233
+      - NODE_AGENT_ADDR=node-agent:9090
+      - REGISTRY_URL=registry:5000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  node-agent:
+    container_name: hosting-node-agent
+    build:
+      context: .
+      dockerfile: docker/node-agent.Dockerfile
+    privileged: true
+    depends_on:
+      service-db:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    environment:
+      - SERVICE_DATABASE_URL=postgres://hosting:hosting@service-db:5432/hosting_service
+      - MYSQL_DSN=root:rootpassword@tcp(mysql:3306)/
+      - GRPC_LISTEN_ADDR=:9090
+    ports:
+      - "9090:9090"
+
+volumes:
+  core-db-data:
+  service-db-data:
+  mysql-data:
+  ceph-data:
+  ceph-etc:
+  registry-data:
+  stalwart-data:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
