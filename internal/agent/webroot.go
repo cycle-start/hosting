@@ -58,15 +58,16 @@ func (m *WebrootManager) Create(ctx context.Context, info *agentv1.WebrootInfo) 
 		Str("symlink", symlinkDir).
 		Msg("creating webroot")
 
-	// Create the storage directory.
-	if err := os.MkdirAll(storageDir, 0750); err != nil {
+	// Create the storage directory. Use 0755 so that www-data (nginx/PHP-FPM)
+	// can traverse the path to serve files.
+	if err := os.MkdirAll(storageDir, 0755); err != nil {
 		return status.Errorf(codes.Internal, "mkdir storage %s: %v", storageDir, err)
 	}
 
 	// Create the public folder inside storage if specified.
 	if publicFolder != "" {
 		publicDir := filepath.Join(storageDir, publicFolder)
-		if err := os.MkdirAll(publicDir, 0750); err != nil {
+		if err := os.MkdirAll(publicDir, 0755); err != nil {
 			return status.Errorf(codes.Internal, "mkdir public folder %s: %v", publicDir, err)
 		}
 	}
@@ -116,14 +117,14 @@ func (m *WebrootManager) Update(ctx context.Context, info *agentv1.WebrootInfo) 
 		Msg("updating webroot")
 
 	// Ensure the storage directory exists.
-	if err := os.MkdirAll(storageDir, 0750); err != nil {
+	if err := os.MkdirAll(storageDir, 0755); err != nil {
 		return status.Errorf(codes.Internal, "mkdir storage %s: %v", storageDir, err)
 	}
 
 	// Ensure the public folder exists if specified.
 	if publicFolder != "" {
 		publicDir := filepath.Join(storageDir, publicFolder)
-		if err := os.MkdirAll(publicDir, 0750); err != nil {
+		if err := os.MkdirAll(publicDir, 0755); err != nil {
 			return status.Errorf(codes.Internal, "mkdir public folder %s: %v", publicDir, err)
 		}
 	}

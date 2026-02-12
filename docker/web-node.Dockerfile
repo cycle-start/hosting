@@ -26,12 +26,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Create hosting user structure
-RUN mkdir -p /srv/hosting /etc/nginx/sites-enabled /var/log/nginx /run/nginx
+RUN mkdir -p /srv/hosting /etc/nginx/sites-enabled /var/log/nginx /run/nginx /var/www/storage /run/php && \
+    rm -f /etc/nginx/sites-enabled/default
 
 # Copy node-agent binary
 COPY --from=builder /node-agent /usr/local/bin/node-agent
 
+# Copy entrypoint script
+COPY docker/web-node-entrypoint.sh /usr/local/bin/web-node-entrypoint.sh
+RUN chmod +x /usr/local/bin/web-node-entrypoint.sh
+
 # Expose ports: HTTP, HTTPS, node-agent gRPC
 EXPOSE 80 443 9090
 
-ENTRYPOINT ["/usr/local/bin/node-agent"]
+ENTRYPOINT ["/usr/local/bin/web-node-entrypoint.sh"]

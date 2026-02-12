@@ -25,7 +25,7 @@ func main() {
 	agentCfg := agent.Config{
 		MySQLDSN:        cfg.MySQLDSN,
 		NginxConfigDir:  getEnv("NGINX_CONFIG_DIR", "/etc/nginx"),
-		WebStorageDir:   getEnv("WEB_STORAGE_DIR", "/var/www"),
+		WebStorageDir:   getEnv("WEB_STORAGE_DIR", "/var/www/storage"),
 		HomeBaseDir:     getEnv("HOME_BASE_DIR", "/home"),
 		CertDir:         getEnv("CERT_DIR", "/etc/ssl/hosting"),
 		ValkeyConfigDir: getEnv("VALKEY_CONFIG_DIR", "/etc/valkey"),

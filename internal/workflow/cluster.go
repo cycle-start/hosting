@@ -48,9 +48,10 @@ func ProvisionClusterWorkflow(ctx workflow.Context, clusterID string) error {
 		return fmt.Errorf("parse cluster spec: %w", err)
 	}
 
-	// Parse cluster config for docker_network.
+	// Parse cluster config for docker_network and ceph_mount_base.
 	var clusterConfig struct {
 		DockerNetwork string `json:"docker_network"`
+		CephMountBase string `json:"ceph_mount_base"`
 	}
 	_ = json.Unmarshal(cluster.Config, &clusterConfig)
 
@@ -221,6 +222,7 @@ func ProvisionClusterWorkflow(ctx workflow.Context, clusterID string) error {
 			err = workflow.ExecuteChildWorkflow(childCtx, ProvisionNodeWorkflow, ProvisionNodeParams{
 				NodeID:        nodeID,
 				DockerNetwork: clusterConfig.DockerNetwork,
+				CephMountBase: clusterConfig.CephMountBase,
 			}).Get(ctx, nil)
 			if err != nil {
 				_ = setResourceFailed(ctx, "clusters", clusterID)

@@ -15,7 +15,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates bash gnupg \
     && curl -fsSL https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 | gpg --dearmor -o /usr/share/keyrings/mysql.gpg \
-    && echo "deb [signed-by=/usr/share/keyrings/mysql.gpg] http://repo.mysql.com/apt/ubuntu/ noble mysql-8.4-lts" \
+    && echo "deb [signed-by=/usr/share/keyrings/mysql.gpg trusted=yes] http://repo.mysql.com/apt/ubuntu/ noble mysql-8.4-lts" \
        > /etc/apt/sources.list.d/mysql.list \
     && apt-get update && apt-get install -y --no-install-recommends \
     mysql-server mysql-client \

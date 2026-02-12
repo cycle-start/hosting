@@ -3,7 +3,10 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"github.com/rs/zerolog"
 )
@@ -119,6 +122,19 @@ func (d *DirectManager) Restart(ctx context.Context, unit string) error {
 }
 
 func (d *DirectManager) Signal(ctx context.Context, process, signal string) error {
+	// Try PID file first (e.g. /run/php/php8.5-fpm.pid). This is more
+	// reliable than pkill because PHP-FPM rewrites its process title.
+	pidFile := filepath.Join("/run/php", process+".pid")
+	if data, err := os.ReadFile(pidFile); err == nil {
+		pid := strings.TrimSpace(string(data))
+		cmd := exec.CommandContext(ctx, "kill", "-"+signal, pid)
+		if err := cmd.Run(); err == nil {
+			d.logger.Debug().Str("process", process).Str("signal", signal).Str("pid", pid).Msg("signalled via PID file")
+			return nil
+		}
+	}
+
+	// Fallback to pkill.
 	if err := pkillSignal(ctx, process, signal); err != nil {
 		d.logger.Warn().Str("process", process).Str("signal", signal).Msg("could not signal process (may not be running)")
 	}

@@ -100,7 +100,7 @@ func TestPHP_PoolConfigPath(t *testing.T) {
 				TenantName:     "user3",
 				RuntimeVersion: "",
 			},
-			expected: "/etc/php/8.2/fpm/pool.d/user3.conf",
+			expected: "/etc/php/8.5/fpm/pool.d/user3.conf",
 		},
 	}
 
@@ -138,7 +138,7 @@ func TestPHP_FpmServiceName(t *testing.T) {
 			webroot: &agentv1.WebrootInfo{
 				RuntimeVersion: "",
 			},
-			expected: "php8.2-fpm",
+			expected: "php8.5-fpm",
 		},
 	}
 

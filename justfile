@@ -41,7 +41,7 @@ test-integration:
 
 # Run e2e tests
 test-e2e:
-    go test ./tests/e2e/... -tags e2e -count=1 -timeout 10m
+    go test ./tests/e2e/... -tags e2e -count=1 -timeout 10m -v
 
 # Run all tests
 test-all: test test-integration test-e2e
@@ -151,19 +151,19 @@ dev: up-infra
 
 # Build all node role Docker images
 build-node-images:
-    docker build -t registry.localhost:5000/hosting/web-node:latest -f docker/web-node.Dockerfile .
-    docker build -t registry.localhost:5000/hosting/db-node:latest -f docker/db-node.Dockerfile .
-    docker build -t registry.localhost:5000/hosting/dns-node:latest -f docker/dns-node.Dockerfile .
-    docker build -t registry.localhost:5000/hosting/valkey-node:latest -f docker/valkey-node.Dockerfile .
-    docker build -t registry.localhost:5000/hosting/email-node:latest -f docker/email-node.Dockerfile .
+    docker build -t localhost:5000/hosting/web-node:latest -f docker/web-node.Dockerfile .
+    docker build -t localhost:5000/hosting/db-node:latest -f docker/db-node.Dockerfile .
+    docker build -t localhost:5000/hosting/dns-node:latest -f docker/dns-node.Dockerfile .
+    docker build -t localhost:5000/hosting/valkey-node:latest -f docker/valkey-node.Dockerfile .
+    docker build -t localhost:5000/hosting/email-node:latest -f docker/email-node.Dockerfile .
 
 # Push node images to local registry
 push-node-images:
-    docker push registry.localhost:5000/hosting/web-node:latest
-    docker push registry.localhost:5000/hosting/db-node:latest
-    docker push registry.localhost:5000/hosting/dns-node:latest
-    docker push registry.localhost:5000/hosting/valkey-node:latest
-    docker push registry.localhost:5000/hosting/email-node:latest
+    docker push localhost:5000/hosting/web-node:latest
+    docker push localhost:5000/hosting/db-node:latest
+    docker push localhost:5000/hosting/dns-node:latest
+    docker push localhost:5000/hosting/valkey-node:latest
+    docker push localhost:5000/hosting/email-node:latest
 
 # Build and push node images
 build-push-node-images: build-node-images push-node-images
@@ -178,6 +178,11 @@ dev-up: up-infra
     @echo ""
     @echo "Ready! Bootstrap a cluster with:"
     @echo "  go run ./cmd/hostctl cluster apply -f clusters/dev.yaml"
+
+# Full dev setup + e2e tests
+dev-e2e: dev-up
+    @echo "Running e2e tests..."
+    just test-e2e
 
 # List images in local registry
 registry-list:

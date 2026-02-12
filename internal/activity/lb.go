@@ -42,13 +42,15 @@ type DeleteLBMapEntryParams struct {
 }
 
 // SetLBMapEntry sets a mapping from an FQDN to an LB backend in the HAProxy map file
-// via the Runtime API.
+// via the Runtime API. It uses "set map" to update existing entries, falling back
+// to "add map" for new entries.
 func (a *LB) SetLBMapEntry(ctx context.Context, params SetLBMapEntryParams) error {
 	host, container, err := a.resolveHAProxy(ctx, params.ClusterID)
 	if err != nil {
 		return fmt.Errorf("resolve haproxy: %w", err)
 	}
 
+	// Try "set map" first (updates existing entry).
 	socatCmd := fmt.Sprintf("set map %s %s %s", haproxyMapPath, params.FQDN, params.LBBackend)
 	result, err := a.deployer.ExecInContainer(ctx, host, container, []string{
 		"sh", "-c", fmt.Sprintf("echo '%s' | socat stdio %s", socatCmd, haproxySockPath),
@@ -56,10 +58,23 @@ func (a *LB) SetLBMapEntry(ctx context.Context, params SetLBMapEntryParams) erro
 	if err != nil {
 		return fmt.Errorf("set map entry %s -> %s: %w", params.FQDN, params.LBBackend, err)
 	}
-	if result.ExitCode != 0 {
-		return fmt.Errorf("set map entry %s -> %s: haproxy returned exit %d: %s",
-			params.FQDN, params.LBBackend, result.ExitCode, strings.TrimSpace(result.Stderr+result.Stdout))
+
+	output := strings.TrimSpace(result.Stderr + result.Stdout)
+	if strings.Contains(strings.ToLower(output), "not found") || result.ExitCode != 0 {
+		// Entry doesn't exist yet — use "add map" to create it.
+		addCmd := fmt.Sprintf("add map %s %s %s", haproxyMapPath, params.FQDN, params.LBBackend)
+		result, err = a.deployer.ExecInContainer(ctx, host, container, []string{
+			"sh", "-c", fmt.Sprintf("echo '%s' | socat stdio %s", addCmd, haproxySockPath),
+		})
+		if err != nil {
+			return fmt.Errorf("add map entry %s -> %s: %w", params.FQDN, params.LBBackend, err)
+		}
+		if result.ExitCode != 0 {
+			return fmt.Errorf("add map entry %s -> %s: haproxy returned exit %d: %s",
+				params.FQDN, params.LBBackend, result.ExitCode, strings.TrimSpace(result.Stderr+result.Stdout))
+		}
 	}
+
 	return nil
 }
 

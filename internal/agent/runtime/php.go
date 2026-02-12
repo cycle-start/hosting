@@ -57,7 +57,7 @@ type phpPoolData struct {
 func (p *PHP) poolConfigPath(webroot *agentv1.WebrootInfo) string {
 	version := webroot.GetRuntimeVersion()
 	if version == "" {
-		version = "8.2"
+		version = "8.5"
 	}
 	return filepath.Join("/etc/php", version, "fpm/pool.d", webroot.GetTenantName()+".conf")
 }
@@ -65,7 +65,7 @@ func (p *PHP) poolConfigPath(webroot *agentv1.WebrootInfo) string {
 func (p *PHP) fpmServiceName(webroot *agentv1.WebrootInfo) string {
 	version := webroot.GetRuntimeVersion()
 	if version == "" {
-		version = "8.2"
+		version = "8.5"
 	}
 	return fmt.Sprintf("php%s-fpm", version)
 }
@@ -74,7 +74,7 @@ func (p *PHP) fpmServiceName(webroot *agentv1.WebrootInfo) string {
 func (p *PHP) Configure(ctx context.Context, webroot *agentv1.WebrootInfo) error {
 	version := webroot.GetRuntimeVersion()
 	if version == "" {
-		version = "8.2"
+		version = "8.5"
 	}
 
 	data := phpPoolData{

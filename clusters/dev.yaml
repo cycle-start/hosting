@@ -36,9 +36,11 @@ cluster:
 node_profiles:
   - name: web-node
     role: web
-    image: registry.localhost:5000/hosting/web-node:latest
+    image: localhost:5000/hosting/web-node:latest
     privileged: true
     network_mode: bridge
+    env:
+      WEB_STORAGE_DIR: "/var/www/storage"
     ports:
       - { host: 0, container: 80 }
       - { host: 0, container: 443 }
@@ -54,7 +56,7 @@ node_profiles:
 
   - name: db-node
     role: database
-    image: registry.localhost:5000/hosting/db-node:latest
+    image: localhost:5000/hosting/db-node:latest
     privileged: false
     network_mode: bridge
     env:
@@ -73,7 +75,7 @@ node_profiles:
 
   - name: dns-node
     role: dns
-    image: registry.localhost:5000/hosting/dns-node:latest
+    image: localhost:5000/hosting/dns-node:latest
     privileged: false
     network_mode: bridge
     env:
@@ -97,7 +99,7 @@ node_profiles:
 
   - name: valkey-node
     role: valkey
-    image: registry.localhost:5000/hosting/valkey-node:latest
+    image: localhost:5000/hosting/valkey-node:latest
     privileged: false
     network_mode: bridge
     ports:

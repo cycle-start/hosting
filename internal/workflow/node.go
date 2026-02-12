@@ -14,10 +14,34 @@ import (
 	"github.com/edvin/hosting/internal/platform"
 )
 
+// resolveStorageVolumes returns shared storage volume mounts for a node based
+// on the shard role and deployment environment. Only web shards get shared
+// storage. In Docker (dev), named volumes are used; in production, CephFS bind
+// mounts from cephMountBase are used.
+func resolveStorageVolumes(shard model.Shard, dockerNetwork, cephMountBase string) []string {
+	if shard.Role != model.ShardRoleWeb {
+		return nil
+	}
+	if dockerNetwork != "" {
+		return []string{
+			fmt.Sprintf("hosting-%s-storage:/var/www/storage", shard.Name),
+			fmt.Sprintf("hosting-%s-homes:/home", shard.Name),
+		}
+	}
+	if cephMountBase != "" {
+		return []string{
+			fmt.Sprintf("%s/%s/storage:/var/www/storage", cephMountBase, shard.Name),
+			fmt.Sprintf("%s/%s/homes:/home", cephMountBase, shard.Name),
+		}
+	}
+	return nil
+}
+
 // ProvisionNodeParams holds parameters for the ProvisionNodeWorkflow.
 type ProvisionNodeParams struct {
 	NodeID        string `json:"node_id"`
 	DockerNetwork string `json:"docker_network,omitempty"`
+	CephMountBase string `json:"ceph_mount_base,omitempty"`
 }
 
 // ProvisionNodeWorkflow deploys a node container on a host machine.
@@ -102,6 +126,7 @@ func ProvisionNodeWorkflow(ctx workflow.Context, params ProvisionNodeParams) err
 	}
 	env["NODE_ID"] = nodeID
 	env["SHARD_ID"] = *node.ShardID
+	env["SHARD_NAME"] = shard.Name
 	env["CLUSTER_ID"] = node.ClusterID
 	env["SHARD_ROLE"] = shard.Role
 
@@ -114,6 +139,9 @@ func ProvisionNodeWorkflow(ctx workflow.Context, params ProvisionNodeParams) err
 	// Parse volumes from profile.
 	var volumes []string
 	_ = json.Unmarshal(profile.Volumes, &volumes)
+
+	// Append shared storage volumes for web shards.
+	volumes = append(volumes, resolveStorageVolumes(shard, params.DockerNetwork, params.CephMountBase)...)
 
 	// Parse resources from profile.
 	var resources struct {
@@ -296,8 +324,10 @@ func DecommissionNodeWorkflow(ctx workflow.Context, nodeID string) error {
 
 // RollingUpdateParams holds parameters for the RollingUpdateWorkflow.
 type RollingUpdateParams struct {
-	ShardID  string `json:"shard_id"`
-	NewImage string    `json:"new_image"`
+	ShardID       string `json:"shard_id"`
+	NewImage      string `json:"new_image"`
+	DockerNetwork string `json:"docker_network,omitempty"`
+	CephMountBase string `json:"ceph_mount_base,omitempty"`
 }
 
 // RollingUpdateWorkflow updates all nodes in a shard to a new image one at a time.
@@ -316,6 +346,23 @@ func RollingUpdateWorkflow(ctx workflow.Context, params RollingUpdateParams) err
 	if err != nil {
 		return err
 	}
+
+	// Get the shard and profile for volume resolution.
+	var shard model.Shard
+	err = workflow.ExecuteActivity(ctx, "GetShardByID", params.ShardID).Get(ctx, &shard)
+	if err != nil {
+		return fmt.Errorf("get shard: %w", err)
+	}
+
+	var profile model.NodeProfile
+	err = workflow.ExecuteActivity(ctx, "GetNodeProfileByRole", shard.Role).Get(ctx, &profile)
+	if err != nil {
+		return fmt.Errorf("get node profile: %w", err)
+	}
+
+	var profileVolumes []string
+	_ = json.Unmarshal(profile.Volumes, &profileVolumes)
+	volumes := append(profileVolumes, resolveStorageVolumes(shard, params.DockerNetwork, params.CephMountBase)...)
 
 	for _, node := range nodes {
 		// Get the deployment for this node.
@@ -371,6 +418,7 @@ func RollingUpdateWorkflow(ctx workflow.Context, params RollingUpdateParams) err
 			Name:        deployment.ContainerName,
 			Image:       params.NewImage,
 			Env:         envOverrides,
+			Volumes:     volumes,
 			NetworkMode: "bridge",
 		}).Get(ctx, &createResult)
 		if err != nil {
