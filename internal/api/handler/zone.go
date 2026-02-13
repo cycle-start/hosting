@@ -20,6 +20,21 @@ func NewZone(svc *core.ZoneService) *Zone {
 	return &Zone{svc: svc}
 }
 
+// List godoc
+//
+//	@Summary		List zones
+//	@Tags			Zones
+//	@Security		ApiKeyAuth
+//	@Param			limit		query		int		false	"Page size"						default(50)
+//	@Param			cursor		query		string	false	"Pagination cursor"
+//	@Param			search		query		string	false	"Search term"
+//	@Param			status		query		string	false	"Filter by status"
+//	@Param			sort		query		string	false	"Sort field"					default(created_at)
+//	@Param			order		query		string	false	"Sort order (asc or desc)"		default(asc)
+//	@Success		200			{object}	response.PaginatedResponse{items=[]model.Zone}
+//	@Failure		400			{object}	response.ErrorResponse
+//	@Failure		500			{object}	response.ErrorResponse
+//	@Router			/zones [get]
 func (h *Zone) List(w http.ResponseWriter, r *http.Request) {
 	params := request.ParseListParams(r, "created_at")
 
@@ -36,6 +51,16 @@ func (h *Zone) List(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, zones, nextCursor, hasMore)
 }
 
+// Create godoc
+//
+//	@Summary		Create a zone
+//	@Tags			Zones
+//	@Security		ApiKeyAuth
+//	@Param			body	body		request.CreateZone	true	"Zone details"
+//	@Success		202		{object}	model.Zone
+//	@Failure		400		{object}	response.ErrorResponse
+//	@Failure		500		{object}	response.ErrorResponse
+//	@Router			/zones [post]
 func (h *Zone) Create(w http.ResponseWriter, r *http.Request) {
 	var req request.CreateZone
 	if err := request.Decode(r, &req); err != nil {
@@ -62,6 +87,16 @@ func (h *Zone) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, zone)
 }
 
+// Get godoc
+//
+//	@Summary		Get a zone
+//	@Tags			Zones
+//	@Security		ApiKeyAuth
+//	@Param			id	path		string	true	"Zone ID"
+//	@Success		200	{object}	model.Zone
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		404	{object}	response.ErrorResponse
+//	@Router			/zones/{id} [get]
 func (h *Zone) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -78,6 +113,18 @@ func (h *Zone) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, zone)
 }
 
+// Update godoc
+//
+//	@Summary		Update a zone
+//	@Tags			Zones
+//	@Security		ApiKeyAuth
+//	@Param			id		path		string				true	"Zone ID"
+//	@Param			body	body		request.UpdateZone	true	"Zone updates"
+//	@Success		200		{object}	model.Zone
+//	@Failure		400		{object}	response.ErrorResponse
+//	@Failure		404		{object}	response.ErrorResponse
+//	@Failure		500		{object}	response.ErrorResponse
+//	@Router			/zones/{id} [put]
 func (h *Zone) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -107,6 +154,16 @@ func (h *Zone) Update(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, zone)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a zone
+//	@Tags			Zones
+//	@Security		ApiKeyAuth
+//	@Param			id	path	string	true	"Zone ID"
+//	@Success		202
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		500	{object}	response.ErrorResponse
+//	@Router			/zones/{id} [delete]
 func (h *Zone) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -122,6 +179,17 @@ func (h *Zone) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// ReassignTenant godoc
+//
+//	@Summary		Reassign zone to a different tenant
+//	@Tags			Zones
+//	@Security		ApiKeyAuth
+//	@Param			id		path		string						true	"Zone ID"
+//	@Param			body	body		request.ReassignZoneTenant	true	"New tenant ID"
+//	@Success		200		{object}	model.Zone
+//	@Failure		400		{object}	response.ErrorResponse
+//	@Failure		500		{object}	response.ErrorResponse
+//	@Router			/zones/{id}/tenant [put]
 func (h *Zone) ReassignTenant(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {

@@ -20,6 +20,18 @@ func NewCertificate(svc *core.CertificateService) *Certificate {
 	return &Certificate{svc: svc}
 }
 
+// ListByFQDN godoc
+//
+//	@Summary		List certificates for an FQDN
+//	@Tags			Certificates
+//	@Security		ApiKeyAuth
+//	@Param			fqdnID path string true "FQDN ID"
+//	@Param			limit query int false "Page size" default(50)
+//	@Param			cursor query string false "Pagination cursor"
+//	@Success		200 {object} response.PaginatedResponse{items=[]model.Certificate}
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/fqdns/{fqdnID}/certificates [get]
 func (h *Certificate) ListByFQDN(w http.ResponseWriter, r *http.Request) {
 	fqdnID, err := request.RequireID(chi.URLParam(r, "fqdnID"))
 	if err != nil {
@@ -45,6 +57,17 @@ func (h *Certificate) ListByFQDN(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, certs, nextCursor, hasMore)
 }
 
+// Upload godoc
+//
+//	@Summary		Upload a custom certificate
+//	@Tags			Certificates
+//	@Security		ApiKeyAuth
+//	@Param			fqdnID path string true "FQDN ID"
+//	@Param			body body request.UploadCertificate true "Certificate details"
+//	@Success		202 {object} model.Certificate
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/fqdns/{fqdnID}/certificates [post]
 func (h *Certificate) Upload(w http.ResponseWriter, r *http.Request) {
 	fqdnID, err := request.RequireID(chi.URLParam(r, "fqdnID"))
 	if err != nil {

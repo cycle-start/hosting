@@ -20,6 +20,18 @@ func NewZoneRecord(svc *core.ZoneRecordService) *ZoneRecord {
 	return &ZoneRecord{svc: svc}
 }
 
+// ListByZone godoc
+//
+//	@Summary		List zone records
+//	@Tags			Zone Records
+//	@Security		ApiKeyAuth
+//	@Param			zoneID	path		string	true	"Zone ID"
+//	@Param			limit	query		int		false	"Page size"	default(50)
+//	@Param			cursor	query		string	false	"Pagination cursor"
+//	@Success		200		{object}	response.PaginatedResponse{items=[]model.ZoneRecord}
+//	@Failure		400		{object}	response.ErrorResponse
+//	@Failure		500		{object}	response.ErrorResponse
+//	@Router			/zones/{zoneID}/records [get]
 func (h *ZoneRecord) ListByZone(w http.ResponseWriter, r *http.Request) {
 	zoneID, err := request.RequireID(chi.URLParam(r, "zoneID"))
 	if err != nil {
@@ -42,6 +54,17 @@ func (h *ZoneRecord) ListByZone(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, records, nextCursor, hasMore)
 }
 
+// Create godoc
+//
+//	@Summary		Create a zone record
+//	@Tags			Zone Records
+//	@Security		ApiKeyAuth
+//	@Param			zoneID	path		string						true	"Zone ID"
+//	@Param			body	body		request.CreateZoneRecord	true	"Zone record details"
+//	@Success		202		{object}	model.ZoneRecord
+//	@Failure		400		{object}	response.ErrorResponse
+//	@Failure		500		{object}	response.ErrorResponse
+//	@Router			/zones/{zoneID}/records [post]
 func (h *ZoneRecord) Create(w http.ResponseWriter, r *http.Request) {
 	zoneID, err := request.RequireID(chi.URLParam(r, "zoneID"))
 	if err != nil {
@@ -83,6 +106,16 @@ func (h *ZoneRecord) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, record)
 }
 
+// Get godoc
+//
+//	@Summary		Get a zone record
+//	@Tags			Zone Records
+//	@Security		ApiKeyAuth
+//	@Param			id	path		string	true	"Zone record ID"
+//	@Success		200	{object}	model.ZoneRecord
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		404	{object}	response.ErrorResponse
+//	@Router			/zone-records/{id} [get]
 func (h *ZoneRecord) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -99,6 +132,18 @@ func (h *ZoneRecord) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, record)
 }
 
+// Update godoc
+//
+//	@Summary		Update a zone record
+//	@Tags			Zone Records
+//	@Security		ApiKeyAuth
+//	@Param			id		path		string						true	"Zone record ID"
+//	@Param			body	body		request.UpdateZoneRecord	true	"Zone record updates"
+//	@Success		202		{object}	model.ZoneRecord
+//	@Failure		400		{object}	response.ErrorResponse
+//	@Failure		404		{object}	response.ErrorResponse
+//	@Failure		500		{object}	response.ErrorResponse
+//	@Router			/zone-records/{id} [put]
 func (h *ZoneRecord) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -136,6 +181,16 @@ func (h *ZoneRecord) Update(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, record)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a zone record
+//	@Tags			Zone Records
+//	@Security		ApiKeyAuth
+//	@Param			id	path	string	true	"Zone record ID"
+//	@Success		202
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		500	{object}	response.ErrorResponse
+//	@Router			/zone-records/{id} [delete]
 func (h *ZoneRecord) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {

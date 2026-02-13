@@ -20,6 +20,16 @@ func NewEmailAutoReply(svc *core.EmailAutoReplyService) *EmailAutoReply {
 	return &EmailAutoReply{svc: svc}
 }
 
+// Get godoc
+//
+//	@Summary		Get email auto-reply settings
+//	@Tags			Email Auto-Reply
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Email account ID"
+//	@Success		200 {object} model.EmailAutoReply
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		404 {object} response.ErrorResponse
+//	@Router			/email-accounts/{id}/autoreply [get]
 func (h *EmailAutoReply) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -36,6 +46,17 @@ func (h *EmailAutoReply) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, ar)
 }
 
+// Put godoc
+//
+//	@Summary		Update email auto-reply settings
+//	@Tags			Email Auto-Reply
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Email account ID"
+//	@Param			body body request.UpdateEmailAutoReply true "Auto-reply settings"
+//	@Success		202 {object} model.EmailAutoReply
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/email-accounts/{id}/autoreply [put]
 func (h *EmailAutoReply) Put(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -71,6 +92,16 @@ func (h *EmailAutoReply) Put(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, ar)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete email auto-reply settings
+//	@Tags			Email Auto-Reply
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Email account ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/email-accounts/{id}/autoreply [delete]
 func (h *EmailAutoReply) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {

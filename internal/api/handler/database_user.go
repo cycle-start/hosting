@@ -20,6 +20,18 @@ func NewDatabaseUser(svc *core.DatabaseUserService) *DatabaseUser {
 	return &DatabaseUser{svc: svc}
 }
 
+// ListByDatabase godoc
+//
+//	@Summary		List database users
+//	@Tags			Database Users
+//	@Security		ApiKeyAuth
+//	@Param			databaseID	path		string	true	"Database ID"
+//	@Param			limit		query		int		false	"Page size"	default(50)
+//	@Param			cursor		query		string	false	"Pagination cursor"
+//	@Success		200			{object}	response.PaginatedResponse{items=[]model.DatabaseUser}
+//	@Failure		400			{object}	response.ErrorResponse
+//	@Failure		500			{object}	response.ErrorResponse
+//	@Router			/databases/{databaseID}/users [get]
 func (h *DatabaseUser) ListByDatabase(w http.ResponseWriter, r *http.Request) {
 	databaseID, err := request.RequireID(chi.URLParam(r, "databaseID"))
 	if err != nil {
@@ -45,6 +57,17 @@ func (h *DatabaseUser) ListByDatabase(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, users, nextCursor, hasMore)
 }
 
+// Create godoc
+//
+//	@Summary		Create a database user
+//	@Tags			Database Users
+//	@Security		ApiKeyAuth
+//	@Param			databaseID	path		string						true	"Database ID"
+//	@Param			body		body		request.CreateDatabaseUser	true	"Database user details"
+//	@Success		202			{object}	model.DatabaseUser
+//	@Failure		400			{object}	response.ErrorResponse
+//	@Failure		500			{object}	response.ErrorResponse
+//	@Router			/databases/{databaseID}/users [post]
 func (h *DatabaseUser) Create(w http.ResponseWriter, r *http.Request) {
 	databaseID, err := request.RequireID(chi.URLParam(r, "databaseID"))
 	if err != nil {
@@ -79,6 +102,16 @@ func (h *DatabaseUser) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, user)
 }
 
+// Get godoc
+//
+//	@Summary		Get a database user
+//	@Tags			Database Users
+//	@Security		ApiKeyAuth
+//	@Param			id	path		string	true	"Database user ID"
+//	@Success		200	{object}	model.DatabaseUser
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		404	{object}	response.ErrorResponse
+//	@Router			/database-users/{id} [get]
 func (h *DatabaseUser) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -96,6 +129,18 @@ func (h *DatabaseUser) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, user)
 }
 
+// Update godoc
+//
+//	@Summary		Update a database user
+//	@Tags			Database Users
+//	@Security		ApiKeyAuth
+//	@Param			id		path		string						true	"Database user ID"
+//	@Param			body	body		request.UpdateDatabaseUser	true	"Database user updates"
+//	@Success		202		{object}	model.DatabaseUser
+//	@Failure		400		{object}	response.ErrorResponse
+//	@Failure		404		{object}	response.ErrorResponse
+//	@Failure		500		{object}	response.ErrorResponse
+//	@Router			/database-users/{id} [put]
 func (h *DatabaseUser) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -131,6 +176,16 @@ func (h *DatabaseUser) Update(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, user)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a database user
+//	@Tags			Database Users
+//	@Security		ApiKeyAuth
+//	@Param			id	path	string	true	"Database user ID"
+//	@Success		202
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		500	{object}	response.ErrorResponse
+//	@Router			/database-users/{id} [delete]
 func (h *DatabaseUser) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {

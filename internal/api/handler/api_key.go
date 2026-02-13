@@ -6,8 +6,12 @@ import (
 	"github.com/edvin/hosting/internal/api/request"
 	"github.com/edvin/hosting/internal/api/response"
 	"github.com/edvin/hosting/internal/core"
+	"github.com/edvin/hosting/internal/model"
 	"github.com/go-chi/chi/v5"
 )
+
+// Referenced in swag annotations.
+var _ *model.APIKey
 
 // APIKey handles API key management endpoints.
 type APIKey struct {
@@ -19,7 +23,16 @@ func NewAPIKey(svc *core.APIKeyService) *APIKey {
 	return &APIKey{svc: svc}
 }
 
-// Create generates a new API key. The raw key is returned once in the response.
+// Create godoc
+//
+//	@Summary		Create an API key
+//	@Tags			API Keys
+//	@Security		ApiKeyAuth
+//	@Param			body body request.CreateAPIKey true "API key details"
+//	@Success		201 {object} map[string]any
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/api-keys [post]
 func (h *APIKey) Create(w http.ResponseWriter, r *http.Request) {
 	var req request.CreateAPIKey
 	if err := request.Decode(r, &req); err != nil {
@@ -45,7 +58,16 @@ func (h *APIKey) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusCreated, resp)
 }
 
-// List lists all API keys with cursor-based pagination.
+// List godoc
+//
+//	@Summary		List API keys
+//	@Tags			API Keys
+//	@Security		ApiKeyAuth
+//	@Param			limit query int false "Page size" default(50)
+//	@Param			cursor query string false "Pagination cursor"
+//	@Success		200 {object} response.PaginatedResponse{items=[]model.APIKey}
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/api-keys [get]
 func (h *APIKey) List(w http.ResponseWriter, r *http.Request) {
 	pg := request.ParsePagination(r)
 
@@ -62,7 +84,16 @@ func (h *APIKey) List(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, keys, nextCursor, hasMore)
 }
 
-// Get retrieves an API key by ID.
+// Get godoc
+//
+//	@Summary		Get an API key
+//	@Tags			API Keys
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "API key ID"
+//	@Success		200 {object} model.APIKey
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		404 {object} response.ErrorResponse
+//	@Router			/api-keys/{id} [get]
 func (h *APIKey) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -79,7 +110,16 @@ func (h *APIKey) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, key)
 }
 
-// Revoke soft-deletes an API key by setting revoked_at.
+// Revoke godoc
+//
+//	@Summary		Revoke an API key
+//	@Tags			API Keys
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "API key ID"
+//	@Success		204
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/api-keys/{id} [delete]
 func (h *APIKey) Revoke(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {

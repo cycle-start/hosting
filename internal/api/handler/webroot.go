@@ -21,6 +21,18 @@ func NewWebroot(svc *core.WebrootService) *Webroot {
 	return &Webroot{svc: svc}
 }
 
+// ListByTenant godoc
+//
+//	@Summary		List webroots for a tenant
+//	@Tags			Webroots
+//	@Security		ApiKeyAuth
+//	@Param			tenantID path string true "Tenant ID"
+//	@Param			limit query int false "Page size" default(50)
+//	@Param			cursor query string false "Pagination cursor"
+//	@Success		200 {object} response.PaginatedResponse{items=[]model.Webroot}
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants/{tenantID}/webroots [get]
 func (h *Webroot) ListByTenant(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := request.RequireID(chi.URLParam(r, "tenantID"))
 	if err != nil {
@@ -43,6 +55,17 @@ func (h *Webroot) ListByTenant(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, webroots, nextCursor, hasMore)
 }
 
+// Create godoc
+//
+//	@Summary		Create a webroot
+//	@Tags			Webroots
+//	@Security		ApiKeyAuth
+//	@Param			tenantID path string true "Tenant ID"
+//	@Param			body body request.CreateWebroot true "Webroot details"
+//	@Success		202 {object} model.Webroot
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants/{tenantID}/webroots [post]
 func (h *Webroot) Create(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := request.RequireID(chi.URLParam(r, "tenantID"))
 	if err != nil {
@@ -82,6 +105,16 @@ func (h *Webroot) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, webroot)
 }
 
+// Get godoc
+//
+//	@Summary		Get a webroot
+//	@Tags			Webroots
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Webroot ID"
+//	@Success		200 {object} model.Webroot
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		404 {object} response.ErrorResponse
+//	@Router			/webroots/{id} [get]
 func (h *Webroot) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -98,6 +131,18 @@ func (h *Webroot) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, webroot)
 }
 
+// Update godoc
+//
+//	@Summary		Update a webroot
+//	@Tags			Webroots
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Webroot ID"
+//	@Param			body body request.UpdateWebroot true "Webroot updates"
+//	@Success		202 {object} model.Webroot
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		404 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/webroots/{id} [put]
 func (h *Webroot) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -138,6 +183,16 @@ func (h *Webroot) Update(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, webroot)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a webroot
+//	@Tags			Webroots
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Webroot ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/webroots/{id} [delete]
 func (h *Webroot) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {

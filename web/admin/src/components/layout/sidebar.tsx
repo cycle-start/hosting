@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Boxes,
+  FileText,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -28,6 +29,7 @@ interface NavItem {
   label: string
   href: string
   icon: React.ElementType
+  external?: boolean
 }
 
 interface NavSection {
@@ -69,6 +71,7 @@ const navSections: NavSection[] = [
       { label: 'Platform Config', href: '/platform-config', icon: Settings },
       { label: 'API Keys', href: '/api-keys', icon: KeyRound },
       { label: 'Audit Log', href: '/audit-log', icon: ScrollText },
+      { label: 'API Docs', href: '/docs', icon: FileText, external: true },
     ],
   },
 ]
@@ -135,16 +138,27 @@ export function Sidebar() {
               )}
               {section.items.map((item) => {
                 const active = isActive(item.href)
-                const linkContent = (
+                const className = cn(
+                  'flex items-center gap-3 rounded-md px-2 py-2 text-sm font-medium transition-colors',
+                  active
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                  collapsed && 'justify-center px-0'
+                )
+                const linkContent = item.external ? (
+                  <a
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={className}
+                  >
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    {!collapsed && <span>{item.label}</span>}
+                  </a>
+                ) : (
                   <Link
                     to={item.href}
-                    className={cn(
-                      'flex items-center gap-3 rounded-md px-2 py-2 text-sm font-medium transition-colors',
-                      active
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                      collapsed && 'justify-center px-0'
-                    )}
+                    className={className}
                   >
                     <item.icon className={cn('h-4 w-4 shrink-0', active && 'text-primary')} />
                     {!collapsed && <span>{item.label}</span>}

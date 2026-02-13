@@ -11,8 +11,13 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
+// ErrorResponse is the standard error response body.
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
 func WriteError(w http.ResponseWriter, status int, message string) {
-	WriteJSON(w, status, map[string]string{"error": message})
+	WriteJSON(w, status, ErrorResponse{Error: message})
 }
 
 // PaginatedResponse wraps a list with pagination metadata.

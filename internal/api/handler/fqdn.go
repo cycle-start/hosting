@@ -20,6 +20,18 @@ func NewFQDN(svc *core.FQDNService) *FQDN {
 	return &FQDN{svc: svc}
 }
 
+// ListByWebroot godoc
+//
+//	@Summary		List FQDNs for a webroot
+//	@Tags			FQDNs
+//	@Security		ApiKeyAuth
+//	@Param			webrootID path string true "Webroot ID"
+//	@Param			limit query int false "Page size" default(50)
+//	@Param			cursor query string false "Pagination cursor"
+//	@Success		200 {object} response.PaginatedResponse{items=[]model.FQDN}
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/webroots/{webrootID}/fqdns [get]
 func (h *FQDN) ListByWebroot(w http.ResponseWriter, r *http.Request) {
 	webrootID, err := request.RequireID(chi.URLParam(r, "webrootID"))
 	if err != nil {
@@ -42,6 +54,17 @@ func (h *FQDN) ListByWebroot(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, fqdns, nextCursor, hasMore)
 }
 
+// Create godoc
+//
+//	@Summary		Create an FQDN
+//	@Tags			FQDNs
+//	@Security		ApiKeyAuth
+//	@Param			webrootID path string true "Webroot ID"
+//	@Param			body body request.CreateFQDN true "FQDN details"
+//	@Success		202 {object} model.FQDN
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/webroots/{webrootID}/fqdns [post]
 func (h *FQDN) Create(w http.ResponseWriter, r *http.Request) {
 	webrootID, err := request.RequireID(chi.URLParam(r, "webrootID"))
 	if err != nil {
@@ -76,6 +99,16 @@ func (h *FQDN) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, fqdn)
 }
 
+// Get godoc
+//
+//	@Summary		Get an FQDN
+//	@Tags			FQDNs
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "FQDN ID"
+//	@Success		200 {object} model.FQDN
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		404 {object} response.ErrorResponse
+//	@Router			/fqdns/{id} [get]
 func (h *FQDN) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -92,6 +125,16 @@ func (h *FQDN) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, fqdn)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete an FQDN
+//	@Tags			FQDNs
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "FQDN ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/fqdns/{id} [delete]
 func (h *FQDN) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {

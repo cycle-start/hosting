@@ -20,6 +20,18 @@ func NewValkeyUser(svc *core.ValkeyUserService) *ValkeyUser {
 	return &ValkeyUser{svc: svc}
 }
 
+// ListByInstance godoc
+//
+//	@Summary		List Valkey users
+//	@Tags			Valkey Users
+//	@Security		ApiKeyAuth
+//	@Param			instanceID	path		string	true	"Valkey instance ID"
+//	@Param			limit		query		int		false	"Page size"	default(50)
+//	@Param			cursor		query		string	false	"Pagination cursor"
+//	@Success		200			{object}	response.PaginatedResponse{items=[]model.ValkeyUser}
+//	@Failure		400			{object}	response.ErrorResponse
+//	@Failure		500			{object}	response.ErrorResponse
+//	@Router			/valkey-instances/{instanceID}/users [get]
 func (h *ValkeyUser) ListByInstance(w http.ResponseWriter, r *http.Request) {
 	instanceID, err := request.RequireID(chi.URLParam(r, "instanceID"))
 	if err != nil {
@@ -45,6 +57,17 @@ func (h *ValkeyUser) ListByInstance(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, users, nextCursor, hasMore)
 }
 
+// Create godoc
+//
+//	@Summary		Create a Valkey user
+//	@Tags			Valkey Users
+//	@Security		ApiKeyAuth
+//	@Param			instanceID	path		string						true	"Valkey instance ID"
+//	@Param			body		body		request.CreateValkeyUser	true	"Valkey user details"
+//	@Success		202			{object}	model.ValkeyUser
+//	@Failure		400			{object}	response.ErrorResponse
+//	@Failure		500			{object}	response.ErrorResponse
+//	@Router			/valkey-instances/{instanceID}/users [post]
 func (h *ValkeyUser) Create(w http.ResponseWriter, r *http.Request) {
 	instanceID, err := request.RequireID(chi.URLParam(r, "instanceID"))
 	if err != nil {
@@ -85,6 +108,16 @@ func (h *ValkeyUser) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, user)
 }
 
+// Get godoc
+//
+//	@Summary		Get a Valkey user
+//	@Tags			Valkey Users
+//	@Security		ApiKeyAuth
+//	@Param			id	path		string	true	"Valkey user ID"
+//	@Success		200	{object}	model.ValkeyUser
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		404	{object}	response.ErrorResponse
+//	@Router			/valkey-users/{id} [get]
 func (h *ValkeyUser) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -102,6 +135,18 @@ func (h *ValkeyUser) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, user)
 }
 
+// Update godoc
+//
+//	@Summary		Update a Valkey user
+//	@Tags			Valkey Users
+//	@Security		ApiKeyAuth
+//	@Param			id		path		string						true	"Valkey user ID"
+//	@Param			body	body		request.UpdateValkeyUser	true	"Valkey user updates"
+//	@Success		202		{object}	model.ValkeyUser
+//	@Failure		400		{object}	response.ErrorResponse
+//	@Failure		404		{object}	response.ErrorResponse
+//	@Failure		500		{object}	response.ErrorResponse
+//	@Router			/valkey-users/{id} [put]
 func (h *ValkeyUser) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -140,6 +185,16 @@ func (h *ValkeyUser) Update(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, user)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a Valkey user
+//	@Tags			Valkey Users
+//	@Security		ApiKeyAuth
+//	@Param			id	path	string	true	"Valkey user ID"
+//	@Success		202
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		500	{object}	response.ErrorResponse
+//	@Router			/valkey-users/{id} [delete]
 func (h *ValkeyUser) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {

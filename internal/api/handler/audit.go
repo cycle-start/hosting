@@ -33,6 +33,23 @@ func NewAudit(pool *pgxpool.Pool) *Audit {
 	return &Audit{pool: pool}
 }
 
+// List godoc
+//
+//	@Summary		List audit logs
+//	@Tags			Audit Logs
+//	@Security		ApiKeyAuth
+//	@Param			cursor			query		string	false	"Pagination cursor"
+//	@Param			limit			query		int		false	"Page size (default 50)"
+//	@Param			sort			query		string	false	"Sort field (method, resource_type, created_at)"
+//	@Param			order			query		string	false	"Sort order (asc, desc)"
+//	@Param			search			query		string	false	"Search in resource_type or method"
+//	@Param			resource_type	query		string	false	"Filter by resource type"
+//	@Param			action			query		string	false	"Filter by HTTP method"
+//	@Param			date_from		query		string	false	"Filter by start date"
+//	@Param			date_to			query		string	false	"Filter by end date"
+//	@Success		200				{object}	response.PaginatedResponse{items=[]handler.AuditLog}
+//	@Failure		500				{object}	response.ErrorResponse
+//	@Router			/audit-logs [get]
 func (h *Audit) List(w http.ResponseWriter, r *http.Request) {
 	params := request.ParseListParams(r, "created_at")
 

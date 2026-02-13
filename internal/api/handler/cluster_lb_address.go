@@ -8,7 +8,11 @@ import (
 	"github.com/edvin/hosting/internal/api/request"
 	"github.com/edvin/hosting/internal/api/response"
 	"github.com/edvin/hosting/internal/core"
+	"github.com/edvin/hosting/internal/model"
 )
+
+// Referenced in swag annotations.
+var _ *model.ClusterLBAddress
 
 type ClusterLBAddressHandler struct {
 	service *core.ClusterLBAddressService
@@ -18,6 +22,18 @@ func NewClusterLBAddressHandler(service *core.ClusterLBAddressService) *ClusterL
 	return &ClusterLBAddressHandler{service: service}
 }
 
+// List godoc
+//
+//	@Summary		List cluster load balancer addresses
+//	@Tags			Cluster LB Addresses
+//	@Security		ApiKeyAuth
+//	@Param			clusterID	path		string	true	"Cluster ID"
+//	@Param			cursor		query		string	false	"Pagination cursor"
+//	@Param			limit		query		int		false	"Page size (default 50)"
+//	@Success		200			{object}	response.PaginatedResponse{items=[]model.ClusterLBAddress}
+//	@Failure		400			{object}	response.ErrorResponse
+//	@Failure		500			{object}	response.ErrorResponse
+//	@Router			/clusters/{clusterID}/lb-addresses [get]
 func (h *ClusterLBAddressHandler) List(w http.ResponseWriter, r *http.Request) {
 	clusterID, err := request.RequireID(chi.URLParam(r, "clusterID"))
 	if err != nil {
@@ -40,6 +56,17 @@ func (h *ClusterLBAddressHandler) List(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, addrs, nextCursor, hasMore)
 }
 
+// Create godoc
+//
+//	@Summary		Create a cluster load balancer address
+//	@Tags			Cluster LB Addresses
+//	@Security		ApiKeyAuth
+//	@Param			clusterID	path		string							true	"Cluster ID"
+//	@Param			body		body		request.CreateClusterLBAddress	true	"LB Address details"
+//	@Success		201			{object}	model.ClusterLBAddress
+//	@Failure		400			{object}	response.ErrorResponse
+//	@Failure		500			{object}	response.ErrorResponse
+//	@Router			/clusters/{clusterID}/lb-addresses [post]
 func (h *ClusterLBAddressHandler) Create(w http.ResponseWriter, r *http.Request) {
 	clusterID, err := request.RequireID(chi.URLParam(r, "clusterID"))
 	if err != nil {
@@ -59,6 +86,16 @@ func (h *ClusterLBAddressHandler) Create(w http.ResponseWriter, r *http.Request)
 	response.WriteJSON(w, http.StatusCreated, addr)
 }
 
+// Get godoc
+//
+//	@Summary		Get a cluster load balancer address
+//	@Tags			Cluster LB Addresses
+//	@Security		ApiKeyAuth
+//	@Param			id	path		string	true	"LB Address ID"
+//	@Success		200	{object}	model.ClusterLBAddress
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		404	{object}	response.ErrorResponse
+//	@Router			/lb-addresses/{id} [get]
 func (h *ClusterLBAddressHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -73,6 +110,16 @@ func (h *ClusterLBAddressHandler) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, addr)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a cluster load balancer address
+//	@Tags			Cluster LB Addresses
+//	@Security		ApiKeyAuth
+//	@Param			id	path	string	true	"LB Address ID"
+//	@Success		204
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		500	{object}	response.ErrorResponse
+//	@Router			/lb-addresses/{id} [delete]
 func (h *ClusterLBAddressHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {

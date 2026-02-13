@@ -22,6 +22,18 @@ func NewValkeyInstance(svc *core.ValkeyInstanceService) *ValkeyInstance {
 	return &ValkeyInstance{svc: svc}
 }
 
+// ListByTenant godoc
+//
+//	@Summary		List Valkey instances for a tenant
+//	@Tags			Valkey Instances
+//	@Security		ApiKeyAuth
+//	@Param			tenantID	path		string	true	"Tenant ID"
+//	@Param			limit		query		int		false	"Page size"	default(50)
+//	@Param			cursor		query		string	false	"Pagination cursor"
+//	@Success		200			{object}	response.PaginatedResponse{items=[]model.ValkeyInstance}
+//	@Failure		400			{object}	response.ErrorResponse
+//	@Failure		500			{object}	response.ErrorResponse
+//	@Router			/tenants/{tenantID}/valkey-instances [get]
 func (h *ValkeyInstance) ListByTenant(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := request.RequireID(chi.URLParam(r, "tenantID"))
 	if err != nil {
@@ -47,6 +59,17 @@ func (h *ValkeyInstance) ListByTenant(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, instances, nextCursor, hasMore)
 }
 
+// Create godoc
+//
+//	@Summary		Create a Valkey instance
+//	@Tags			Valkey Instances
+//	@Security		ApiKeyAuth
+//	@Param			tenantID	path		string							true	"Tenant ID"
+//	@Param			body		body		request.CreateValkeyInstance	true	"Valkey instance details"
+//	@Success		202			{object}	model.ValkeyInstance
+//	@Failure		400			{object}	response.ErrorResponse
+//	@Failure		500			{object}	response.ErrorResponse
+//	@Router			/tenants/{tenantID}/valkey-instances [post]
 func (h *ValkeyInstance) Create(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := request.RequireID(chi.URLParam(r, "tenantID"))
 	if err != nil {
@@ -88,6 +111,16 @@ func (h *ValkeyInstance) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, instance)
 }
 
+// Get godoc
+//
+//	@Summary		Get a Valkey instance
+//	@Tags			Valkey Instances
+//	@Security		ApiKeyAuth
+//	@Param			id	path		string	true	"Valkey instance ID"
+//	@Success		200	{object}	model.ValkeyInstance
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		404	{object}	response.ErrorResponse
+//	@Router			/valkey-instances/{id} [get]
 func (h *ValkeyInstance) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -105,6 +138,16 @@ func (h *ValkeyInstance) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, instance)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a Valkey instance
+//	@Tags			Valkey Instances
+//	@Security		ApiKeyAuth
+//	@Param			id	path	string	true	"Valkey instance ID"
+//	@Success		202
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		500	{object}	response.ErrorResponse
+//	@Router			/valkey-instances/{id} [delete]
 func (h *ValkeyInstance) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -120,6 +163,17 @@ func (h *ValkeyInstance) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// Migrate godoc
+//
+//	@Summary		Migrate a Valkey instance to a different shard
+//	@Tags			Valkey Instances
+//	@Security		ApiKeyAuth
+//	@Param			id		path	string							true	"Valkey instance ID"
+//	@Param			body	body	request.MigrateValkeyInstance	true	"Target shard ID"
+//	@Success		202
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		500	{object}	response.ErrorResponse
+//	@Router			/valkey-instances/{id}/migrate [post]
 func (h *ValkeyInstance) Migrate(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -141,6 +195,17 @@ func (h *ValkeyInstance) Migrate(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// ReassignTenant godoc
+//
+//	@Summary		Reassign Valkey instance to a different tenant
+//	@Tags			Valkey Instances
+//	@Security		ApiKeyAuth
+//	@Param			id		path		string									true	"Valkey instance ID"
+//	@Param			body	body		request.ReassignValkeyInstanceTenant	true	"New tenant ID"
+//	@Success		200		{object}	model.ValkeyInstance
+//	@Failure		400		{object}	response.ErrorResponse
+//	@Failure		500		{object}	response.ErrorResponse
+//	@Router			/valkey-instances/{id}/tenant [put]
 func (h *ValkeyInstance) ReassignTenant(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {

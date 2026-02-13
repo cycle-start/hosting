@@ -29,6 +29,10 @@ build-admin:
 dev-admin:
     cd web/admin && npm run dev
 
+# Generate OpenAPI docs from swag annotations
+docs:
+    swag init -g internal/api/doc.go -o internal/api/docs --parseDependency --parseInternal
+
 # --- Test ---
 
 # Run unit tests

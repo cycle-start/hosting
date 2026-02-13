@@ -20,6 +20,21 @@ func NewTenant(svc *core.TenantService) *Tenant {
 	return &Tenant{svc: svc}
 }
 
+// List godoc
+//
+//	@Summary		List tenants
+//	@Tags			Tenants
+//	@Security		ApiKeyAuth
+//	@Param			search query string false "Search query"
+//	@Param			status query string false "Filter by status"
+//	@Param			sort query string false "Sort field" default(created_at)
+//	@Param			order query string false "Sort order (asc/desc)" default(asc)
+//	@Param			limit query int false "Page size" default(50)
+//	@Param			cursor query string false "Pagination cursor"
+//	@Success		200 {object} response.PaginatedResponse{items=[]model.Tenant}
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants [get]
 func (h *Tenant) List(w http.ResponseWriter, r *http.Request) {
 	params := request.ParseListParams(r, "created_at")
 
@@ -36,6 +51,16 @@ func (h *Tenant) List(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, tenants, nextCursor, hasMore)
 }
 
+// Create godoc
+//
+//	@Summary		Create a tenant
+//	@Tags			Tenants
+//	@Security		ApiKeyAuth
+//	@Param			body body request.CreateTenant true "Tenant details"
+//	@Success		202 {object} model.Tenant
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants [post]
 func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 	var req request.CreateTenant
 	if err := request.Decode(r, &req); err != nil {
@@ -67,6 +92,16 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, tenant)
 }
 
+// Get godoc
+//
+//	@Summary		Get a tenant
+//	@Tags			Tenants
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Tenant ID"
+//	@Success		200 {object} model.Tenant
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		404 {object} response.ErrorResponse
+//	@Router			/tenants/{id} [get]
 func (h *Tenant) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -83,6 +118,18 @@ func (h *Tenant) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, tenant)
 }
 
+// Update godoc
+//
+//	@Summary		Update a tenant
+//	@Tags			Tenants
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Tenant ID"
+//	@Param			body body request.UpdateTenant true "Tenant updates"
+//	@Success		202 {object} model.Tenant
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		404 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants/{id} [put]
 func (h *Tenant) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -114,6 +161,16 @@ func (h *Tenant) Update(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, tenant)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a tenant
+//	@Tags			Tenants
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Tenant ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants/{id} [delete]
 func (h *Tenant) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -129,6 +186,16 @@ func (h *Tenant) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// Suspend godoc
+//
+//	@Summary		Suspend a tenant
+//	@Tags			Tenants
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Tenant ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants/{id}/suspend [post]
 func (h *Tenant) Suspend(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -144,6 +211,16 @@ func (h *Tenant) Suspend(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// Unsuspend godoc
+//
+//	@Summary		Unsuspend a tenant
+//	@Tags			Tenants
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Tenant ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants/{id}/unsuspend [post]
 func (h *Tenant) Unsuspend(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -159,6 +236,17 @@ func (h *Tenant) Unsuspend(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// Migrate godoc
+//
+//	@Summary		Migrate a tenant to another shard
+//	@Tags			Tenants
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Tenant ID"
+//	@Param			body body request.MigrateTenant true "Migration details"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants/{id}/migrate [post]
 func (h *Tenant) Migrate(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {

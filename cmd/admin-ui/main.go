@@ -28,6 +28,14 @@ func main() {
 		proxy.ServeHTTP(w, r)
 	})
 
+	// Proxy docs to core-api
+	mux.HandleFunc("/docs/", func(w http.ResponseWriter, r *http.Request) {
+		proxy.ServeHTTP(w, r)
+	})
+	mux.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
+		proxy.ServeHTTP(w, r)
+	})
+
 	// Health check
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

@@ -20,6 +20,18 @@ func NewEmailAlias(svc *core.EmailAliasService) *EmailAlias {
 	return &EmailAlias{svc: svc}
 }
 
+// ListByAccount godoc
+//
+//	@Summary		List email aliases for an account
+//	@Tags			Email Aliases
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Email account ID"
+//	@Param			limit query int false "Page size" default(50)
+//	@Param			cursor query string false "Pagination cursor"
+//	@Success		200 {object} response.PaginatedResponse{items=[]model.EmailAlias}
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/email-accounts/{id}/aliases [get]
 func (h *EmailAlias) ListByAccount(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -42,6 +54,17 @@ func (h *EmailAlias) ListByAccount(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, aliases, nextCursor, hasMore)
 }
 
+// Create godoc
+//
+//	@Summary		Create an email alias
+//	@Tags			Email Aliases
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Email account ID"
+//	@Param			body body request.CreateEmailAlias true "Email alias details"
+//	@Success		202 {object} model.EmailAlias
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/email-accounts/{id}/aliases [post]
 func (h *EmailAlias) Create(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -73,6 +96,16 @@ func (h *EmailAlias) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, alias)
 }
 
+// Get godoc
+//
+//	@Summary		Get an email alias
+//	@Tags			Email Aliases
+//	@Security		ApiKeyAuth
+//	@Param			aliasID path string true "Email alias ID"
+//	@Success		200 {object} model.EmailAlias
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		404 {object} response.ErrorResponse
+//	@Router			/email-aliases/{aliasID} [get]
 func (h *EmailAlias) Get(w http.ResponseWriter, r *http.Request) {
 	aliasID, err := request.RequireID(chi.URLParam(r, "aliasID"))
 	if err != nil {
@@ -89,6 +122,16 @@ func (h *EmailAlias) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, alias)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete an email alias
+//	@Tags			Email Aliases
+//	@Security		ApiKeyAuth
+//	@Param			aliasID path string true "Email alias ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/email-aliases/{aliasID} [delete]
 func (h *EmailAlias) Delete(w http.ResponseWriter, r *http.Request) {
 	aliasID, err := request.RequireID(chi.URLParam(r, "aliasID"))
 	if err != nil {

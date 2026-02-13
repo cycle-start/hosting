@@ -22,6 +22,18 @@ func NewBackup(svc *core.BackupService, webroot *core.WebrootService, db *core.D
 	return &Backup{svc: svc, webroot: webroot, db: db}
 }
 
+// ListByTenant godoc
+//
+//	@Summary		List backups for a tenant
+//	@Tags			Backups
+//	@Security		ApiKeyAuth
+//	@Param			tenantID path string true "Tenant ID"
+//	@Param			limit query int false "Page size" default(50)
+//	@Param			cursor query string false "Pagination cursor"
+//	@Success		200 {object} response.PaginatedResponse{items=[]model.Backup}
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants/{tenantID}/backups [get]
 func (h *Backup) ListByTenant(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := request.RequireID(chi.URLParam(r, "tenantID"))
 	if err != nil {
@@ -44,6 +56,18 @@ func (h *Backup) ListByTenant(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, backups, nextCursor, hasMore)
 }
 
+// Create godoc
+//
+//	@Summary		Create a backup
+//	@Tags			Backups
+//	@Security		ApiKeyAuth
+//	@Param			tenantID path string true "Tenant ID"
+//	@Param			body body request.CreateBackup true "Backup details"
+//	@Success		202 {object} model.Backup
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		404 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants/{tenantID}/backups [post]
 func (h *Backup) Create(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := request.RequireID(chi.URLParam(r, "tenantID"))
 	if err != nil {
@@ -96,6 +120,16 @@ func (h *Backup) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, backup)
 }
 
+// Get godoc
+//
+//	@Summary		Get a backup
+//	@Tags			Backups
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Backup ID"
+//	@Success		200 {object} model.Backup
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		404 {object} response.ErrorResponse
+//	@Router			/backups/{id} [get]
 func (h *Backup) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -112,6 +146,16 @@ func (h *Backup) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, backup)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a backup
+//	@Tags			Backups
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Backup ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/backups/{id} [delete]
 func (h *Backup) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -127,6 +171,16 @@ func (h *Backup) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// Restore godoc
+//
+//	@Summary		Restore a backup
+//	@Tags			Backups
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Backup ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/backups/{id}/restore [post]
 func (h *Backup) Restore(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {

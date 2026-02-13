@@ -24,7 +24,18 @@ func NewSFTPKey(svc *core.SFTPKeyService) *SFTPKey {
 	return &SFTPKey{svc: svc}
 }
 
-// ListByTenant lists SFTP keys for a tenant with cursor-based pagination.
+// ListByTenant godoc
+//
+//	@Summary		List SFTP keys for a tenant
+//	@Tags			SFTP Keys
+//	@Security		ApiKeyAuth
+//	@Param			tenantID path string true "Tenant ID"
+//	@Param			limit query int false "Page size" default(50)
+//	@Param			cursor query string false "Pagination cursor"
+//	@Success		200 {object} response.PaginatedResponse{items=[]model.SFTPKey}
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants/{tenantID}/sftp-keys [get]
 func (h *SFTPKey) ListByTenant(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := request.RequireID(chi.URLParam(r, "tenantID"))
 	if err != nil {
@@ -47,7 +58,17 @@ func (h *SFTPKey) ListByTenant(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, keys, nextCursor, hasMore)
 }
 
-// Create creates a new SFTP key for a tenant.
+// Create godoc
+//
+//	@Summary		Create an SFTP key
+//	@Tags			SFTP Keys
+//	@Security		ApiKeyAuth
+//	@Param			tenantID path string true "Tenant ID"
+//	@Param			body body request.CreateSFTPKey true "SFTP key details"
+//	@Success		202 {object} model.SFTPKey
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants/{tenantID}/sftp-keys [post]
 func (h *SFTPKey) Create(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := request.RequireID(chi.URLParam(r, "tenantID"))
 	if err != nil {
@@ -89,7 +110,16 @@ func (h *SFTPKey) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, key)
 }
 
-// Get retrieves an SFTP key by ID.
+// Get godoc
+//
+//	@Summary		Get an SFTP key
+//	@Tags			SFTP Keys
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "SFTP key ID"
+//	@Success		200 {object} model.SFTPKey
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		404 {object} response.ErrorResponse
+//	@Router			/sftp-keys/{id} [get]
 func (h *SFTPKey) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -106,7 +136,16 @@ func (h *SFTPKey) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, key)
 }
 
-// Delete removes an SFTP key by ID.
+// Delete godoc
+//
+//	@Summary		Delete an SFTP key
+//	@Tags			SFTP Keys
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "SFTP key ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/sftp-keys/{id} [delete]
 func (h *SFTPKey) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {

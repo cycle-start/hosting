@@ -20,6 +20,18 @@ func NewEmailForward(svc *core.EmailForwardService) *EmailForward {
 	return &EmailForward{svc: svc}
 }
 
+// ListByAccount godoc
+//
+//	@Summary		List email forwards for an account
+//	@Tags			Email Forwards
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Email account ID"
+//	@Param			limit query int false "Page size" default(50)
+//	@Param			cursor query string false "Pagination cursor"
+//	@Success		200 {object} response.PaginatedResponse{items=[]model.EmailForward}
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/email-accounts/{id}/forwards [get]
 func (h *EmailForward) ListByAccount(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -42,6 +54,17 @@ func (h *EmailForward) ListByAccount(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, forwards, nextCursor, hasMore)
 }
 
+// Create godoc
+//
+//	@Summary		Create an email forward
+//	@Tags			Email Forwards
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Email account ID"
+//	@Param			body body request.CreateEmailForward true "Email forward details"
+//	@Success		202 {object} model.EmailForward
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/email-accounts/{id}/forwards [post]
 func (h *EmailForward) Create(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -79,6 +102,16 @@ func (h *EmailForward) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, fwd)
 }
 
+// Get godoc
+//
+//	@Summary		Get an email forward
+//	@Tags			Email Forwards
+//	@Security		ApiKeyAuth
+//	@Param			forwardID path string true "Email forward ID"
+//	@Success		200 {object} model.EmailForward
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		404 {object} response.ErrorResponse
+//	@Router			/email-forwards/{forwardID} [get]
 func (h *EmailForward) Get(w http.ResponseWriter, r *http.Request) {
 	forwardID, err := request.RequireID(chi.URLParam(r, "forwardID"))
 	if err != nil {
@@ -95,6 +128,16 @@ func (h *EmailForward) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, fwd)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete an email forward
+//	@Tags			Email Forwards
+//	@Security		ApiKeyAuth
+//	@Param			forwardID path string true "Email forward ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/email-forwards/{forwardID} [delete]
 func (h *EmailForward) Delete(w http.ResponseWriter, r *http.Request) {
 	forwardID, err := request.RequireID(chi.URLParam(r, "forwardID"))
 	if err != nil {

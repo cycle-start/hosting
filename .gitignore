@@ -33,6 +33,9 @@ certs/
 web/admin/node_modules/
 web/admin/dist/
 
+# Generated API docs
+internal/api/docs/
+
 # Test/build artifacts
 coverage.out
 *.prof

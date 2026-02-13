@@ -20,6 +20,16 @@ func NewRegion(svc *core.RegionService) *Region {
 	return &Region{svc: svc}
 }
 
+// List godoc
+//
+//	@Summary	List regions
+//	@Tags		Regions
+//	@Security	ApiKeyAuth
+//	@Param		limit	query	int		false	"Page size"	default(50)
+//	@Param		cursor	query	string	false	"Pagination cursor"
+//	@Success	200		{object}	response.PaginatedResponse{items=[]model.Region}
+//	@Failure	500		{object}	response.ErrorResponse
+//	@Router		/regions [get]
 func (h *Region) List(w http.ResponseWriter, r *http.Request) {
 	pg := request.ParsePagination(r)
 
@@ -36,12 +46,18 @@ func (h *Region) List(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, regions, nextCursor, hasMore)
 }
 
+// Create godoc
+//
+//	@Summary	Create a region
+//	@Tags		Regions
+//	@Security	ApiKeyAuth
+//	@Param		body	body		request.CreateRegion	true	"Region"
+//	@Success	201		{object}	model.Region
+//	@Failure	400		{object}	response.ErrorResponse
+//	@Failure	500		{object}	response.ErrorResponse
+//	@Router		/regions [post]
 func (h *Region) Create(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		ID     string          `json:"id" validate:"required,slug"`
-		Name   string          `json:"name" validate:"required,slug"`
-		Config json.RawMessage `json:"config"`
-	}
+	var req request.CreateRegion
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
 		return
@@ -69,6 +85,16 @@ func (h *Region) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusCreated, region)
 }
 
+// Get godoc
+//
+//	@Summary	Get a region
+//	@Tags		Regions
+//	@Security	ApiKeyAuth
+//	@Param		id	path		string	true	"Region ID"
+//	@Success	200	{object}	model.Region
+//	@Failure	400	{object}	response.ErrorResponse
+//	@Failure	404	{object}	response.ErrorResponse
+//	@Router		/regions/{id} [get]
 func (h *Region) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -85,6 +111,18 @@ func (h *Region) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, region)
 }
 
+// Update godoc
+//
+//	@Summary	Update a region
+//	@Tags		Regions
+//	@Security	ApiKeyAuth
+//	@Param		id		path		string				true	"Region ID"
+//	@Param		body	body		request.UpdateRegion	true	"Region"
+//	@Success	200		{object}	model.Region
+//	@Failure	400		{object}	response.ErrorResponse
+//	@Failure	404		{object}	response.ErrorResponse
+//	@Failure	500		{object}	response.ErrorResponse
+//	@Router		/regions/{id} [put]
 func (h *Region) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -92,10 +130,7 @@ func (h *Region) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Name   string          `json:"name"`
-		Config json.RawMessage `json:"config"`
-	}
+	var req request.UpdateRegion
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
 		return
@@ -122,6 +157,16 @@ func (h *Region) Update(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, region)
 }
 
+// Delete godoc
+//
+//	@Summary	Delete a region
+//	@Tags		Regions
+//	@Security	ApiKeyAuth
+//	@Param		id	path	string	true	"Region ID"
+//	@Success	204
+//	@Failure	400	{object}	response.ErrorResponse
+//	@Failure	500	{object}	response.ErrorResponse
+//	@Router		/regions/{id} [delete]
 func (h *Region) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -137,6 +182,18 @@ func (h *Region) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// ListRuntimes godoc
+//
+//	@Summary	List runtimes for a region
+//	@Tags		Regions
+//	@Security	ApiKeyAuth
+//	@Param		id		path	string	true	"Region ID"
+//	@Param		limit	query	int		false	"Page size"	default(50)
+//	@Param		cursor	query	string	false	"Pagination cursor"
+//	@Success	200		{object}	response.PaginatedResponse{items=[]model.RegionRuntime}
+//	@Failure	400		{object}	response.ErrorResponse
+//	@Failure	500		{object}	response.ErrorResponse
+//	@Router		/regions/{id}/runtimes [get]
 func (h *Region) ListRuntimes(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -159,6 +216,17 @@ func (h *Region) ListRuntimes(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, runtimes, nextCursor, hasMore)
 }
 
+// AddRuntime godoc
+//
+//	@Summary	Add a runtime to a region
+//	@Tags		Regions
+//	@Security	ApiKeyAuth
+//	@Param		id		path		string					true	"Region ID"
+//	@Param		body	body		request.AddRegionRuntime	true	"Runtime"
+//	@Success	201		{object}	model.RegionRuntime
+//	@Failure	400		{object}	response.ErrorResponse
+//	@Failure	500		{object}	response.ErrorResponse
+//	@Router		/regions/{id}/runtimes [post]
 func (h *Region) AddRuntime(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -166,10 +234,7 @@ func (h *Region) AddRuntime(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Runtime string `json:"runtime" validate:"required"`
-		Version string `json:"version" validate:"required"`
-	}
+	var req request.AddRegionRuntime
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
 		return
@@ -190,6 +255,17 @@ func (h *Region) AddRuntime(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusCreated, rt)
 }
 
+// RemoveRuntime godoc
+//
+//	@Summary	Remove a runtime from a region
+//	@Tags		Regions
+//	@Security	ApiKeyAuth
+//	@Param		id		path	string						true	"Region ID"
+//	@Param		body	body	request.RemoveRegionRuntime	true	"Runtime"
+//	@Success	204
+//	@Failure	400	{object}	response.ErrorResponse
+//	@Failure	500	{object}	response.ErrorResponse
+//	@Router		/regions/{id}/runtimes [delete]
 func (h *Region) RemoveRuntime(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -197,10 +273,7 @@ func (h *Region) RemoveRuntime(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Runtime string `json:"runtime" validate:"required"`
-		Version string `json:"version" validate:"required"`
-	}
+	var req request.RemoveRegionRuntime
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
 		return

@@ -20,6 +20,22 @@ func NewDatabase(svc *core.DatabaseService) *Database {
 	return &Database{svc: svc}
 }
 
+// ListByTenant godoc
+//
+//	@Summary		List databases for a tenant
+//	@Tags			Databases
+//	@Security		ApiKeyAuth
+//	@Param			tenantID	path		string	true	"Tenant ID"
+//	@Param			limit		query		int		false	"Page size"						default(50)
+//	@Param			cursor		query		string	false	"Pagination cursor"
+//	@Param			search		query		string	false	"Search term"
+//	@Param			status		query		string	false	"Filter by status"
+//	@Param			sort		query		string	false	"Sort field"					default(created_at)
+//	@Param			order		query		string	false	"Sort order (asc or desc)"		default(asc)
+//	@Success		200			{object}	response.PaginatedResponse{items=[]model.Database}
+//	@Failure		400			{object}	response.ErrorResponse
+//	@Failure		500			{object}	response.ErrorResponse
+//	@Router			/tenants/{tenantID}/databases [get]
 func (h *Database) ListByTenant(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := request.RequireID(chi.URLParam(r, "tenantID"))
 	if err != nil {
@@ -42,6 +58,17 @@ func (h *Database) ListByTenant(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, databases, nextCursor, hasMore)
 }
 
+// Create godoc
+//
+//	@Summary		Create a database
+//	@Tags			Databases
+//	@Security		ApiKeyAuth
+//	@Param			tenantID	path		string					true	"Tenant ID"
+//	@Param			body		body		request.CreateDatabase	true	"Database details"
+//	@Success		202			{object}	model.Database
+//	@Failure		400			{object}	response.ErrorResponse
+//	@Failure		500			{object}	response.ErrorResponse
+//	@Router			/tenants/{tenantID}/databases [post]
 func (h *Database) Create(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := request.RequireID(chi.URLParam(r, "tenantID"))
 	if err != nil {
@@ -75,6 +102,16 @@ func (h *Database) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, database)
 }
 
+// Get godoc
+//
+//	@Summary		Get a database
+//	@Tags			Databases
+//	@Security		ApiKeyAuth
+//	@Param			id	path		string	true	"Database ID"
+//	@Success		200	{object}	model.Database
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		404	{object}	response.ErrorResponse
+//	@Router			/databases/{id} [get]
 func (h *Database) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -91,6 +128,16 @@ func (h *Database) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, database)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a database
+//	@Tags			Databases
+//	@Security		ApiKeyAuth
+//	@Param			id	path	string	true	"Database ID"
+//	@Success		202
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		500	{object}	response.ErrorResponse
+//	@Router			/databases/{id} [delete]
 func (h *Database) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -106,6 +153,17 @@ func (h *Database) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// Migrate godoc
+//
+//	@Summary		Migrate a database to a different shard
+//	@Tags			Databases
+//	@Security		ApiKeyAuth
+//	@Param			id		path	string					true	"Database ID"
+//	@Param			body	body	request.MigrateDatabase	true	"Target shard ID"
+//	@Success		202
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		500	{object}	response.ErrorResponse
+//	@Router			/databases/{id}/migrate [post]
 func (h *Database) Migrate(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -127,6 +185,17 @@ func (h *Database) Migrate(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// ReassignTenant godoc
+//
+//	@Summary		Reassign database to a different tenant
+//	@Tags			Databases
+//	@Security		ApiKeyAuth
+//	@Param			id		path		string							true	"Database ID"
+//	@Param			body	body		request.ReassignDatabaseTenant	true	"New tenant ID"
+//	@Success		200		{object}	model.Database
+//	@Failure		400		{object}	response.ErrorResponse
+//	@Failure		500		{object}	response.ErrorResponse
+//	@Router			/databases/{id}/tenant [put]
 func (h *Database) ReassignTenant(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {

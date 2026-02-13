@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -18,6 +19,9 @@ import (
 	"github.com/edvin/hosting/internal/config"
 	"github.com/edvin/hosting/internal/core"
 )
+
+//go:embed docs/swagger.json
+var swaggerJSON []byte
 
 type Server struct {
 	router         chi.Router
@@ -64,6 +68,16 @@ func (s *Server) setupRoutes() {
 	// Health check endpoints
 	s.router.Get("/healthz", s.handleHealthz)
 	s.router.Get("/readyz", s.handleReadyz)
+
+	// API documentation (no auth required)
+	s.router.Get("/docs/openapi.json", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(swaggerJSON)
+	})
+	s.router.Get("/docs", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(scalarHTML))
+	})
 
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Use(mw.Auth(s.corePool))
@@ -299,3 +313,16 @@ func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
 }
+
+const scalarHTML = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Hosting Platform API</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body>
+  <script id="api-reference" data-url="/docs/openapi.json"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+</body>
+</html>`

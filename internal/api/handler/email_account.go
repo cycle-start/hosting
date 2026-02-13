@@ -20,6 +20,18 @@ func NewEmailAccount(svc *core.EmailAccountService) *EmailAccount {
 	return &EmailAccount{svc: svc}
 }
 
+// ListByFQDN godoc
+//
+//	@Summary		List email accounts for an FQDN
+//	@Tags			Email Accounts
+//	@Security		ApiKeyAuth
+//	@Param			fqdnID path string true "FQDN ID"
+//	@Param			limit query int false "Page size" default(50)
+//	@Param			cursor query string false "Pagination cursor"
+//	@Success		200 {object} response.PaginatedResponse{items=[]model.EmailAccount}
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/fqdns/{fqdnID}/email-accounts [get]
 func (h *EmailAccount) ListByFQDN(w http.ResponseWriter, r *http.Request) {
 	fqdnID, err := request.RequireID(chi.URLParam(r, "fqdnID"))
 	if err != nil {
@@ -42,6 +54,17 @@ func (h *EmailAccount) ListByFQDN(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, accounts, nextCursor, hasMore)
 }
 
+// Create godoc
+//
+//	@Summary		Create an email account
+//	@Tags			Email Accounts
+//	@Security		ApiKeyAuth
+//	@Param			fqdnID path string true "FQDN ID"
+//	@Param			body body request.CreateEmailAccount true "Email account details"
+//	@Success		202 {object} model.EmailAccount
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/fqdns/{fqdnID}/email-accounts [post]
 func (h *EmailAccount) Create(w http.ResponseWriter, r *http.Request) {
 	fqdnID, err := request.RequireID(chi.URLParam(r, "fqdnID"))
 	if err != nil {
@@ -75,6 +98,16 @@ func (h *EmailAccount) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, account)
 }
 
+// Get godoc
+//
+//	@Summary		Get an email account
+//	@Tags			Email Accounts
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Email account ID"
+//	@Success		200 {object} model.EmailAccount
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		404 {object} response.ErrorResponse
+//	@Router			/email-accounts/{id} [get]
 func (h *EmailAccount) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -91,6 +124,16 @@ func (h *EmailAccount) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, account)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete an email account
+//	@Tags			Email Accounts
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Email account ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/email-accounts/{id} [delete]
 func (h *EmailAccount) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {

@@ -20,6 +20,21 @@ func NewNode(svc *core.NodeService) *Node {
 	return &Node{svc: svc}
 }
 
+// ListByCluster godoc
+//
+//	@Summary		List nodes in a cluster
+//	@Tags			Nodes
+//	@Security		ApiKeyAuth
+//	@Param			clusterID	path		string	true	"Cluster ID"
+//	@Param			limit		query		int		false	"Page size"		default(50)
+//	@Param			cursor		query		string	false	"Pagination cursor"
+//	@Param			search		query		string	false	"Search query"
+//	@Param			sort		query		string	false	"Sort field"	default(created_at)
+//	@Param			status		query		string	false	"Filter by status"
+//	@Success		200			{object}	response.PaginatedResponse{items=[]model.Node}
+//	@Failure		400			{object}	response.ErrorResponse
+//	@Failure		500			{object}	response.ErrorResponse
+//	@Router			/clusters/{clusterID}/nodes [get]
 func (h *Node) ListByCluster(w http.ResponseWriter, r *http.Request) {
 	clusterID, err := request.RequireID(chi.URLParam(r, "clusterID"))
 	if err != nil {
@@ -42,6 +57,17 @@ func (h *Node) ListByCluster(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, nodes, nextCursor, hasMore)
 }
 
+// Create godoc
+//
+//	@Summary		Create a node
+//	@Tags			Nodes
+//	@Security		ApiKeyAuth
+//	@Param			clusterID	path		string				true	"Cluster ID"
+//	@Param			body		body		request.CreateNode	true	"Node data"
+//	@Success		201			{object}	model.Node
+//	@Failure		400			{object}	response.ErrorResponse
+//	@Failure		500			{object}	response.ErrorResponse
+//	@Router			/clusters/{clusterID}/nodes [post]
 func (h *Node) Create(w http.ResponseWriter, r *http.Request) {
 	clusterID, err := request.RequireID(chi.URLParam(r, "clusterID"))
 	if err != nil {
@@ -49,14 +75,7 @@ func (h *Node) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		ID         string   `json:"id"`
-		Hostname   string   `json:"hostname" validate:"required"`
-		IPAddress  *string  `json:"ip_address"`
-		IP6Address *string  `json:"ip6_address"`
-		ShardID    *string  `json:"shard_id"`
-		Roles      []string `json:"roles" validate:"required,min=1"`
-	}
+	var req request.CreateNode
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
 		return
@@ -89,6 +108,16 @@ func (h *Node) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusCreated, node)
 }
 
+// Get godoc
+//
+//	@Summary		Get a node
+//	@Tags			Nodes
+//	@Security		ApiKeyAuth
+//	@Param			id	path		string	true	"Node ID"
+//	@Success		200	{object}	model.Node
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		404	{object}	response.ErrorResponse
+//	@Router			/nodes/{id} [get]
 func (h *Node) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -105,6 +134,18 @@ func (h *Node) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, node)
 }
 
+// Update godoc
+//
+//	@Summary		Update a node
+//	@Tags			Nodes
+//	@Security		ApiKeyAuth
+//	@Param			id		path		string				true	"Node ID"
+//	@Param			body	body		request.UpdateNode	true	"Node updates"
+//	@Success		200		{object}	model.Node
+//	@Failure		400		{object}	response.ErrorResponse
+//	@Failure		404		{object}	response.ErrorResponse
+//	@Failure		500		{object}	response.ErrorResponse
+//	@Router			/nodes/{id} [put]
 func (h *Node) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -112,14 +153,7 @@ func (h *Node) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Hostname   string   `json:"hostname"`
-		IPAddress  *string  `json:"ip_address"`
-		IP6Address *string  `json:"ip6_address"`
-		ShardID    *string  `json:"shard_id"`
-		Roles      []string `json:"roles"`
-		Status     string   `json:"status"`
-	}
+	var req request.UpdateNode
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
 		return
@@ -158,6 +192,16 @@ func (h *Node) Update(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, node)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a node
+//	@Tags			Nodes
+//	@Security		ApiKeyAuth
+//	@Param			id	path	string	true	"Node ID"
+//	@Success		204
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		500	{object}	response.ErrorResponse
+//	@Router			/nodes/{id} [delete]
 func (h *Node) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -172,4 +216,3 @@ func (h *Node) Delete(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
-

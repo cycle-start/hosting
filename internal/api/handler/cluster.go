@@ -20,6 +20,18 @@ func NewCluster(svc *core.ClusterService) *Cluster {
 	return &Cluster{svc: svc}
 }
 
+// ListByRegion godoc
+//
+//	@Summary		List clusters in a region
+//	@Tags			Clusters
+//	@Security		ApiKeyAuth
+//	@Param			regionID	path		string	true	"Region ID"
+//	@Param			limit		query		int		false	"Page size"	default(50)
+//	@Param			cursor		query		string	false	"Pagination cursor"
+//	@Success		200			{object}	response.PaginatedResponse{items=[]model.Cluster}
+//	@Failure		400			{object}	response.ErrorResponse
+//	@Failure		500			{object}	response.ErrorResponse
+//	@Router			/regions/{regionID}/clusters [get]
 func (h *Cluster) ListByRegion(w http.ResponseWriter, r *http.Request) {
 	regionID, err := request.RequireID(chi.URLParam(r, "regionID"))
 	if err != nil {
@@ -42,6 +54,17 @@ func (h *Cluster) ListByRegion(w http.ResponseWriter, r *http.Request) {
 	response.WritePaginated(w, http.StatusOK, clusters, nextCursor, hasMore)
 }
 
+// Create godoc
+//
+//	@Summary		Create a cluster
+//	@Tags			Clusters
+//	@Security		ApiKeyAuth
+//	@Param			regionID	path		string					true	"Region ID"
+//	@Param			body		body		request.CreateCluster	true	"Cluster data"
+//	@Success		201			{object}	model.Cluster
+//	@Failure		400			{object}	response.ErrorResponse
+//	@Failure		500			{object}	response.ErrorResponse
+//	@Router			/regions/{regionID}/clusters [post]
 func (h *Cluster) Create(w http.ResponseWriter, r *http.Request) {
 	regionID, err := request.RequireID(chi.URLParam(r, "regionID"))
 	if err != nil {
@@ -49,12 +72,7 @@ func (h *Cluster) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		ID     string          `json:"id" validate:"required,slug"`
-		Name   string          `json:"name" validate:"required,slug"`
-		Config json.RawMessage `json:"config"`
-		Spec   json.RawMessage `json:"spec"`
-	}
+	var req request.CreateCluster
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
 		return
@@ -89,6 +107,16 @@ func (h *Cluster) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusCreated, cluster)
 }
 
+// Get godoc
+//
+//	@Summary		Get a cluster
+//	@Tags			Clusters
+//	@Security		ApiKeyAuth
+//	@Param			id	path		string	true	"Cluster ID"
+//	@Success		200	{object}	model.Cluster
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		404	{object}	response.ErrorResponse
+//	@Router			/clusters/{id} [get]
 func (h *Cluster) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -105,6 +133,18 @@ func (h *Cluster) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, cluster)
 }
 
+// Update godoc
+//
+//	@Summary		Update a cluster
+//	@Tags			Clusters
+//	@Security		ApiKeyAuth
+//	@Param			id		path		string					true	"Cluster ID"
+//	@Param			body	body		request.UpdateCluster	true	"Cluster updates"
+//	@Success		200		{object}	model.Cluster
+//	@Failure		400		{object}	response.ErrorResponse
+//	@Failure		404		{object}	response.ErrorResponse
+//	@Failure		500		{object}	response.ErrorResponse
+//	@Router			/clusters/{id} [put]
 func (h *Cluster) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -112,11 +152,7 @@ func (h *Cluster) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Name   string          `json:"name"`
-		Config json.RawMessage `json:"config"`
-		Spec   json.RawMessage `json:"spec"`
-	}
+	var req request.UpdateCluster
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
 		return
@@ -146,6 +182,16 @@ func (h *Cluster) Update(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, cluster)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a cluster
+//	@Tags			Clusters
+//	@Security		ApiKeyAuth
+//	@Param			id	path	string	true	"Cluster ID"
+//	@Success		204
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		500	{object}	response.ErrorResponse
+//	@Router			/clusters/{id} [delete]
 func (h *Cluster) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
@@ -160,4 +206,3 @@ func (h *Cluster) Delete(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
-
