@@ -62,6 +62,11 @@ func ClusterApply(configPath string, timeout time.Duration) error {
 		}
 	} else {
 		fmt.Printf("Cluster %q: %s (exists)\n", cfg.Cluster.Name, clusterID)
+
+		// Update config and spec on existing cluster.
+		if err := updateCluster(client, clusterID, cfg.Cluster); err != nil {
+			return fmt.Errorf("update cluster: %w", err)
+		}
 	}
 
 	// 3. Apply nodes (create via API with shard assignment, converge)
@@ -218,6 +223,38 @@ func findOrCreateCluster(client *Client, regionID string, def ClusterDef) (strin
 
 	id, err = extractID(resp)
 	return id, true, err
+}
+
+func updateCluster(client *Client, clusterID string, def ClusterDef) error {
+	body := map[string]any{}
+	if def.Config != nil {
+		body["config"] = def.Config
+	}
+	if len(def.Spec.Shards) > 0 || def.Spec.Infrastructure != (InfrastructureSpecDef{}) {
+		spec := map[string]any{}
+		if len(def.Spec.Shards) > 0 {
+			shards := make([]map[string]any, len(def.Spec.Shards))
+			for i, s := range def.Spec.Shards {
+				shards[i] = map[string]any{
+					"name":       s.Name,
+					"role":       s.Role,
+					"node_count": s.NodeCount,
+				}
+			}
+			spec["shards"] = shards
+		}
+		body["spec"] = spec
+	}
+	if len(body) == 0 {
+		return nil
+	}
+
+	_, err := client.Put(fmt.Sprintf("/clusters/%s", clusterID), body)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("  Config/spec updated\n")
+	return nil
 }
 
 func printClusterSummary(client *Client, clusterID string) error {

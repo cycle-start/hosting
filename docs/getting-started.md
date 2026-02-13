@@ -42,26 +42,34 @@ go run ./cmd/hostctl seed -f seeds/dev-tenants.yaml
 ```
 
 This creates:
-- A DNS zone (`example.com`)
+- A brand (`acme-brand`) with DNS nameservers under `hosting.localhost`
+- A DNS zone (`hosting.localhost`)
 - A tenant (`acme-corp`) on the web shard
 - A webroot with PHP 8.5 runtime
 - FQDNs (`acme.hosting.localhost`, `www.acme.hosting.localhost`)
 - A MySQL database with a user
 - A Valkey (Redis) instance with a user
-- An email account
+- S3 bucket and email accounts
 
 ### 5. Verify
 
+All services are accessible via `.localhost` hostnames (no `/etc/hosts` or DNS config needed):
+
 ```bash
-# List tenants (with auth)
-curl -s -H "X-API-Key: hst_..." http://localhost:8090/api/v1/tenants | jq
+# Admin UI
+open http://admin.hosting.localhost
 
-# Open admin UI
-open http://localhost:3001
+# Core API
+curl -s -H "X-API-Key: hst_..." http://api.hosting.localhost/api/v1/tenants | jq
 
-# Check Temporal workflows
-open http://localhost:8080
+# Temporal UI
+open http://temporal.hosting.localhost
+
+# Tenant site (after seeding)
+curl http://acme.hosting.localhost
 ```
+
+See [Local Networking](local-networking.md) for details on the hostname scheme and optional split DNS setup.
 
 ### 6. Run e2e tests
 

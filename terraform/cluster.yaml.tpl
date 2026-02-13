@@ -11,7 +11,7 @@ cluster:
   lb_addresses:
     - address: "${gateway_ip}"
   config:
-    haproxy_admin_addr: "${gateway_ip}:9999"
+    haproxy_admin_addr: "localhost:9999"
     stalwart_url: "http://${gateway_ip}:8082"
     stalwart_token: "dev-token"
     mail_hostname: "mail.hosting.localhost"

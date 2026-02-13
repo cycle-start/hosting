@@ -24,15 +24,35 @@ frontend stats
 # Main HTTP frontend
 frontend http
     bind *:80
+    # Control plane routing
+    use_backend backend-admin-ui    if { req.hdr(host) -i admin.hosting.localhost }
+    use_backend backend-core-api    if { req.hdr(host) -i api.hosting.localhost }
+    use_backend backend-temporal-ui if { req.hdr(host) -i temporal.hosting.localhost }
+    # Tenant routing via dynamic map
     use_backend %[req.hdr(host),lower,map(/var/lib/haproxy/maps/fqdn-to-shard.map,shard-default)]
+
+# Control plane backends
+backend backend-admin-ui
+    server admin 127.0.0.1:3001
+
+backend backend-core-api
+    server api 127.0.0.1:8090
+
+backend backend-temporal-ui
+    server temporal 127.0.0.1:8080
 
 # Default backend (returns 503 for unmapped FQDNs)
 backend shard-default
     mode http
     http-request deny deny_status 503
 
-backend shard-web-1
+# Shard backends with real VM IPs
+%{ for shard_name, servers in shard_backends ~}
+backend shard-${shard_name}
     balance hdr(Host)
     hash-type consistent
-    server web-1-node-0 node-3bc83bcd:80 check
-    server web-1-node-1 node-13a3cecc:80 check
+%{ for server in servers ~}
+    server ${server.name} ${server.ip}:80 check
+%{ endfor ~}
+
+%{ endfor ~}

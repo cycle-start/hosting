@@ -15,7 +15,7 @@ brands:
       - vm-cluster-1
 
 zones:
-  - name: example.com
+  - name: hosting.localhost
     brand: acme-brand
     tenant: acme-corp
 

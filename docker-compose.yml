@@ -158,11 +158,7 @@ services:
       context: ./docker/haproxy
     profiles: ["infra", "platform"]
     user: root
-    ports:
-      - "80:80"
-      - "443:443"
-      - "8404:8404"   # stats UI
-      - "9999:9999"   # Runtime API
+    network_mode: host
     volumes:
       - ./docker/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
       - ./docker/haproxy/fqdn-to-shard.map:/var/lib/haproxy/maps/fqdn-to-shard.map
@@ -266,6 +262,7 @@ services:
       context: .
       dockerfile: docker/worker.Dockerfile
     profiles: ["platform"]
+    network_mode: host
     depends_on:
       core-db:
         condition: service_healthy
@@ -274,10 +271,10 @@ services:
       temporal:
         condition: service_started
     environment:
-      - CORE_DATABASE_URL=postgres://hosting:hosting@core-db:5432/hosting_core
-      - POWERDNS_DATABASE_URL=postgres://hosting:hosting@powerdns-db:5432/hosting_powerdns
-      - TEMPORAL_ADDRESS=temporal:7233
-      - REGISTRY_URL=registry:5000
+      - CORE_DATABASE_URL=postgres://hosting:hosting@localhost:5432/hosting_core
+      - POWERDNS_DATABASE_URL=postgres://hosting:hosting@localhost:5433/hosting_powerdns
+      - TEMPORAL_ADDRESS=localhost:7233
+      - REGISTRY_URL=localhost:5000
 
   admin-ui:
     container_name: hosting-admin-ui

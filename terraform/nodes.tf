@@ -576,9 +576,28 @@ locals {
     nodes      = local.all_nodes
     gateway_ip = var.gateway_ip
   })
+
+  # Group web nodes by shard for HAProxy backend generation.
+  shard_backends = {
+    for shard_name, nodes in {
+      for node in local.all_nodes : node.shard_name => node... if node.role == "web"
+    } : shard_name => [
+      for node in nodes : {
+        name = node.name
+        ip   = node.ip
+      }
+    ]
+  }
 }
 
 resource "local_file" "cluster_yaml" {
   content  = local.cluster_yaml
   filename = "${path.module}/../clusters/vm-generated.yaml"
+}
+
+resource "local_file" "haproxy_cfg" {
+  content = templatefile("${path.module}/templates/haproxy.cfg.tpl", {
+    shard_backends = local.shard_backends
+  })
+  filename = "${path.module}/../docker/haproxy/haproxy.cfg"
 }
