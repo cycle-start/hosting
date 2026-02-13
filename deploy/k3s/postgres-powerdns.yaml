@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-powerdns-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-powerdns
+spec:
+  serviceName: postgres-powerdns
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-powerdns
+  template:
+    metadata:
+      labels:
+        app: postgres-powerdns
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: postgres
+          image: postgres:16
+          args: ["-c", "port=5433"]
+          ports:
+            - containerPort: 5433
+          env:
+            - name: POSTGRES_USER
+              value: hosting
+            - name: POSTGRES_PASSWORD
+              value: hosting
+            - name: POSTGRES_DB
+              value: hosting_powerdns
+            - name: PGPORT
+              value: "5433"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-powerdns-data

@@ -2,171 +2,203 @@
 
 How traffic reaches services and tenant sites in the local development environment.
 
+## Network topology
+
+```
+Windows
+  |
+  | route add 10.10.10.0/24 via <WSL2 IP>
+  v
+WSL2 (eth0: 172.x.x.x, virbr1: 10.10.10.1)
+  |
+  | iptables FORWARD + MASQUERADE
+  v
+libvirt network 10.10.10.0/24
+  |
+  |-- controlplane-0 (10.10.10.2) — k3s
+  |     |-- HAProxy :80          (routes all HTTP by Host header)
+  |     |-- HAProxy stats :8404
+  |     |-- core-api :8090
+  |     |-- admin-ui :3001
+  |     |-- Temporal :7233
+  |     |-- Temporal UI :8080
+  |     |-- PostgreSQL :5432 (core), :5433 (powerdns)
+  |     |-- Valkey :6379
+  |     '-- Registry :5000
+  |
+  |-- web-1-node-0  (10.10.10.10)  — nginx + PHP-FPM + node-agent
+  |-- web-1-node-1  (10.10.10.11)  — nginx + PHP-FPM + node-agent
+  |-- db-1-node-0   (10.10.10.20)  — MySQL + node-agent
+  |-- dns-1-node-0  (10.10.10.30)  — PowerDNS + node-agent
+  |-- valkey-1-node-0 (10.10.10.40) — Valkey + node-agent
+  |-- storage-1-node-0 (10.10.10.50) — Ceph (S3/CephFS) + node-agent
+  '-- dbadmin-1-node-0 (10.10.10.60) — CloudBeaver + node-agent
+```
+
+All k3s pods use `hostNetwork: true`, so services bind directly to `10.10.10.2`. HAProxy on port 80 routes requests based on the `Host` header — this is the single entry point for all HTTP traffic.
+
 ## How it works
 
-HAProxy runs with `network_mode: host` so it binds directly on the WSL2/host network. It listens on port 80 and routes requests based on the `Host` header:
+1. Windows hosts file maps `*.hosting.test` hostnames to `10.10.10.2`
+2. Windows route sends `10.10.10.0/24` traffic to WSL2
+3. WSL2 iptables forwards the traffic to the libvirt bridge (`virbr1`)
+4. HAProxy on the controlplane VM matches the `Host` header and routes to the appropriate backend
 
-1. **Control plane hostnames** are matched first (hardcoded in HAProxy config)
-2. **Tenant FQDNs** are looked up in the dynamic `fqdn-to-shard.map` file, which is updated via the HAProxy Runtime API when FQDNs are bound
+For control plane services (admin UI, API, Temporal UI), HAProxy forwards to `127.0.0.1:<port>` on the same VM. For tenant sites, HAProxy looks up the FQDN in a dynamic map file and forwards to the web shard's node VMs.
 
-All development hostnames use the `.localhost` TLD, which browsers resolve to `127.0.0.1` automatically per [RFC 6761](https://datatracker.ietf.org/doc/html/rfc6761). No `/etc/hosts` entries or DNS configuration needed.
+## Setup
+
+### 1. WSL2 forwarding (once per boot)
+
+```bash
+just forward
+```
+
+This runs `scripts/wsl-forward.sh` which:
+- Enables IP forwarding (`net.ipv4.ip_forward=1`)
+- Adds iptables FORWARD rules: `eth0` -> `virbr1` and back
+- Adds MASQUERADE so VMs see traffic from `10.10.10.1` (not Windows' `172.x.x.x` which they can't route to)
+
+### 2. Windows route (once per boot)
+
+WSL2's IP changes on each boot. Get it from the forwarding script output or:
+
+```bash
+hostname -I | awk '{print $1}'
+```
+
+Then in PowerShell as Administrator:
+
+```powershell
+route add 10.10.10.0 mask 255.255.255.0 <WSL2_IP>
+```
+
+To make it persistent (survives Windows reboots):
+
+```powershell
+route -p add 10.10.10.0 mask 255.255.255.0 <WSL2_IP>
+```
+
+Note: if WSL2's IP changes, you'll need to update the persistent route.
+
+### 3. Windows hosts file (once)
+
+Edit `C:\Windows\System32\drivers\etc\hosts` as Administrator:
+
+```
+10.10.10.2  admin.hosting.test api.hosting.test temporal.hosting.test dbadmin.hosting.test
+```
+
+Add tenant FQDNs as needed:
+
+```
+10.10.10.2  acme.hosting.test www.acme.hosting.test
+```
 
 ## Hostname reference
 
-| URL | Service |
-|-----|---------|
-| `http://admin.hosting.localhost` | Admin UI |
-| `http://api.hosting.localhost` | Core API (`/api/v1/...`) |
-| `http://temporal.hosting.localhost` | Temporal UI |
-| `http://<fqdn>.hosting.localhost` | Tenant site (via shard map) |
+| URL | Service | Backend |
+|-----|---------|---------|
+| `http://admin.hosting.test` | Admin UI | `127.0.0.1:3001` |
+| `http://api.hosting.test` | Core API | `127.0.0.1:8090` |
+| `http://temporal.hosting.test` | Temporal UI | `127.0.0.1:8080` |
+| `http://dbadmin.hosting.test` | DB Admin (CloudBeaver) | `127.0.0.1:4180` |
+| `http://acme.hosting.test` | Tenant site | web shard VMs |
 
-These are configured in the HAProxy config template at `terraform/templates/haproxy.cfg.tpl`, which Terraform generates with real VM IPs for shard backends.
+These hostnames are configured in the HAProxy config template at `terraform/templates/haproxy.cfg.tpl`. The domain is controlled by the `base_domain` Terraform variable (default: `hosting.test`).
 
 ## Adding and reaching tenant sites
 
 1. Create a tenant (via admin UI or API)
 2. Create a webroot on the tenant
-3. Add an FQDN using a `.hosting.localhost` subdomain, e.g. `mysite.hosting.localhost`
+3. Add an FQDN using a `.hosting.test` subdomain, e.g. `mysite.hosting.test`
 4. The FQDN binding workflow:
    - Adds the FQDN to the HAProxy map via Runtime API
    - Creates DNS records in PowerDNS (if a matching zone exists)
-5. Visit `http://mysite.hosting.localhost` in the browser
+5. Add `10.10.10.2  mysite.hosting.test` to your Windows hosts file
+6. Visit `http://mysite.hosting.test` in the browser
 
-The seed file (`seeds/dev-tenants.yaml`) creates a zone `hosting.localhost` under the `acme-brand`. Any FQDN ending in `.hosting.localhost` will match this zone and get auto-DNS records created.
+The seed file (`seeds/dev-tenants.yaml`) creates a zone `hosting.test` under the `acme-brand`. Any FQDN ending in `.hosting.test` will match this zone and get auto-DNS records created.
 
 ### Example: adding a second tenant
 
 ```bash
 # Create tenant via API
-curl -X POST http://api.hosting.localhost/api/v1/tenants \
+curl -X POST http://api.hosting.test/api/v1/tenants \
   -H "X-API-Key: hst_..." \
   -H "Content-Type: application/json" \
   -d '{"brand_id": "acme-brand", "shard_id": "<web-shard-id>"}'
 
 # Create webroot (use tenant ID from response)
-curl -X POST http://api.hosting.localhost/api/v1/tenants/<id>/webroots \
+curl -X POST http://api.hosting.test/api/v1/tenants/<id>/webroots \
   -H "X-API-Key: hst_..." \
   -H "Content-Type: application/json" \
   -d '{"name": "main", "runtime": "php", "runtime_version": "8.5"}'
 
 # Add FQDN (use webroot ID from response)
-curl -X POST http://api.hosting.localhost/api/v1/webroots/<id>/fqdns \
+curl -X POST http://api.hosting.test/api/v1/webroots/<id>/fqdns \
   -H "X-API-Key: hst_..." \
   -H "Content-Type: application/json" \
-  -d '{"fqdn": "newsite.hosting.localhost"}'
+  -d '{"fqdn": "newsite.hosting.test"}'
 
-# Visit in browser
-open http://newsite.hosting.localhost
+# Add to Windows hosts file, then visit
+open http://newsite.hosting.test
 ```
 
 ## Verifying DNS records
 
-The platform creates DNS records in PowerDNS when FQDNs are bound. PowerDNS is exposed on port 5300. You can query it directly:
+The platform creates DNS records in PowerDNS when FQDNs are bound. PowerDNS runs on the DNS node VM. You can query it directly from WSL2:
 
 ```bash
-# Check zone SOA
-dig @127.0.0.1 -p 5300 hosting.localhost SOA
-
-# Check FQDN A record
-dig @127.0.0.1 -p 5300 acme.hosting.localhost A
-
-# Check NS records
-dig @127.0.0.1 -p 5300 hosting.localhost NS
+dig @10.10.10.30 hosting.test SOA
+dig @10.10.10.30 acme.hosting.test A
+dig @10.10.10.30 hosting.test NS
 ```
 
-These DNS records aren't used for browser routing (`.localhost` bypasses DNS), but they confirm the platform's DNS pipeline works correctly and would be used in production.
+These DNS records aren't used for browser routing in dev (we use hosts file entries), but they confirm the platform's DNS pipeline works correctly and would be used in production.
 
-## Network topology
+## Why `.test` instead of `.localhost`?
 
-```
-Browser (Windows)
-  |
-  | http://mysite.hosting.localhost
-  | (.localhost -> 127.0.0.1, RFC 6761)
-  v
-HAProxy :80 (network_mode: host)
-  |
-  |-- Host: admin.hosting.localhost  --> localhost:3001 (admin-ui container)
-  |-- Host: api.hosting.localhost    --> localhost:8090 (core-api container)
-  |-- Host: temporal.hosting.localhost -> localhost:8080 (temporal-ui container)
-  |-- Host: mysite.hosting.localhost --> fqdn-to-shard.map lookup
-  |       |
-  |       v
-  |     shard-web-1 backend
-  |       |-- 10.10.10.10:80 (web-1-node-0 VM)
-  |       |-- 10.10.10.11:80 (web-1-node-1 VM)
-  |
-  |-- No match --> 503
-```
+Browsers hardcode `.localhost` to resolve to `127.0.0.1` per [RFC 6761](https://datatracker.ietf.org/doc/html/rfc6761), ignoring hosts file entries. Since the control plane runs on `10.10.10.2` (not localhost), we use `.test` which is also RFC 6761 reserved but browsers resolve it normally via hosts file / DNS.
 
-The worker also runs with `network_mode: host`, so it can reach both Docker services (via `localhost:<port>`) and libvirt VMs (via `10.10.10.x`) for HAProxy Runtime API calls.
+## Debugging
 
-## Using custom (non-`.localhost`) domains
-
-For testing with real-looking domain names (e.g. `mysite.test`), you need the browser to resolve them to `127.0.0.1`. Two options:
-
-### Option A: Windows hosts file (simple)
-
-Edit `C:\Windows\System32\drivers\etc\hosts` as Administrator:
-
-```
-127.0.0.1  mysite.test
-127.0.0.1  www.mysite.test
-```
-
-Then create a matching zone in the platform:
-
-```bash
-curl -X POST http://api.hosting.localhost/api/v1/zones \
-  -H "X-API-Key: hst_..." \
-  -H "Content-Type: application/json" \
-  -d '{"name": "mysite.test", "brand_id": "acme-brand"}'
-```
-
-Downside: each new FQDN needs a manual hosts file entry.
-
-### Option B: Forward DNS to PowerDNS via NRPT (automatic)
-
-This makes Windows forward DNS queries for a specific domain to PowerDNS, so new FQDNs work automatically.
-
-**Step 1**: Expose PowerDNS on port 53. Add a second port mapping in `docker-compose.yml`:
-
-```yaml
-powerdns:
-  ports:
-    - "5300:53/udp"
-    - "5300:53/tcp"
-    - "8081:8081"
-    - "127.0.0.2:53:53/udp"  # For NRPT forwarding
-    - "127.0.0.2:53:53/tcp"
-```
-
-Port 53 on `127.0.0.1` is typically used by the Windows DNS Client service, so we bind to `127.0.0.2` instead (loopback aliases always work on Windows).
-
-**Step 2**: Add an NRPT rule in PowerShell (as Administrator):
+### Verify routing from Windows
 
 ```powershell
-# Forward all *.mysite.test queries to PowerDNS
-Add-DnsClientNrptRule -Namespace ".mysite.test" -NameServers "127.0.0.2"
+# Check route exists
+route print | findstr 10.10.10
 
-# Verify the rule
-Get-DnsClientNrptRule
+# Test connectivity
+ping 10.10.10.2
+curl http://10.10.10.2:8090/healthz
 ```
 
-**Step 3**: Create the zone and FQDN in the platform. PowerDNS will respond with the correct A record (the cluster LB address), and the browser will route to HAProxy.
-
-To remove the rule later:
-
-```powershell
-Get-DnsClientNrptRule | Where-Object Namespace -eq ".mysite.test" | Remove-DnsClientNrptRule
-```
-
-### Verifying from WSL
-
-Inside WSL2, `.localhost` resolution works the same way. To query PowerDNS directly:
+### Verify from WSL2
 
 ```bash
-dig @127.0.0.1 -p 5300 mysite.test A
+# Direct API access
+curl http://10.10.10.2:8090/healthz
+
+# Via HAProxy
+curl -H "Host: api.hosting.test" http://10.10.10.2/api/v1/healthz
+
+# Check forwarding rules
+just forward-status
 ```
 
-WSL2 shares the Windows host network, so all port mappings are accessible from both Windows and WSL.
+### Check HAProxy map
+
+```bash
+just lb-show
+```
+
+### Check response headers
+
+```bash
+curl -v http://acme.hosting.test
+```
+
+Look for:
+- `X-Served-By` — the node hostname that handled the request
+- `X-Shard` — the shard name the node belongs to

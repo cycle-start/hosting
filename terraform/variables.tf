@@ -28,6 +28,33 @@ variable "ssh_public_key_path" {
   default     = "~/.ssh/id_rsa.pub"
 }
 
+# --- Control plane ---
+
+variable "controlplane_ip" {
+  description = "IP address for the k3s control plane VM"
+  type        = string
+  default     = "10.10.10.2"
+}
+
+variable "base_domain" {
+  description = "Base domain for control plane hostnames (e.g. admin.<base_domain>)"
+  type        = string
+  default     = "hosting.test"
+}
+
+variable "controlplane_nodes" {
+  description = "Control plane node definitions"
+  type = list(object({
+    name   = string
+    ip     = string
+    memory = optional(number, 4096)
+    vcpus  = optional(number, 4)
+  }))
+  default = [
+    { name = "controlplane-0", ip = "10.10.10.2" },
+  ]
+}
+
 # --- Web nodes ---
 
 variable "web_nodes" {

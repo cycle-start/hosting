@@ -1,0 +1,37 @@
+image:
+  pullPolicy: Never
+  coreApi:
+    repository: hosting-core-api
+    tag: latest
+  worker:
+    repository: hosting-worker
+    tag: latest
+  adminUi:
+    repository: hosting-admin-ui
+    tag: latest
+
+coreApi:
+  replicas: 1
+  port: 8090
+  migrate: true
+  hostNetwork: true
+
+worker:
+  replicas: 1
+  hostNetwork: true
+
+adminUi:
+  replicas: 1
+  hostNetwork: true
+
+config:
+  registryUrl: "localhost:5000"
+  oidcIssuerUrl: "http://api.hosting.test"
+
+secrets:
+  coreDatabaseUrl: "postgres://hosting:hosting@127.0.0.1:5432/hosting_core"
+  powerdnsDatabaseUrl: "postgres://hosting:hosting@127.0.0.1:5433/hosting_powerdns"
+  stalwartAdminToken: "dev-token"
+
+temporal:
+  address: "127.0.0.1:7233"

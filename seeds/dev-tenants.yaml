@@ -7,15 +7,15 @@ cluster: vm-cluster-1
 brands:
   - id: acme-brand
     name: "Acme Hosting"
-    base_hostname: "hosting.localhost"
-    primary_ns: "ns1.hosting.localhost"
-    secondary_ns: "ns2.hosting.localhost"
-    hostmaster_email: "hostmaster@hosting.localhost"
+    base_hostname: "hosting.test"
+    primary_ns: "ns1.hosting.test"
+    secondary_ns: "ns2.hosting.test"
+    hostmaster_email: "hostmaster@hosting.test"
     allowed_clusters:
       - vm-cluster-1
 
 zones:
-  - name: hosting.localhost
+  - name: hosting.test
     brand: acme-brand
     tenant: acme-corp
 
@@ -24,7 +24,7 @@ oidc_clients:
     secret: cloudbeaver-secret
     name: CloudBeaver DB Admin
     redirect_uris:
-      - http://dbadmin.hosting.localhost/oauth2/callback
+      - http://dbadmin.hosting.test/oauth2/callback
 
 tenants:
   - name: acme-corp
@@ -38,9 +38,9 @@ tenants:
         runtime_version: "8.5"
         public_folder: public
         fqdns:
-          - fqdn: acme.hosting.localhost
+          - fqdn: acme.hosting.test
             ssl_enabled: false
-          - fqdn: www.acme.hosting.localhost
+          - fqdn: www.acme.hosting.test
             ssl_enabled: false
     databases:
       - name: acme_db
@@ -64,12 +64,12 @@ tenants:
         public: true
         quota_bytes: 10737418240
     email_accounts:
-      - fqdn: acme.hosting.localhost
-        address: info@acme.hosting.localhost
+      - fqdn: acme.hosting.test
+        address: info@acme.hosting.test
         display_name: Acme Info
         aliases:
-          - address: contact@acme.hosting.localhost
-          - address: hello@acme.hosting.localhost
+          - address: contact@acme.hosting.test
+          - address: hello@acme.hosting.test
         forwards:
           - destination: admin@example.com
             keep_copy: true
@@ -77,8 +77,8 @@ tenants:
           subject: "Thanks for reaching out!"
           body: "We received your message and will get back to you shortly."
           enabled: true
-      - fqdn: acme.hosting.localhost
-        address: support@acme.hosting.localhost
+      - fqdn: acme.hosting.test
+        address: support@acme.hosting.test
         display_name: Acme Support
         forwards:
           - destination: helpdesk@example.com

@@ -17,6 +17,10 @@ spec:
         {{- include "hosting.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: core-api
     spec:
+      {{- if .Values.coreApi.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
       containers:
         - name: core-api
           image: "{{ .Values.image.coreApi.repository }}:{{ .Values.image.coreApi.tag }}"

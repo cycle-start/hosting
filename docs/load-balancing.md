@@ -91,12 +91,12 @@ just lb-del www.example.com
 
 ### HAProxy stats UI
 
-Open http://localhost:8404/stats to see backend health, active connections, and server status.
+Open http://10.10.10.2:8404/stats (or `http://localhost:8404/stats` if using Docker Compose) to see backend health, active connections, and server status.
 
 ### Check response headers
 
 ```bash
-curl -v http://localhost -H "Host: acme.hosting.localhost"
+curl -v http://10.10.10.2 -H "Host: acme.hosting.test"
 ```
 
 Look for:

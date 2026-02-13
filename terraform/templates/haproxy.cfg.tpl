@@ -25,10 +25,10 @@ frontend stats
 frontend http
     bind *:80
     # Control plane routing
-    use_backend backend-admin-ui    if { req.hdr(host) -i admin.hosting.localhost }
-    use_backend backend-core-api    if { req.hdr(host) -i api.hosting.localhost }
-    use_backend backend-temporal-ui if { req.hdr(host) -i temporal.hosting.localhost }
-    use_backend backend-dbadmin    if { req.hdr(host) -i dbadmin.hosting.localhost }
+    use_backend backend-admin-ui    if { req.hdr(host) -i admin.${base_domain} }
+    use_backend backend-core-api    if { req.hdr(host) -i api.${base_domain} }
+    use_backend backend-temporal-ui if { req.hdr(host) -i temporal.${base_domain} }
+    use_backend backend-dbadmin    if { req.hdr(host) -i dbadmin.${base_domain} }
     # Tenant routing via dynamic map
     use_backend %[req.hdr(host),lower,map(/var/lib/haproxy/maps/fqdn-to-shard.map,shard-default)]
 

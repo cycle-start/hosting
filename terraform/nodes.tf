@@ -108,7 +108,7 @@ resource "libvirt_cloudinit_disk" "web_node" {
     hostname         = var.web_nodes[count.index].name
     node_id          = random_uuid.web_node_id[count.index].result
     shard_name       = var.web_shard_name
-    temporal_address = "${var.gateway_ip}:${var.temporal_port}"
+    temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
     ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
     storage_node_ip  = var.storage_nodes[0].ip
   })
@@ -138,7 +138,7 @@ resource "libvirt_cloudinit_disk" "db_node" {
     hostname         = var.db_nodes[count.index].name
     node_id          = random_uuid.db_node_id[count.index].result
     shard_name       = var.db_shard_name
-    temporal_address = "${var.gateway_ip}:${var.temporal_port}"
+    temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
     ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
@@ -167,7 +167,7 @@ resource "libvirt_cloudinit_disk" "dns_node" {
     hostname         = var.dns_nodes[count.index].name
     node_id          = random_uuid.dns_node_id[count.index].result
     shard_name       = var.dns_shard_name
-    temporal_address = "${var.gateway_ip}:${var.temporal_port}"
+    temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
     ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
@@ -196,7 +196,7 @@ resource "libvirt_cloudinit_disk" "valkey_node" {
     hostname         = var.valkey_nodes[count.index].name
     node_id          = random_uuid.valkey_node_id[count.index].result
     shard_name       = var.valkey_shard_name
-    temporal_address = "${var.gateway_ip}:${var.temporal_port}"
+    temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
     ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
@@ -269,7 +269,7 @@ resource "libvirt_cloudinit_disk" "dbadmin_node" {
     hostname         = var.dbadmin_nodes[count.index].name
     node_id          = random_uuid.dbadmin_node_id[count.index].result
     shard_name       = var.dbadmin_shard_name
-    temporal_address = "${var.gateway_ip}:${var.temporal_port}"
+    temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
     ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
@@ -593,6 +593,95 @@ resource "libvirt_domain" "dbadmin_node" {
   }
 }
 
+# --- Control Plane VM (k3s, not a hosting shard) ---
+
+resource "libvirt_volume" "controlplane_node" {
+  count    = length(var.controlplane_nodes)
+  name     = "${var.controlplane_nodes[count.index].name}.qcow2"
+  pool     = libvirt_pool.hosting.name
+  capacity = 21474836480 # 20 GB
+  target   = { format = { type = "qcow2" } }
+  backing_store = {
+    path   = libvirt_volume.image_controlplane.path
+    format = { type = "qcow2" }
+  }
+}
+
+resource "libvirt_cloudinit_disk" "controlplane_node" {
+  count = length(var.controlplane_nodes)
+  name  = "${var.controlplane_nodes[count.index].name}-cloudinit.iso"
+  meta_data = yamlencode({
+    instance-id    = "i-${var.controlplane_nodes[count.index].name}"
+    local-hostname = var.controlplane_nodes[count.index].name
+  })
+  user_data = templatefile("${path.module}/cloud-init/controlplane-node.yaml.tpl", {
+    hostname       = var.controlplane_nodes[count.index].name
+    ssh_public_key = file(pathexpand(var.ssh_public_key_path))
+  })
+  network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
+    ip_address = var.controlplane_nodes[count.index].ip
+    gateway    = var.gateway_ip
+  })
+}
+
+resource "libvirt_volume" "controlplane_node_seed" {
+  count = length(var.controlplane_nodes)
+  name  = "${var.controlplane_nodes[count.index].name}-seed.iso"
+  pool  = libvirt_pool.hosting.name
+  create = {
+    content = { url = libvirt_cloudinit_disk.controlplane_node[count.index].path }
+  }
+}
+
+resource "libvirt_domain" "controlplane_node" {
+  count       = length(var.controlplane_nodes)
+  name        = var.controlplane_nodes[count.index].name
+  memory      = var.controlplane_nodes[count.index].memory
+  memory_unit = "MiB"
+  vcpu        = var.controlplane_nodes[count.index].vcpus
+  type        = "kvm"
+  running     = true
+  autostart   = true
+
+  os = { type = "hvm" }
+
+  devices = {
+    disks = [
+      {
+        source = {
+          volume = {
+            pool   = libvirt_pool.hosting.name
+            volume = libvirt_volume.controlplane_node[count.index].name
+          }
+        }
+        driver = { type = "qcow2" }
+        target = { dev = "vda", bus = "virtio" }
+      },
+      {
+        source = {
+          volume = {
+            pool   = libvirt_pool.hosting.name
+            volume = libvirt_volume.controlplane_node_seed[count.index].name
+          }
+        }
+        driver = { type = "raw" }
+        target = { dev = "vdb", bus = "virtio" }
+      },
+    ]
+
+    interfaces = [{
+      type   = "network"
+      source = { network = { network = libvirt_network.hosting.name } }
+      model  = { type = "virtio" }
+    }]
+
+    consoles = [{
+      type   = "pty"
+      target = { type = "serial", port = "0" }
+    }]
+  }
+}
+
 # --- Cluster YAML generation ---
 
 locals {
@@ -642,8 +731,10 @@ locals {
   )
 
   cluster_yaml = templatefile("${path.module}/cluster.yaml.tpl", {
-    nodes      = local.all_nodes
-    gateway_ip = var.gateway_ip
+    nodes           = local.all_nodes
+    gateway_ip      = var.gateway_ip
+    controlplane_ip = var.controlplane_ip
+    base_domain     = var.base_domain
   })
 
   # Group web nodes by shard for HAProxy backend generation.
@@ -667,6 +758,7 @@ resource "local_file" "cluster_yaml" {
 resource "local_file" "haproxy_cfg" {
   content = templatefile("${path.module}/templates/haproxy.cfg.tpl", {
     shard_backends = local.shard_backends
+    base_domain    = var.base_domain
   })
   filename = "${path.module}/../docker/haproxy/haproxy.cfg"
 }

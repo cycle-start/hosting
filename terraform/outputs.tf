@@ -58,6 +58,11 @@ output "dbadmin_node_ids" {
   value       = { for k, v in random_uuid.dbadmin_node_id : var.dbadmin_nodes[k].name => v.result }
 }
 
+output "controlplane_ip" {
+  description = "IP address of the k3s control plane VM"
+  value       = var.controlplane_ip
+}
+
 output "cluster_yaml" {
   description = "Generated cluster YAML for hostctl cluster apply"
   value       = local.cluster_yaml

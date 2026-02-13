@@ -17,6 +17,10 @@ spec:
         {{- include "hosting.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: worker
     spec:
+      {{- if .Values.worker.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
       containers:
         - name: worker
           image: "{{ .Values.image.worker.repository }}:{{ .Values.image.worker.tag }}"

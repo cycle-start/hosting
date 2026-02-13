@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-core-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-core
+spec:
+  serviceName: postgres-core
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-core
+  template:
+    metadata:
+      labels:
+        app: postgres-core
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: hosting
+            - name: POSTGRES_PASSWORD
+              value: hosting
+            - name: POSTGRES_DB
+              value: hosting_core
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-core-data

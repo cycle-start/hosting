@@ -3,75 +3,106 @@
 ## Prerequisites
 
 - Go 1.26+
-- Docker Desktop (or Docker Engine with Compose)
+- Docker Desktop (for building images)
 - [just](https://github.com/casey/just) command runner
 - [goose](https://github.com/pressly/goose) for database migrations
+- [Packer](https://www.packer.io/) for building VM golden images
+- [Terraform](https://www.terraform.io/) + [libvirt provider](https://github.com/dmacvicar/terraform-provider-libvirt) for VM provisioning
+- [Helm](https://helm.sh/) for k3s deployments
 - protoc 3.21+ (only if modifying gRPC definitions)
-- Terraform + libvirt provider (for VM-based nodes)
 
 ## Quick Start
 
-### 1. Start infrastructure and control plane
+### 1. Build golden images
 
 ```bash
-just dev
+just packer-all
 ```
 
-This starts the Docker Compose control plane (PostgreSQL, Temporal, HAProxy, MySQL, PowerDNS, Ceph, etc.), runs database migrations, and starts core-api + worker.
+This builds QEMU/KVM golden images for all VM roles (controlplane, web, db, dns, valkey, storage, dbadmin) using Packer. Each image is a minimal Ubuntu with role-specific software pre-installed.
 
-### 2. Create VMs and bootstrap a cluster
+### 2. Create VMs and deploy the control plane
 
 ```bash
-just dev-vm
+just dev-k3s
 ```
 
-This runs `just dev` then provisions VMs via Terraform/libvirt and registers them with the platform using `hostctl cluster apply`.
+This runs the full bootstrap:
+1. Creates all VMs via Terraform/libvirt (controlplane + node agents)
+2. Fetches the k3s kubeconfig
+3. Builds Docker images and imports them into k3s
+4. Deploys infrastructure (PostgreSQL, Temporal, HAProxy, Valkey, registry) and the platform (core-api, worker, admin-ui) to k3s
+5. Registers the cluster and nodes with the platform via `hostctl cluster apply`
 
-### 3. Create an API key
+### 3. Enable Windows access
+
+The VMs run on a libvirt network (`10.10.10.0/24`) inside WSL2. Windows needs IP forwarding rules and a route to reach them.
+
+**In WSL2:**
 
 ```bash
-just create-api-key admin
+just forward
 ```
 
-This connects directly to the core database, creates a hashed API key, and prints the plaintext key once. Save it — you'll need it for the admin UI and API requests. All `/api/v1/*` endpoints require the `X-API-Key` header.
+This enables IP forwarding from Windows through WSL2 to the VM network. It prints the Windows commands you need to run.
 
-### 4. Seed test data
+**In PowerShell (as Administrator):**
+
+```powershell
+# Add route to VM network (use the WSL2 IP printed by `just forward`)
+route add 10.10.10.0 mask 255.255.255.0 <WSL2_IP>
+```
+
+**In `C:\Windows\System32\drivers\etc\hosts` (as Administrator):**
+
+```
+10.10.10.2  admin.hosting.test api.hosting.test temporal.hosting.test dbadmin.hosting.test
+```
+
+After this, all services are accessible from the Windows browser. See [Local Networking](local-networking.md) for details.
+
+### 4. Create an API key
+
+```bash
+KUBECONFIG=~/.kube/k3s-config kubectl exec deploy/hosting-core-api -- \
+  /core-api create-api-key --name admin
+```
+
+This creates a hashed API key in the database and prints the plaintext key once. Save it — you'll need it for the admin UI and API requests.
+
+### 5. Seed test data
 
 ```bash
 go run ./cmd/hostctl seed -f seeds/dev-tenants.yaml
 ```
 
 This creates:
-- A brand (`acme-brand`) with DNS nameservers under `hosting.localhost`
-- A DNS zone (`hosting.localhost`)
+- A brand (`acme-brand`) with DNS nameservers under `hosting.test`
+- A DNS zone (`hosting.test`)
 - A tenant (`acme-corp`) on the web shard
 - A webroot with PHP 8.5 runtime
-- FQDNs (`acme.hosting.localhost`, `www.acme.hosting.localhost`)
+- FQDNs (`acme.hosting.test`, `www.acme.hosting.test`)
 - A MySQL database with a user
 - A Valkey (Redis) instance with a user
 - S3 bucket and email accounts
 
-### 5. Verify
-
-All services are accessible via `.localhost` hostnames (no `/etc/hosts` or DNS config needed):
+### 6. Verify
 
 ```bash
 # Admin UI
-open http://admin.hosting.localhost
+open http://admin.hosting.test
 
 # Core API
-curl -s -H "X-API-Key: hst_..." http://api.hosting.localhost/api/v1/tenants | jq
+curl -s -H "X-API-Key: hst_..." http://api.hosting.test/api/v1/tenants | jq
 
 # Temporal UI
-open http://temporal.hosting.localhost
+open http://temporal.hosting.test
 
-# Tenant site (after seeding)
-curl http://acme.hosting.localhost
+# Tenant site (after seeding — add host entry for 10.10.10.2)
+curl http://acme.hosting.test
 ```
 
-See [Local Networking](local-networking.md) for details on the hostname scheme and optional split DNS setup.
-
-### 6. Run e2e tests
+### 7. Run e2e tests
 
 ```bash
 just test-e2e
@@ -83,26 +114,28 @@ just test-e2e
 # Destroy VMs
 just vm-down
 
-# Stop control plane, remove volumes (clean slate)
-just down-clean
+# Remove forwarding rules
+just forward-stop
 ```
 
 ## Resetting the database
 
-If migrations have changed since your database was created (e.g. columns added to existing migration files), reset and re-migrate:
+If migrations have changed since your database was created (e.g. columns added to existing migration files), reset and re-migrate. The easiest way is to delete the controlplane VM's persistent volumes:
 
 ```bash
-just reset-db && just migrate
+KUBECONFIG=~/.kube/k3s-config kubectl delete pvc --all
+KUBECONFIG=~/.kube/k3s-config kubectl rollout restart statefulset
 ```
 
-This drops all tables and re-applies all migrations from scratch. All data will be lost.
+Wait for pods to restart, then re-seed.
 
 ## Rebuilding after code changes
 
 ```bash
-just rebuild core-api          # Rebuild and restart core-api
-just rebuild worker            # Rebuild and restart worker
+just vm-deploy
 ```
+
+This rebuilds all Docker images, imports them into k3s, and restarts the deployments.
 
 ## Project layout
 
@@ -126,11 +159,15 @@ internal/
   platform/          Shared utilities
 
 terraform/           Terraform configs for VM provisioning
+packer/              Packer configs for golden images
 seeds/               Test data seed YAML files
 migrations/
   core/              Core database migrations
   service/           Service database migrations
-docker/              Dockerfiles and container configs (control plane)
+deploy/
+  k3s/               Kubernetes manifests for infrastructure services
+  helm/hosting/      Helm chart for platform services
+docker/              Dockerfiles (used to build images for k3s)
 docs/                Documentation
 tests/e2e/           End-to-end tests (require VMs)
 ```
@@ -145,18 +182,19 @@ The platform uses a desired-state / actual-state model:
 
 Hierarchy: Region > Cluster > Shard > Node. Tenants are assigned to shards. Nodes are VMs provisioned by Terraform/libvirt and registered with the platform via `hostctl cluster apply`.
 
+The control plane runs on a k3s single-node cluster (controlplane VM at `10.10.10.2`). All pods use `hostNetwork: true` so services bind directly to the VM's IP.
+
 ## Useful commands
 
 ```bash
 just --list                    # Show all available commands
-just create-api-key admin      # Create an API key
 just test                      # Run unit tests
 just lint                      # Run linter
-just log core-api              # Tail logs for a service
-just ps                        # Show running services
-just db-core                   # Connect to core database
-just migrate-status            # Check migration status
-just dev-admin                 # Start admin UI dev server (hot reload)
+just vm-deploy                 # Rebuild and redeploy to k3s
+just vm-pods                   # Show k3s pod status
+just vm-log hosting-core-api   # Tail logs for a deployment
 just vm-ssh web-1-node-0       # SSH into a VM
 just lb-show                   # Show HAProxy map entries
+just forward                   # Enable Windows -> VM networking
+just dev-admin                 # Start admin UI dev server (hot reload)
 ```

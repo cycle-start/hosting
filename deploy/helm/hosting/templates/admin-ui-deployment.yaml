@@ -17,6 +17,10 @@ spec:
         {{- include "hosting.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: admin-ui
     spec:
+      {{- if .Values.adminUi.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
       containers:
         - name: admin-ui
           image: "{{ .Values.image.adminUi.repository }}:{{ .Values.image.adminUi.tag }}"
@@ -27,7 +31,11 @@ spec:
               protocol: TCP
           env:
             - name: CORE_API_URL
+              {{- if .Values.adminUi.hostNetwork }}
+              value: "http://127.0.0.1:{{ .Values.coreApi.port }}"
+              {{- else }}
               value: "http://{{ include "hosting.fullname" . }}-core-api:{{ .Values.coreApi.port }}"
+              {{- end }}
             - name: STATIC_DIR
               value: /app/dist
             - name: LISTEN_ADDR

@@ -15,17 +15,20 @@ coreApi:
   port: 8090
   migrate: true
   migrateDir: /migrations/core
+  hostNetwork: false
   resources: {}
   extraEnv: []
 
 worker:
   replicas: 1
+  hostNetwork: false
   resources: {}
   extraEnv: []
 
 adminUi:
   replicas: 1
   port: 3001
+  hostNetwork: false
   resources: {}
   extraEnv: []
 

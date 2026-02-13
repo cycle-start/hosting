@@ -156,6 +156,27 @@ source "qemu" "dbadmin" {
   cd_label         = "cidata"
 }
 
+source "qemu" "controlplane" {
+  iso_url          = var.ubuntu_image_url
+  iso_checksum     = var.ubuntu_image_checksum
+  disk_image       = true
+  disk_size        = "20G"
+  memory           = 2048
+  format           = "qcow2"
+  accelerator      = "kvm"
+  vm_name          = "controlplane.qcow2"
+  output_directory = "${var.output_dir}/controlplane-build"
+  net_device       = "virtio-net"
+  disk_interface   = "virtio"
+  headless         = true
+  ssh_username     = "ubuntu"
+  ssh_password     = "ubuntu"
+  ssh_timeout      = "10m"
+  shutdown_command = "sudo shutdown -P now"
+  cd_files         = ["http/meta-data", "http/user-data"]
+  cd_label         = "cidata"
+}
+
 # --- Web image ---
 
 build {
@@ -360,6 +381,28 @@ build {
     inline = [
       "cp ${var.output_dir}/dbadmin-build/dbadmin.qcow2 ${var.output_dir}/dbadmin.qcow2",
       "rm -rf ${var.output_dir}/dbadmin-build",
+    ]
+  }
+}
+
+# --- Control Plane image (k3s + Helm, no node-agent) ---
+
+build {
+  name = "controlplane"
+
+  sources = ["source.qemu.controlplane"]
+
+  provisioner "shell" {
+    execute_command = "sudo sh -c '{{ .Vars }} {{ .Path }}'"
+    scripts = [
+      "scripts/controlplane.sh",
+    ]
+  }
+
+  post-processor "shell-local" {
+    inline = [
+      "cp ${var.output_dir}/controlplane-build/controlplane.qcow2 ${var.output_dir}/controlplane.qcow2",
+      "rm -rf ${var.output_dir}/controlplane-build",
     ]
   }
 }
