@@ -113,13 +113,15 @@ sudo chmod +x /usr/local/bin/mkcert
 mkcert -install
 ```
 
-If you access sites from Windows browsers, you also need to trust the CA on Windows. WSL2 mounts Windows drives at `/mnt/c/`, so copy the CA cert to your Desktop:
+If you access sites from Windows browsers, you also need to trust the CA on Windows. WSL2 mounts Windows drives at `/mnt/c/`, so copy the CA cert to your Desktop (using `.crt` extension so Windows recognizes it):
 
 ```bash
-cp "$(mkcert -CAROOT)/rootCA.pem" /mnt/c/Users/<your-windows-username>/Desktop/rootCA.pem
+cp "$(mkcert -CAROOT)/rootCA.pem" /mnt/c/Users/<your-windows-username>/Desktop/rootCA.crt
 ```
 
-Then on Windows: double-click `rootCA.pem` on your Desktop > "Install Certificate" > "Local Machine" > "Place all certificates in the following store" > "Trusted Root Certification Authorities" > Finish.
+Then on Windows either:
+- **GUI**: double-click `rootCA.crt` > "Install Certificate" > "Local Machine" > "Place all certificates in the following store" > "Trusted Root Certification Authorities" > Finish
+- **CLI** (PowerShell as Administrator): `certutil -addstore "Root" %USERPROFILE%\Desktop\rootCA.crt`
 
 ### Generate and deploy certs
 
