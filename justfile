@@ -182,6 +182,8 @@ vm-deploy:
       ssh -o StrictHostKeyChecking=no ubuntu@{{cp}} "sudo k3s ctr images import -"
     # Apply infra manifests
     kubectl --context hosting apply -f deploy/k3s/
+    # Create self-signed SSL cert for HAProxy (replace with `just ssl-init` for trusted certs)
+    just _ssl-self-signed
     # Create HAProxy ConfigMap from Terraform-generated config (delete first if exists)
     kubectl --context hosting delete configmap haproxy-config --ignore-not-found
     kubectl --context hosting create configmap haproxy-config \
@@ -220,6 +222,31 @@ dev-k3s: build-node-agent
     just vm-deploy
     @sleep 10
     go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml
+
+# --- SSL ---
+
+# Generate trusted SSL certs with mkcert and deploy to HAProxy
+ssl-init:
+    mkcert -cert-file /tmp/haproxy-cert.pem -key-file /tmp/haproxy-key.pem "*.hosting.test" "hosting.test"
+    cat /tmp/haproxy-cert.pem /tmp/haproxy-key.pem > /tmp/hosting.pem
+    kubectl --context hosting create secret generic haproxy-certs \
+      --from-file=hosting.pem=/tmp/hosting.pem \
+      --dry-run=client -o yaml | kubectl --context hosting apply -f -
+    rm /tmp/haproxy-cert.pem /tmp/haproxy-key.pem /tmp/hosting.pem
+    kubectl --context hosting rollout restart deployment/haproxy
+    @echo "Trusted SSL certs installed. Visit https://admin.hosting.test"
+
+# Generate self-signed SSL cert (used by vm-deploy, no browser trust)
+_ssl-self-signed:
+    openssl req -x509 -newkey rsa:2048 \
+      -keyout /tmp/haproxy-key.pem -out /tmp/haproxy-cert.pem \
+      -days 365 -nodes -subj '/CN=*.hosting.test' \
+      -addext 'subjectAltName=DNS:*.hosting.test,DNS:hosting.test' 2>/dev/null
+    cat /tmp/haproxy-cert.pem /tmp/haproxy-key.pem > /tmp/hosting.pem
+    kubectl --context hosting create secret generic haproxy-certs \
+      --from-file=hosting.pem=/tmp/hosting.pem \
+      --dry-run=client -o yaml | kubectl --context hosting apply -f -
+    rm /tmp/haproxy-cert.pem /tmp/haproxy-key.pem /tmp/hosting.pem
 
 # --- Networking ---
 

@@ -21,9 +21,10 @@ frontend stats
     stats uri /stats
     stats refresh 10s
 
-# Main HTTP frontend
+# Main HTTP/HTTPS frontend
 frontend http
     bind *:80
+    bind *:443 ssl crt /etc/haproxy/certs/hosting.pem
     # Control plane routing
     use_backend backend-admin-ui    if { req.hdr(host) -i admin.${base_domain} }
     use_backend backend-core-api    if { req.hdr(host) -i api.${base_domain} }

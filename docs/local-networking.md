@@ -16,7 +16,7 @@ WSL2 (eth0: 172.x.x.x, virbr1: 10.10.10.1)
 libvirt network 10.10.10.0/24
   |
   |-- controlplane-0 (10.10.10.2) — k3s
-  |     |-- HAProxy :80          (routes all HTTP by Host header)
+  |     |-- HAProxy :80/:443     (routes all HTTP/HTTPS by Host header)
   |     |-- HAProxy stats :8404
   |     |-- core-api :8090
   |     |-- admin-ui :3001
@@ -95,15 +95,64 @@ Add tenant FQDNs as needed:
 10.10.10.2  acme.hosting.test www.acme.hosting.test
 ```
 
+## SSL/TLS (optional)
+
+HTTPS works out of the box with a self-signed certificate (created during `just vm-deploy`). Browsers will show a security warning which you can click through.
+
+For trusted certificates with no warnings, use [mkcert](https://github.com/FiloSottile/mkcert):
+
+### Install mkcert
+
+```bash
+# On Ubuntu/WSL2
+sudo apt install libnss3-tools
+curl -L https://dl.filippo.io/mkcert/latest?for=linux/amd64 -o /usr/local/bin/mkcert
+sudo chmod +x /usr/local/bin/mkcert
+
+# Install the local CA into system trust stores
+mkcert -install
+```
+
+If you access sites from Windows browsers, you also need to trust the CA on Windows. Copy the CA cert to Windows and install it:
+
+```bash
+# Find where mkcert stores the CA
+mkcert -CAROOT
+# e.g. /home/user/.local/share/mkcert
+
+# Copy to Windows (adjust path)
+cp "$(mkcert -CAROOT)/rootCA.pem" /mnt/c/Users/<you>/rootCA.pem
+```
+
+Then on Windows: double-click `rootCA.pem` > "Install Certificate" > "Local Machine" > "Place all certificates in the following store" > "Trusted Root Certification Authorities" > Finish.
+
+### Generate and deploy certs
+
+```bash
+just ssl-init
+```
+
+This generates a wildcard cert for `*.hosting.test`, creates a k8s Secret, and restarts HAProxy. All `https://*.hosting.test` URLs will work without warnings.
+
+### Verify
+
+```bash
+curl -v https://api.hosting.test/healthz
+```
+
+Both HTTP and HTTPS work simultaneously — no forced redirect.
+
 ## Hostname reference
 
 | URL | Service | Backend |
 |-----|---------|---------|
-| `http://admin.hosting.test` | Admin UI | `127.0.0.1:3001` |
-| `http://api.hosting.test` | Core API | `127.0.0.1:8090` |
-| `http://temporal.hosting.test` | Temporal UI | `127.0.0.1:8080` |
-| `http://dbadmin.hosting.test` | DB Admin (CloudBeaver) | `127.0.0.1:4180` |
-| `http://acme.hosting.test` | Tenant site | web shard VMs |
+| `https://admin.hosting.test` | Admin UI | `127.0.0.1:3001` |
+| `https://api.hosting.test` | Core API | `127.0.0.1:8090` |
+| `https://temporal.hosting.test` | Temporal UI | `127.0.0.1:8080` |
+| `https://dbadmin.hosting.test` | DB Admin (CloudBeaver) | `127.0.0.1:4180` |
+| `https://acme.hosting.test` | Tenant site | web shard VMs |
+
+HTTP (`http://`) also works on all URLs — no forced redirect.
 
 These hostnames are configured in the HAProxy config template at `terraform/templates/haproxy.cfg.tpl`. The domain is controlled by the `base_domain` Terraform variable (default: `hosting.test`).
 
