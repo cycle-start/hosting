@@ -266,6 +266,10 @@ func (s *Server) setupRoutes() {
 		r.Delete("/backups/{id}", backup.Delete)
 		r.Post("/backups/{id}/restore", backup.Restore)
 
+		// Search
+		search := handler.NewSearch(s.services.Search)
+		r.Get("/search", search.Search)
+
 		// API keys
 		apiKey := handler.NewAPIKey(s.services.APIKey)
 		r.Get("/api-keys", apiKey.List)

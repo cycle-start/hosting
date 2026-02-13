@@ -85,7 +85,7 @@ func (s *ProvisionLECertWorkflowTestSuite) TestSuccess() {
 		SSLEnabled: true,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
-	tenant := model.Tenant{ID: tenantID, Name: "testuser", ShardID: &shardID}
+	tenant := model.Tenant{ID: tenantID, ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 
 	s.setupACMESuccessMocks(fqdnID, webrootID, tenantID, shardID, fqdn, webroot, tenant, nodes)
@@ -117,7 +117,7 @@ func (s *ProvisionLECertWorkflowTestSuite) TestCreateOrderFails_SetsStatusFailed
 		SSLEnabled: true,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
-	tenant := model.Tenant{ID: tenantID, Name: "testuser", ShardID: &shardID}
+	tenant := model.Tenant{ID: tenantID, ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 
 	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(&fqdn, nil)
@@ -145,7 +145,7 @@ func (s *ProvisionLECertWorkflowTestSuite) TestStoreCertificateFails_SetsStatusF
 		SSLEnabled: true,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
-	tenant := model.Tenant{ID: tenantID, Name: "testuser", ShardID: &shardID}
+	tenant := model.Tenant{ID: tenantID, ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 
 	now := time.Now()
@@ -198,7 +198,7 @@ func (s *ProvisionLECertWorkflowTestSuite) TestInstallCertificateFails_SetsStatu
 		SSLEnabled: true,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
-	tenant := model.Tenant{ID: tenantID, Name: "testuser", ShardID: &shardID}
+	tenant := model.Tenant{ID: tenantID, ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 
 	now := time.Now()
@@ -252,7 +252,7 @@ func (s *ProvisionLECertWorkflowTestSuite) TestDeactivateOtherCertsFails_SetsSta
 		SSLEnabled: true,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
-	tenant := model.Tenant{ID: tenantID, Name: "testuser", ShardID: &shardID}
+	tenant := model.Tenant{ID: tenantID, ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 
 	now := time.Now()
@@ -307,7 +307,7 @@ func (s *ProvisionLECertWorkflowTestSuite) TestActivateCertificateFails_SetsStat
 		SSLEnabled: true,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
-	tenant := model.Tenant{ID: tenantID, Name: "testuser", ShardID: &shardID}
+	tenant := model.Tenant{ID: tenantID, ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 
 	now := time.Now()
@@ -389,7 +389,7 @@ func (s *UploadCustomCertWorkflowTestSuite) TestSuccess() {
 		WebrootID: webrootID,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, Name: "testuser", ShardID: &shardID}
+	tenant := model.Tenant{ID: tenantID, ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -476,7 +476,7 @@ func (s *UploadCustomCertWorkflowTestSuite) TestInstallFails_SetsStatusFailed() 
 		WebrootID: "test-webroot-4",
 	}
 	webroot := model.Webroot{ID: "test-webroot-4", TenantID: "test-tenant-4"}
-	tenant := model.Tenant{ID: "test-tenant-4", Name: "testuser", ShardID: &shardID}
+	tenant := model.Tenant{ID: "test-tenant-4", ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -517,7 +517,7 @@ func (s *UploadCustomCertWorkflowTestSuite) TestDeactivateOtherCertsFails_SetsSt
 		WebrootID: "test-webroot-5",
 	}
 	webroot := model.Webroot{ID: "test-webroot-5", TenantID: "test-tenant-5"}
-	tenant := model.Tenant{ID: "test-tenant-5", Name: "testuser", ShardID: &shardID}
+	tenant := model.Tenant{ID: "test-tenant-5", ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -559,7 +559,7 @@ func (s *UploadCustomCertWorkflowTestSuite) TestActivateCertFails_SetsStatusFail
 		WebrootID: "test-webroot-6",
 	}
 	webroot := model.Webroot{ID: "test-webroot-6", TenantID: "test-tenant-6"}
-	tenant := model.Tenant{ID: "test-tenant-6", Name: "testuser", ShardID: &shardID}
+	tenant := model.Tenant{ID: "test-tenant-6", ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{

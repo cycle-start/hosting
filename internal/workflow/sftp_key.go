@@ -80,7 +80,7 @@ func AddSFTPKeyWorkflow(ctx workflow.Context, keyID string) error {
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "SyncSFTPKeys", activity.SyncSFTPKeysParams{
-			TenantName: tenant.Name,
+			TenantName: tenant.ID,
 			PublicKeys: publicKeys,
 		}).Get(ctx, nil)
 		if err != nil {
@@ -161,7 +161,7 @@ func RemoveSFTPKeyWorkflow(ctx workflow.Context, keyID string) error {
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "SyncSFTPKeys", activity.SyncSFTPKeysParams{
-			TenantName: tenant.Name,
+			TenantName: tenant.ID,
 			PublicKeys: publicKeys,
 		}).Get(ctx, nil)
 		if err != nil {

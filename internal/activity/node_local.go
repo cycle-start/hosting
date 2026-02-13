@@ -54,10 +54,10 @@ func NewNodeLocal(
 
 // CreateTenant creates a tenant locally on this node.
 func (a *NodeLocal) CreateTenant(ctx context.Context, params CreateTenantParams) error {
-	a.logger.Info().Str("tenant", params.Name).Msg("CreateTenant")
+	a.logger.Info().Str("tenant", params.ID).Msg("CreateTenant")
 	return a.tenant.Create(ctx, &agentv1.TenantInfo{
 		Id:          params.ID,
-		Name:        params.Name,
+		Name:        params.ID,
 		Uid:         int32(params.UID),
 		SftpEnabled: params.SFTPEnabled,
 	})
@@ -65,10 +65,10 @@ func (a *NodeLocal) CreateTenant(ctx context.Context, params CreateTenantParams)
 
 // UpdateTenant updates a tenant locally on this node.
 func (a *NodeLocal) UpdateTenant(ctx context.Context, params UpdateTenantParams) error {
-	a.logger.Info().Str("tenant", params.Name).Msg("UpdateTenant")
+	a.logger.Info().Str("tenant", params.ID).Msg("UpdateTenant")
 	return a.tenant.Update(ctx, &agentv1.TenantInfo{
 		Id:          params.ID,
-		Name:        params.Name,
+		Name:        params.ID,
 		Uid:         int32(params.UID),
 		SftpEnabled: params.SFTPEnabled,
 	})

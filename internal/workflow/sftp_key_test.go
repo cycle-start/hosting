@@ -42,7 +42,6 @@ func (s *AddSFTPKeyWorkflowTestSuite) TestSuccess() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "testuser",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{{ID: "node-1"}}
@@ -55,7 +54,7 @@ func (s *AddSFTPKeyWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("GetSFTPKeysByTenant", mock.Anything, tenantID).Return([]model.SFTPKey{}, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("SyncSFTPKeys", mock.Anything, activity.SyncSFTPKeysParams{
-		TenantName: "testuser",
+		TenantName: tenantID,
 		PublicKeys: []string{"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5 test@test"},
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -86,7 +85,6 @@ func (s *AddSFTPKeyWorkflowTestSuite) TestWithExistingActiveKeys() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "testuser",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{{ID: "node-1"}}
@@ -99,7 +97,7 @@ func (s *AddSFTPKeyWorkflowTestSuite) TestWithExistingActiveKeys() {
 	s.env.OnActivity("GetSFTPKeysByTenant", mock.Anything, tenantID).Return([]model.SFTPKey{existingKey}, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("SyncSFTPKeys", mock.Anything, activity.SyncSFTPKeysParams{
-		TenantName: "testuser",
+		TenantName: tenantID,
 		PublicKeys: []string{"ssh-ed25519 AAAAC3... first@test", "ssh-rsa AAAAB3... second@test"},
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -136,7 +134,6 @@ func (s *AddSFTPKeyWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 	}
 	tenant := model.Tenant{
 		ID:   tenantID,
-		Name: "testuser",
 		// ShardID is nil
 	}
 
@@ -165,7 +162,6 @@ func (s *AddSFTPKeyWorkflowTestSuite) TestSyncFails_SetsStatusFailed() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "testuser",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{{ID: "node-1"}}
@@ -228,7 +224,6 @@ func (s *RemoveSFTPKeyWorkflowTestSuite) TestSuccess() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "testuser",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{{ID: "node-1"}}
@@ -241,7 +236,7 @@ func (s *RemoveSFTPKeyWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("GetSFTPKeysByTenant", mock.Anything, tenantID).Return([]model.SFTPKey{}, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("SyncSFTPKeys", mock.Anything, activity.SyncSFTPKeysParams{
-		TenantName: "testuser",
+		TenantName: tenantID,
 		PublicKeys: []string{},
 	}).Return(nil)
 
@@ -268,7 +263,6 @@ func (s *RemoveSFTPKeyWorkflowTestSuite) TestWithRemainingKeys() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "testuser",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{{ID: "node-1"}}
@@ -281,7 +275,7 @@ func (s *RemoveSFTPKeyWorkflowTestSuite) TestWithRemainingKeys() {
 	s.env.OnActivity("GetSFTPKeysByTenant", mock.Anything, tenantID).Return([]model.SFTPKey{remainingKey}, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("SyncSFTPKeys", mock.Anything, activity.SyncSFTPKeysParams{
-		TenantName: "testuser",
+		TenantName: tenantID,
 		PublicKeys: []string{"ssh-rsa AAAAB3... other@test"},
 	}).Return(nil)
 
@@ -313,7 +307,6 @@ func (s *RemoveSFTPKeyWorkflowTestSuite) TestNoShard() {
 	}
 	tenant := model.Tenant{
 		ID:   tenantID,
-		Name: "testuser",
 		// ShardID is nil
 	}
 
@@ -339,7 +332,6 @@ func (s *RemoveSFTPKeyWorkflowTestSuite) TestSyncFails() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "testuser",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{{ID: "node-1"}}

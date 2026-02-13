@@ -75,7 +75,6 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 	shardID := req.ShardID
 	tenant := &model.Tenant{
 		ID:        platform.NewShortID(),
-		Name:      req.Name,
 		RegionID:  req.RegionID,
 		ClusterID: req.ClusterID,
 		ShardID:   &shardID,

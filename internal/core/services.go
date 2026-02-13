@@ -29,6 +29,7 @@ type Services struct {
 	SFTPKey          *SFTPKeyService
 	Backup           *BackupService
 	APIKey           *APIKeyService
+	Search           *SearchService
 }
 
 func NewServices(db DB, tc temporalclient.Client) *Services {
@@ -57,5 +58,6 @@ func NewServices(db DB, tc temporalclient.Client) *Services {
 		SFTPKey:          NewSFTPKeyService(db, tc),
 		Backup:           NewBackupService(db, tc),
 		APIKey:           NewAPIKeyService(db),
+		Search:           NewSearchService(db),
 	}
 }

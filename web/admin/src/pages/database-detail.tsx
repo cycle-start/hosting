@@ -18,7 +18,7 @@ import { CopyButton } from '@/components/shared/copy-button'
 import { formatDate } from '@/lib/utils'
 import { rules, validateField } from '@/lib/validation'
 import {
-  useTenant, useDatabase, useDatabaseUsers,
+  useDatabase, useDatabaseUsers,
   useCreateDatabaseUser, useUpdateDatabaseUser, useDeleteDatabaseUser,
 } from '@/lib/hooks'
 import type { DatabaseUser } from '@/lib/types'
@@ -42,7 +42,6 @@ export function DatabaseDetailPage() {
   const [editPassword, setEditPassword] = useState('')
   const [editPrivileges, setEditPrivileges] = useState<string[]>([])
 
-  const { data: tenant } = useTenant(tenantId)
   const { data: database, isLoading } = useDatabase(databaseId)
   const { data: usersData, isLoading: usersLoading } = useDatabaseUsers(databaseId)
   const createMut = useCreateDatabaseUser()
@@ -136,7 +135,7 @@ export function DatabaseDetailPage() {
     <div className="space-y-6">
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
-        { label: tenant?.name ?? tenantId, href: `/tenants/${tenantId}` },
+        { label: tenantId, href: `/tenants/${tenantId}` },
         { label: 'Databases' },
         { label: database.name },
       ]} />

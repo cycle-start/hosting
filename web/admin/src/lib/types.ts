@@ -53,7 +53,6 @@ export interface Node {
 
 export interface Tenant {
   id: string
-  name: string
   region_id: string
   cluster_id: string
   shard_id?: string | null
@@ -363,7 +362,6 @@ export interface ValkeyUserFormData {
 export interface SFTPKeyFormData { name: string; public_key: string }
 
 export interface CreateTenantRequest {
-  name: string
   region_id: string
   cluster_id: string
   shard_id: string

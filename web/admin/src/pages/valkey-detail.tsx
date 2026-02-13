@@ -18,7 +18,7 @@ import { CopyButton } from '@/components/shared/copy-button'
 import { formatDate } from '@/lib/utils'
 import { rules, validateField } from '@/lib/validation'
 import {
-  useTenant, useValkeyInstance, useValkeyUsers,
+  useValkeyInstance, useValkeyUsers,
   useCreateValkeyUser, useUpdateValkeyUser, useDeleteValkeyUser,
 } from '@/lib/hooks'
 import type { ValkeyUser } from '@/lib/types'
@@ -44,7 +44,6 @@ export function ValkeyDetailPage() {
   const [editPrivileges, setEditPrivileges] = useState<string[]>([])
   const [editKeyPattern, setEditKeyPattern] = useState('')
 
-  const { data: tenant } = useTenant(tenantId)
   const { data: instance, isLoading } = useValkeyInstance(instanceId)
   const { data: usersData, isLoading: usersLoading } = useValkeyUsers(instanceId)
   const createMut = useCreateValkeyUser()
@@ -143,7 +142,7 @@ export function ValkeyDetailPage() {
     <div className="space-y-6">
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
-        { label: tenant?.name ?? tenantId, href: `/tenants/${tenantId}` },
+        { label: tenantId, href: `/tenants/${tenantId}` },
         { label: 'Valkey' },
         { label: instance.name },
       ]} />

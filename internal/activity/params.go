@@ -3,7 +3,6 @@ package activity
 // CreateTenantParams holds parameters for creating a tenant on a node.
 type CreateTenantParams struct {
 	ID          string
-	Name        string
 	UID         int
 	SFTPEnabled bool
 }
@@ -11,7 +10,6 @@ type CreateTenantParams struct {
 // UpdateTenantParams holds parameters for updating a tenant on a node.
 type UpdateTenantParams struct {
 	ID          string
-	Name        string
 	UID         int
 	SFTPEnabled bool
 }

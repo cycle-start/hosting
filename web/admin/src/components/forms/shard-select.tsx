@@ -17,7 +17,7 @@ export function ShardSelect({ clusterId, role, value, onChange, label = 'Shard' 
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <Select value={value} onValueChange={onChange} disabled={!clusterId}>
+      <Select value={value || undefined} onValueChange={onChange} disabled={!clusterId}>
         <SelectTrigger><SelectValue placeholder="Select shard..." /></SelectTrigger>
         <SelectContent>
           {shards.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}

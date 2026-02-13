@@ -97,7 +97,7 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 
 	// Step 2: For each authorization, get the HTTP-01 challenge.
 	// Typically there is one authz per domain; we handle them all.
-	webrootPath := fmt.Sprintf("/var/www/storage/%s/%s/%s", certTenant.Name, certWebroot.Name, certWebroot.PublicFolder)
+	webrootPath := fmt.Sprintf("/var/www/storage/%s/%s/%s", certTenant.ID, certWebroot.Name, certWebroot.PublicFolder)
 
 	for _, authzURL := range orderResult.AuthzURLs {
 		var challengeResult activity.ACMEChallengeResult

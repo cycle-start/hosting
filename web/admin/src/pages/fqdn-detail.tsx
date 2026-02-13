@@ -20,7 +20,7 @@ import { CopyButton } from '@/components/shared/copy-button'
 import { formatDate } from '@/lib/utils'
 import { rules, validateField } from '@/lib/validation'
 import {
-  useTenant, useFQDN, useCertificates, useEmailAccounts,
+  useFQDN, useCertificates, useEmailAccounts,
   useUploadCertificate, useCreateEmailAccount, useDeleteEmailAccount,
 } from '@/lib/hooks'
 import type { Certificate, EmailAccount } from '@/lib/types'
@@ -44,7 +44,6 @@ export function FQDNDetailPage() {
   const [emailDisplay, setEmailDisplay] = useState('')
   const [emailQuota, setEmailQuota] = useState('')
 
-  const { data: tenant } = useTenant(tenantId)
   const { data: fqdn, isLoading } = useFQDN(fqdnId)
   const { data: certsData, isLoading: certsLoading } = useCertificates(fqdnId)
   const { data: emailsData, isLoading: emailsLoading } = useEmailAccounts(fqdnId)
@@ -126,7 +125,7 @@ export function FQDNDetailPage() {
     <div className="space-y-6">
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
-        { label: tenant?.name ?? tenantId, href: `/tenants/${tenantId}` },
+        { label: tenantId, href: `/tenants/${tenantId}` },
         { label: 'FQDNs' },
         { label: fqdn.fqdn },
       ]} />

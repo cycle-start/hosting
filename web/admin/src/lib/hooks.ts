@@ -708,3 +708,21 @@ export function useUpdatePlatformConfig() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['platform-config'] }),
   })
 }
+
+// Search
+export interface SearchResult {
+  type: 'tenant' | 'zone' | 'fqdn' | 'webroot' | 'database' | 'email_account' | 'valkey_instance'
+  id: string
+  label: string
+  tenant_id?: string
+  status: string
+}
+
+export function useSearch(query: string) {
+  return useQuery({
+    queryKey: ['search', query],
+    queryFn: () => api.get<{ results: SearchResult[] }>(`/search?q=${encodeURIComponent(query)}&limit=5`),
+    enabled: query.length >= 2,
+    staleTime: 30_000,
+  })
+}

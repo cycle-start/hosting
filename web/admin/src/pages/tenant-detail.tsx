@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Pause, Play, Trash2, Plus, RotateCcw, Loader2, FolderOpen, Database as DatabaseIcon, Globe, Boxes, Key, Archive } from 'lucide-react'
@@ -70,6 +70,24 @@ export function TenantDetailPage() {
   const [znForm, setZnForm] = useState<ZoneFormData>(defaultZone)
   const [bkType, setBkType] = useState('web')
   const [bkSource, setBkSource] = useState('')
+
+  // Auto-open create dialogs from ?create= query param (used by command palette)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const autoCreate = params.get('create')
+    if (autoCreate) {
+      resetForm()
+      switch (autoCreate) {
+        case 'webroot': setCreateWebrootOpen(true); break
+        case 'database': setCreateDbOpen(true); break
+        case 'valkey': setCreateValkeyOpen(true); break
+        case 'sftp_key': setCreateSftpOpen(true); break
+        case 'zone': setCreateZoneOpen(true); break
+      }
+      // Clean up the URL
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: tenant, isLoading } = useTenant(id)
   const { data: summary } = useTenantResourceSummary(id)
@@ -353,11 +371,11 @@ export function TenantDetailPage() {
     <div className="space-y-6">
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
-        { label: tenant.name },
+        { label: tenant.id },
       ]} />
 
       <ResourceHeader
-        title={tenant.name}
+        title={tenant.id}
         subtitle={`UID: ${tenant.uid} | Region: ${tenant.region_id} | Cluster: ${tenant.cluster_id}`}
         status={tenant.status}
         actions={
@@ -505,7 +523,7 @@ export function TenantDetailPage() {
 
       {/* Delete Tenant */}
       <ConfirmDialog open={deleteOpen} onOpenChange={setDeleteOpen} title="Delete Tenant"
-        description={`Are you sure you want to delete "${tenant.name}"? All associated resources will be removed.`}
+        description={`Are you sure you want to delete "${tenant.id}"? All associated resources will be removed.`}
         confirmLabel="Delete" variant="destructive" onConfirm={handleDelete} loading={deleteMutation.isPending} />
 
       {/* Delete Webroot */}

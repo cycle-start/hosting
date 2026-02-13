@@ -42,7 +42,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 		{ID: "node-2"},
 	}
 	tenants := []model.Tenant{
-		{ID: "tenant-1", Name: "example", ShardID: &tenantShardID, UID: 1000, SFTPEnabled: true, Status: model.StatusActive},
+		{ID: "tenant-1", ShardID: &tenantShardID, UID: 1000, SFTPEnabled: true, Status: model.StatusActive},
 	}
 	webroots := []model.Webroot{
 		{ID: "wr-1", TenantID: "tenant-1", Name: "main", Runtime: "php", RuntimeVersion: "8.5", RuntimeConfig: json.RawMessage(`{}`), PublicFolder: "public", Status: model.StatusActive},
@@ -57,7 +57,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 
 	// CreateTenant for each node
 	s.env.OnActivity("CreateTenant", mock.Anything, activity.CreateTenantParams{
-		ID: "tenant-1", Name: "example", UID: 1000, SFTPEnabled: true,
+		ID: "tenant-1", UID: 1000, SFTPEnabled: true,
 	}).Return(nil)
 
 	s.env.OnActivity("ListWebrootsByTenantID", mock.Anything, "tenant-1").Return(webroots, nil)
@@ -65,7 +65,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 
 	// CreateWebroot for each node
 	s.env.OnActivity("CreateWebroot", mock.Anything, activity.CreateWebrootParams{
-		ID: "wr-1", TenantName: "example", Name: "main",
+		ID: "wr-1", TenantName: "tenant-1", Name: "main",
 		Runtime: "php", RuntimeVersion: "8.5", RuntimeConfig: "{}",
 		PublicFolder: "public",
 		FQDNs:        []activity.FQDNParam{{FQDN: "example.com", WebrootID: "wr-1", SSLEnabled: true}},
@@ -178,8 +178,8 @@ func (s *ConvergeShardWorkflowTestSuite) TestSkipsInactiveResources() {
 	}
 	// A provisioning tenant should be skipped.
 	tenants := []model.Tenant{
-		{ID: "tenant-active", Name: "active", UID: 1000, Status: model.StatusActive},
-		{ID: "tenant-prov", Name: "provisioning", UID: 1001, Status: model.StatusProvisioning},
+		{ID: "tenant-active", UID: 1000, Status: model.StatusActive},
+		{ID: "tenant-prov", UID: 1001, Status: model.StatusProvisioning},
 	}
 
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
@@ -188,7 +188,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestSkipsInactiveResources() {
 
 	// Only the active tenant gets CreateTenant.
 	s.env.OnActivity("CreateTenant", mock.Anything, activity.CreateTenantParams{
-		ID: "tenant-active", Name: "active", UID: 1000,
+		ID: "tenant-active", UID: 1000,
 	}).Return(nil)
 
 	s.env.OnActivity("ListWebrootsByTenantID", mock.Anything, "tenant-active").Return([]model.Webroot{}, nil)

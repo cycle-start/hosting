@@ -76,7 +76,6 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 			nodeCtx := nodeActivityCtx(ctx, node.ID)
 			err = workflow.ExecuteActivity(nodeCtx, "CreateTenant", activity.CreateTenantParams{
 				ID:          tenant.ID,
-				Name:        tenant.Name,
 				UID:         tenant.UID,
 				SFTPEnabled: tenant.SFTPEnabled,
 			}).Get(ctx, nil)
@@ -121,7 +120,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				nodeCtx := nodeActivityCtx(ctx, node.ID)
 				err = workflow.ExecuteActivity(nodeCtx, "CreateWebroot", activity.CreateWebrootParams{
 					ID:             webroot.ID,
-					TenantName:     tenant.Name,
+					TenantName:     tenant.ID,
 					Name:           webroot.Name,
 					Runtime:        webroot.Runtime,
 					RuntimeVersion: webroot.RuntimeVersion,

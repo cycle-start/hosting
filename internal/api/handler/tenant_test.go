@@ -53,58 +53,10 @@ func TestTenantCreate_MissingRequiredFields(t *testing.T) {
 	assert.Contains(t, body["error"], "validation error")
 }
 
-func TestTenantCreate_MissingName(t *testing.T) {
-	h := newTenantHandler()
-	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/tenants", map[string]any{
-		"region_id":  validID,
-		"cluster_id": validID2,
-		"shard_id":   "test-shard-1",
-	})
-
-	h.Create(rec, r)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	body := decodeErrorResponse(rec)
-	assert.Contains(t, body["error"], "validation error")
-}
-
-func TestTenantCreate_InvalidSlugName(t *testing.T) {
-	tests := []struct {
-		name string
-		slug string
-	}{
-		{"uppercase", "MyTenant"},
-		{"spaces", "my tenant"},
-		{"special chars", "my@tenant"},
-		{"starts with digit", "1tenant"},
-		{"starts with dash", "-tenant"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := newTenantHandler()
-			rec := httptest.NewRecorder()
-			r := newRequest(http.MethodPost, "/tenants", map[string]any{
-				"name":       tt.slug,
-				"region_id":  validID,
-				"cluster_id": validID2,
-				"shard_id":   "test-shard-1",
-			})
-
-			h.Create(rec, r)
-
-			assert.Equal(t, http.StatusBadRequest, rec.Code)
-			body := decodeErrorResponse(rec)
-			assert.Contains(t, body["error"], "validation error")
-		})
-	}
-}
-
 func TestTenantCreate_MissingRegionID(t *testing.T) {
 	h := newTenantHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants", map[string]any{
-		"name":       "my-tenant",
 		"cluster_id": validID2,
 		"shard_id":   "test-shard-1",
 	})
@@ -120,7 +72,6 @@ func TestTenantCreate_MissingClusterID(t *testing.T) {
 	h := newTenantHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants", map[string]any{
-		"name":      "my-tenant",
 		"region_id": validID,
 		"shard_id":  "test-shard-1",
 	})
@@ -330,7 +281,6 @@ func TestTenantCreate_ValidBodyParsing(t *testing.T) {
 	h := newTenantHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants", map[string]any{
-		"name":         "my-tenant",
 		"region_id":    "test-region-1",
 		"cluster_id":   "test-cluster-1",
 		"shard_id":     "test-shard-1",
@@ -351,7 +301,6 @@ func TestTenantCreate_OptionalSFTPEnabled(t *testing.T) {
 	h := newTenantHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants", map[string]any{
-		"name":       "my-tenant",
 		"region_id":  "test-region-1",
 		"cluster_id": "test-cluster-1",
 		"shard_id":   "test-shard-1",
@@ -370,7 +319,6 @@ func TestTenantCreate_ExtraFieldsIgnored(t *testing.T) {
 	h := newTenantHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants", map[string]any{
-		"name":        "my-tenant",
 		"region_id":   "test-region-1",
 		"cluster_id":  "test-cluster-1",
 		"shard_id":    "test-shard-1",
@@ -389,7 +337,6 @@ func TestTenantCreate_ExtraFieldsIgnored(t *testing.T) {
 
 func validTenantBody() map[string]any {
 	return map[string]any{
-		"name":       "my-tenant",
 		"region_id":  "test-region-1",
 		"cluster_id": "test-cluster-1",
 		"shard_id":   "test-shard-1",

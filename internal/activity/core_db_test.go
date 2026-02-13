@@ -91,28 +91,26 @@ func TestCoreDB_ListTenantsByShard_Success(t *testing.T) {
 	rows := newMockRows(
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
-			*(dest[1].(*string)) = "alpha"
-			*(dest[2].(*string)) = regionID
-			*(dest[3].(*string)) = clusterID
-			*(dest[4].(**string)) = &shardID
-			*(dest[5].(*int)) = 5001
-			*(dest[6].(*bool)) = false
-			*(dest[7].(*string)) = model.StatusActive
+			*(dest[1].(*string)) = regionID
+			*(dest[2].(*string)) = clusterID
+			*(dest[3].(**string)) = &shardID
+			*(dest[4].(*int)) = 5001
+			*(dest[5].(*bool)) = false
+			*(dest[6].(*string)) = model.StatusActive
+			*(dest[7].(*time.Time)) = now
 			*(dest[8].(*time.Time)) = now
-			*(dest[9].(*time.Time)) = now
 			return nil
 		},
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id2
-			*(dest[1].(*string)) = "beta"
-			*(dest[2].(*string)) = regionID
-			*(dest[3].(*string)) = clusterID
-			*(dest[4].(**string)) = &shardID
-			*(dest[5].(*int)) = 5002
-			*(dest[6].(*bool)) = true
-			*(dest[7].(*string)) = model.StatusPending
+			*(dest[1].(*string)) = regionID
+			*(dest[2].(*string)) = clusterID
+			*(dest[3].(**string)) = &shardID
+			*(dest[4].(*int)) = 5002
+			*(dest[5].(*bool)) = true
+			*(dest[6].(*string)) = model.StatusPending
+			*(dest[7].(*time.Time)) = now
 			*(dest[8].(*time.Time)) = now
-			*(dest[9].(*time.Time)) = now
 			return nil
 		},
 	)
@@ -121,8 +119,8 @@ func TestCoreDB_ListTenantsByShard_Success(t *testing.T) {
 	result, err := a.ListTenantsByShard(ctx, shardID)
 	require.NoError(t, err)
 	require.Len(t, result, 2)
-	assert.Equal(t, "alpha", result[0].Name)
-	assert.Equal(t, "beta", result[1].Name)
+	assert.Equal(t, id1, result[0].ID)
+	assert.Equal(t, id2, result[1].ID)
 	assert.Equal(t, 5001, result[0].UID)
 	assert.Equal(t, 5002, result[1].UID)
 	assert.Equal(t, &shardID, result[0].ShardID)

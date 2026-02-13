@@ -20,7 +20,7 @@ import { CopyButton } from '@/components/shared/copy-button'
 import { formatDate } from '@/lib/utils'
 import { rules, validateField } from '@/lib/validation'
 import {
-  useTenant, useWebroot, useFQDNs,
+  useWebroot, useFQDNs,
   useUpdateWebroot, useCreateFQDN, useDeleteFQDN,
 } from '@/lib/hooks'
 import type { FQDN } from '@/lib/types'
@@ -45,7 +45,6 @@ export function WebrootDetailPage() {
   const [fqdnValue, setFqdnValue] = useState('')
   const [fqdnSsl, setFqdnSsl] = useState(true)
 
-  const { data: tenant } = useTenant(tenantId)
   const { data: webroot, isLoading } = useWebroot(webrootId)
   const { data: fqdnsData, isLoading: fqdnsLoading } = useFQDNs(webrootId)
   const updateMut = useUpdateWebroot()
@@ -113,7 +112,7 @@ export function WebrootDetailPage() {
     <div className="space-y-6">
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
-        { label: tenant?.name ?? tenantId, href: `/tenants/${tenantId}` },
+        { label: tenantId, href: `/tenants/${tenantId}` },
         { label: 'Webroots' },
         { label: webroot.name },
       ]} />

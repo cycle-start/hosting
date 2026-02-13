@@ -15,6 +15,7 @@ import {
   Boxes,
   FileText,
   FolderOpen,
+  Search,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -86,7 +87,11 @@ function getStoredCollapsed(): boolean {
   }
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  onSearchClick?: () => void
+}
+
+export function Sidebar({ onSearchClick }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(getStoredCollapsed)
   const routerState = useRouterState()
   const currentPath = routerState.location.pathname
@@ -123,6 +128,19 @@ export function Sidebar() {
             </span>
           )}
         </div>
+      </div>
+
+      {/* Search */}
+      <div className="px-2 py-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn('w-full justify-start gap-2 text-muted-foreground', collapsed && 'justify-center px-0')}
+          onClick={onSearchClick}
+        >
+          <Search className="h-4 w-4" />
+          {!collapsed && <>Search... <kbd className="ml-auto rounded border bg-muted px-1.5 text-[10px] font-medium">⌘K</kbd></>}
+        </Button>
       </div>
 
       {/* Navigation */}

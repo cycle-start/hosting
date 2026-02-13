@@ -47,9 +47,9 @@ func (a *CoreDB) UpdateResourceStatus(ctx context.Context, params UpdateResource
 func (a *CoreDB) GetTenantByID(ctx context.Context, id string) (*model.Tenant, error) {
 	var t model.Tenant
 	err := a.db.QueryRow(ctx,
-		`SELECT id, name, region_id, cluster_id, shard_id, uid, sftp_enabled, status, created_at, updated_at
+		`SELECT id, region_id, cluster_id, shard_id, uid, sftp_enabled, status, created_at, updated_at
 		 FROM tenants WHERE id = $1`, id,
-	).Scan(&t.ID, &t.Name, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.Status, &t.CreatedAt, &t.UpdatedAt)
+	).Scan(&t.ID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.Status, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get tenant by id: %w", err)
 	}
@@ -273,8 +273,8 @@ func (a *CoreDB) CreateCertificate(ctx context.Context, params CreateCertificate
 // ListTenantsByShard retrieves all tenants assigned to a shard.
 func (a *CoreDB) ListTenantsByShard(ctx context.Context, shardID string) ([]model.Tenant, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, name, region_id, cluster_id, shard_id, uid, sftp_enabled, status, created_at, updated_at
-		 FROM tenants WHERE shard_id = $1 ORDER BY name`, shardID,
+		`SELECT id, region_id, cluster_id, shard_id, uid, sftp_enabled, status, created_at, updated_at
+		 FROM tenants WHERE shard_id = $1 ORDER BY id`, shardID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list tenants by shard: %w", err)
@@ -284,7 +284,7 @@ func (a *CoreDB) ListTenantsByShard(ctx context.Context, shardID string) ([]mode
 	var tenants []model.Tenant
 	for rows.Next() {
 		var t model.Tenant
-		if err := rows.Scan(&t.ID, &t.Name, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.Status, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.Status, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan tenant row: %w", err)
 		}
 		tenants = append(tenants, t)

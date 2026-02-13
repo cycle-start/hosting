@@ -82,7 +82,7 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "CreateWebroot", activity.CreateWebrootParams{
 			ID:             webroot.ID,
-			TenantName:     tenant.Name,
+			TenantName:     tenant.ID,
 			Name:           webroot.Name,
 			Runtime:        webroot.Runtime,
 			RuntimeVersion: webroot.RuntimeVersion,
@@ -174,7 +174,7 @@ func UpdateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "UpdateWebroot", activity.UpdateWebrootParams{
 			ID:             webroot.ID,
-			TenantName:     tenant.Name,
+			TenantName:     tenant.ID,
 			Name:           webroot.Name,
 			Runtime:        webroot.Runtime,
 			RuntimeVersion: webroot.RuntimeVersion,
@@ -247,7 +247,7 @@ func DeleteWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	// Delete webroot on each node in the shard.
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "DeleteWebroot", tenant.Name, webroot.Name).Get(ctx, nil)
+		err = workflow.ExecuteActivity(nodeCtx, "DeleteWebroot", tenant.ID, webroot.Name).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "webroots", webrootID)
 			return err

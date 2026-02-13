@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,11 +25,10 @@ export function CreateTenantPage() {
   const navigate = useNavigate()
   const createMutation = useCreateTenant()
 
-  const [name, setName] = useState('')
   const [regionId, setRegionId] = useState('')
   const [clusterId, setClusterId] = useState('')
   const [shardId, setShardId] = useState('')
-  const [sftpEnabled, setSftpEnabled] = useState(false)
+  const [sftpEnabled, setSftpEnabled] = useState(true)
 
   const [zones, setZones] = useState<ZoneFormData[]>([])
   const [webroots, setWebroots] = useState<WebrootFormData[]>([])
@@ -40,7 +38,6 @@ export function CreateTenantPage() {
 
   const handleSubmit = async () => {
     const payload: CreateTenantRequest = {
-      name,
       region_id: regionId,
       cluster_id: clusterId,
       shard_id: shardId,
@@ -61,7 +58,7 @@ export function CreateTenantPage() {
     }
   }
 
-  const canSubmit = name && regionId && clusterId && shardId && !createMutation.isPending
+  const canSubmit = regionId && clusterId && shardId && !createMutation.isPending
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -75,10 +72,6 @@ export function CreateTenantPage() {
       <Card>
         <CardHeader><CardTitle>Tenant Details</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Name</Label>
-            <Input placeholder="my-tenant" value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
           <RegionClusterShardSelect
             regionId={regionId} onRegionChange={setRegionId}
             clusterId={clusterId} onClusterChange={setClusterId}

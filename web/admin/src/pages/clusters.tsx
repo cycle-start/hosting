@@ -46,6 +46,7 @@ export function ClustersPage() {
     {
       accessorKey: 'id',
       header: 'ID',
+      size: 180,
       cell: ({ row }) => (
         <div className="flex items-center gap-1">
           <code className="text-xs">{truncateID(row.original.id)}</code>
@@ -57,15 +58,18 @@ export function ClustersPage() {
     {
       accessorKey: 'status',
       header: 'Status',
+      size: 110,
       cell: ({ row }) => <StatusBadge status={row.original.status} />,
     },
     {
       accessorKey: 'created_at',
       header: 'Created',
+      size: 180,
       cell: ({ row }) => <span className="text-sm text-muted-foreground">{formatDate(row.original.created_at)}</span>,
     },
     {
       id: 'actions',
+      size: 60,
       cell: ({ row }) => (
         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteTarget(row.original) }}>
           <Trash2 className="h-4 w-4 text-destructive" />

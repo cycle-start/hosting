@@ -57,7 +57,6 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "CreateTenant", activity.CreateTenantParams{
 			ID:          tenant.ID,
-			Name:        tenant.Name,
 			UID:         tenant.UID,
 			SFTPEnabled: tenant.SFTPEnabled,
 		}).Get(ctx, nil)
@@ -120,7 +119,6 @@ func UpdateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "UpdateTenant", activity.UpdateTenantParams{
 			ID:          tenant.ID,
-			Name:        tenant.Name,
 			UID:         tenant.UID,
 			SFTPEnabled: tenant.SFTPEnabled,
 		}).Get(ctx, nil)
@@ -170,7 +168,7 @@ func SuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	// Suspend tenant on each node in the shard.
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "SuspendTenant", tenant.Name).Get(ctx, nil)
+		err = workflow.ExecuteActivity(nodeCtx, "SuspendTenant", tenant.ID).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "tenants", tenantID)
 			return err
@@ -228,7 +226,7 @@ func UnsuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	// Unsuspend tenant on each node in the shard.
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "UnsuspendTenant", tenant.Name).Get(ctx, nil)
+		err = workflow.ExecuteActivity(nodeCtx, "UnsuspendTenant", tenant.ID).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "tenants", tenantID)
 			return err
@@ -286,7 +284,7 @@ func DeleteTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	// Delete tenant on each node in the shard.
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "DeleteTenant", tenant.Name).Get(ctx, nil)
+		err = workflow.ExecuteActivity(nodeCtx, "DeleteTenant", tenant.ID).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "tenants", tenantID)
 			return err

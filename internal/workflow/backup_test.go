@@ -44,7 +44,6 @@ func (s *CreateBackupWorkflowTestSuite) TestSuccess_WebBackup() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "tenant1",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{
@@ -63,7 +62,7 @@ func (s *CreateBackupWorkflowTestSuite) TestSuccess_WebBackup() {
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("GetWebrootByID", mock.Anything, "test-webroot-1").Return(&webroot, nil)
 	s.env.OnActivity("CreateWebBackup", mock.Anything, mock.Anything).Return(&activity.BackupResult{
-		StoragePath: "/var/backups/hosting/tenant1/test-backup-1.tar.gz",
+		StoragePath: "/var/backups/hosting/test-tenant-1/test-backup-1.tar.gz",
 		SizeBytes:   2048,
 	}, nil)
 	s.env.OnActivity("UpdateBackupResult", mock.Anything, mock.Anything).Return(nil)
@@ -90,7 +89,6 @@ func (s *CreateBackupWorkflowTestSuite) TestSuccess_DatabaseBackup() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "tenant1",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{
@@ -104,7 +102,7 @@ func (s *CreateBackupWorkflowTestSuite) TestSuccess_DatabaseBackup() {
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("CreateMySQLBackup", mock.Anything, mock.Anything).Return(&activity.BackupResult{
-		StoragePath: "/var/backups/hosting/tenant1/test-backup-2.sql.gz",
+		StoragePath: "/var/backups/hosting/test-tenant-1/test-backup-2.sql.gz",
 		SizeBytes:   4096,
 	}, nil)
 	s.env.OnActivity("UpdateBackupResult", mock.Anything, mock.Anything).Return(nil)
@@ -144,7 +142,6 @@ func (s *CreateBackupWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "tenant1",
 		ShardID: nil, // no shard
 	}
 
@@ -188,7 +185,6 @@ func (s *CreateBackupWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "tenant1",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{
@@ -245,7 +241,7 @@ func (s *RestoreBackupWorkflowTestSuite) TestSuccess_WebRestore() {
 		Type:        model.BackupTypeWeb,
 		SourceID:    "test-webroot-1",
 		SourceName:  "mysite",
-		StoragePath: "/var/backups/hosting/tenant1/test-backup-1.tar.gz",
+		StoragePath: "/var/backups/hosting/test-tenant-1/test-backup-1.tar.gz",
 		SizeBytes:   2048,
 		Status:      model.StatusActive,
 		StartedAt:   &now,
@@ -253,7 +249,6 @@ func (s *RestoreBackupWorkflowTestSuite) TestSuccess_WebRestore() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "tenant1",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{
@@ -293,7 +288,7 @@ func (s *RestoreBackupWorkflowTestSuite) TestSuccess_DatabaseRestore() {
 		Type:        model.BackupTypeDatabase,
 		SourceID:    "test-database-1",
 		SourceName:  "mydb",
-		StoragePath: "/var/backups/hosting/tenant1/test-backup-2.sql.gz",
+		StoragePath: "/var/backups/hosting/test-tenant-1/test-backup-2.sql.gz",
 		SizeBytes:   4096,
 		Status:      model.StatusActive,
 		StartedAt:   &now,
@@ -301,7 +296,6 @@ func (s *RestoreBackupWorkflowTestSuite) TestSuccess_DatabaseRestore() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "tenant1",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{
@@ -346,14 +340,13 @@ func (s *RestoreBackupWorkflowTestSuite) TestRestoreFails_SetsStatusFailed() {
 		Type:        model.BackupTypeDatabase,
 		SourceID:    "test-database-1",
 		SourceName:  "mydb",
-		StoragePath: "/var/backups/hosting/tenant1/test-backup-4.sql.gz",
+		StoragePath: "/var/backups/hosting/test-tenant-1/test-backup-4.sql.gz",
 		Status:      model.StatusActive,
 		StartedAt:   &now,
 		CompletedAt: &now,
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "tenant1",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{
@@ -404,7 +397,7 @@ func (s *DeleteBackupWorkflowTestSuite) TestSuccess() {
 		TenantID:    tenantID,
 		Type:        model.BackupTypeWeb,
 		SourceName:  "mysite",
-		StoragePath: "/var/backups/hosting/tenant1/test-backup-1.tar.gz",
+		StoragePath: "/var/backups/hosting/test-tenant-1/test-backup-1.tar.gz",
 		SizeBytes:   2048,
 		Status:      model.StatusDeleting,
 		StartedAt:   &now,
@@ -412,7 +405,6 @@ func (s *DeleteBackupWorkflowTestSuite) TestSuccess() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "tenant1",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{
@@ -455,14 +447,13 @@ func (s *DeleteBackupWorkflowTestSuite) TestDeleteFileFails_SetsStatusFailed() {
 		ID:          backupID,
 		TenantID:    tenantID,
 		Type:        model.BackupTypeWeb,
-		StoragePath: "/var/backups/hosting/tenant1/test-backup-3.tar.gz",
+		StoragePath: "/var/backups/hosting/test-tenant-1/test-backup-3.tar.gz",
 		Status:      model.StatusDeleting,
 		StartedAt:   &now,
 		CompletedAt: &now,
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "tenant1",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{
