@@ -3,11 +3,22 @@
 package e2e
 
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/require"
 )
+
+// s3NodePort is the RGW port on S3 node VMs.
+const s3NodePort = 7480
 
 // TestS3BucketCRUD tests the full S3 bucket lifecycle:
 // create tenant -> create S3 bucket -> wait active -> create access key ->
@@ -119,6 +130,180 @@ func TestS3BucketCRUD(t *testing.T) {
 	t.Logf("S3 bucket deleted")
 }
 
+// TestS3ObjectOperations creates a bucket, uploads objects via the S3 API,
+// downloads them back, tests public access, and cleans up. This verifies that
+// RGW is properly serving S3 requests on the node agent VMs.
+func TestS3ObjectOperations(t *testing.T) {
+	tenantID, _, clusterID, _, _ := createTestTenant(t, "e2e-s3-objects")
+
+	s3ShardID := findS3Shard(t, clusterID)
+	if s3ShardID == "" {
+		t.Skip("no S3 shard found in cluster; skipping S3 object tests")
+	}
+
+	// Discover the S3 node IP for direct RGW access.
+	s3NodeIPs := findNodeIPsByRole(t, clusterID, "s3")
+	require.NotEmpty(t, s3NodeIPs, "no S3 node IPs found")
+	rgwEndpoint := fmt.Sprintf("http://%s:%d", s3NodeIPs[0], s3NodePort)
+	t.Logf("RGW endpoint: %s", rgwEndpoint)
+
+	// Create a bucket.
+	resp, body := httpPost(t, fmt.Sprintf("%s/tenants/%s/s3-buckets", coreAPIURL, tenantID), map[string]interface{}{
+		"name":     "e2e-objects",
+		"shard_id": s3ShardID,
+	})
+	require.Equal(t, 202, resp.StatusCode, "create S3 bucket: %s", body)
+	bucket := parseJSON(t, body)
+	bucketID := bucket["id"].(string)
+
+	bucket = waitForStatus(t, coreAPIURL+"/s3-buckets/"+bucketID, "active", provisionTimeout)
+	require.Equal(t, "active", bucket["status"])
+	t.Logf("S3 bucket active: %s", bucketID)
+
+	// The internal RGW bucket name is "{tenantID}--{bucketName}".
+	internalBucket := tenantID + "--e2e-objects"
+
+	// Create an access key.
+	resp, body = httpPost(t, fmt.Sprintf("%s/s3-buckets/%s/access-keys", coreAPIURL, bucketID), map[string]interface{}{
+		"permissions": "read-write",
+	})
+	require.Equal(t, 201, resp.StatusCode, "create access key: %s", body)
+	key := parseJSON(t, body)
+	keyID := key["id"].(string)
+	accessKeyID := key["access_key_id"].(string)
+	secretAccessKey := key["secret_access_key"].(string)
+	t.Logf("access key created: %s", accessKeyID)
+
+	// Create an S3 client pointing to the RGW endpoint.
+	s3Client := s3.New(s3.Options{
+		BaseEndpoint: aws.String(rgwEndpoint),
+		Region:       "us-east-1",
+		Credentials:  credentials.NewStaticCredentialsProvider(accessKeyID, secretAccessKey, ""),
+		UsePathStyle: true, // RGW uses path-style addressing.
+	})
+
+	ctx := context.Background()
+
+	// --- Test 1: Upload an object. ---
+	testContent := "Hello from S3 e2e test! This verifies that Ceph RGW is operational."
+	_, err := s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(internalBucket),
+		Key:         aws.String("test-file.txt"),
+		Body:        strings.NewReader(testContent),
+		ContentType: aws.String("text/plain"),
+	})
+	require.NoError(t, err, "PutObject should succeed")
+	t.Logf("uploaded test-file.txt to bucket %s", internalBucket)
+
+	// --- Test 2: Download and verify the object. ---
+	getResp, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(internalBucket),
+		Key:    aws.String("test-file.txt"),
+	})
+	require.NoError(t, err, "GetObject should succeed")
+	defer getResp.Body.Close()
+
+	downloaded, err := io.ReadAll(getResp.Body)
+	require.NoError(t, err)
+	require.Equal(t, testContent, string(downloaded), "downloaded content should match uploaded")
+	require.Equal(t, "text/plain", aws.ToString(getResp.ContentType))
+	t.Logf("downloaded and verified test-file.txt")
+
+	// --- Test 3: List objects in the bucket. ---
+	listResp, err := s3Client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+		Bucket: aws.String(internalBucket),
+	})
+	require.NoError(t, err, "ListObjects should succeed")
+	require.Equal(t, int32(1), aws.ToInt32(listResp.KeyCount))
+	require.Equal(t, "test-file.txt", aws.ToString(listResp.Contents[0].Key))
+	t.Logf("listed objects: found %d", aws.ToInt32(listResp.KeyCount))
+
+	// --- Test 4: Upload a second object (binary data). ---
+	binaryData := make([]byte, 1024)
+	for i := range binaryData {
+		binaryData[i] = byte(i % 256)
+	}
+	_, err = s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(internalBucket),
+		Key:         aws.String("subdir/binary.bin"),
+		Body:        bytes.NewReader(binaryData),
+		ContentType: aws.String("application/octet-stream"),
+	})
+	require.NoError(t, err, "PutObject binary should succeed")
+	t.Logf("uploaded subdir/binary.bin (1024 bytes)")
+
+	// Verify list now shows 2 objects.
+	listResp, err = s3Client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+		Bucket: aws.String(internalBucket),
+	})
+	require.NoError(t, err)
+	require.Equal(t, int32(2), aws.ToInt32(listResp.KeyCount))
+	t.Logf("listed objects: found %d", aws.ToInt32(listResp.KeyCount))
+
+	// --- Test 5: Set bucket to public and verify anonymous read. ---
+	resp, body = httpPut(t, coreAPIURL+"/s3-buckets/"+bucketID, map[string]interface{}{
+		"public": true,
+	})
+	require.Equal(t, 200, resp.StatusCode, "set public: %s", body)
+	t.Logf("bucket set to public")
+
+	// Anonymous GET (no auth) should work for public buckets.
+	anonURL := fmt.Sprintf("%s/%s/test-file.txt", rgwEndpoint, internalBucket)
+	anonResp, err := http.Get(anonURL)
+	require.NoError(t, err, "anonymous GET should succeed")
+	defer anonResp.Body.Close()
+	require.Equal(t, 200, anonResp.StatusCode, "anonymous GET should return 200 for public bucket")
+	anonBody, _ := io.ReadAll(anonResp.Body)
+	require.Equal(t, testContent, string(anonBody), "anonymous download content should match")
+	t.Logf("anonymous public read OK")
+
+	// --- Test 6: Set bucket back to private and verify anonymous read fails. ---
+	resp, body = httpPut(t, coreAPIURL+"/s3-buckets/"+bucketID, map[string]interface{}{
+		"public": false,
+	})
+	require.Equal(t, 200, resp.StatusCode, "set private: %s", body)
+	t.Logf("bucket set to private")
+
+	anonResp2, err := http.Get(anonURL)
+	require.NoError(t, err, "anonymous GET should complete (even if 403)")
+	defer anonResp2.Body.Close()
+	require.Equal(t, 403, anonResp2.StatusCode, "anonymous GET should return 403 for private bucket")
+	t.Logf("anonymous private read correctly denied (403)")
+
+	// --- Test 7: Authenticated read should still work after setting private. ---
+	getResp2, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(internalBucket),
+		Key:    aws.String("test-file.txt"),
+	})
+	require.NoError(t, err, "authenticated GetObject should still work on private bucket")
+	defer getResp2.Body.Close()
+	downloaded2, _ := io.ReadAll(getResp2.Body)
+	require.Equal(t, testContent, string(downloaded2))
+	t.Logf("authenticated read on private bucket OK")
+
+	// --- Test 8: Delete an object. ---
+	_, err = s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(internalBucket),
+		Key:    aws.String("test-file.txt"),
+	})
+	require.NoError(t, err, "DeleteObject should succeed")
+	t.Logf("deleted test-file.txt")
+
+	// Verify it's gone.
+	listResp, err = s3Client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+		Bucket: aws.String(internalBucket),
+	})
+	require.NoError(t, err)
+	require.Equal(t, int32(1), aws.ToInt32(listResp.KeyCount), "should have 1 object left")
+	t.Logf("verified object deleted, %d remaining", aws.ToInt32(listResp.KeyCount))
+
+	// --- Cleanup ---
+	httpDelete(t, coreAPIURL+"/s3-access-keys/"+keyID)
+	httpDelete(t, coreAPIURL+"/s3-buckets/"+bucketID)
+	waitForStatus(t, coreAPIURL+"/s3-buckets/"+bucketID, "deleted", provisionTimeout)
+	t.Logf("cleanup complete")
+}
+
 // TestS3BucketGetNotFound verifies that fetching a non-existent S3 bucket returns 404.
 func TestS3BucketGetNotFound(t *testing.T) {
 	resp, _ := httpGet(t, coreAPIURL+"/s3-buckets/00000000-0000-0000-0000-000000000000")
@@ -228,4 +413,38 @@ func findS3Shard(t *testing.T, clusterID string) string {
 		}
 	}
 	return ""
+}
+
+// findNodeIPsByRole returns all node IPs for the given role in a cluster.
+func findNodeIPsByRole(t *testing.T, clusterID, role string) []string {
+	t.Helper()
+
+	resp, body := httpGet(t, fmt.Sprintf("%s/clusters/%s/shards", coreAPIURL, clusterID))
+	require.Equal(t, 200, resp.StatusCode)
+
+	shards := parsePaginatedItems(t, body)
+	var shardID string
+	for _, s := range shards {
+		if r, _ := s["role"].(string); r == role {
+			shardID, _ = s["id"].(string)
+			break
+		}
+	}
+	if shardID == "" {
+		return nil
+	}
+
+	resp, body = httpGet(t, fmt.Sprintf("%s/shards/%s/nodes", coreAPIURL, shardID))
+	if resp.StatusCode != 200 {
+		return nil
+	}
+
+	nodes := parsePaginatedItems(t, body)
+	var ips []string
+	for _, n := range nodes {
+		if ip, ok := n["ip_address"].(string); ok && ip != "" {
+			ips = append(ips, ip)
+		}
+	}
+	return ips
 }
