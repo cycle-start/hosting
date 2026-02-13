@@ -233,7 +233,7 @@ ssl-init:
       --from-file=hosting.pem=/tmp/hosting.pem \
       --dry-run=client -o yaml | kubectl --context hosting apply -f -
     rm /tmp/haproxy-cert.pem /tmp/haproxy-key.pem /tmp/hosting.pem
-    kubectl --context hosting delete pod -l app=haproxy
+    kubectl --context hosting rollout restart deployment/haproxy
     kubectl --context hosting rollout status deployment/haproxy --timeout=30s
     @echo "Trusted SSL certs installed. Visit https://admin.hosting.test"
 
