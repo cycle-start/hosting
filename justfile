@@ -82,11 +82,11 @@ migrate: migrate-core migrate-powerdns
 
 # Reset core DB (drop all tables and goose version tracking)
 reset-core:
-    KUBECONFIG=~/.kube/k3s-config kubectl exec statefulset/postgres-core -- psql -U hosting hosting_core -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+    kubectl --context hosting exec statefulset/postgres-core -- psql -U hosting hosting_core -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 
 # Reset PowerDNS DB (drop all tables and goose version tracking)
 reset-powerdns:
-    KUBECONFIG=~/.kube/k3s-config kubectl exec statefulset/postgres-powerdns -- psql -U hosting hosting_powerdns -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+    kubectl --context hosting exec statefulset/postgres-powerdns -- psql -U hosting hosting_powerdns -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 
 # Reset all databases
 reset-db: reset-core reset-powerdns
@@ -181,31 +181,34 @@ vm-deploy:
     docker save hosting-core-api:latest hosting-worker:latest hosting-admin-ui:latest | \
       ssh -o StrictHostKeyChecking=no ubuntu@{{cp}} "sudo k3s ctr images import -"
     # Apply infra manifests
-    KUBECONFIG=~/.kube/k3s-config kubectl apply -f deploy/k3s/
+    kubectl --context hosting apply -f deploy/k3s/
     # Create HAProxy ConfigMap from Terraform-generated config (delete first if exists)
-    KUBECONFIG=~/.kube/k3s-config kubectl delete configmap haproxy-config --ignore-not-found
-    KUBECONFIG=~/.kube/k3s-config kubectl create configmap haproxy-config \
+    kubectl --context hosting delete configmap haproxy-config --ignore-not-found
+    kubectl --context hosting create configmap haproxy-config \
       --from-file=haproxy.cfg=docker/haproxy/haproxy.cfg \
       --from-literal=fqdn-to-shard.map=""
     # Install/upgrade Helm chart
-    KUBECONFIG=~/.kube/k3s-config helm upgrade --install hosting \
+    helm --kube-context hosting upgrade --install hosting \
       deploy/helm/hosting -f deploy/helm/hosting/values-dev.yaml
 
-# Fetch kubeconfig from controlplane VM
+# Fetch kubeconfig from controlplane VM and merge into ~/.kube/config
 vm-kubeconfig:
     mkdir -p ~/.kube
     ssh -o StrictHostKeyChecking=no ubuntu@{{cp}} "sudo cp /etc/rancher/k3s/k3s.yaml /home/ubuntu/.kube/config && sudo chown ubuntu:ubuntu /home/ubuntu/.kube/config"
-    scp -o StrictHostKeyChecking=no ubuntu@{{cp}}:/home/ubuntu/.kube/config ~/.kube/k3s-config
-    sed -i 's/127.0.0.1/{{cp}}/g' ~/.kube/k3s-config
-    @echo "KUBECONFIG=~/.kube/k3s-config kubectl get pods"
+    scp -o StrictHostKeyChecking=no ubuntu@{{cp}}:/home/ubuntu/.kube/config /tmp/k3s-config
+    sed -i 's/127.0.0.1/{{cp}}/g' /tmp/k3s-config
+    sed -i 's/: default$/: hosting/g' /tmp/k3s-config
+    KUBECONFIG=~/.kube/config:/tmp/k3s-config kubectl config view --flatten > /tmp/kube-merged && mv /tmp/kube-merged ~/.kube/config
+    kubectl config use-context hosting
+    @echo "Merged into ~/.kube/config as context 'hosting'"
 
 # Show k3s pod status
 vm-pods:
-    KUBECONFIG=~/.kube/k3s-config kubectl get pods
+    kubectl --context hosting get pods
 
 # Stream k3s pod logs (e.g. just vm-log hosting-core-api)
 vm-log name:
-    KUBECONFIG=~/.kube/k3s-config kubectl logs -f deployment/{{name}}
+    kubectl --context hosting logs -f deployment/{{name}}
 
 # Full dev setup: build images, create VMs, deploy control plane, seed cluster
 dev-k3s: build-node-agent
