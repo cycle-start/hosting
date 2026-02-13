@@ -33,9 +33,7 @@ This runs `just dev` then provisions VMs via Terraform/libvirt and registers the
 just create-api-key admin
 ```
 
-This connects directly to the core database, creates a hashed API key, and prints the plaintext key once. Save it — you'll need it for the admin UI and authenticated API requests.
-
-To enable authentication, set `AUTH_ENABLED=true` on the core-api service. All `/api/v1/*` endpoints will then require the `X-API-Key` header.
+This connects directly to the core database, creates a hashed API key, and prints the plaintext key once. Save it — you'll need it for the admin UI and API requests. All `/api/v1/*` endpoints require the `X-API-Key` header.
 
 ### 4. Seed test data
 

@@ -66,9 +66,7 @@ func (s *Server) setupRoutes() {
 	s.router.Get("/readyz", s.handleReadyz)
 
 	s.router.Route("/api/v1", func(r chi.Router) {
-		if s.cfg.AuthEnabled {
-			r.Use(mw.Auth(s.corePool))
-		}
+		r.Use(mw.Auth(s.corePool))
 		r.Use(s.auditLogger.Middleware)
 
 		// Dashboard

@@ -20,8 +20,6 @@ type Config struct {
 	// Used to register on the "node-{id}" task queue.
 	NodeID string
 
-	AuthEnabled bool // AUTH_ENABLED — enable API key authentication (default false)
-
 	ACMEEmail        string // ACME_EMAIL — contact email for Let's Encrypt
 	ACMEDirectoryURL string // ACME_DIRECTORY_URL — defaults to LE production
 
@@ -47,7 +45,6 @@ func Load() (*Config, error) {
 		LogLevel:              getEnv("LOG_LEVEL", "info"),
 		StalwartAdminToken:    getEnv("STALWART_ADMIN_TOKEN", ""),
 		NodeID:                getEnv("NODE_ID", ""),
-		AuthEnabled:           getEnv("AUTH_ENABLED", "") == "true",
 		ACMEEmail:             getEnv("ACME_EMAIL", ""),
 		ACMEDirectoryURL:      getEnv("ACME_DIRECTORY_URL", "https://acme-v02.api.letsencrypt.org/directory"),
 		AuditLogRetentionDays: getEnvInt("AUDIT_LOG_RETENTION_DAYS", 90),
