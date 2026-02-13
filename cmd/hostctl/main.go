@@ -57,14 +57,15 @@ func main() {
 	case "converge-shard":
 		fs := flag.NewFlagSet("converge-shard", flag.ExitOnError)
 		apiURL := fs.String("api", "http://localhost:8080", "Core API base URL")
+		apiKey := fs.String("api-key", "", "API key for authentication")
 		fs.Parse(os.Args[2:])
 
 		if fs.NArg() < 1 {
-			fmt.Fprintln(os.Stderr, "Usage: hostctl converge-shard [-api URL] <shard-id>")
+			fmt.Fprintln(os.Stderr, "Usage: hostctl converge-shard [-api URL] [-api-key KEY] <shard-id>")
 			os.Exit(1)
 		}
 
-		if err := hostctl.ConvergeShard(*apiURL, fs.Arg(0)); err != nil {
+		if err := hostctl.ConvergeShard(*apiURL, *apiKey, fs.Arg(0)); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}

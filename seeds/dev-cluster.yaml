@@ -1,4 +1,5 @@
 api_url: http://localhost:8090/api/v1
+api_key: hst_dev_e2e_test_key_00000000
 
 region:
   name: dev

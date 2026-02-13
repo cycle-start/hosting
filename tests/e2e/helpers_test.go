@@ -17,6 +17,20 @@ import (
 
 const coreAPIURL = "http://localhost:8090/api/v1"
 
+// apiKey returns the API key for authenticating with the core API.
+// Set via HOSTING_API_KEY env var; defaults to the dev test key.
+func apiKey() string {
+	if k := os.Getenv("HOSTING_API_KEY"); k != "" {
+		return k
+	}
+	return "hst_dev_e2e_test_key_00000000"
+}
+
+// setAPIKey adds the X-API-Key header to a request.
+func setAPIKey(req *http.Request) {
+	req.Header.Set("X-API-Key", apiKey())
+}
+
 // sshExec runs a command on a VM via SSH and returns stdout.
 func sshExec(t *testing.T, ip string, cmd string) string {
 	t.Helper()
@@ -126,6 +140,7 @@ func httpGetWithHost(url, host string) (*http.Response, string, error) {
 	if err != nil {
 		return nil, "", fmt.Errorf("create request: %w", err)
 	}
+	setAPIKey(req)
 	if host != "" {
 		req.Host = host
 	}
@@ -185,6 +200,7 @@ func httpPost(t *testing.T, url string, body interface{}) (*http.Response, strin
 		t.Fatalf("create POST request %s: %v", url, err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	setAPIKey(req)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -211,6 +227,7 @@ func httpPut(t *testing.T, url string, body interface{}) (*http.Response, string
 		t.Fatalf("create PUT request %s: %v", url, err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	setAPIKey(req)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -228,6 +245,7 @@ func httpDelete(t *testing.T, url string) (*http.Response, string) {
 	if err != nil {
 		t.Fatalf("create DELETE request %s: %v", url, err)
 	}
+	setAPIKey(req)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -241,7 +259,12 @@ func httpDelete(t *testing.T, url string) (*http.Response, string) {
 // httpGet performs an HTTP GET and returns the response and body string.
 func httpGet(t *testing.T, url string) (*http.Response, string) {
 	t.Helper()
-	resp, err := http.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatalf("create GET request %s: %v", url, err)
+	}
+	setAPIKey(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("GET %s: %v", url, err)
 	}
@@ -370,12 +393,40 @@ func findShardByRole(t *testing.T, clusterID, role string) map[string]interface{
 	return nil
 }
 
+// findOrCreateBrand ensures a test brand exists and returns its ID.
+func findOrCreateBrand(t *testing.T) string {
+	t.Helper()
+
+	// Check if brand already exists.
+	resp, body := httpGet(t, coreAPIURL+"/brands/e2e-brand")
+	if resp.StatusCode == 200 {
+		brand := parseJSON(t, body)
+		return brand["id"].(string)
+	}
+
+	// Create brand.
+	resp, body = httpPost(t, coreAPIURL+"/brands", map[string]interface{}{
+		"id":               "e2e-brand",
+		"name":             "E2E Test Brand",
+		"base_hostname":    "e2e.hosting.test",
+		"primary_ns":       "ns1.e2e.hosting.test",
+		"secondary_ns":     "ns2.e2e.hosting.test",
+		"hostmaster_email": "hostmaster@e2e.hosting.test",
+	})
+	if resp.StatusCode != 201 && resp.StatusCode != 200 {
+		t.Fatalf("create brand: status %d body=%s", resp.StatusCode, body)
+	}
+	brand := parseJSON(t, body)
+	return brand["id"].(string)
+}
+
 // createTestTenant creates a tenant assigned to the first web shard and
 // waits for it to become active. It registers a cleanup function that
 // deletes the tenant when the test completes.
 func createTestTenant(t *testing.T, name string) (tenantID, regionID, clusterID, webShardID, dbShardID string) {
 	t.Helper()
 
+	brandID := findOrCreateBrand(t)
 	regionID = findFirstRegionID(t)
 	cluster := findFirstCluster(t, regionID)
 	clusterID, _ = cluster["id"].(string)
@@ -396,7 +447,7 @@ func createTestTenant(t *testing.T, name string) (tenantID, regionID, clusterID,
 	}
 
 	createResp, createBody := httpPost(t, coreAPIURL+"/tenants", map[string]interface{}{
-		"name":       name,
+		"brand_id":   brandID,
 		"region_id":  regionID,
 		"cluster_id": clusterID,
 		"shard_id":   webShardID,

@@ -20,7 +20,7 @@ func ClusterApply(configPath string, timeout time.Duration) error {
 		return fmt.Errorf("parse config: %w", err)
 	}
 
-	client := NewClient(cfg.APIURL)
+	client := NewClient(cfg.APIURL, cfg.APIKey)
 
 	// 1. Find or create region
 	regionID, err := findOrCreateRegion(client, cfg.Region)

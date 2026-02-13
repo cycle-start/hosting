@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -101,7 +102,7 @@ func TestS3BucketCRUD(t *testing.T) {
 	resp, body = httpPut(t, coreAPIURL+"/s3-buckets/"+bucketID, map[string]interface{}{
 		"public": true,
 	})
-	require.Equal(t, 200, resp.StatusCode, "update S3 bucket: %s", body)
+	require.True(t, resp.StatusCode == 200 || resp.StatusCode == 202, "update S3 bucket: status %d: %s", resp.StatusCode, body)
 	updated := parseJSON(t, body)
 	require.Equal(t, true, updated["public"])
 	t.Logf("S3 bucket updated to public")
@@ -110,7 +111,7 @@ func TestS3BucketCRUD(t *testing.T) {
 	resp, body = httpPut(t, coreAPIURL+"/s3-buckets/"+bucketID, map[string]interface{}{
 		"public": false,
 	})
-	require.Equal(t, 200, resp.StatusCode, "update S3 bucket: %s", body)
+	require.True(t, resp.StatusCode == 200 || resp.StatusCode == 202, "update S3 bucket: status %d: %s", resp.StatusCode, body)
 	updated = parseJSON(t, body)
 	require.Equal(t, false, updated["public"])
 	t.Logf("S3 bucket updated to private")
@@ -163,7 +164,7 @@ func TestS3ObjectOperations(t *testing.T) {
 	// The internal RGW bucket name is "{tenantID}--{bucketName}".
 	internalBucket := tenantID + "--e2e-objects"
 
-	// Create an access key.
+	// Create an access key and wait for it to be provisioned in RGW.
 	resp, body = httpPost(t, fmt.Sprintf("%s/s3-buckets/%s/access-keys", coreAPIURL, bucketID), map[string]interface{}{
 		"permissions": "read-write",
 	})
@@ -172,7 +173,10 @@ func TestS3ObjectOperations(t *testing.T) {
 	keyID := key["id"].(string)
 	accessKeyID := key["access_key_id"].(string)
 	secretAccessKey := key["secret_access_key"].(string)
-	t.Logf("access key created: %s", accessKeyID)
+	t.Logf("access key created: %s, waiting for provisioning...", accessKeyID)
+
+	// Wait for the async workflow to register the key in RGW.
+	time.Sleep(5 * time.Second)
 
 	// Create an S3 client pointing to the RGW endpoint.
 	s3Client := s3.New(s3.Options{
@@ -244,16 +248,27 @@ func TestS3ObjectOperations(t *testing.T) {
 	resp, body = httpPut(t, coreAPIURL+"/s3-buckets/"+bucketID, map[string]interface{}{
 		"public": true,
 	})
-	require.Equal(t, 200, resp.StatusCode, "set public: %s", body)
+	require.True(t, resp.StatusCode == 200 || resp.StatusCode == 202, "set public: status %d: %s", resp.StatusCode, body)
 	t.Logf("bucket set to public")
 
-	// Anonymous GET (no auth) should work for public buckets.
+	// Wait for the async workflow to apply the public policy in RGW,
+	// then verify anonymous GET works.
 	anonURL := fmt.Sprintf("%s/%s/test-file.txt", rgwEndpoint, internalBucket)
-	anonResp, err := http.Get(anonURL)
-	require.NoError(t, err, "anonymous GET should succeed")
-	defer anonResp.Body.Close()
-	require.Equal(t, 200, anonResp.StatusCode, "anonymous GET should return 200 for public bucket")
-	anonBody, _ := io.ReadAll(anonResp.Body)
+	var anonBody []byte
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		anonResp, err := http.Get(anonURL)
+		if err == nil {
+			body, _ := io.ReadAll(anonResp.Body)
+			anonResp.Body.Close()
+			if anonResp.StatusCode == 200 {
+				anonBody = body
+				break
+			}
+		}
+		time.Sleep(2 * time.Second)
+	}
+	require.NotNil(t, anonBody, "anonymous GET should eventually return 200 for public bucket")
 	require.Equal(t, testContent, string(anonBody), "anonymous download content should match")
 	t.Logf("anonymous public read OK")
 
@@ -261,13 +276,24 @@ func TestS3ObjectOperations(t *testing.T) {
 	resp, body = httpPut(t, coreAPIURL+"/s3-buckets/"+bucketID, map[string]interface{}{
 		"public": false,
 	})
-	require.Equal(t, 200, resp.StatusCode, "set private: %s", body)
+	require.True(t, resp.StatusCode == 200 || resp.StatusCode == 202, "set private: status %d: %s", resp.StatusCode, body)
 	t.Logf("bucket set to private")
 
-	anonResp2, err := http.Get(anonURL)
-	require.NoError(t, err, "anonymous GET should complete (even if 403)")
-	defer anonResp2.Body.Close()
-	require.Equal(t, 403, anonResp2.StatusCode, "anonymous GET should return 403 for private bucket")
+	// Wait for the async workflow to remove the public policy.
+	deadline = time.Now().Add(30 * time.Second)
+	var gotForbidden bool
+	for time.Now().Before(deadline) {
+		anonResp2, err := http.Get(anonURL)
+		if err == nil {
+			anonResp2.Body.Close()
+			if anonResp2.StatusCode == 403 {
+				gotForbidden = true
+				break
+			}
+		}
+		time.Sleep(2 * time.Second)
+	}
+	require.True(t, gotForbidden, "anonymous GET should eventually return 403 for private bucket")
 	t.Logf("anonymous private read correctly denied (403)")
 
 	// --- Test 7: Authenticated read should still work after setting private. ---
@@ -392,7 +418,7 @@ func TestS3BucketWithQuota(t *testing.T) {
 	resp, body = httpPut(t, coreAPIURL+"/s3-buckets/"+bucketID, map[string]interface{}{
 		"quota_bytes": newQuota,
 	})
-	require.Equal(t, 200, resp.StatusCode, "update quota: %s", body)
+	require.True(t, resp.StatusCode == 200 || resp.StatusCode == 202, "update quota: status %d: %s", resp.StatusCode, body)
 	updated := parseJSON(t, body)
 	require.Equal(t, float64(newQuota), updated["quota_bytes"])
 	t.Logf("S3 bucket quota updated to %d", newQuota)
@@ -419,6 +445,7 @@ func findS3Shard(t *testing.T, clusterID string) string {
 func findNodeIPsByRole(t *testing.T, clusterID, role string) []string {
 	t.Helper()
 
+	// Find the shard ID for this role.
 	resp, body := httpGet(t, fmt.Sprintf("%s/clusters/%s/shards", coreAPIURL, clusterID))
 	require.Equal(t, 200, resp.StatusCode)
 
@@ -434,7 +461,8 @@ func findNodeIPsByRole(t *testing.T, clusterID, role string) []string {
 		return nil
 	}
 
-	resp, body = httpGet(t, fmt.Sprintf("%s/shards/%s/nodes", coreAPIURL, shardID))
+	// List all nodes in the cluster, filter by shard_id.
+	resp, body = httpGet(t, fmt.Sprintf("%s/clusters/%s/nodes", coreAPIURL, clusterID))
 	if resp.StatusCode != 200 {
 		return nil
 	}
@@ -442,8 +470,14 @@ func findNodeIPsByRole(t *testing.T, clusterID, role string) []string {
 	nodes := parsePaginatedItems(t, body)
 	var ips []string
 	for _, n := range nodes {
-		if ip, ok := n["ip_address"].(string); ok && ip != "" {
-			ips = append(ips, ip)
+		if sid, _ := n["shard_id"].(string); sid == shardID {
+			if ip, ok := n["ip_address"].(string); ok && ip != "" {
+				// Strip CIDR suffix if present (e.g., "10.10.10.50/32" -> "10.10.10.50").
+				if idx := strings.Index(ip, "/"); idx != -1 {
+					ip = ip[:idx]
+				}
+				ips = append(ips, ip)
+			}
 		}
 	}
 	return ips

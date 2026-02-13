@@ -3,8 +3,8 @@ package hostctl
 import "fmt"
 
 // ConvergeShard triggers shard convergence via the API.
-func ConvergeShard(apiURL, shardID string) error {
-	client := NewClient(apiURL)
+func ConvergeShard(apiURL, apiKey, shardID string) error {
+	client := NewClient(apiURL, apiKey)
 	resp, err := client.Post(fmt.Sprintf("/api/v1/shards/%s/converge", shardID), nil)
 	if err != nil {
 		return err

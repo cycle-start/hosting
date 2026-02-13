@@ -10,6 +10,7 @@ import (
 
 type Client struct {
 	BaseURL    string
+	APIKey     string
 	HTTPClient *http.Client
 }
 
@@ -18,9 +19,10 @@ type Response struct {
 	Body       json.RawMessage
 }
 
-func NewClient(baseURL string) *Client {
+func NewClient(baseURL, apiKey string) *Client {
 	return &Client{
 		BaseURL:    baseURL,
+		APIKey:     apiKey,
 		HTTPClient: &http.Client{},
 	}
 }
@@ -59,6 +61,9 @@ func (c *Client) do(method, path string, body any) (*Response, error) {
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	if c.APIKey != "" {
+		req.Header.Set("X-API-Key", c.APIKey)
 	}
 
 	resp, err := c.HTTPClient.Do(req)

@@ -19,7 +19,7 @@ func Seed(configPath string, timeout time.Duration) error {
 		return fmt.Errorf("parse config: %w", err)
 	}
 
-	client := NewClient(cfg.APIURL)
+	client := NewClient(cfg.APIURL, cfg.APIKey)
 
 	// Resolve references
 	regionID, err := client.FindRegionByName(cfg.Region)

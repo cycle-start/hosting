@@ -7,6 +7,10 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/rs/zerolog"
 )
 
@@ -27,6 +31,16 @@ func NewS3Manager(logger zerolog.Logger, endpoint, adminKey, adminSecret string)
 		adminKey:    adminKey,
 		adminSecret: adminSecret,
 	}
+}
+
+// s3Client returns an S3 client configured for the local RGW endpoint.
+func (m *S3Manager) s3Client() *s3.Client {
+	return s3.New(s3.Options{
+		BaseEndpoint: aws.String(m.endpoint),
+		Region:       "us-east-1",
+		Credentials:  credentials.NewStaticCredentialsProvider(m.adminKey, m.adminSecret, ""),
+		UsePathStyle: true,
+	})
 }
 
 // execRGWAdmin runs a radosgw-admin command and returns the combined output.
@@ -57,7 +71,7 @@ func (m *S3Manager) ensureUser(ctx context.Context, tenantID string) error {
 	return nil
 }
 
-// CreateBucket creates an S3 bucket via radosgw-admin.
+// CreateBucket creates an S3 bucket via the S3 API and links it to the tenant user.
 func (m *S3Manager) CreateBucket(ctx context.Context, tenantID, name string, quotaBytes int64) error {
 	m.logger.Info().Str("tenant", tenantID).Str("bucket", name).Msg("creating S3 bucket")
 
@@ -66,26 +80,47 @@ func (m *S3Manager) CreateBucket(ctx context.Context, tenantID, name string, quo
 		return err
 	}
 
-	// Create bucket via radosgw-admin (bucket create is not available in all versions).
-	// Use the S3 API approach: create with admin creds then link to user.
-	_, err := m.execRGWAdmin(ctx, "bucket", "create",
-		"--bucket="+name,
-		"--bucket-id="+name,
-	)
+	// Create bucket via S3 API using admin credentials.
+	// The admin user retains ownership so it can manage policies.
+	// Tenant access is granted via per-user access keys + bucket policy.
+	client := m.s3Client()
+	_, err := client.CreateBucket(ctx, &s3.CreateBucketInput{
+		Bucket: aws.String(name),
+	})
 	if err != nil {
 		// If bucket already exists, that's fine.
-		if !strings.Contains(string(err.Error()), "BucketAlreadyExists") {
+		if !strings.Contains(err.Error(), "BucketAlreadyExists") &&
+			!strings.Contains(err.Error(), "BucketAlreadyOwnedByYou") {
 			return fmt.Errorf("create bucket %s: %w", name, err)
 		}
 	}
 
-	// Link bucket to tenant user.
-	_, err = m.execRGWAdmin(ctx, "bucket", "link",
-		"--bucket="+name,
-		"--uid="+tenantID,
-	)
+	// Grant the tenant user full access to the bucket via a bucket policy.
+	policy := map[string]any{
+		"Version": "2012-10-17",
+		"Statement": []map[string]any{
+			{
+				"Sid":       "TenantFullAccess",
+				"Effect":    "Allow",
+				"Principal": map[string]any{"AWS": []string{fmt.Sprintf("arn:aws:iam:::user/%s", tenantID)}},
+				"Action":    "s3:*",
+				"Resource": []string{
+					fmt.Sprintf("arn:aws:s3:::%s", name),
+					fmt.Sprintf("arn:aws:s3:::%s/*", name),
+				},
+			},
+		},
+	}
+	policyJSON, err := json.Marshal(policy)
 	if err != nil {
-		return fmt.Errorf("link bucket %s to user %s: %w", name, tenantID, err)
+		return fmt.Errorf("marshal tenant policy: %w", err)
+	}
+	_, err = client.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{
+		Bucket: aws.String(name),
+		Policy: aws.String(string(policyJSON)),
+	})
+	if err != nil {
+		return fmt.Errorf("set tenant bucket policy: %w", err)
 	}
 
 	// Set quota if non-zero.
@@ -123,12 +158,34 @@ func (m *S3Manager) setBucketQuota(ctx context.Context, tenantID, name string, b
 func (m *S3Manager) DeleteBucket(ctx context.Context, tenantID, name string) error {
 	m.logger.Info().Str("tenant", tenantID).Str("bucket", name).Msg("deleting S3 bucket")
 
-	// Purge all objects and delete bucket via radosgw-admin.
-	_, err := m.execRGWAdmin(ctx, "bucket", "rm",
-		"--bucket="+name,
-		"--purge-objects",
-	)
-	if err != nil {
+	// First, delete all objects in the bucket via S3 API.
+	client := m.s3Client()
+	paginator := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{
+		Bucket: aws.String(name),
+	})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			break // Bucket may already be empty or gone.
+		}
+		if len(page.Contents) == 0 {
+			break
+		}
+		objects := make([]s3types.ObjectIdentifier, len(page.Contents))
+		for i, obj := range page.Contents {
+			objects[i] = s3types.ObjectIdentifier{Key: obj.Key}
+		}
+		_, _ = client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+			Bucket: aws.String(name),
+			Delete: &s3types.Delete{Objects: objects},
+		})
+	}
+
+	// Delete the bucket itself.
+	_, err := client.DeleteBucket(ctx, &s3.DeleteBucketInput{
+		Bucket: aws.String(name),
+	})
+	if err != nil && !strings.Contains(err.Error(), "NoSuchBucket") {
 		return fmt.Errorf("delete bucket %s: %w", name, err)
 	}
 
@@ -171,42 +228,52 @@ func (m *S3Manager) DeleteAccessKey(ctx context.Context, tenantID, accessKey str
 	return nil
 }
 
-// SetBucketPolicy sets or removes the public-read bucket policy.
+// SetBucketPolicy sets the bucket policy, always preserving tenant access and
+// optionally adding public read access.
 func (m *S3Manager) SetBucketPolicy(ctx context.Context, tenantID, name string, public bool) error {
 	m.logger.Info().Str("bucket", name).Bool("public", public).Msg("setting S3 bucket policy")
 
-	if public {
-		policy := map[string]any{
-			"Version": "2012-10-17",
-			"Statement": []map[string]any{
-				{
-					"Sid":       "PublicRead",
-					"Effect":    "Allow",
-					"Principal": "*",
-					"Action":    "s3:GetObject",
-					"Resource":  fmt.Sprintf("arn:aws:s3:::%s/*", name),
-				},
-			},
-		}
-		policyJSON, err := json.Marshal(policy)
-		if err != nil {
-			return fmt.Errorf("marshal bucket policy: %w", err)
-		}
+	client := m.s3Client()
 
-		_, err = m.execRGWAdmin(ctx, "bucket", "policy", "set",
-			"--bucket="+name,
-			"--policy="+string(policyJSON),
-		)
-		if err != nil {
-			return fmt.Errorf("set public bucket policy: %w", err)
-		}
-	} else {
-		_, err := m.execRGWAdmin(ctx, "bucket", "policy", "delete",
-			"--bucket="+name,
-		)
-		if err != nil {
-			return fmt.Errorf("delete bucket policy: %w", err)
-		}
+	// Always include tenant full access.
+	statements := []map[string]any{
+		{
+			"Sid":       "TenantFullAccess",
+			"Effect":    "Allow",
+			"Principal": map[string]any{"AWS": []string{fmt.Sprintf("arn:aws:iam:::user/%s", tenantID)}},
+			"Action":    "s3:*",
+			"Resource": []string{
+				fmt.Sprintf("arn:aws:s3:::%s", name),
+				fmt.Sprintf("arn:aws:s3:::%s/*", name),
+			},
+		},
+	}
+
+	if public {
+		statements = append(statements, map[string]any{
+			"Sid":       "PublicRead",
+			"Effect":    "Allow",
+			"Principal": "*",
+			"Action":    "s3:GetObject",
+			"Resource":  fmt.Sprintf("arn:aws:s3:::%s/*", name),
+		})
+	}
+
+	policy := map[string]any{
+		"Version":   "2012-10-17",
+		"Statement": statements,
+	}
+	policyJSON, err := json.Marshal(policy)
+	if err != nil {
+		return fmt.Errorf("marshal bucket policy: %w", err)
+	}
+
+	_, err = client.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{
+		Bucket: aws.String(name),
+		Policy: aws.String(string(policyJSON)),
+	})
+	if err != nil {
+		return fmt.Errorf("set bucket policy: %w", err)
 	}
 
 	return nil

@@ -2,6 +2,7 @@ package hostctl
 
 type ClusterConfig struct {
 	APIURL  string     `yaml:"api_url"`
+	APIKey  string     `yaml:"api_key"`
 	Region  RegionDef  `yaml:"region"`
 	Cluster ClusterDef `yaml:"cluster"`
 }

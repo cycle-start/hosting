@@ -2,6 +2,7 @@ package hostctl
 
 type SeedConfig struct {
 	APIURL  string      `yaml:"api_url"`
+	APIKey  string      `yaml:"api_key"`
 	Region  string      `yaml:"region"`
 	Cluster string      `yaml:"cluster"`
 	Zones   []ZoneDef   `yaml:"zones"`
