@@ -7,6 +7,10 @@ metadata:
     app.kubernetes.io/component: admin-ui
 spec:
   replicas: {{ .Values.adminUi.replicas }}
+  {{- if .Values.adminUi.hostNetwork }}
+  strategy:
+    type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       {{- include "hosting.selectorLabels" . | nindent 6 }}

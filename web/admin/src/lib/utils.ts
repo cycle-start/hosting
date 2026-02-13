@@ -31,6 +31,6 @@ export function formatRelative(date: string | Date): string {
 }
 
 export function truncateID(id: string, len = 8): string {
-  if (id.length <= len) return id
+  if (id.length <= 20) return id
   return id.substring(0, len) + '...'
 }

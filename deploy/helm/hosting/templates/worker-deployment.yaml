@@ -7,6 +7,10 @@ metadata:
     app.kubernetes.io/component: worker
 spec:
   replicas: {{ .Values.worker.replicas }}
+  {{- if .Values.worker.hostNetwork }}
+  strategy:
+    type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       {{- include "hosting.selectorLabels" . | nindent 6 }}

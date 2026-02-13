@@ -167,6 +167,9 @@ func (h *Cluster) Update(w http.ResponseWriter, r *http.Request) {
 	if req.Name != "" {
 		cluster.Name = req.Name
 	}
+	if req.Status != "" {
+		cluster.Status = req.Status
+	}
 	if req.Config != nil {
 		cluster.Config = req.Config
 	}

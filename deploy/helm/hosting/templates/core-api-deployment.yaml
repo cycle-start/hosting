@@ -7,6 +7,10 @@ metadata:
     app.kubernetes.io/component: core-api
 spec:
   replicas: {{ .Values.coreApi.replicas }}
+  {{- if .Values.coreApi.hostNetwork }}
+  strategy:
+    type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       {{- include "hosting.selectorLabels" . | nindent 6 }}

@@ -70,7 +70,20 @@ func ClusterApply(configPath string, timeout time.Duration) error {
 	}
 
 	// 3. Apply nodes (create via API with shard assignment, converge)
-	return applyNodes(client, clusterID, cfg.Cluster)
+	if err := applyNodes(client, clusterID, cfg.Cluster); err != nil {
+		return err
+	}
+
+	// 4. Set cluster status to active
+	_, err = client.Put(fmt.Sprintf("/clusters/%s", clusterID), map[string]any{
+		"status": "active",
+	})
+	if err != nil {
+		return fmt.Errorf("set cluster active: %w", err)
+	}
+	fmt.Printf("Cluster %q: active\n", cfg.Cluster.Name)
+
+	return nil
 }
 
 func applyNodes(client *Client, clusterID string, def ClusterDef) error {

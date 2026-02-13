@@ -11,6 +11,7 @@ type CreateCluster struct {
 
 type UpdateCluster struct {
 	Name   string          `json:"name"`
+	Status string          `json:"status"`
 	Config json.RawMessage `json:"config"`
 	Spec   json.RawMessage `json:"spec"`
 }
