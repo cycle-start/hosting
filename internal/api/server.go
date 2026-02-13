@@ -34,7 +34,7 @@ type Server struct {
 }
 
 func NewServer(logger zerolog.Logger, coreDB *pgxpool.Pool, temporalClient temporalclient.Client, cfg *config.Config) *Server {
-	services := core.NewServices(coreDB, temporalClient)
+	services := core.NewServices(coreDB, temporalClient, cfg.OIDCIssuerURL)
 	auditLogger := mw.NewAuditLogger(coreDB, logger)
 
 	s := &Server{
@@ -78,6 +78,13 @@ func (s *Server) setupRoutes() {
 		w.Header().Set("Content-Type", "text/html")
 		w.Write([]byte(scalarHTML))
 	})
+
+	// OIDC endpoints (no auth required — public)
+	oidc := handler.NewOIDC(s.services.OIDC)
+	s.router.Get("/.well-known/openid-configuration", oidc.Discovery)
+	s.router.Get("/oidc/jwks", oidc.JWKS)
+	s.router.Get("/oidc/authorize", oidc.Authorize)
+	s.router.Post("/oidc/token", oidc.Token)
 
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Use(mw.Auth(s.corePool))
@@ -162,6 +169,14 @@ func (s *Server) setupRoutes() {
 		r.Post("/tenants/{id}/unsuspend", tenant.Unsuspend)
 		r.Post("/tenants/{id}/migrate", tenant.Migrate)
 		r.Get("/tenants/{id}/resource-summary", tenant.ResourceSummary)
+
+		// OIDC login sessions
+		oidcLogin := handler.NewOIDCLogin(s.services.OIDC)
+		r.Post("/tenants/{id}/login-sessions", oidcLogin.CreateLoginSession)
+
+		// OIDC clients (admin)
+		oidcClient := handler.NewOIDCClient(s.services.OIDC)
+		r.Post("/oidc/clients", oidcClient.Create)
 
 		// Webroots
 		webroot := handler.NewWebroot(s.services)

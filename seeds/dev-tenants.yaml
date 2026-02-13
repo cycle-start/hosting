@@ -19,11 +19,19 @@ zones:
     brand: acme-brand
     tenant: acme-corp
 
+oidc_clients:
+  - id: cloudbeaver
+    secret: cloudbeaver-secret
+    name: CloudBeaver DB Admin
+    redirect_uris:
+      - http://dbadmin.hosting.localhost/oauth2/callback
+
 tenants:
   - name: acme-corp
     brand: acme-brand
     shard: web-1
     sftp_enabled: true
+    ssh_enabled: true
     webroots:
       - name: main-site
         runtime: php
@@ -52,7 +60,7 @@ tenants:
             key_pattern: "~*"
     s3_buckets:
       - name: media-uploads
-        shard: s3-1
+        shard: storage-1
         public: true
         quota_bytes: 10737418240
     email_accounts:

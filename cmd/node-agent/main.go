@@ -34,11 +34,11 @@ func main() {
 		MySQLDSN:        cfg.MySQLDSN,
 		NginxConfigDir:  getEnv("NGINX_CONFIG_DIR", "/etc/nginx"),
 		WebStorageDir:   getEnv("WEB_STORAGE_DIR", "/var/www/storage"),
-		HomeBaseDir:     getEnv("HOME_BASE_DIR", "/home"),
 		CertDir:         getEnv("CERT_DIR", "/etc/ssl/hosting"),
 		ValkeyConfigDir: getEnv("VALKEY_CONFIG_DIR", "/etc/valkey"),
 		ValkeyDataDir:   getEnv("VALKEY_DATA_DIR", "/var/lib/valkey"),
 		InitSystem:      getEnv("INIT_SYSTEM", "direct"),
+		SSHConfigDir:    getEnv("SSH_CONFIG_DIR", "/etc/ssh/sshd_config.d"),
 		ShardName:       getEnv("SHARD_NAME", ""),
 	}
 
@@ -77,6 +77,7 @@ func main() {
 		srv.DatabaseManager(),
 		srv.ValkeyManager(),
 		s3Mgr,
+		srv.SSHManager(),
 		srv.Runtimes(),
 	)
 	w.RegisterActivity(nodeActs)

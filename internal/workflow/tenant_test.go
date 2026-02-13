@@ -35,7 +35,7 @@ func (s *CreateTenantWorkflowTestSuite) TestSuccess() {
 	tenant := model.Tenant{
 		ID:          tenantID,
 		BrandID:     "test-brand",
-			UID:         5001,
+		UID:         5001,
 		ShardID:     &shardID,
 		SFTPEnabled: true,
 	}
@@ -50,8 +50,11 @@ func (s *CreateTenantWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("CreateTenant", mock.Anything, activity.CreateTenantParams{
 		ID:          tenantID,
-			UID:         5001,
+		UID:         5001,
 		SFTPEnabled: true,
+	}).Return(nil)
+	s.env.OnActivity("SyncSSHConfig", mock.Anything, activity.SyncSSHConfigParams{
+		TenantName: tenantID, SFTPEnabled: true,
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "tenants", ID: tenantID, Status: model.StatusActive,
@@ -158,7 +161,7 @@ func (s *UpdateTenantWorkflowTestSuite) TestSuccess() {
 	tenant := model.Tenant{
 		ID:          tenantID,
 		BrandID:     "test-brand",
-			UID:         5001,
+		UID:         5001,
 		ShardID:     &shardID,
 		SFTPEnabled: true,
 	}
@@ -173,8 +176,11 @@ func (s *UpdateTenantWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("UpdateTenant", mock.Anything, activity.UpdateTenantParams{
 		ID:          tenantID,
-			UID:         5001,
+		UID:         5001,
 		SFTPEnabled: true,
+	}).Return(nil)
+	s.env.OnActivity("SyncSSHConfig", mock.Anything, activity.SyncSSHConfigParams{
+		TenantName: tenantID, SFTPEnabled: true,
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "tenants", ID: tenantID, Status: model.StatusActive,
@@ -396,6 +402,7 @@ func (s *DeleteTenantWorkflowTestSuite) TestSuccess() {
 	}).Return(nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("RemoveSSHConfig", mock.Anything, tenantID).Return(nil)
 	s.env.OnActivity("DeleteTenant", mock.Anything, tenantID).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "tenants", ID: tenantID, Status: model.StatusDeleted,
@@ -423,6 +430,7 @@ func (s *DeleteTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	}).Return(nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("RemoveSSHConfig", mock.Anything, tenantID).Return(nil)
 	s.env.OnActivity("DeleteTenant", mock.Anything, tenantID).Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "tenants", ID: tenantID, Status: model.StatusFailed,

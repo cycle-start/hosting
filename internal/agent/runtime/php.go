@@ -9,8 +9,6 @@ import (
 	"text/template"
 
 	"github.com/rs/zerolog"
-
-	agentv1 "github.com/edvin/hosting/proto/agent/v1"
 )
 
 const phpPoolTemplate = `[{{ .TenantName }}]
@@ -29,8 +27,9 @@ pm.min_spare_servers = 1
 pm.max_spare_servers = 3
 pm.max_requests = 500
 
-php_admin_value[error_log] = /home/{{ .TenantName }}/logs/php-error.log
+php_admin_value[error_log] = /var/www/storage/{{ .TenantName }}/logs/php-error.log
 php_admin_flag[log_errors] = on
+php_admin_value[open_basedir] = /var/www/storage/{{ .TenantName }}/:/tmp/
 `
 
 var phpPoolTmpl = template.Must(template.New("phppool").Parse(phpPoolTemplate))
@@ -54,16 +53,16 @@ type phpPoolData struct {
 	Version    string
 }
 
-func (p *PHP) poolConfigPath(webroot *agentv1.WebrootInfo) string {
-	version := webroot.GetRuntimeVersion()
+func (p *PHP) poolConfigPath(webroot *WebrootInfo) string {
+	version := webroot.RuntimeVersion
 	if version == "" {
 		version = "8.5"
 	}
-	return filepath.Join("/etc/php", version, "fpm/pool.d", webroot.GetTenantName()+".conf")
+	return filepath.Join("/etc/php", version, "fpm/pool.d", webroot.TenantName+".conf")
 }
 
-func (p *PHP) fpmServiceName(webroot *agentv1.WebrootInfo) string {
-	version := webroot.GetRuntimeVersion()
+func (p *PHP) fpmServiceName(webroot *WebrootInfo) string {
+	version := webroot.RuntimeVersion
 	if version == "" {
 		version = "8.5"
 	}
@@ -71,14 +70,14 @@ func (p *PHP) fpmServiceName(webroot *agentv1.WebrootInfo) string {
 }
 
 // Configure generates and writes a PHP-FPM pool configuration file for the tenant.
-func (p *PHP) Configure(ctx context.Context, webroot *agentv1.WebrootInfo) error {
-	version := webroot.GetRuntimeVersion()
+func (p *PHP) Configure(ctx context.Context, webroot *WebrootInfo) error {
+	version := webroot.RuntimeVersion
 	if version == "" {
 		version = "8.5"
 	}
 
 	data := phpPoolData{
-		TenantName: webroot.GetTenantName(),
+		TenantName: webroot.TenantName,
 		Version:    version,
 	}
 
@@ -90,7 +89,7 @@ func (p *PHP) Configure(ctx context.Context, webroot *agentv1.WebrootInfo) error
 	configPath := p.poolConfigPath(webroot)
 
 	p.logger.Info().
-		Str("tenant", webroot.GetTenantName()).
+		Str("tenant", webroot.TenantName).
 		Str("version", version).
 		Str("path", configPath).
 		Msg("writing PHP-FPM pool config")
@@ -107,10 +106,10 @@ func (p *PHP) Configure(ctx context.Context, webroot *agentv1.WebrootInfo) error
 }
 
 // Start reloads PHP-FPM to pick up the new pool configuration.
-func (p *PHP) Start(ctx context.Context, webroot *agentv1.WebrootInfo) error {
+func (p *PHP) Start(ctx context.Context, webroot *WebrootInfo) error {
 	service := p.fpmServiceName(webroot)
 	p.logger.Info().
-		Str("tenant", webroot.GetTenantName()).
+		Str("tenant", webroot.TenantName).
 		Str("service", service).
 		Msg("reloading PHP-FPM to start pool")
 
@@ -119,12 +118,12 @@ func (p *PHP) Start(ctx context.Context, webroot *agentv1.WebrootInfo) error {
 }
 
 // Stop removes the pool configuration and reloads PHP-FPM.
-func (p *PHP) Stop(ctx context.Context, webroot *agentv1.WebrootInfo) error {
+func (p *PHP) Stop(ctx context.Context, webroot *WebrootInfo) error {
 	configPath := p.poolConfigPath(webroot)
 	service := p.fpmServiceName(webroot)
 
 	p.logger.Info().
-		Str("tenant", webroot.GetTenantName()).
+		Str("tenant", webroot.TenantName).
 		Str("path", configPath).
 		Msg("removing PHP-FPM pool config and reloading")
 
@@ -136,10 +135,10 @@ func (p *PHP) Stop(ctx context.Context, webroot *agentv1.WebrootInfo) error {
 }
 
 // Reload triggers a graceful reload of the PHP-FPM service.
-func (p *PHP) Reload(ctx context.Context, webroot *agentv1.WebrootInfo) error {
+func (p *PHP) Reload(ctx context.Context, webroot *WebrootInfo) error {
 	service := p.fpmServiceName(webroot)
 	p.logger.Info().
-		Str("tenant", webroot.GetTenantName()).
+		Str("tenant", webroot.TenantName).
 		Str("service", service).
 		Msg("reloading PHP-FPM")
 
@@ -147,6 +146,6 @@ func (p *PHP) Reload(ctx context.Context, webroot *agentv1.WebrootInfo) error {
 }
 
 // Remove removes the pool configuration and reloads PHP-FPM.
-func (p *PHP) Remove(ctx context.Context, webroot *agentv1.WebrootInfo) error {
+func (p *PHP) Remove(ctx context.Context, webroot *WebrootInfo) error {
 	return p.Stop(ctx, webroot)
 }

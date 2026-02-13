@@ -59,6 +59,9 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 	s.env.OnActivity("CreateTenant", mock.Anything, activity.CreateTenantParams{
 		ID: "tenant-1", UID: 1000, SFTPEnabled: true,
 	}).Return(nil)
+	s.env.OnActivity("SyncSSHConfig", mock.Anything, activity.SyncSSHConfigParams{
+		TenantName: "tenant-1", SFTPEnabled: true,
+	}).Return(nil)
 
 	s.env.OnActivity("ListWebrootsByTenantID", mock.Anything, "tenant-1").Return(webroots, nil)
 	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, "wr-1").Return(fqdns, nil)
@@ -189,6 +192,9 @@ func (s *ConvergeShardWorkflowTestSuite) TestSkipsInactiveResources() {
 	// Only the active tenant gets CreateTenant.
 	s.env.OnActivity("CreateTenant", mock.Anything, activity.CreateTenantParams{
 		ID: "tenant-active", UID: 1000,
+	}).Return(nil)
+	s.env.OnActivity("SyncSSHConfig", mock.Anything, activity.SyncSSHConfigParams{
+		TenantName: "tenant-active",
 	}).Return(nil)
 
 	s.env.OnActivity("ListWebrootsByTenantID", mock.Anything, "tenant-active").Return([]model.Webroot{}, nil)

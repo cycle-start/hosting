@@ -59,6 +59,18 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 			ID:          tenant.ID,
 			UID:         tenant.UID,
 			SFTPEnabled: tenant.SFTPEnabled,
+			SSHEnabled:  tenant.SSHEnabled,
+		}).Get(ctx, nil)
+		if err != nil {
+			_ = setResourceFailed(ctx, "tenants", tenantID)
+			return err
+		}
+
+		// Sync SSH/SFTP config on the node.
+		err = workflow.ExecuteActivity(nodeCtx, "SyncSSHConfig", activity.SyncSSHConfigParams{
+			TenantName:  tenant.ID,
+			SSHEnabled:  tenant.SSHEnabled,
+			SFTPEnabled: tenant.SFTPEnabled,
 		}).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "tenants", tenantID)
@@ -120,6 +132,18 @@ func UpdateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		err = workflow.ExecuteActivity(nodeCtx, "UpdateTenant", activity.UpdateTenantParams{
 			ID:          tenant.ID,
 			UID:         tenant.UID,
+			SFTPEnabled: tenant.SFTPEnabled,
+			SSHEnabled:  tenant.SSHEnabled,
+		}).Get(ctx, nil)
+		if err != nil {
+			_ = setResourceFailed(ctx, "tenants", tenantID)
+			return err
+		}
+
+		// Sync SSH/SFTP config on the node.
+		err = workflow.ExecuteActivity(nodeCtx, "SyncSSHConfig", activity.SyncSSHConfigParams{
+			TenantName:  tenant.ID,
+			SSHEnabled:  tenant.SSHEnabled,
 			SFTPEnabled: tenant.SFTPEnabled,
 		}).Get(ctx, nil)
 		if err != nil {
@@ -284,6 +308,14 @@ func DeleteTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	// Delete tenant on each node in the shard.
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
+
+		// Remove SSH config before deleting the tenant.
+		err = workflow.ExecuteActivity(nodeCtx, "RemoveSSHConfig", tenant.ID).Get(ctx, nil)
+		if err != nil {
+			_ = setResourceFailed(ctx, "tenants", tenantID)
+			return err
+		}
+
 		err = workflow.ExecuteActivity(nodeCtx, "DeleteTenant", tenant.ID).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "tenants", tenantID)

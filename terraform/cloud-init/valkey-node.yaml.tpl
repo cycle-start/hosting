@@ -9,35 +9,15 @@ users:
     ssh_authorized_keys:
       - ${ssh_public_key}
 
-packages:
-  - curl
-
-mounts:
-  - ["hostbin", "/opt/hosting/bin", "9p", "trans=virtio,version=9p2000.L,ro", "0", "0"]
-
 write_files:
-  - path: /etc/systemd/system/node-agent.service
+  - path: /etc/default/node-agent
     content: |
-      [Unit]
-      Description=Hosting Node Agent
-      After=network-online.target
-      Wants=network-online.target
-
-      [Service]
-      Type=simple
-      ExecStart=/opt/hosting/bin/node-agent
-      Environment=TEMPORAL_ADDRESS=${temporal_address}
-      Environment=NODE_ID=${node_id}
-      Environment=SHARD_NAME=${shard_name}
-      Environment=VALKEY_CONFIG_DIR=/etc/valkey
-      Environment=VALKEY_DATA_DIR=/var/lib/valkey
-      Restart=always
-      RestartSec=5
-
-      [Install]
-      WantedBy=multi-user.target
+      TEMPORAL_ADDRESS=${temporal_address}
+      NODE_ID=${node_id}
+      SHARD_NAME=${shard_name}
+      VALKEY_CONFIG_DIR=/etc/valkey
+      VALKEY_DATA_DIR=/var/lib/valkey
 
 runcmd:
-  - mkdir -p /etc/valkey /var/lib/valkey
   - systemctl daemon-reload
-  - systemctl enable --now node-agent
+  - systemctl start node-agent

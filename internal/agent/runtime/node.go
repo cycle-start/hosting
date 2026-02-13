@@ -10,8 +10,6 @@ import (
 	"text/template"
 
 	"github.com/rs/zerolog"
-
-	agentv1 "github.com/edvin/hosting/proto/agent/v1"
 )
 
 const nodeServiceTemplate = `[Unit]
@@ -29,8 +27,8 @@ RestartSec=5
 Environment=NODE_ENV=production
 Environment=PORT={{ .Port }}
 
-StandardOutput=append:/home/{{ .TenantName }}/logs/node-{{ .WebrootName }}.log
-StandardError=append:/home/{{ .TenantName }}/logs/node-{{ .WebrootName }}.error.log
+StandardOutput=append:/var/www/storage/{{ .TenantName }}/logs/node-{{ .WebrootName }}.log
+StandardError=append:/var/www/storage/{{ .TenantName }}/logs/node-{{ .WebrootName }}.error.log
 
 [Install]
 WantedBy=multi-user.target
@@ -60,11 +58,11 @@ type nodeServiceData struct {
 	Port        uint32
 }
 
-func (n *Node) serviceName(webroot *agentv1.WebrootInfo) string {
-	return fmt.Sprintf("node-%s-%s", webroot.GetTenantName(), webroot.GetName())
+func (n *Node) serviceName(webroot *WebrootInfo) string {
+	return fmt.Sprintf("node-%s-%s", webroot.TenantName, webroot.Name)
 }
 
-func (n *Node) unitFilePath(webroot *agentv1.WebrootInfo) string {
+func (n *Node) unitFilePath(webroot *WebrootInfo) string {
 	return filepath.Join("/etc/systemd/system", n.serviceName(webroot)+".service")
 }
 
@@ -77,14 +75,14 @@ func computePort(tenant, webroot string) uint32 {
 }
 
 // Configure generates and writes a systemd service unit for the Node.js application.
-func (n *Node) Configure(ctx context.Context, webroot *agentv1.WebrootInfo) error {
-	port := computePort(webroot.GetTenantName(), webroot.GetName())
+func (n *Node) Configure(ctx context.Context, webroot *WebrootInfo) error {
+	port := computePort(webroot.TenantName, webroot.Name)
 	entryPoint := "index.js"
-	workingDir := filepath.Join("/var/www/storage", webroot.GetTenantName(), webroot.GetName())
+	workingDir := filepath.Join("/var/www/storage", webroot.TenantName, "webroots", webroot.Name)
 
 	data := nodeServiceData{
-		TenantName:  webroot.GetTenantName(),
-		WebrootName: webroot.GetName(),
+		TenantName:  webroot.TenantName,
+		WebrootName: webroot.Name,
 		WorkingDir:  workingDir,
 		EntryPoint:  entryPoint,
 		Port:        port,
@@ -98,8 +96,8 @@ func (n *Node) Configure(ctx context.Context, webroot *agentv1.WebrootInfo) erro
 	unitPath := n.unitFilePath(webroot)
 
 	n.logger.Info().
-		Str("tenant", webroot.GetTenantName()).
-		Str("webroot", webroot.GetName()).
+		Str("tenant", webroot.TenantName).
+		Str("webroot", webroot.Name).
 		Uint32("port", port).
 		Str("path", unitPath).
 		Msg("writing Node.js systemd unit")
@@ -112,28 +110,28 @@ func (n *Node) Configure(ctx context.Context, webroot *agentv1.WebrootInfo) erro
 }
 
 // Start enables and starts the Node.js systemd service.
-func (n *Node) Start(ctx context.Context, webroot *agentv1.WebrootInfo) error {
+func (n *Node) Start(ctx context.Context, webroot *WebrootInfo) error {
 	service := n.serviceName(webroot)
 	n.logger.Info().Str("service", service).Msg("starting Node.js service")
 	return n.svcMgr.Start(ctx, service)
 }
 
 // Stop stops and disables the Node.js systemd service.
-func (n *Node) Stop(ctx context.Context, webroot *agentv1.WebrootInfo) error {
+func (n *Node) Stop(ctx context.Context, webroot *WebrootInfo) error {
 	service := n.serviceName(webroot)
 	n.logger.Info().Str("service", service).Msg("stopping Node.js service")
 	return n.svcMgr.Stop(ctx, service)
 }
 
 // Reload restarts the Node.js service to pick up changes.
-func (n *Node) Reload(ctx context.Context, webroot *agentv1.WebrootInfo) error {
+func (n *Node) Reload(ctx context.Context, webroot *WebrootInfo) error {
 	service := n.serviceName(webroot)
 	n.logger.Info().Str("service", service).Msg("restarting Node.js service")
 	return n.svcMgr.Restart(ctx, service)
 }
 
 // Remove stops the service and removes the systemd unit file.
-func (n *Node) Remove(ctx context.Context, webroot *agentv1.WebrootInfo) error {
+func (n *Node) Remove(ctx context.Context, webroot *WebrootInfo) error {
 	if err := n.Stop(ctx, webroot); err != nil {
 		n.logger.Warn().Err(err).Msg("failed to stop node service during removal, continuing")
 	}

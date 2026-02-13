@@ -122,6 +122,7 @@ func Seed(configPath string, timeout time.Duration) error {
 			"cluster_id":   clusterID,
 			"shard_id":     shardID,
 			"sftp_enabled": t.SFTPEnabled,
+			"ssh_enabled":  t.SSHEnabled,
 		}
 		if t.Brand != "" {
 			tenantBody["brand_id"] = t.Brand
@@ -191,6 +192,21 @@ func Seed(configPath string, timeout time.Duration) error {
 				return fmt.Errorf("email account %q for tenant %q: %w", e.Address, t.Name, err)
 			}
 		}
+	}
+
+	// 4. Create OIDC clients
+	for _, c := range cfg.OIDCClients {
+		fmt.Printf("Creating OIDC client %q...\n", c.ID)
+		_, err := client.Post("/oidc/clients", map[string]any{
+			"id":            c.ID,
+			"secret":        c.Secret,
+			"name":          c.Name,
+			"redirect_uris": c.RedirectURIs,
+		})
+		if err != nil {
+			return fmt.Errorf("create OIDC client %q: %w", c.ID, err)
+		}
+		fmt.Printf("  OIDC client %q: created\n", c.ID)
 	}
 
 	// Print summary

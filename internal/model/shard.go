@@ -23,5 +23,11 @@ const (
 	ShardRoleDNS      = "dns"
 	ShardRoleEmail    = "email"
 	ShardRoleValkey   = "valkey"
-	ShardRoleS3       = "s3"
+	ShardRoleStorage     = "storage"
+	ShardRoleDBAdmin = "dbadmin"
 )
+
+type StorageShardConfig struct {
+	S3Enabled        bool `json:"s3_enabled"`
+	FilestoreEnabled bool `json:"filestore_enabled"`
+}

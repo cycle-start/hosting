@@ -9,45 +9,23 @@ users:
     ssh_authorized_keys:
       - ${ssh_public_key}
 
-packages:
-  - nginx
-  - php8.3-fpm
-  - php8.3-cli
-  - php8.3-mysql
-  - php8.3-curl
-  - php8.3-mbstring
-  - php8.3-xml
-  - php8.3-zip
-  - curl
-
-mounts:
-  - ["hostbin", "/opt/hosting/bin", "9p", "trans=virtio,version=9p2000.L,ro", "0", "0"]
-
 write_files:
-  - path: /etc/systemd/system/node-agent.service
+  - path: /etc/default/node-agent
     content: |
-      [Unit]
-      Description=Hosting Node Agent
-      After=network-online.target
-      Wants=network-online.target
-
-      [Service]
-      Type=simple
-      ExecStart=/opt/hosting/bin/node-agent
-      Environment=TEMPORAL_ADDRESS=${temporal_address}
-      Environment=NODE_ID=${node_id}
-      Environment=SHARD_NAME=${shard_name}
-      Environment=NGINX_CONFIG_DIR=/etc/nginx
-      Environment=WEB_STORAGE_DIR=/var/www/storage
-      Environment=HOME_BASE_DIR=/home
-      Environment=CERT_DIR=/etc/ssl/hosting
-      Restart=always
-      RestartSec=5
-
-      [Install]
-      WantedBy=multi-user.target
+      TEMPORAL_ADDRESS=${temporal_address}
+      NODE_ID=${node_id}
+      SHARD_NAME=${shard_name}
+      NGINX_CONFIG_DIR=/etc/nginx
+      WEB_STORAGE_DIR=/var/www/storage
+      CERT_DIR=/etc/ssl/hosting
+      SSH_CONFIG_DIR=/etc/ssh/sshd_config.d
 
 runcmd:
-  - mkdir -p /var/www/storage /etc/ssl/hosting
+  # Fetch CephFS client keyring and config from storage node.
+  - scp -o StrictHostKeyChecking=no ubuntu@${storage_node_ip}:/etc/ceph/ceph.client.web.keyring /etc/ceph/
+  - scp -o StrictHostKeyChecking=no ubuntu@${storage_node_ip}:/etc/ceph/ceph.conf /etc/ceph/
+  # Mount CephFS for shared web storage.
+  - mount -t ceph ${storage_node_ip}:/ /var/www/storage -o name=web,secretfile=/etc/ceph/ceph.client.web.keyring
+  - echo "${storage_node_ip}:/ /var/www/storage ceph name=web,secretfile=/etc/ceph/ceph.client.web.keyring,noatime 0 0" >> /etc/fstab
   - systemctl daemon-reload
-  - systemctl enable --now node-agent
+  - systemctl start node-agent

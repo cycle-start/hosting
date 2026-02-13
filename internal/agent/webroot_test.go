@@ -12,7 +12,6 @@ func newTestWebrootManager(t *testing.T) *WebrootManager {
 	tmpDir := t.TempDir()
 	cfg := Config{
 		WebStorageDir: tmpDir + "/storage",
-		HomeBaseDir:   tmpDir + "/home",
 	}
 	return NewWebrootManager(zerolog.Nop(), cfg)
 }
@@ -21,24 +20,17 @@ func TestWebrootManager_StoragePath(t *testing.T) {
 	mgr := newTestWebrootManager(t)
 
 	path := mgr.storagePath("tenant1", "mysite")
-	assert.Contains(t, path, "storage/tenant1/mysite")
-}
-
-func TestWebrootManager_SymlinkPath(t *testing.T) {
-	mgr := newTestWebrootManager(t)
-
-	path := mgr.symlinkPath("tenant1", "mysite")
-	assert.Contains(t, path, "home/tenant1/webroots/mysite")
+	assert.Contains(t, path, "storage/tenant1/webroots/mysite")
 }
 
 func TestWebrootManager_IsValidStoragePath_Valid(t *testing.T) {
 	mgr := newTestWebrootManager(t)
 
-	// Two levels deep should be valid.
+	// Three levels deep (tenant/webroots/webroot) should be valid.
 	valid := mgr.isValidStoragePath(mgr.storagePath("tenant1", "mysite"))
 	assert.True(t, valid)
 
-	// More than two levels deep is also valid.
+	// More than three levels deep is also valid.
 	valid = mgr.isValidStoragePath(mgr.storagePath("tenant1", "mysite") + "/subdir")
 	assert.True(t, valid)
 }
@@ -52,6 +44,7 @@ func TestWebrootManager_IsValidStoragePath_Invalid(t *testing.T) {
 	}{
 		{"storage root only", mgr.webStorageDir},
 		{"one level deep", mgr.webStorageDir + "/tenant1"},
+		{"two levels deep", mgr.webStorageDir + "/tenant1/webroots"},
 		{"path traversal", mgr.webStorageDir + "/tenant1/../../../etc"},
 		{"outside storage", "/etc/passwd"},
 		{"relative path traversal", mgr.webStorageDir + "/tenant1/../../etc/passwd"},

@@ -52,6 +52,12 @@ func ConvergeShardWorkflow(ctx workflow.Context, params ConvergeShardParams) err
 		return convergeDatabaseShard(ctx, params.ShardID, nodes)
 	case model.ShardRoleValkey:
 		return convergeValkeyShard(ctx, params.ShardID, nodes)
+	case model.ShardRoleStorage:
+		// Storage nodes (S3/CephFS) are configured at boot via cloud-init; no convergence needed.
+		return nil
+	case model.ShardRoleDBAdmin:
+		// DB admin nodes are configured at boot via cloud-init; no convergence needed.
+		return nil
 	default:
 		// DNS/email shards don't have convergence yet.
 		return nil
@@ -78,9 +84,20 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				ID:          tenant.ID,
 				UID:         tenant.UID,
 				SFTPEnabled: tenant.SFTPEnabled,
+				SSHEnabled:  tenant.SSHEnabled,
 			}).Get(ctx, nil)
 			if err != nil {
 				return fmt.Errorf("create tenant %s on node %s: %w", tenant.ID, node.ID, err)
+			}
+
+			// Sync SSH/SFTP config on the node.
+			err = workflow.ExecuteActivity(nodeCtx, "SyncSSHConfig", activity.SyncSSHConfigParams{
+				TenantName:  tenant.ID,
+				SSHEnabled:  tenant.SSHEnabled,
+				SFTPEnabled: tenant.SFTPEnabled,
+			}).Get(ctx, nil)
+			if err != nil {
+				return fmt.Errorf("sync ssh config for %s on node %s: %w", tenant.ID, node.ID, err)
 			}
 		}
 

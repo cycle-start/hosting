@@ -35,6 +35,7 @@ config:
   registryUrl: ""
   acmeEmail: ""
   acmeDirectoryUrl: "https://acme-v02.api.letsencrypt.org/directory"
+  oidcIssuerUrl: "http://api.hosting.localhost"
   auditLogRetentionDays: "90"
   backupRetentionDays: "30"
 

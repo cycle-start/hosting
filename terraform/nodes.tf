@@ -16,11 +16,15 @@ resource "random_uuid" "valkey_node_id" {
   count = length(var.valkey_nodes)
 }
 
-resource "random_uuid" "s3_node_id" {
-  count = length(var.s3_nodes)
+resource "random_uuid" "storage_node_id" {
+  count = length(var.storage_nodes)
 }
 
-# --- Volumes (backed by base image) ---
+resource "random_uuid" "dbadmin_node_id" {
+  count = length(var.dbadmin_nodes)
+}
+
+# --- Volumes (backed by golden images) ---
 
 resource "libvirt_volume" "web_node" {
   count    = length(var.web_nodes)
@@ -29,7 +33,7 @@ resource "libvirt_volume" "web_node" {
   capacity = 10737418240 # 10 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
-    path   = libvirt_volume.ubuntu_base.path
+    path   = libvirt_volume.image_web.path
     format = { type = "qcow2" }
   }
 }
@@ -41,7 +45,7 @@ resource "libvirt_volume" "db_node" {
   capacity = 21474836480 # 20 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
-    path   = libvirt_volume.ubuntu_base.path
+    path   = libvirt_volume.image_db.path
     format = { type = "qcow2" }
   }
 }
@@ -53,7 +57,7 @@ resource "libvirt_volume" "dns_node" {
   capacity = 5368709120 # 5 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
-    path   = libvirt_volume.ubuntu_base.path
+    path   = libvirt_volume.image_dns.path
     format = { type = "qcow2" }
   }
 }
@@ -65,27 +69,27 @@ resource "libvirt_volume" "valkey_node" {
   capacity = 5368709120 # 5 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
-    path   = libvirt_volume.ubuntu_base.path
+    path   = libvirt_volume.image_valkey.path
     format = { type = "qcow2" }
   }
 }
 
-resource "libvirt_volume" "s3_node" {
-  count    = length(var.s3_nodes)
-  name     = "${var.s3_nodes[count.index].name}.qcow2"
+resource "libvirt_volume" "storage_node" {
+  count    = length(var.storage_nodes)
+  name     = "${var.storage_nodes[count.index].name}.qcow2"
   pool     = libvirt_pool.hosting.name
   capacity = 21474836480 # 20 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
-    path   = libvirt_volume.ubuntu_base.path
+    path   = libvirt_volume.image_storage.path
     format = { type = "qcow2" }
   }
 }
 
 # Dedicated OSD data disk for Ceph BlueStore.
-resource "libvirt_volume" "s3_node_osd" {
-  count    = length(var.s3_nodes)
-  name     = "${var.s3_nodes[count.index].name}-osd.raw"
+resource "libvirt_volume" "storage_node_osd" {
+  count    = length(var.storage_nodes)
+  name     = "${var.storage_nodes[count.index].name}-osd.raw"
   pool     = libvirt_pool.hosting.name
   capacity = 10737418240 # 10 GB
   target   = { format = { type = "raw" } }
@@ -106,6 +110,7 @@ resource "libvirt_cloudinit_disk" "web_node" {
     shard_name       = var.web_shard_name
     temporal_address = "${var.gateway_ip}:${var.temporal_port}"
     ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
+    storage_node_ip  = var.storage_nodes[0].ip
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.web_nodes[count.index].ip
@@ -209,33 +214,76 @@ resource "libvirt_volume" "valkey_node_seed" {
   }
 }
 
-resource "libvirt_cloudinit_disk" "s3_node" {
-  count = length(var.s3_nodes)
-  name  = "${var.s3_nodes[count.index].name}-cloudinit.iso"
+resource "libvirt_cloudinit_disk" "storage_node" {
+  count = length(var.storage_nodes)
+  name  = "${var.storage_nodes[count.index].name}-cloudinit.iso"
   meta_data = yamlencode({
-    instance-id    = "i-${var.s3_nodes[count.index].name}"
-    local-hostname = var.s3_nodes[count.index].name
+    instance-id    = "i-${var.storage_nodes[count.index].name}"
+    local-hostname = var.storage_nodes[count.index].name
   })
-  user_data = templatefile("${path.module}/cloud-init/s3-node.yaml.tpl", {
-    hostname         = var.s3_nodes[count.index].name
-    node_id          = random_uuid.s3_node_id[count.index].result
-    shard_name       = var.s3_shard_name
-    temporal_address = "${var.gateway_ip}:${var.temporal_port}"
-    ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
-    ip_address       = var.s3_nodes[count.index].ip
+  user_data = templatefile("${path.module}/cloud-init/storage-node.yaml.tpl", {
+    hostname           = var.storage_nodes[count.index].name
+    node_id            = random_uuid.storage_node_id[count.index].result
+    shard_name         = var.storage_shard_name
+    temporal_address   = "${var.gateway_ip}:${var.temporal_port}"
+    ssh_public_key     = file(pathexpand(var.ssh_public_key_path))
+    ip_address         = var.storage_nodes[count.index].ip
+    s3_enabled         = true
+    filestore_enabled  = true
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
-    ip_address = var.s3_nodes[count.index].ip
+    ip_address = var.storage_nodes[count.index].ip
     gateway    = var.gateway_ip
   })
 }
 
-resource "libvirt_volume" "s3_node_seed" {
-  count = length(var.s3_nodes)
-  name  = "${var.s3_nodes[count.index].name}-seed.iso"
+resource "libvirt_volume" "storage_node_seed" {
+  count = length(var.storage_nodes)
+  name  = "${var.storage_nodes[count.index].name}-seed.iso"
   pool  = libvirt_pool.hosting.name
   create = {
-    content = { url = libvirt_cloudinit_disk.s3_node[count.index].path }
+    content = { url = libvirt_cloudinit_disk.storage_node[count.index].path }
+  }
+}
+
+resource "libvirt_volume" "dbadmin_node" {
+  count    = length(var.dbadmin_nodes)
+  name     = "${var.dbadmin_nodes[count.index].name}.qcow2"
+  pool     = libvirt_pool.hosting.name
+  capacity = 10737418240 # 10 GB
+  target   = { format = { type = "qcow2" } }
+  backing_store = {
+    path   = libvirt_volume.image_dbadmin.path
+    format = { type = "qcow2" }
+  }
+}
+
+resource "libvirt_cloudinit_disk" "dbadmin_node" {
+  count = length(var.dbadmin_nodes)
+  name  = "${var.dbadmin_nodes[count.index].name}-cloudinit.iso"
+  meta_data = yamlencode({
+    instance-id    = "i-${var.dbadmin_nodes[count.index].name}"
+    local-hostname = var.dbadmin_nodes[count.index].name
+  })
+  user_data = templatefile("${path.module}/cloud-init/dbadmin-node.yaml.tpl", {
+    hostname         = var.dbadmin_nodes[count.index].name
+    node_id          = random_uuid.dbadmin_node_id[count.index].result
+    shard_name       = var.dbadmin_shard_name
+    temporal_address = "${var.gateway_ip}:${var.temporal_port}"
+    ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
+  })
+  network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
+    ip_address = var.dbadmin_nodes[count.index].ip
+    gateway    = var.gateway_ip
+  })
+}
+
+resource "libvirt_volume" "dbadmin_node_seed" {
+  count = length(var.dbadmin_nodes)
+  name  = "${var.dbadmin_nodes[count.index].name}-seed.iso"
+  pool  = libvirt_pool.hosting.name
+  create = {
+    content = { url = libvirt_cloudinit_disk.dbadmin_node[count.index].path }
   }
 }
 
@@ -281,13 +329,6 @@ resource "libvirt_domain" "web_node" {
       type   = "network"
       source = { network = { network = libvirt_network.hosting.name } }
       model  = { type = "virtio" }
-    }]
-
-    filesystems = [{
-      type       = "mount"
-      accessmode = "passthrough"
-      source     = { mount = { dir = abspath("${path.module}/../bin") } }
-      target     = { dir = "hostbin" }
     }]
 
     consoles = [{
@@ -339,13 +380,6 @@ resource "libvirt_domain" "db_node" {
       model  = { type = "virtio" }
     }]
 
-    filesystems = [{
-      type       = "mount"
-      accessmode = "passthrough"
-      source     = { mount = { dir = abspath("${path.module}/../bin") } }
-      target     = { dir = "hostbin" }
-    }]
-
     consoles = [{
       type   = "pty"
       target = { type = "serial", port = "0" }
@@ -393,13 +427,6 @@ resource "libvirt_domain" "dns_node" {
       type   = "network"
       source = { network = { network = libvirt_network.hosting.name } }
       model  = { type = "virtio" }
-    }]
-
-    filesystems = [{
-      type       = "mount"
-      accessmode = "passthrough"
-      source     = { mount = { dir = abspath("${path.module}/../bin") } }
-      target     = { dir = "hostbin" }
     }]
 
     consoles = [{
@@ -451,13 +478,6 @@ resource "libvirt_domain" "valkey_node" {
       model  = { type = "virtio" }
     }]
 
-    filesystems = [{
-      type       = "mount"
-      accessmode = "passthrough"
-      source     = { mount = { dir = abspath("${path.module}/../bin") } }
-      target     = { dir = "hostbin" }
-    }]
-
     consoles = [{
       type   = "pty"
       target = { type = "serial", port = "0" }
@@ -465,12 +485,12 @@ resource "libvirt_domain" "valkey_node" {
   }
 }
 
-resource "libvirt_domain" "s3_node" {
-  count       = length(var.s3_nodes)
-  name        = var.s3_nodes[count.index].name
-  memory      = var.s3_nodes[count.index].memory
+resource "libvirt_domain" "storage_node" {
+  count       = length(var.storage_nodes)
+  name        = var.storage_nodes[count.index].name
+  memory      = var.storage_nodes[count.index].memory
   memory_unit = "MiB"
-  vcpu        = var.s3_nodes[count.index].vcpus
+  vcpu        = var.storage_nodes[count.index].vcpus
   type        = "kvm"
   running     = true
   autostart   = true
@@ -483,7 +503,7 @@ resource "libvirt_domain" "s3_node" {
         source = {
           volume = {
             pool   = libvirt_pool.hosting.name
-            volume = libvirt_volume.s3_node[count.index].name
+            volume = libvirt_volume.storage_node[count.index].name
           }
         }
         driver = { type = "qcow2" }
@@ -493,7 +513,7 @@ resource "libvirt_domain" "s3_node" {
         source = {
           volume = {
             pool   = libvirt_pool.hosting.name
-            volume = libvirt_volume.s3_node_seed[count.index].name
+            volume = libvirt_volume.storage_node_seed[count.index].name
           }
         }
         driver = { type = "raw" }
@@ -503,7 +523,7 @@ resource "libvirt_domain" "s3_node" {
         source = {
           volume = {
             pool   = libvirt_pool.hosting.name
-            volume = libvirt_volume.s3_node_osd[count.index].name
+            volume = libvirt_volume.storage_node_osd[count.index].name
           }
         }
         driver = { type = "raw" }
@@ -517,11 +537,53 @@ resource "libvirt_domain" "s3_node" {
       model  = { type = "virtio" }
     }]
 
-    filesystems = [{
-      type       = "mount"
-      accessmode = "passthrough"
-      source     = { mount = { dir = abspath("${path.module}/../bin") } }
-      target     = { dir = "hostbin" }
+    consoles = [{
+      type   = "pty"
+      target = { type = "serial", port = "0" }
+    }]
+  }
+}
+
+resource "libvirt_domain" "dbadmin_node" {
+  count       = length(var.dbadmin_nodes)
+  name        = var.dbadmin_nodes[count.index].name
+  memory      = var.dbadmin_nodes[count.index].memory
+  memory_unit = "MiB"
+  vcpu        = var.dbadmin_nodes[count.index].vcpus
+  type        = "kvm"
+  running     = true
+  autostart   = true
+
+  os = { type = "hvm" }
+
+  devices = {
+    disks = [
+      {
+        source = {
+          volume = {
+            pool   = libvirt_pool.hosting.name
+            volume = libvirt_volume.dbadmin_node[count.index].name
+          }
+        }
+        driver = { type = "qcow2" }
+        target = { dev = "vda", bus = "virtio" }
+      },
+      {
+        source = {
+          volume = {
+            pool   = libvirt_pool.hosting.name
+            volume = libvirt_volume.dbadmin_node_seed[count.index].name
+          }
+        }
+        driver = { type = "raw" }
+        target = { dev = "vdb", bus = "virtio" }
+      },
+    ]
+
+    interfaces = [{
+      type   = "network"
+      source = { network = { network = libvirt_network.hosting.name } }
+      model  = { type = "virtio" }
     }]
 
     consoles = [{
@@ -563,12 +625,19 @@ locals {
       shard_name = var.valkey_shard_name
       role       = "valkey"
     }],
-    [for i, n in var.s3_nodes : {
-      id         = random_uuid.s3_node_id[i].result
+    [for i, n in var.storage_nodes : {
+      id         = random_uuid.storage_node_id[i].result
       name       = n.name
       ip         = n.ip
-      shard_name = var.s3_shard_name
-      role       = "s3"
+      shard_name = var.storage_shard_name
+      role       = "storage"
+    }],
+    [for i, n in var.dbadmin_nodes : {
+      id         = random_uuid.dbadmin_node_id[i].result
+      name       = n.name
+      ip         = n.ip
+      shard_name = var.dbadmin_shard_name
+      role       = "dbadmin"
     }],
   )
 

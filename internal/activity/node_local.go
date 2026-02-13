@@ -11,7 +11,6 @@ import (
 
 	"github.com/edvin/hosting/internal/agent"
 	"github.com/edvin/hosting/internal/agent/runtime"
-	agentv1 "github.com/edvin/hosting/proto/agent/v1"
 )
 
 // NodeLocal contains activities that execute locally on the node using manager
@@ -25,6 +24,7 @@ type NodeLocal struct {
 	database *agent.DatabaseManager
 	valkey   *agent.ValkeyManager
 	s3       *agent.S3Manager
+	ssh      *agent.SSHManager
 	runtimes map[string]runtime.Manager
 }
 
@@ -37,6 +37,7 @@ func NewNodeLocal(
 	database *agent.DatabaseManager,
 	valkey *agent.ValkeyManager,
 	s3 *agent.S3Manager,
+	ssh *agent.SSHManager,
 	runtimes map[string]runtime.Manager,
 ) *NodeLocal {
 	return &NodeLocal{
@@ -47,6 +48,7 @@ func NewNodeLocal(
 		database: database,
 		valkey:   valkey,
 		s3:       s3,
+		ssh:      ssh,
 		runtimes: runtimes,
 	}
 }
@@ -58,22 +60,24 @@ func NewNodeLocal(
 // CreateTenant creates a tenant locally on this node.
 func (a *NodeLocal) CreateTenant(ctx context.Context, params CreateTenantParams) error {
 	a.logger.Info().Str("tenant", params.ID).Msg("CreateTenant")
-	return a.tenant.Create(ctx, &agentv1.TenantInfo{
-		Id:          params.ID,
+	return a.tenant.Create(ctx, &agent.TenantInfo{
+		ID:          params.ID,
 		Name:        params.ID,
-		Uid:         int32(params.UID),
-		SftpEnabled: params.SFTPEnabled,
+		UID:         int32(params.UID),
+		SFTPEnabled: params.SFTPEnabled,
+		SSHEnabled:  params.SSHEnabled,
 	})
 }
 
 // UpdateTenant updates a tenant locally on this node.
 func (a *NodeLocal) UpdateTenant(ctx context.Context, params UpdateTenantParams) error {
 	a.logger.Info().Str("tenant", params.ID).Msg("UpdateTenant")
-	return a.tenant.Update(ctx, &agentv1.TenantInfo{
-		Id:          params.ID,
+	return a.tenant.Update(ctx, &agent.TenantInfo{
+		ID:          params.ID,
 		Name:        params.ID,
-		Uid:         int32(params.UID),
-		SftpEnabled: params.SFTPEnabled,
+		UID:         int32(params.UID),
+		SFTPEnabled: params.SFTPEnabled,
+		SSHEnabled:  params.SSHEnabled,
 	})
 }
 
@@ -103,8 +107,8 @@ func (a *NodeLocal) DeleteTenant(ctx context.Context, name string) error {
 func (a *NodeLocal) CreateWebroot(ctx context.Context, params CreateWebrootParams) error {
 	a.logger.Info().Str("tenant", params.TenantName).Str("webroot", params.Name).Msg("CreateWebroot")
 
-	info := &agentv1.WebrootInfo{
-		Id:             params.ID,
+	info := &runtime.WebrootInfo{
+		ID:             params.ID,
 		TenantName:     params.TenantName,
 		Name:           params.Name,
 		Runtime:        params.Runtime,
@@ -113,12 +117,12 @@ func (a *NodeLocal) CreateWebroot(ctx context.Context, params CreateWebrootParam
 		PublicFolder:   params.PublicFolder,
 	}
 
-	fqdns := make([]*agentv1.FQDNInfo, len(params.FQDNs))
+	fqdns := make([]*agent.FQDNInfo, len(params.FQDNs))
 	for i, f := range params.FQDNs {
-		fqdns[i] = &agentv1.FQDNInfo{
-			Fqdn:       f.FQDN,
-			WebrootId:  f.WebrootID,
-			SslEnabled: f.SSLEnabled,
+		fqdns[i] = &agent.FQDNInfo{
+			FQDN:       f.FQDN,
+			WebrootID:  f.WebrootID,
+			SSLEnabled: f.SSLEnabled,
 		}
 	}
 
@@ -128,9 +132,9 @@ func (a *NodeLocal) CreateWebroot(ctx context.Context, params CreateWebrootParam
 	}
 
 	// Configure and start runtime.
-	rt, ok := a.runtimes[info.GetRuntime()]
+	rt, ok := a.runtimes[info.Runtime]
 	if !ok {
-		return fmt.Errorf("unsupported runtime: %s", info.GetRuntime())
+		return fmt.Errorf("unsupported runtime: %s", info.Runtime)
 	}
 	if err := rt.Configure(ctx, info); err != nil {
 		return fmt.Errorf("configure runtime: %w", err)
@@ -144,7 +148,7 @@ func (a *NodeLocal) CreateWebroot(ctx context.Context, params CreateWebrootParam
 	if err != nil {
 		return fmt.Errorf("generate nginx config: %w", err)
 	}
-	if err := a.nginx.WriteConfig(info.GetTenantName(), info.GetName(), nginxConfig); err != nil {
+	if err := a.nginx.WriteConfig(info.TenantName, info.Name, nginxConfig); err != nil {
 		return fmt.Errorf("write nginx config: %w", err)
 	}
 
@@ -160,8 +164,8 @@ func (a *NodeLocal) CreateWebroot(ctx context.Context, params CreateWebrootParam
 func (a *NodeLocal) UpdateWebroot(ctx context.Context, params UpdateWebrootParams) error {
 	a.logger.Info().Str("tenant", params.TenantName).Str("webroot", params.Name).Msg("UpdateWebroot")
 
-	info := &agentv1.WebrootInfo{
-		Id:             params.ID,
+	info := &runtime.WebrootInfo{
+		ID:             params.ID,
 		TenantName:     params.TenantName,
 		Name:           params.Name,
 		Runtime:        params.Runtime,
@@ -170,12 +174,12 @@ func (a *NodeLocal) UpdateWebroot(ctx context.Context, params UpdateWebrootParam
 		PublicFolder:   params.PublicFolder,
 	}
 
-	fqdns := make([]*agentv1.FQDNInfo, len(params.FQDNs))
+	fqdns := make([]*agent.FQDNInfo, len(params.FQDNs))
 	for i, f := range params.FQDNs {
-		fqdns[i] = &agentv1.FQDNInfo{
-			Fqdn:       f.FQDN,
-			WebrootId:  f.WebrootID,
-			SslEnabled: f.SSLEnabled,
+		fqdns[i] = &agent.FQDNInfo{
+			FQDN:       f.FQDN,
+			WebrootID:  f.WebrootID,
+			SSLEnabled: f.SSLEnabled,
 		}
 	}
 
@@ -185,9 +189,9 @@ func (a *NodeLocal) UpdateWebroot(ctx context.Context, params UpdateWebrootParam
 	}
 
 	// Reconfigure and reload runtime.
-	rt, ok := a.runtimes[info.GetRuntime()]
+	rt, ok := a.runtimes[info.Runtime]
 	if !ok {
-		return fmt.Errorf("unsupported runtime: %s", info.GetRuntime())
+		return fmt.Errorf("unsupported runtime: %s", info.Runtime)
 	}
 	if err := rt.Configure(ctx, info); err != nil {
 		return fmt.Errorf("configure runtime: %w", err)
@@ -201,7 +205,7 @@ func (a *NodeLocal) UpdateWebroot(ctx context.Context, params UpdateWebrootParam
 	if err != nil {
 		return fmt.Errorf("generate nginx config: %w", err)
 	}
-	if err := a.nginx.WriteConfig(info.GetTenantName(), info.GetName(), nginxConfig); err != nil {
+	if err := a.nginx.WriteConfig(info.TenantName, info.Name, nginxConfig); err != nil {
 		return fmt.Errorf("write nginx config: %w", err)
 	}
 
@@ -228,7 +232,7 @@ func (a *NodeLocal) DeleteWebroot(ctx context.Context, tenantName, webrootName s
 	}
 
 	// Remove runtimes (try all, only one will match).
-	wrInfo := &agentv1.WebrootInfo{TenantName: tenantName, Name: webrootName}
+	wrInfo := &runtime.WebrootInfo{TenantName: tenantName, Name: webrootName}
 	for _, rt := range a.runtimes {
 		_ = rt.Remove(ctx, wrInfo)
 	}
@@ -249,8 +253,8 @@ func (a *NodeLocal) DeleteWebroot(ctx context.Context, tenantName, webrootName s
 func (a *NodeLocal) ConfigureRuntime(ctx context.Context, params ConfigureRuntimeParams) error {
 	a.logger.Info().Str("runtime", params.Runtime).Str("webroot", params.Name).Msg("ConfigureRuntime")
 
-	info := &agentv1.WebrootInfo{
-		Id:             params.ID,
+	info := &runtime.WebrootInfo{
+		ID:             params.ID,
 		TenantName:     params.TenantName,
 		Name:           params.Name,
 		Runtime:        params.Runtime,
@@ -259,9 +263,9 @@ func (a *NodeLocal) ConfigureRuntime(ctx context.Context, params ConfigureRuntim
 		PublicFolder:   params.PublicFolder,
 	}
 
-	rt, ok := a.runtimes[info.GetRuntime()]
+	rt, ok := a.runtimes[info.Runtime]
 	if !ok {
-		return fmt.Errorf("unsupported runtime: %s", info.GetRuntime())
+		return fmt.Errorf("unsupported runtime: %s", info.Runtime)
 	}
 	if err := rt.Configure(ctx, info); err != nil {
 		return fmt.Errorf("configure runtime: %w", err)
@@ -388,8 +392,13 @@ func (a *NodeLocal) CleanupMigrateFile(ctx context.Context, path string) error {
 func (a *NodeLocal) SyncSFTPKeys(ctx context.Context, params SyncSFTPKeysParams) error {
 	a.logger.Info().Str("tenant", params.TenantName).Int("key_count", len(params.PublicKeys)).Msg("SyncSFTPKeys")
 
-	homeDir := filepath.Join(a.tenant.HomeBaseDir(), params.TenantName)
-	authKeysPath := filepath.Join(homeDir, ".ssh", "authorized_keys")
+	// authorized_keys lives in the tenant's home dir on CephFS.
+	sshDir := filepath.Join(a.tenant.WebStorageDir(), params.TenantName, "home", ".ssh")
+	if err := os.MkdirAll(sshDir, 0700); err != nil {
+		return fmt.Errorf("create .ssh dir for %s: %w", params.TenantName, err)
+	}
+
+	authKeysPath := filepath.Join(sshDir, "authorized_keys")
 
 	content := ""
 	for _, key := range params.PublicKeys {
@@ -404,17 +413,37 @@ func (a *NodeLocal) SyncSFTPKeys(ctx context.Context, params SyncSFTPKeysParams)
 }
 
 // --------------------------------------------------------------------------
+// SSH
+// --------------------------------------------------------------------------
+
+// SyncSSHConfig writes per-tenant sshd config and reloads sshd.
+func (a *NodeLocal) SyncSSHConfig(ctx context.Context, params SyncSSHConfigParams) error {
+	a.logger.Info().Str("tenant", params.TenantName).Bool("ssh", params.SSHEnabled).Bool("sftp", params.SFTPEnabled).Msg("SyncSSHConfig")
+	return a.ssh.SyncConfig(ctx, &agent.TenantInfo{
+		Name:        params.TenantName,
+		SSHEnabled:  params.SSHEnabled,
+		SFTPEnabled: params.SFTPEnabled,
+	})
+}
+
+// RemoveSSHConfig removes per-tenant sshd config and reloads sshd.
+func (a *NodeLocal) RemoveSSHConfig(ctx context.Context, name string) error {
+	a.logger.Info().Str("tenant", name).Msg("RemoveSSHConfig")
+	return a.ssh.RemoveConfig(ctx, name)
+}
+
+// --------------------------------------------------------------------------
 // SSL
 // --------------------------------------------------------------------------
 
 // InstallCertificate writes SSL certificate files to disk locally on this node.
 func (a *NodeLocal) InstallCertificate(ctx context.Context, params InstallCertificateParams) error {
 	a.logger.Info().Str("fqdn", params.FQDN).Msg("InstallCertificate")
-	return a.nginx.InstallCertificate(ctx, &agentv1.CertificateInfo{
-		Fqdn:     params.FQDN,
-		CertPem:  params.CertPEM,
-		KeyPem:   params.KeyPEM,
-		ChainPem: params.ChainPEM,
+	return a.nginx.InstallCertificate(ctx, &agent.CertificateInfo{
+		FQDN:     params.FQDN,
+		CertPEM:  params.CertPEM,
+		KeyPEM:   params.KeyPEM,
+		ChainPEM: params.ChainPEM,
 	})
 }
 
@@ -426,7 +455,7 @@ func (a *NodeLocal) InstallCertificate(ctx context.Context, params InstallCertif
 func (a *NodeLocal) CreateWebBackup(ctx context.Context, params CreateWebBackupParams) (*BackupResult, error) {
 	a.logger.Info().Str("tenant", params.TenantName).Str("webroot", params.WebrootName).Str("path", params.BackupPath).Msg("CreateWebBackup")
 
-	sourceDir := fmt.Sprintf("/var/www/storage/%s/%s", params.TenantName, params.WebrootName)
+	sourceDir := fmt.Sprintf("/var/www/storage/%s/webroots/%s", params.TenantName, params.WebrootName)
 
 	// Ensure backup directory exists.
 	if err := os.MkdirAll(filepath.Dir(params.BackupPath), 0755); err != nil {
@@ -453,7 +482,7 @@ func (a *NodeLocal) CreateWebBackup(ctx context.Context, params CreateWebBackupP
 func (a *NodeLocal) RestoreWebBackup(ctx context.Context, params RestoreWebBackupParams) error {
 	a.logger.Info().Str("tenant", params.TenantName).Str("webroot", params.WebrootName).Str("path", params.BackupPath).Msg("RestoreWebBackup")
 
-	targetDir := fmt.Sprintf("/var/www/storage/%s/%s", params.TenantName, params.WebrootName)
+	targetDir := fmt.Sprintf("/var/www/storage/%s/webroots/%s", params.TenantName, params.WebrootName)
 
 	cmd := exec.CommandContext(ctx, "tar", "xzf", params.BackupPath, "-C", targetDir)
 	if out, err := cmd.CombinedOutput(); err != nil {

@@ -594,6 +594,14 @@ export function useDeleteDatabaseUser() {
   })
 }
 
+// OIDC Login Sessions
+export function useCreateLoginSession() {
+  return useMutation({
+    mutationFn: (tenantId: string) =>
+      api.post<{ session_id: string; expires_at: string }>(`/tenants/${tenantId}/login-sessions`),
+  })
+}
+
 // Valkey Instances
 export function useValkeyInstances(tenantId: string, params?: ListParams) {
   return useQuery({

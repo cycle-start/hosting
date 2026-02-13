@@ -40,6 +40,9 @@ web/admin/dist/
 # Generated API docs
 internal/api/docs/
 
+# Packer output images
+packer/output/
+
 # Test/build artifacts
 coverage.out
 *.prof

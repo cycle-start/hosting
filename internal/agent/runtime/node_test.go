@@ -7,15 +7,13 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	agentv1 "github.com/edvin/hosting/proto/agent/v1"
 )
 
 func TestNode_ServiceTemplate(t *testing.T) {
 	data := nodeServiceData{
 		TenantName:  "tenant1",
 		WebrootName: "myapp",
-		WorkingDir:  "/var/www/storage/tenant1/myapp",
+		WorkingDir:  "/var/www/storage/tenant1/webroots/myapp",
 		EntryPoint:  "index.js",
 		Port:        3456,
 	}
@@ -36,16 +34,16 @@ func TestNode_ServiceTemplate(t *testing.T) {
 	assert.Contains(t, config, "Type=simple")
 	assert.Contains(t, config, "User=tenant1")
 	assert.Contains(t, config, "Group=tenant1")
-	assert.Contains(t, config, "WorkingDirectory=/var/www/storage/tenant1/myapp")
+	assert.Contains(t, config, "WorkingDirectory=/var/www/storage/tenant1/webroots/myapp")
 	assert.Contains(t, config, "ExecStart=/usr/bin/node index.js")
 	assert.Contains(t, config, "Restart=on-failure")
 	assert.Contains(t, config, "RestartSec=5")
 	assert.Contains(t, config, "Environment=NODE_ENV=production")
 	assert.Contains(t, config, "Environment=PORT=3456")
 
-	// Verify log paths.
-	assert.Contains(t, config, "StandardOutput=append:/home/tenant1/logs/node-myapp.log")
-	assert.Contains(t, config, "StandardError=append:/home/tenant1/logs/node-myapp.error.log")
+	// Verify log paths on CephFS.
+	assert.Contains(t, config, "StandardOutput=append:/var/www/storage/tenant1/logs/node-myapp.log")
+	assert.Contains(t, config, "StandardError=append:/var/www/storage/tenant1/logs/node-myapp.error.log")
 
 	// Verify [Install] section.
 	assert.Contains(t, config, "[Install]")
@@ -55,7 +53,7 @@ func TestNode_ServiceTemplate(t *testing.T) {
 func TestNode_ServiceName(t *testing.T) {
 	n := NewNode(zerolog.Nop(), NewDirectManager(zerolog.Nop()))
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &WebrootInfo{
 		TenantName: "tenant1",
 		Name:       "myapp",
 	}
@@ -66,7 +64,7 @@ func TestNode_ServiceName(t *testing.T) {
 func TestNode_UnitFilePath(t *testing.T) {
 	n := NewNode(zerolog.Nop(), NewDirectManager(zerolog.Nop()))
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &WebrootInfo{
 		TenantName: "tenant1",
 		Name:       "myapp",
 	}

@@ -22,22 +22,10 @@ variable "temporal_port" {
   default     = 7233
 }
 
-variable "base_image_url" {
-  description = "URL of the Ubuntu 24.04 cloud image"
-  type        = string
-  default     = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
-}
-
 variable "ssh_public_key_path" {
   description = "Path to SSH public key for VM access"
   type        = string
   default     = "~/.ssh/id_rsa.pub"
-}
-
-variable "node_agent_binary" {
-  description = "Path to the node-agent binary (built for linux/amd64)"
-  type        = string
-  default     = "../bin/node-agent"
 }
 
 # --- Web nodes ---
@@ -125,10 +113,10 @@ variable "valkey_shard_name" {
   default     = "valkey-1"
 }
 
-# --- S3/Ceph storage nodes ---
+# --- Storage nodes (Ceph: S3/RGW + CephFS/MDS) ---
 
-variable "s3_nodes" {
-  description = "S3/Ceph storage node definitions (runs Ceph mon+mgr+osd+rgw + node-agent)"
+variable "storage_nodes" {
+  description = "Storage node definitions (runs Ceph mon+mgr+osd+rgw+mds + node-agent)"
   type = list(object({
     name   = string
     ip     = string
@@ -136,12 +124,33 @@ variable "s3_nodes" {
     vcpus  = optional(number, 2)
   }))
   default = [
-    { name = "s3-1-node-0", ip = "10.10.10.50" },
+    { name = "storage-1-node-0", ip = "10.10.10.50" },
   ]
 }
 
-variable "s3_shard_name" {
-  description = "Shard name for S3 nodes"
+variable "storage_shard_name" {
+  description = "Shard name for storage nodes"
   type        = string
-  default     = "s3-1"
+  default     = "storage-1"
+}
+
+# --- DB Admin nodes ---
+
+variable "dbadmin_nodes" {
+  description = "DB Admin node definitions (runs CloudBeaver + node-agent)"
+  type = list(object({
+    name   = string
+    ip     = string
+    memory = optional(number, 2048)
+    vcpus  = optional(number, 2)
+  }))
+  default = [
+    { name = "dbadmin-1-node-0", ip = "10.10.10.60" },
+  ]
+}
+
+variable "dbadmin_shard_name" {
+  description = "Shard name for DB Admin nodes"
+  type        = string
+  default     = "dbadmin-1"
 }

@@ -12,7 +12,7 @@ func TestNewServices(t *testing.T) {
 	db := &mockDB{}
 	tc := &temporalmocks.Client{}
 
-	svcs := NewServices(db, tc)
+	svcs := NewServices(db, tc, "http://localhost")
 
 	require.NotNil(t, svcs)
 	assert.NotNil(t, svcs.PlatformConfig)
@@ -27,4 +27,5 @@ func TestNewServices(t *testing.T) {
 	assert.NotNil(t, svcs.ZoneRecord)
 	assert.NotNil(t, svcs.Database)
 	assert.NotNil(t, svcs.DatabaseUser)
+	assert.NotNil(t, svcs.OIDC)
 }

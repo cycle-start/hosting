@@ -27,6 +27,9 @@ type Config struct {
 	AuditLogRetentionDays int // AUDIT_LOG_RETENTION_DAYS — default 90
 	BackupRetentionDays   int // BACKUP_RETENTION_DAYS — default 30
 
+	// OIDC
+	OIDCIssuerURL string // OIDC_ISSUER_URL — issuer URL for the built-in OIDC provider
+
 	// Temporal mTLS
 	TemporalTLSCert       string // TEMPORAL_TLS_CERT — path to client cert
 	TemporalTLSKey        string // TEMPORAL_TLS_KEY — path to client key
@@ -47,6 +50,7 @@ func Load() (*Config, error) {
 		NodeID:                getEnv("NODE_ID", ""),
 		ACMEEmail:             getEnv("ACME_EMAIL", ""),
 		ACMEDirectoryURL:      getEnv("ACME_DIRECTORY_URL", "https://acme-v02.api.letsencrypt.org/directory"),
+		OIDCIssuerURL:         getEnv("OIDC_ISSUER_URL", "http://api.hosting.localhost"),
 		AuditLogRetentionDays: getEnvInt("AUDIT_LOG_RETENTION_DAYS", 90),
 		BackupRetentionDays:   getEnvInt("BACKUP_RETENTION_DAYS", 30),
 		TemporalTLSCert:       getEnv("TEMPORAL_TLS_CERT", ""),

@@ -226,14 +226,25 @@ lb-del fqdn:
 lb-show:
     echo "show map /var/lib/haproxy/maps/fqdn-to-shard.map" | nc localhost 9999
 
-# --- VM Infrastructure ---
+# --- Packer (Golden Images) ---
 
 # Build the node-agent binary for Linux (for VM deployment)
 build-node-agent:
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/node-agent ./cmd/node-agent
 
+# Build all golden images (requires node-agent binary)
+packer-all: build-node-agent
+    cd packer && packer init . && packer build .
+
+# Build a specific role image (e.g. just packer-role web)
+packer-role role: build-node-agent
+    cd packer && packer init . && packer build -only="*.{{role}}" .
+
+# --- VM Infrastructure ---
+
 # Create VMs with Terraform and register them with the platform
-vm-up: build-node-agent
+# (Requires golden images — run `just packer-all` first)
+vm-up:
     cd terraform && terraform apply -auto-approve
     go run ./cmd/hostctl cluster apply -f terraform/cluster.yaml
 

@@ -32,10 +32,11 @@ type Services struct {
 	SFTPKey          *SFTPKeyService
 	Backup           *BackupService
 	APIKey           *APIKeyService
+	OIDC             *OIDCService
 	Search           *SearchService
 }
 
-func NewServices(db DB, tc temporalclient.Client) *Services {
+func NewServices(db DB, tc temporalclient.Client, oidcIssuerURL string) *Services {
 	return &Services{
 		Dashboard:        NewDashboardService(db),
 		PlatformConfig:   NewPlatformConfigService(db),
@@ -64,6 +65,7 @@ func NewServices(db DB, tc temporalclient.Client) *Services {
 		SFTPKey:          NewSFTPKeyService(db, tc),
 		Backup:           NewBackupService(db, tc),
 		APIKey:           NewAPIKeyService(db),
+		OIDC:             NewOIDCService(db, oidcIssuerURL),
 		Search:           NewSearchService(db),
 	}
 }

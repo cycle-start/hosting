@@ -38,9 +38,14 @@ cluster:
         role: valkey
         node_count: ${length([for n in nodes : n if n.shard_name == node.shard_name])}
 %{ endif ~}
-%{ if node.role == "s3" && endswith(node.name, "node-0") ~}
+%{ if node.role == "storage" && endswith(node.name, "node-0") ~}
       - name: ${node.shard_name}
-        role: s3
+        role: storage
+        node_count: ${length([for n in nodes : n if n.shard_name == node.shard_name])}
+%{ endif ~}
+%{ if node.role == "dbadmin" && endswith(node.name, "node-0") ~}
+      - name: ${node.shard_name}
+        role: dbadmin
         node_count: ${length([for n in nodes : n if n.shard_name == node.shard_name])}
 %{ endif ~}
 %{ endfor ~}

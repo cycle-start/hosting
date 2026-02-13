@@ -9,8 +9,6 @@ import (
 	"text/template"
 
 	"github.com/rs/zerolog"
-
-	agentv1 "github.com/edvin/hosting/proto/agent/v1"
 )
 
 const pythonServiceTemplate = `[Unit]
@@ -31,8 +29,8 @@ ExecReload=/bin/kill -s HUP $MAINPID
 Restart=on-failure
 RestartSec=5
 
-StandardOutput=append:/home/{{ .TenantName }}/logs/gunicorn-{{ .WebrootName }}.log
-StandardError=append:/home/{{ .TenantName }}/logs/gunicorn-{{ .WebrootName }}.error.log
+StandardOutput=append:/var/www/storage/{{ .TenantName }}/logs/gunicorn-{{ .WebrootName }}.log
+StandardError=append:/var/www/storage/{{ .TenantName }}/logs/gunicorn-{{ .WebrootName }}.error.log
 
 [Install]
 WantedBy=multi-user.target
@@ -61,22 +59,22 @@ type pythonServiceData struct {
 	WSGIModule  string
 }
 
-func (p *Python) serviceName(webroot *agentv1.WebrootInfo) string {
-	return fmt.Sprintf("gunicorn-%s-%s", webroot.GetTenantName(), webroot.GetName())
+func (p *Python) serviceName(webroot *WebrootInfo) string {
+	return fmt.Sprintf("gunicorn-%s-%s", webroot.TenantName, webroot.Name)
 }
 
-func (p *Python) unitFilePath(webroot *agentv1.WebrootInfo) string {
+func (p *Python) unitFilePath(webroot *WebrootInfo) string {
 	return filepath.Join("/etc/systemd/system", p.serviceName(webroot)+".service")
 }
 
 // Configure generates and writes a systemd service unit for the Gunicorn application.
-func (p *Python) Configure(ctx context.Context, webroot *agentv1.WebrootInfo) error {
+func (p *Python) Configure(ctx context.Context, webroot *WebrootInfo) error {
 	wsgiModule := "app:application"
-	workingDir := filepath.Join("/var/www/storage", webroot.GetTenantName(), webroot.GetName())
+	workingDir := filepath.Join("/var/www/storage", webroot.TenantName, "webroots", webroot.Name)
 
 	data := pythonServiceData{
-		TenantName:  webroot.GetTenantName(),
-		WebrootName: webroot.GetName(),
+		TenantName:  webroot.TenantName,
+		WebrootName: webroot.Name,
 		WorkingDir:  workingDir,
 		WSGIModule:  wsgiModule,
 	}
@@ -89,8 +87,8 @@ func (p *Python) Configure(ctx context.Context, webroot *agentv1.WebrootInfo) er
 	unitPath := p.unitFilePath(webroot)
 
 	p.logger.Info().
-		Str("tenant", webroot.GetTenantName()).
-		Str("webroot", webroot.GetName()).
+		Str("tenant", webroot.TenantName).
+		Str("webroot", webroot.Name).
 		Str("path", unitPath).
 		Msg("writing Gunicorn systemd unit")
 
@@ -106,28 +104,28 @@ func (p *Python) Configure(ctx context.Context, webroot *agentv1.WebrootInfo) er
 }
 
 // Start enables and starts the Gunicorn systemd service.
-func (p *Python) Start(ctx context.Context, webroot *agentv1.WebrootInfo) error {
+func (p *Python) Start(ctx context.Context, webroot *WebrootInfo) error {
 	service := p.serviceName(webroot)
 	p.logger.Info().Str("service", service).Msg("starting Gunicorn service")
 	return p.svcMgr.Start(ctx, service)
 }
 
 // Stop stops and disables the Gunicorn systemd service.
-func (p *Python) Stop(ctx context.Context, webroot *agentv1.WebrootInfo) error {
+func (p *Python) Stop(ctx context.Context, webroot *WebrootInfo) error {
 	service := p.serviceName(webroot)
 	p.logger.Info().Str("service", service).Msg("stopping Gunicorn service")
 	return p.svcMgr.Stop(ctx, service)
 }
 
 // Reload sends a HUP signal to Gunicorn for graceful reload.
-func (p *Python) Reload(ctx context.Context, webroot *agentv1.WebrootInfo) error {
+func (p *Python) Reload(ctx context.Context, webroot *WebrootInfo) error {
 	service := p.serviceName(webroot)
 	p.logger.Info().Str("service", service).Msg("reloading Gunicorn service")
 	return p.svcMgr.Reload(ctx, service)
 }
 
 // Remove stops the service and removes the systemd unit file.
-func (p *Python) Remove(ctx context.Context, webroot *agentv1.WebrootInfo) error {
+func (p *Python) Remove(ctx context.Context, webroot *WebrootInfo) error {
 	if err := p.Stop(ctx, webroot); err != nil {
 		p.logger.Warn().Err(err).Msg("failed to stop gunicorn service during removal, continuing")
 	}
@@ -139,7 +137,7 @@ func (p *Python) Remove(ctx context.Context, webroot *agentv1.WebrootInfo) error
 		return fmt.Errorf("remove python systemd unit: %w", err)
 	}
 
-	sockPath := fmt.Sprintf("/run/gunicorn/%s-%s.sock", webroot.GetTenantName(), webroot.GetName())
+	sockPath := fmt.Sprintf("/run/gunicorn/%s-%s.sock", webroot.TenantName, webroot.Name)
 	_ = os.Remove(sockPath)
 
 	return p.svcMgr.DaemonReload(ctx)

@@ -29,7 +29,7 @@ func TestS3BucketCRUD(t *testing.T) {
 	tenantID, _, clusterID, _, _ := createTestTenant(t, "e2e-s3-crud")
 
 	// Find an S3 shard.
-	s3ShardID := findS3Shard(t, clusterID)
+	s3ShardID := findStorageShard(t, clusterID)
 	if s3ShardID == "" {
 		t.Skip("no S3 shard found in cluster; skipping S3 tests")
 	}
@@ -137,15 +137,15 @@ func TestS3BucketCRUD(t *testing.T) {
 func TestS3ObjectOperations(t *testing.T) {
 	tenantID, _, clusterID, _, _ := createTestTenant(t, "e2e-s3-objects")
 
-	s3ShardID := findS3Shard(t, clusterID)
+	s3ShardID := findStorageShard(t, clusterID)
 	if s3ShardID == "" {
 		t.Skip("no S3 shard found in cluster; skipping S3 object tests")
 	}
 
-	// Discover the S3 node IP for direct RGW access.
-	s3NodeIPs := findNodeIPsByRole(t, clusterID, "s3")
-	require.NotEmpty(t, s3NodeIPs, "no S3 node IPs found")
-	rgwEndpoint := fmt.Sprintf("http://%s:%d", s3NodeIPs[0], s3NodePort)
+	// Discover the storage node IP for direct RGW access.
+	storageNodeIPs := findNodeIPsByRole(t, clusterID, "storage")
+	require.NotEmpty(t, storageNodeIPs, "no storage node IPs found")
+	rgwEndpoint := fmt.Sprintf("http://%s:%d", storageNodeIPs[0], s3NodePort)
 	t.Logf("RGW endpoint: %s", rgwEndpoint)
 
 	// Create a bucket.
@@ -365,7 +365,7 @@ func TestS3BucketCreateValidation(t *testing.T) {
 // invalid permissions returns 400.
 func TestS3AccessKeyCreateValidation(t *testing.T) {
 	tenantID, _, clusterID, _, _ := createTestTenant(t, "e2e-s3-keyval")
-	s3ShardID := findS3Shard(t, clusterID)
+	s3ShardID := findStorageShard(t, clusterID)
 	if s3ShardID == "" {
 		t.Skip("no S3 shard found")
 	}
@@ -390,7 +390,7 @@ func TestS3AccessKeyCreateValidation(t *testing.T) {
 // TestS3BucketWithQuota tests creating a bucket with a quota.
 func TestS3BucketWithQuota(t *testing.T) {
 	tenantID, _, clusterID, _, _ := createTestTenant(t, "e2e-s3-quota")
-	s3ShardID := findS3Shard(t, clusterID)
+	s3ShardID := findStorageShard(t, clusterID)
 	if s3ShardID == "" {
 		t.Skip("no S3 shard found")
 	}
@@ -424,8 +424,8 @@ func TestS3BucketWithQuota(t *testing.T) {
 	t.Logf("S3 bucket quota updated to %d", newQuota)
 }
 
-// findS3Shard returns the ID of the first S3 shard in the cluster, or empty string if none.
-func findS3Shard(t *testing.T, clusterID string) string {
+// findStorageShard returns the ID of the first storage shard in the cluster, or empty string if none.
+func findStorageShard(t *testing.T, clusterID string) string {
 	t.Helper()
 	resp, body := httpGet(t, fmt.Sprintf("%s/clusters/%s/shards", coreAPIURL, clusterID))
 	if resp.StatusCode != 200 {
@@ -433,7 +433,7 @@ func findS3Shard(t *testing.T, clusterID string) string {
 	}
 	shards := parsePaginatedItems(t, body)
 	for _, s := range shards {
-		if r, _ := s["role"].(string); r == "s3" {
+		if r, _ := s["role"].(string); r == "storage" {
 			id, _ := s["id"].(string)
 			return id
 		}

@@ -1,13 +1,21 @@
 package hostctl
 
 type SeedConfig struct {
-	APIURL  string      `yaml:"api_url"`
-	APIKey  string      `yaml:"api_key"`
-	Region  string      `yaml:"region"`
-	Cluster string      `yaml:"cluster"`
-	Brands  []BrandDef  `yaml:"brands"`
-	Zones   []ZoneDef   `yaml:"zones"`
-	Tenants []TenantDef `yaml:"tenants"`
+	APIURL      string          `yaml:"api_url"`
+	APIKey      string          `yaml:"api_key"`
+	Region      string          `yaml:"region"`
+	Cluster     string          `yaml:"cluster"`
+	Brands      []BrandDef      `yaml:"brands"`
+	Zones       []ZoneDef       `yaml:"zones"`
+	Tenants     []TenantDef     `yaml:"tenants"`
+	OIDCClients []OIDCClientDef `yaml:"oidc_clients"`
+}
+
+type OIDCClientDef struct {
+	ID           string   `yaml:"id"`
+	Secret       string   `yaml:"secret"`
+	Name         string   `yaml:"name"`
+	RedirectURIs []string `yaml:"redirect_uris"`
 }
 
 type BrandDef struct {
@@ -31,6 +39,7 @@ type TenantDef struct {
 	Brand            string              `yaml:"brand"`
 	Shard            string              `yaml:"shard"`
 	SFTPEnabled      bool                `yaml:"sftp_enabled"`
+	SSHEnabled       bool                `yaml:"ssh_enabled"`
 	Webroots         []WebrootDef        `yaml:"webroots"`
 	Databases        []DatabaseDef       `yaml:"databases"`
 	ValkeyInstances  []ValkeyInstanceDef `yaml:"valkey_instances"`

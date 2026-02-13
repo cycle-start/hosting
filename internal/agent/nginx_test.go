@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	agentv1 "github.com/edvin/hosting/proto/agent/v1"
+	"github.com/edvin/hosting/internal/agent/runtime"
 )
 
 // newTestNginxManager creates an NginxManager with a temporary config directory.
@@ -27,15 +27,15 @@ func newTestNginxManager(t *testing.T) *NginxManager {
 func TestGenerateConfig_PHPRuntime(t *testing.T) {
 	mgr := newTestNginxManager(t)
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &runtime.WebrootInfo{
 		TenantName:     "tenant1",
 		Name:           "mysite",
 		Runtime:        "php",
 		RuntimeVersion: "8.2",
 		PublicFolder:   "public",
 	}
-	fqdns := []*agentv1.FQDNInfo{
-		{Fqdn: "example.com", SslEnabled: false},
+	fqdns := []*FQDNInfo{
+		{FQDN: "example.com", SSLEnabled: false},
 	}
 
 	config, err := mgr.GenerateConfig(webroot, fqdns)
@@ -54,16 +54,16 @@ func TestGenerateConfig_PHPRuntime(t *testing.T) {
 	// Verify server_name.
 	assert.Contains(t, config, "server_name example.com")
 
-	// Verify document root includes public folder.
-	assert.Contains(t, config, "root /var/www/storage/tenant1/mysite/public")
+	// Verify document root includes public folder (under webroots/).
+	assert.Contains(t, config, "root /var/www/storage/tenant1/webroots/mysite/public")
 
 	// Verify .ht deny block.
 	assert.Contains(t, config, "location ~ /\\.ht")
 	assert.Contains(t, config, "deny all")
 
-	// Verify log paths.
-	assert.Contains(t, config, "access_log /home/tenant1/logs/mysite-access.log")
-	assert.Contains(t, config, "error_log  /home/tenant1/logs/mysite-error.log")
+	// Verify log paths on CephFS.
+	assert.Contains(t, config, "access_log /var/www/storage/tenant1/logs/mysite-access.log")
+	assert.Contains(t, config, "error_log  /var/www/storage/tenant1/logs/mysite-error.log")
 
 	// Verify node identification headers.
 	assert.Contains(t, config, "add_header X-Served-By $hostname always")
@@ -73,12 +73,12 @@ func TestGenerateConfig_NodeIdentificationHeaders(t *testing.T) {
 	mgr := newTestNginxManager(t)
 	mgr.SetShardName("web-1")
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &runtime.WebrootInfo{
 		TenantName: "tenant1",
 		Name:       "mysite",
 		Runtime:    "static",
 	}
-	fqdns := []*agentv1.FQDNInfo{{Fqdn: "example.com"}}
+	fqdns := []*FQDNInfo{{FQDN: "example.com"}}
 
 	config, err := mgr.GenerateConfig(webroot, fqdns)
 	require.NoError(t, err)
@@ -92,14 +92,14 @@ func TestGenerateConfig_NodeIdentificationHeaders(t *testing.T) {
 func TestGenerateConfig_PHPRuntime_DefaultVersion(t *testing.T) {
 	mgr := newTestNginxManager(t)
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &runtime.WebrootInfo{
 		TenantName:     "tenant1",
 		Name:           "mysite",
 		Runtime:        "php",
 		RuntimeVersion: "", // Empty; nginx template uses it directly.
 	}
-	fqdns := []*agentv1.FQDNInfo{
-		{Fqdn: "example.com"},
+	fqdns := []*FQDNInfo{
+		{FQDN: "example.com"},
 	}
 
 	config, err := mgr.GenerateConfig(webroot, fqdns)
@@ -112,13 +112,13 @@ func TestGenerateConfig_PHPRuntime_DefaultVersion(t *testing.T) {
 func TestGenerateConfig_NodeRuntime(t *testing.T) {
 	mgr := newTestNginxManager(t)
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &runtime.WebrootInfo{
 		TenantName: "tenant1",
 		Name:       "nodeapp",
 		Runtime:    "node",
 	}
-	fqdns := []*agentv1.FQDNInfo{
-		{Fqdn: "nodeapp.example.com"},
+	fqdns := []*FQDNInfo{
+		{FQDN: "nodeapp.example.com"},
 	}
 
 	config, err := mgr.GenerateConfig(webroot, fqdns)
@@ -148,12 +148,12 @@ func TestGenerateConfig_NodeRuntime(t *testing.T) {
 func TestGenerateConfig_NodeRuntime_PortDeterminism(t *testing.T) {
 	mgr := newTestNginxManager(t)
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &runtime.WebrootInfo{
 		TenantName: "tenant1",
 		Name:       "nodeapp",
 		Runtime:    "node",
 	}
-	fqdns := []*agentv1.FQDNInfo{{Fqdn: "example.com"}}
+	fqdns := []*FQDNInfo{{FQDN: "example.com"}}
 
 	config1, err := mgr.GenerateConfig(webroot, fqdns)
 	require.NoError(t, err)
@@ -168,13 +168,13 @@ func TestGenerateConfig_NodeRuntime_PortDeterminism(t *testing.T) {
 func TestGenerateConfig_PythonRuntime(t *testing.T) {
 	mgr := newTestNginxManager(t)
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &runtime.WebrootInfo{
 		TenantName: "tenant2",
 		Name:       "djangoapp",
 		Runtime:    "python",
 	}
-	fqdns := []*agentv1.FQDNInfo{
-		{Fqdn: "django.example.com"},
+	fqdns := []*FQDNInfo{
+		{FQDN: "django.example.com"},
 	}
 
 	config, err := mgr.GenerateConfig(webroot, fqdns)
@@ -198,13 +198,13 @@ func TestGenerateConfig_PythonRuntime(t *testing.T) {
 func TestGenerateConfig_RubyRuntime(t *testing.T) {
 	mgr := newTestNginxManager(t)
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &runtime.WebrootInfo{
 		TenantName: "tenant3",
 		Name:       "railsapp",
 		Runtime:    "ruby",
 	}
-	fqdns := []*agentv1.FQDNInfo{
-		{Fqdn: "rails.example.com"},
+	fqdns := []*FQDNInfo{
+		{FQDN: "rails.example.com"},
 	}
 
 	config, err := mgr.GenerateConfig(webroot, fqdns)
@@ -229,14 +229,14 @@ func TestGenerateConfig_RubyRuntime(t *testing.T) {
 func TestGenerateConfig_StaticRuntime(t *testing.T) {
 	mgr := newTestNginxManager(t)
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &runtime.WebrootInfo{
 		TenantName:   "tenant4",
 		Name:         "staticsite",
 		Runtime:      "static",
 		PublicFolder: "",
 	}
-	fqdns := []*agentv1.FQDNInfo{
-		{Fqdn: "static.example.com"},
+	fqdns := []*FQDNInfo{
+		{FQDN: "static.example.com"},
 	}
 
 	config, err := mgr.GenerateConfig(webroot, fqdns)
@@ -245,8 +245,8 @@ func TestGenerateConfig_StaticRuntime(t *testing.T) {
 	// Verify try_files with =404 for static.
 	assert.Contains(t, config, "try_files $uri $uri/ =404")
 
-	// Verify document root without public folder.
-	assert.Contains(t, config, "root /var/www/storage/tenant4/staticsite")
+	// Verify document root without public folder (under webroots/).
+	assert.Contains(t, config, "root /var/www/storage/tenant4/webroots/staticsite")
 
 	// Should NOT contain PHP, Node, Python, or Ruby directives.
 	assert.NotContains(t, config, "fastcgi_pass")
@@ -262,13 +262,13 @@ func TestGenerateConfig_WithSSL(t *testing.T) {
 	}
 	mgr := NewNginxManager(zerolog.Nop(), cfg)
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &runtime.WebrootInfo{
 		TenantName: "tenant1",
 		Name:       "securesite",
 		Runtime:    "static",
 	}
-	fqdns := []*agentv1.FQDNInfo{
-		{Fqdn: "secure.example.com", SslEnabled: true},
+	fqdns := []*FQDNInfo{
+		{FQDN: "secure.example.com", SSLEnabled: true},
 	}
 
 	config, err := mgr.GenerateConfig(webroot, fqdns)
@@ -311,13 +311,13 @@ func TestGenerateConfig_WithSSL(t *testing.T) {
 func TestGenerateConfig_WithSSL_NoHTTP(t *testing.T) {
 	mgr := newTestNginxManager(t)
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &runtime.WebrootInfo{
 		TenantName: "tenant1",
 		Name:       "httpsite",
 		Runtime:    "static",
 	}
-	fqdns := []*agentv1.FQDNInfo{
-		{Fqdn: "http.example.com", SslEnabled: false},
+	fqdns := []*FQDNInfo{
+		{FQDN: "http.example.com", SSLEnabled: false},
 	}
 
 	config, err := mgr.GenerateConfig(webroot, fqdns)
@@ -337,15 +337,15 @@ func TestGenerateConfig_WithSSL_NoHTTP(t *testing.T) {
 func TestGenerateConfig_MultipleFQDNs(t *testing.T) {
 	mgr := newTestNginxManager(t)
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &runtime.WebrootInfo{
 		TenantName: "tenant1",
 		Name:       "multisite",
 		Runtime:    "static",
 	}
-	fqdns := []*agentv1.FQDNInfo{
-		{Fqdn: "example.com"},
-		{Fqdn: "www.example.com"},
-		{Fqdn: "alias.example.com"},
+	fqdns := []*FQDNInfo{
+		{FQDN: "example.com"},
+		{FQDN: "www.example.com"},
+		{FQDN: "alias.example.com"},
 	}
 
 	config, err := mgr.GenerateConfig(webroot, fqdns)
@@ -363,15 +363,15 @@ func TestGenerateConfig_MultipleFQDNs_SSLFromFirst(t *testing.T) {
 	}
 	mgr := NewNginxManager(zerolog.Nop(), cfg)
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &runtime.WebrootInfo{
 		TenantName: "tenant1",
 		Name:       "multisite",
 		Runtime:    "static",
 	}
-	fqdns := []*agentv1.FQDNInfo{
-		{Fqdn: "example.com", SslEnabled: false},
-		{Fqdn: "www.example.com", SslEnabled: true},
-		{Fqdn: "alias.example.com", SslEnabled: false},
+	fqdns := []*FQDNInfo{
+		{FQDN: "example.com", SSLEnabled: false},
+		{FQDN: "www.example.com", SSLEnabled: true},
+		{FQDN: "alias.example.com", SSLEnabled: false},
 	}
 
 	config, err := mgr.GenerateConfig(webroot, fqdns)
@@ -386,55 +386,55 @@ func TestGenerateConfig_MultipleFQDNs_SSLFromFirst(t *testing.T) {
 func TestGenerateConfig_WithPublicFolder(t *testing.T) {
 	mgr := newTestNginxManager(t)
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &runtime.WebrootInfo{
 		TenantName:   "tenant1",
 		Name:         "laravelapp",
 		Runtime:      "php",
 		PublicFolder: "public",
 	}
-	fqdns := []*agentv1.FQDNInfo{
-		{Fqdn: "laravel.example.com"},
+	fqdns := []*FQDNInfo{
+		{FQDN: "laravel.example.com"},
 	}
 
 	config, err := mgr.GenerateConfig(webroot, fqdns)
 	require.NoError(t, err)
 
-	// Verify root includes public folder.
-	assert.Contains(t, config, "root /var/www/storage/tenant1/laravelapp/public")
+	// Verify root includes public folder (under webroots/).
+	assert.Contains(t, config, "root /var/www/storage/tenant1/webroots/laravelapp/public")
 }
 
 func TestGenerateConfig_WithoutPublicFolder(t *testing.T) {
 	mgr := newTestNginxManager(t)
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &runtime.WebrootInfo{
 		TenantName:   "tenant1",
 		Name:         "plainsite",
 		Runtime:      "static",
 		PublicFolder: "",
 	}
-	fqdns := []*agentv1.FQDNInfo{
-		{Fqdn: "plain.example.com"},
+	fqdns := []*FQDNInfo{
+		{FQDN: "plain.example.com"},
 	}
 
 	config, err := mgr.GenerateConfig(webroot, fqdns)
 	require.NoError(t, err)
 
 	// Verify root is just the webroot storage path without a public subfolder.
-	assert.Contains(t, config, "root /var/www/storage/tenant1/plainsite")
+	assert.Contains(t, config, "root /var/www/storage/tenant1/webroots/plainsite")
 	// The root should NOT end with /public.
-	assert.NotContains(t, config, "root /var/www/storage/tenant1/plainsite/public")
+	assert.NotContains(t, config, "root /var/www/storage/tenant1/webroots/plainsite/public")
 }
 
 func TestGenerateConfig_NoFQDNs(t *testing.T) {
 	mgr := newTestNginxManager(t)
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &runtime.WebrootInfo{
 		TenantName: "tenant1",
 		Name:       "nodomainsite",
 		Runtime:    "static",
 	}
 	// Empty FQDN list.
-	fqdns := []*agentv1.FQDNInfo{}
+	fqdns := []*FQDNInfo{}
 
 	config, err := mgr.GenerateConfig(webroot, fqdns)
 	require.NoError(t, err)
@@ -450,7 +450,7 @@ func TestGenerateConfig_NoFQDNs(t *testing.T) {
 func TestGenerateConfig_NilFQDNs(t *testing.T) {
 	mgr := newTestNginxManager(t)
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &runtime.WebrootInfo{
 		TenantName: "tenant1",
 		Name:       "nodomainsite",
 		Runtime:    "static",
@@ -466,12 +466,12 @@ func TestGenerateConfig_NilFQDNs(t *testing.T) {
 func TestGenerateConfig_AutoGeneratedComment(t *testing.T) {
 	mgr := newTestNginxManager(t)
 
-	webroot := &agentv1.WebrootInfo{
+	webroot := &runtime.WebrootInfo{
 		TenantName: "mytenant",
 		Name:       "mywebroot",
 		Runtime:    "static",
 	}
-	fqdns := []*agentv1.FQDNInfo{{Fqdn: "example.com"}}
+	fqdns := []*FQDNInfo{{FQDN: "example.com"}}
 
 	config, err := mgr.GenerateConfig(webroot, fqdns)
 	require.NoError(t, err)
@@ -574,11 +574,11 @@ func TestInstallCertificate(t *testing.T) {
 	cfg := Config{CertDir: tmpDir}
 	mgr := NewNginxManager(zerolog.Nop(), cfg)
 
-	cert := &agentv1.CertificateInfo{
-		Fqdn:     "example.com",
-		CertPem:  "-----BEGIN CERTIFICATE-----\ncert-content\n-----END CERTIFICATE-----",
-		KeyPem:   "-----BEGIN PRIVATE KEY-----\nkey-content\n-----END PRIVATE KEY-----",
-		ChainPem: "-----BEGIN CERTIFICATE-----\nchain-content\n-----END CERTIFICATE-----",
+	cert := &CertificateInfo{
+		FQDN:     "example.com",
+		CertPEM:  "-----BEGIN CERTIFICATE-----\ncert-content\n-----END CERTIFICATE-----",
+		KeyPEM:   "-----BEGIN PRIVATE KEY-----\nkey-content\n-----END PRIVATE KEY-----",
+		ChainPEM: "-----BEGIN CERTIFICATE-----\nchain-content\n-----END CERTIFICATE-----",
 	}
 
 	err := mgr.InstallCertificate(nil, cert)
@@ -601,11 +601,11 @@ func TestInstallCertificate_NoChain(t *testing.T) {
 	cfg := Config{CertDir: tmpDir}
 	mgr := NewNginxManager(zerolog.Nop(), cfg)
 
-	cert := &agentv1.CertificateInfo{
-		Fqdn:     "example.com",
-		CertPem:  "cert-only",
-		KeyPem:   "key-only",
-		ChainPem: "",
+	cert := &CertificateInfo{
+		FQDN:     "example.com",
+		CertPEM:  "cert-only",
+		KeyPEM:   "key-only",
+		ChainPEM: "",
 	}
 
 	err := mgr.InstallCertificate(nil, cert)

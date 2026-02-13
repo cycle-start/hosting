@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Trash2, Pencil, Users } from 'lucide-react'
+import { Plus, Trash2, Pencil, Users, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,7 @@ import { rules, validateField } from '@/lib/validation'
 import {
   useDatabase, useDatabaseUsers,
   useCreateDatabaseUser, useUpdateDatabaseUser, useDeleteDatabaseUser,
+  useCreateLoginSession,
 } from '@/lib/hooks'
 import type { DatabaseUser } from '@/lib/types'
 
@@ -47,6 +48,19 @@ export function DatabaseDetailPage() {
   const createMut = useCreateDatabaseUser()
   const updateMut = useUpdateDatabaseUser()
   const deleteMut = useDeleteDatabaseUser()
+  const createLoginSessionMut = useCreateLoginSession()
+
+  const handleOpenDbAdmin = async () => {
+    try {
+      const session = await createLoginSessionMut.mutateAsync(tenantId)
+      window.open(
+        `http://dbadmin.hosting.localhost/oauth2/start?rd=/&login_hint=${session.session_id}`,
+        '_blank'
+      )
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Failed to open DB Admin')
+    }
+  }
 
   if (isLoading || !database) {
     return <div className="space-y-6"><Skeleton className="h-10 w-64" /><Skeleton className="h-64 w-full" /></div>
@@ -144,6 +158,12 @@ export function DatabaseDetailPage() {
         title={database.name}
         subtitle={`Shard: ${database.shard_id || '-'}`}
         status={database.status}
+        actions={
+          <Button variant="outline" size="sm" onClick={handleOpenDbAdmin}>
+            <ExternalLink className="mr-2 h-4 w-4" />
+            Open in DB Admin
+          </Button>
+        }
       />
 
       <div className="flex items-center gap-2 text-sm text-muted-foreground">

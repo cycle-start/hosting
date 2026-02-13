@@ -9,8 +9,6 @@ import (
 	"text/template"
 
 	"github.com/rs/zerolog"
-
-	agentv1 "github.com/edvin/hosting/proto/agent/v1"
 )
 
 const rubyServiceTemplate = `[Unit]
@@ -31,8 +29,8 @@ ExecReload=/bin/kill -s USR1 $MAINPID
 Restart=on-failure
 RestartSec=5
 
-StandardOutput=append:/home/{{ .TenantName }}/logs/puma-{{ .WebrootName }}.log
-StandardError=append:/home/{{ .TenantName }}/logs/puma-{{ .WebrootName }}.error.log
+StandardOutput=append:/var/www/storage/{{ .TenantName }}/logs/puma-{{ .WebrootName }}.log
+StandardError=append:/var/www/storage/{{ .TenantName }}/logs/puma-{{ .WebrootName }}.error.log
 
 [Install]
 WantedBy=multi-user.target
@@ -60,21 +58,21 @@ type rubyServiceData struct {
 	WorkingDir  string
 }
 
-func (r *Ruby) serviceName(webroot *agentv1.WebrootInfo) string {
-	return fmt.Sprintf("puma-%s-%s", webroot.GetTenantName(), webroot.GetName())
+func (r *Ruby) serviceName(webroot *WebrootInfo) string {
+	return fmt.Sprintf("puma-%s-%s", webroot.TenantName, webroot.Name)
 }
 
-func (r *Ruby) unitFilePath(webroot *agentv1.WebrootInfo) string {
+func (r *Ruby) unitFilePath(webroot *WebrootInfo) string {
 	return filepath.Join("/etc/systemd/system", r.serviceName(webroot)+".service")
 }
 
 // Configure generates and writes a systemd service unit for the Puma application.
-func (r *Ruby) Configure(ctx context.Context, webroot *agentv1.WebrootInfo) error {
-	workingDir := filepath.Join("/var/www/storage", webroot.GetTenantName(), webroot.GetName())
+func (r *Ruby) Configure(ctx context.Context, webroot *WebrootInfo) error {
+	workingDir := filepath.Join("/var/www/storage", webroot.TenantName, "webroots", webroot.Name)
 
 	data := rubyServiceData{
-		TenantName:  webroot.GetTenantName(),
-		WebrootName: webroot.GetName(),
+		TenantName:  webroot.TenantName,
+		WebrootName: webroot.Name,
 		WorkingDir:  workingDir,
 	}
 
@@ -86,8 +84,8 @@ func (r *Ruby) Configure(ctx context.Context, webroot *agentv1.WebrootInfo) erro
 	unitPath := r.unitFilePath(webroot)
 
 	r.logger.Info().
-		Str("tenant", webroot.GetTenantName()).
-		Str("webroot", webroot.GetName()).
+		Str("tenant", webroot.TenantName).
+		Str("webroot", webroot.Name).
 		Str("path", unitPath).
 		Msg("writing Puma systemd unit")
 
@@ -103,28 +101,28 @@ func (r *Ruby) Configure(ctx context.Context, webroot *agentv1.WebrootInfo) erro
 }
 
 // Start enables and starts the Puma systemd service.
-func (r *Ruby) Start(ctx context.Context, webroot *agentv1.WebrootInfo) error {
+func (r *Ruby) Start(ctx context.Context, webroot *WebrootInfo) error {
 	service := r.serviceName(webroot)
 	r.logger.Info().Str("service", service).Msg("starting Puma service")
 	return r.svcMgr.Start(ctx, service)
 }
 
 // Stop stops and disables the Puma systemd service.
-func (r *Ruby) Stop(ctx context.Context, webroot *agentv1.WebrootInfo) error {
+func (r *Ruby) Stop(ctx context.Context, webroot *WebrootInfo) error {
 	service := r.serviceName(webroot)
 	r.logger.Info().Str("service", service).Msg("stopping Puma service")
 	return r.svcMgr.Stop(ctx, service)
 }
 
 // Reload sends a USR1 signal to Puma for graceful restart.
-func (r *Ruby) Reload(ctx context.Context, webroot *agentv1.WebrootInfo) error {
+func (r *Ruby) Reload(ctx context.Context, webroot *WebrootInfo) error {
 	service := r.serviceName(webroot)
 	r.logger.Info().Str("service", service).Msg("reloading Puma service")
 	return r.svcMgr.Reload(ctx, service)
 }
 
 // Remove stops the service and removes the systemd unit file.
-func (r *Ruby) Remove(ctx context.Context, webroot *agentv1.WebrootInfo) error {
+func (r *Ruby) Remove(ctx context.Context, webroot *WebrootInfo) error {
 	if err := r.Stop(ctx, webroot); err != nil {
 		r.logger.Warn().Err(err).Msg("failed to stop puma service during removal, continuing")
 	}
@@ -136,7 +134,7 @@ func (r *Ruby) Remove(ctx context.Context, webroot *agentv1.WebrootInfo) error {
 		return fmt.Errorf("remove ruby systemd unit: %w", err)
 	}
 
-	sockPath := fmt.Sprintf("/run/puma/%s-%s.sock", webroot.GetTenantName(), webroot.GetName())
+	sockPath := fmt.Sprintf("/run/puma/%s-%s.sock", webroot.TenantName, webroot.Name)
 	_ = os.Remove(sockPath)
 
 	return r.svcMgr.DaemonReload(ctx)

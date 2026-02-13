@@ -21,8 +21,8 @@ cluster:
       - name: valkey-1
         role: valkey
         node_count: 1
-      - name: s3-1
-        role: s3
+      - name: storage-1
+        role: storage
         node_count: 1
     infrastructure:
       haproxy: true
@@ -45,7 +45,6 @@ node_profiles:
     env:
       NGINX_CONFIG_DIR: /etc/nginx
       WEB_STORAGE_DIR: /var/www
-      HOME_BASE_DIR: /home
       CERT_DIR: /etc/ssl/hosting
       SHARD_NAME: web-1
     resources:

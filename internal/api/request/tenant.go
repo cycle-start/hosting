@@ -6,6 +6,7 @@ type CreateTenant struct {
 	ClusterID   string `json:"cluster_id" validate:"required"`
 	ShardID     string `json:"shard_id" validate:"required"`
 	SFTPEnabled *bool  `json:"sftp_enabled"`
+	SSHEnabled  *bool  `json:"ssh_enabled"`
 	// Nested (all optional)
 	Zones           []CreateZoneNested           `json:"zones" validate:"omitempty,dive"`
 	Webroots        []CreateWebrootNested        `json:"webroots" validate:"omitempty,dive"`
@@ -17,4 +18,5 @@ type CreateTenant struct {
 
 type UpdateTenant struct {
 	SFTPEnabled *bool `json:"sftp_enabled"`
+	SSHEnabled  *bool `json:"ssh_enabled"`
 }

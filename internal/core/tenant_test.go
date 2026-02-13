@@ -208,9 +208,10 @@ func TestTenantService_GetByID_Success(t *testing.T) {
 		*(dest[4].(**string)) = &shardID
 		*(dest[5].(*int)) = 5001
 		*(dest[6].(*bool)) = true
-		*(dest[7].(*string)) = model.StatusActive
-		*(dest[8].(*time.Time)) = now
+		*(dest[7].(*bool)) = false
+		*(dest[8].(*string)) = model.StatusActive
 		*(dest[9].(*time.Time)) = now
+		*(dest[10].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -224,6 +225,7 @@ func TestTenantService_GetByID_Success(t *testing.T) {
 	assert.Equal(t, &shardID, result.ShardID)
 	assert.Equal(t, 5001, result.UID)
 	assert.True(t, result.SFTPEnabled)
+	assert.False(t, result.SSHEnabled)
 	assert.Equal(t, model.StatusActive, result.Status)
 	assert.Equal(t, now, result.CreatedAt)
 	assert.Equal(t, now, result.UpdatedAt)
@@ -273,9 +275,10 @@ func TestTenantService_List_Success(t *testing.T) {
 			*(dest[4].(**string)) = &shardID
 			*(dest[5].(*int)) = 5001
 			*(dest[6].(*bool)) = false
-			*(dest[7].(*string)) = model.StatusActive
-			*(dest[8].(*time.Time)) = now
+			*(dest[7].(*bool)) = false
+			*(dest[8].(*string)) = model.StatusActive
 			*(dest[9].(*time.Time)) = now
+			*(dest[10].(*time.Time)) = now
 			return nil
 		},
 		func(dest ...any) error {
@@ -286,9 +289,10 @@ func TestTenantService_List_Success(t *testing.T) {
 			*(dest[4].(**string)) = &shardID
 			*(dest[5].(*int)) = 5002
 			*(dest[6].(*bool)) = true
-			*(dest[7].(*string)) = model.StatusPending
-			*(dest[8].(*time.Time)) = now
+			*(dest[7].(*bool)) = false
+			*(dest[8].(*string)) = model.StatusPending
 			*(dest[9].(*time.Time)) = now
+			*(dest[10].(*time.Time)) = now
 			return nil
 		},
 	)
@@ -555,9 +559,10 @@ func TestTenantService_ListByShard_Success(t *testing.T) {
 			*(dest[4].(**string)) = &shardID
 			*(dest[5].(*int)) = 5001
 			*(dest[6].(*bool)) = false
-			*(dest[7].(*string)) = model.StatusActive
-			*(dest[8].(*time.Time)) = now
+			*(dest[7].(*bool)) = false
+			*(dest[8].(*string)) = model.StatusActive
 			*(dest[9].(*time.Time)) = now
+			*(dest[10].(*time.Time)) = now
 			return nil
 		},
 		func(dest ...any) error {
@@ -568,9 +573,10 @@ func TestTenantService_ListByShard_Success(t *testing.T) {
 			*(dest[4].(**string)) = &shardID
 			*(dest[5].(*int)) = 5002
 			*(dest[6].(*bool)) = true
-			*(dest[7].(*string)) = model.StatusPending
-			*(dest[8].(*time.Time)) = now
+			*(dest[7].(*bool)) = false
+			*(dest[8].(*string)) = model.StatusPending
 			*(dest[9].(*time.Time)) = now
+			*(dest[10].(*time.Time)) = now
 			return nil
 		},
 	)

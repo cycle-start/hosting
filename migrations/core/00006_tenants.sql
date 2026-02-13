@@ -6,6 +6,7 @@ CREATE TABLE tenants (
     cluster_id   TEXT NOT NULL REFERENCES clusters(id),
     uid          INT NOT NULL UNIQUE,
     sftp_enabled BOOLEAN NOT NULL DEFAULT true,
+    ssh_enabled  BOOLEAN NOT NULL DEFAULT false,
     status       TEXT NOT NULL DEFAULT 'pending',
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()

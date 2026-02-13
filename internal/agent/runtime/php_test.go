@@ -7,8 +7,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	agentv1 "github.com/edvin/hosting/proto/agent/v1"
 )
 
 func TestPHP_PoolConfigTemplate(t *testing.T) {
@@ -47,9 +45,12 @@ func TestPHP_PoolConfigTemplate(t *testing.T) {
 	assert.Contains(t, config, "pm.max_spare_servers = 3")
 	assert.Contains(t, config, "pm.max_requests = 500")
 
-	// Verify error log path.
-	assert.Contains(t, config, "php_admin_value[error_log] = /home/tenant1/logs/php-error.log")
+	// Verify error log path on CephFS.
+	assert.Contains(t, config, "php_admin_value[error_log] = /var/www/storage/tenant1/logs/php-error.log")
 	assert.Contains(t, config, "php_admin_flag[log_errors] = on")
+
+	// Verify open_basedir restriction.
+	assert.Contains(t, config, "php_admin_value[open_basedir] = /var/www/storage/tenant1/:/tmp/")
 }
 
 func TestPHP_PoolConfigTemplate_DifferentVersion(t *testing.T) {
@@ -75,12 +76,12 @@ func TestPHP_PoolConfigPath(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		webroot  *agentv1.WebrootInfo
+		webroot  *WebrootInfo
 		expected string
 	}{
 		{
 			name: "with version 8.2",
-			webroot: &agentv1.WebrootInfo{
+			webroot: &WebrootInfo{
 				TenantName:     "tenant1",
 				RuntimeVersion: "8.2",
 			},
@@ -88,7 +89,7 @@ func TestPHP_PoolConfigPath(t *testing.T) {
 		},
 		{
 			name: "with version 8.3",
-			webroot: &agentv1.WebrootInfo{
+			webroot: &WebrootInfo{
 				TenantName:     "user2",
 				RuntimeVersion: "8.3",
 			},
@@ -96,7 +97,7 @@ func TestPHP_PoolConfigPath(t *testing.T) {
 		},
 		{
 			name: "default version when empty",
-			webroot: &agentv1.WebrootInfo{
+			webroot: &WebrootInfo{
 				TenantName:     "user3",
 				RuntimeVersion: "",
 			},
@@ -116,26 +117,26 @@ func TestPHP_FpmServiceName(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		webroot  *agentv1.WebrootInfo
+		webroot  *WebrootInfo
 		expected string
 	}{
 		{
 			name: "version 8.2",
-			webroot: &agentv1.WebrootInfo{
+			webroot: &WebrootInfo{
 				RuntimeVersion: "8.2",
 			},
 			expected: "php8.2-fpm",
 		},
 		{
 			name: "version 8.3",
-			webroot: &agentv1.WebrootInfo{
+			webroot: &WebrootInfo{
 				RuntimeVersion: "8.3",
 			},
 			expected: "php8.3-fpm",
 		},
 		{
 			name: "default version",
-			webroot: &agentv1.WebrootInfo{
+			webroot: &WebrootInfo{
 				RuntimeVersion: "",
 			},
 			expected: "php8.5-fpm",

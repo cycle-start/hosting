@@ -10,6 +10,7 @@ type Tenant struct {
 	ShardID     *string `json:"shard_id,omitempty" db:"shard_id"`
 	UID         int     `json:"uid" db:"uid"`
 	SFTPEnabled bool    `json:"sftp_enabled" db:"sftp_enabled"`
+	SSHEnabled  bool    `json:"ssh_enabled" db:"ssh_enabled"`
 	Status      string  `json:"status" db:"status"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`

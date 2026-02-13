@@ -38,14 +38,24 @@ output "valkey_node_ids" {
   value       = { for k, v in random_uuid.valkey_node_id : var.valkey_nodes[k].name => v.result }
 }
 
-output "s3_node_ips" {
-  description = "IP addresses of S3/Ceph nodes"
-  value       = { for k, v in var.s3_nodes : v.name => v.ip }
+output "storage_node_ips" {
+  description = "IP addresses of storage/Ceph nodes"
+  value       = { for k, v in var.storage_nodes : v.name => v.ip }
 }
 
-output "s3_node_ids" {
-  description = "Generated UUIDs for S3 nodes"
-  value       = { for k, v in random_uuid.s3_node_id : var.s3_nodes[k].name => v.result }
+output "storage_node_ids" {
+  description = "Generated UUIDs for storage nodes"
+  value       = { for k, v in random_uuid.storage_node_id : var.storage_nodes[k].name => v.result }
+}
+
+output "dbadmin_node_ips" {
+  description = "IP addresses of DB Admin nodes"
+  value       = { for k, v in var.dbadmin_nodes : v.name => v.ip }
+}
+
+output "dbadmin_node_ids" {
+  description = "Generated UUIDs for DB Admin nodes"
+  value       = { for k, v in random_uuid.dbadmin_node_id : var.dbadmin_nodes[k].name => v.result }
 }
 
 output "cluster_yaml" {

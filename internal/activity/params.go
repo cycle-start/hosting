@@ -5,6 +5,7 @@ type CreateTenantParams struct {
 	ID          string
 	UID         int
 	SFTPEnabled bool
+	SSHEnabled  bool
 }
 
 // UpdateTenantParams holds parameters for updating a tenant on a node.
@@ -12,6 +13,7 @@ type UpdateTenantParams struct {
 	ID          string
 	UID         int
 	SFTPEnabled bool
+	SSHEnabled  bool
 }
 
 // FQDNParam represents an FQDN for webroot operations.
@@ -119,6 +121,13 @@ type InstallCertificateParams struct {
 	CertPEM  string
 	KeyPEM   string
 	ChainPEM string
+}
+
+// SyncSSHConfigParams holds parameters for syncing SSH/SFTP config on a node.
+type SyncSSHConfigParams struct {
+	TenantName  string
+	SSHEnabled  bool
+	SFTPEnabled bool
 }
 
 // SyncSFTPKeysParams holds parameters for syncing SFTP authorized keys on a node.

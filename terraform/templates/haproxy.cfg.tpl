@@ -28,6 +28,7 @@ frontend http
     use_backend backend-admin-ui    if { req.hdr(host) -i admin.hosting.localhost }
     use_backend backend-core-api    if { req.hdr(host) -i api.hosting.localhost }
     use_backend backend-temporal-ui if { req.hdr(host) -i temporal.hosting.localhost }
+    use_backend backend-dbadmin    if { req.hdr(host) -i dbadmin.hosting.localhost }
     # Tenant routing via dynamic map
     use_backend %[req.hdr(host),lower,map(/var/lib/haproxy/maps/fqdn-to-shard.map,shard-default)]
 
@@ -40,6 +41,9 @@ backend backend-core-api
 
 backend backend-temporal-ui
     server temporal 127.0.0.1:8080
+
+backend backend-dbadmin
+    server dbadmin 127.0.0.1:4180
 
 # Default backend (returns 503 for unmapped FQDNs)
 backend shard-default
