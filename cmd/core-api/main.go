@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,10 +15,16 @@ import (
 
 	"github.com/edvin/hosting/internal/api"
 	"github.com/edvin/hosting/internal/config"
+	"github.com/edvin/hosting/internal/core"
 	"github.com/edvin/hosting/internal/db"
 )
 
 func main() {
+	if len(os.Args) >= 2 && os.Args[1] == "create-api-key" {
+		createAPIKey(os.Args[2:])
+		return
+	}
+
 	migrateFlag := flag.Bool("migrate", false, "Run database migrations before starting")
 	migrateDirFlag := flag.String("migrate-dir", "migrations/core", "Migration files directory")
 	flag.Parse()
@@ -95,4 +102,45 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 	httpServer.Shutdown(shutdownCtx)
+}
+
+func createAPIKey(args []string) {
+	fs := flag.NewFlagSet("create-api-key", flag.ExitOnError)
+	name := fs.String("name", "", "Name for the API key (required)")
+	fs.Parse(args)
+
+	if *name == "" {
+		fmt.Fprintln(os.Stderr, "error: --name is required")
+		fmt.Fprintln(os.Stderr, "usage: core-api create-api-key --name <name>")
+		os.Exit(1)
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: failed to load config: %v\n", err)
+		os.Exit(1)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	pool, err := db.NewCorePool(ctx, cfg.CoreDatabaseURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: failed to connect to database: %v\n", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+
+	svc := core.NewAPIKeyService(pool)
+	key, rawKey, err := svc.Create(ctx, *name, nil)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: failed to create API key: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("API key created successfully.\n\n")
+	fmt.Printf("  Name:   %s\n", key.Name)
+	fmt.Printf("  ID:     %s\n", key.ID)
+	fmt.Printf("  Key:    %s\n\n", rawKey)
+	fmt.Printf("Save this key — it will not be shown again.\n")
 }

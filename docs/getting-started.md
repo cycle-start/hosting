@@ -27,7 +27,17 @@ just dev-vm
 
 This runs `just dev` then provisions VMs via Terraform/libvirt and registers them with the platform using `hostctl cluster apply`.
 
-### 3. Seed test data
+### 3. Create an API key
+
+```bash
+just create-api-key admin
+```
+
+This connects directly to the core database, creates a hashed API key, and prints the plaintext key once. Save it — you'll need it for the admin UI and authenticated API requests.
+
+To enable authentication, set `AUTH_ENABLED=true` on the core-api service. All `/api/v1/*` endpoints will then require the `X-API-Key` header.
+
+### 4. Seed test data
 
 ```bash
 go run ./cmd/hostctl seed -f seeds/dev-tenants.yaml
@@ -42,20 +52,20 @@ This creates:
 - A Valkey (Redis) instance with a user
 - An email account
 
-### 4. Verify
+### 5. Verify
 
 ```bash
-# List tenants
-curl -s http://localhost:8090/api/v1/tenants | jq
+# List tenants (with auth)
+curl -s -H "X-API-Key: hst_..." http://localhost:8090/api/v1/tenants | jq
 
-# List zones
-curl -s http://localhost:8090/api/v1/zones | jq
+# Open admin UI
+open http://localhost:3001
 
 # Check Temporal workflows
 open http://localhost:8080
 ```
 
-### 5. Run e2e tests
+### 6. Run e2e tests
 
 ```bash
 just test-e2e
@@ -92,9 +102,10 @@ just rebuild worker            # Rebuild and restart worker
 
 ```
 cmd/
-  core-api/          REST API server
+  core-api/          REST API server (also: create-api-key subcommand)
   worker/            Temporal worker (workflows + activities)
   node-agent/        Temporal worker running on each VM node
+  admin-ui/          Admin UI reverse proxy + SPA server
   hostctl/           CLI for cluster bootstrap and test data seeding
 
 internal/
@@ -131,13 +142,15 @@ Hierarchy: Region > Cluster > Shard > Node. Tenants are assigned to shards. Node
 ## Useful commands
 
 ```bash
-just --list           # Show all available commands
-just test             # Run unit tests
-just lint             # Run linter
-just log core-api     # Tail logs for a service
-just ps               # Show running services
-just db-core          # Connect to core database
-just migrate-status   # Check migration status
-just vm-ssh web-1-node-0  # SSH into a VM
-just lb-show          # Show HAProxy map entries
+just --list                    # Show all available commands
+just create-api-key admin      # Create an API key
+just test                      # Run unit tests
+just lint                      # Run linter
+just log core-api              # Tail logs for a service
+just ps                        # Show running services
+just db-core                   # Connect to core database
+just migrate-status            # Check migration status
+just dev-admin                 # Start admin UI dev server (hot reload)
+just vm-ssh web-1-node-0       # SSH into a VM
+just lb-show                   # Show HAProxy map entries
 ```

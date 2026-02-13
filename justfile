@@ -186,6 +186,12 @@ grafana:
 gen-certs:
     bash scripts/gen-temporal-certs.sh
 
+# --- Auth ---
+
+# Create an API key (requires core-db running)
+create-api-key name:
+    CORE_DATABASE_URL="postgres://hosting:hosting@localhost:5432/hosting_core?sslmode=disable" go run ./cmd/core-api create-api-key --name {{name}}
+
 # --- Utilities ---
 
 # Connect to core DB via psql
