@@ -151,6 +151,7 @@ func (s *Server) setupRoutes() {
 		r.Post("/tenants/{id}/suspend", tenant.Suspend)
 		r.Post("/tenants/{id}/unsuspend", tenant.Unsuspend)
 		r.Post("/tenants/{id}/migrate", tenant.Migrate)
+		r.Get("/tenants/{id}/resource-summary", tenant.ResourceSummary)
 
 		// Webroots
 		webroot := handler.NewWebroot(s.services.Webroot)

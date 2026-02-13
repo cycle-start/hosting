@@ -53,7 +53,12 @@ func TestCertificateService_Upload_Success(t *testing.T) {
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "UploadCustomCertWorkflow", mock.Anything).Return(wfRun, nil)
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "test-tenant-1"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Upload(ctx, cert)
 	require.NoError(t, err)
@@ -79,7 +84,12 @@ func TestCertificateService_Upload_SetsTypeToCustom(t *testing.T) {
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "UploadCustomCertWorkflow", mock.Anything).Return(wfRun, nil)
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "test-tenant-1"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Upload(ctx, cert)
 	require.NoError(t, err)
@@ -113,7 +123,12 @@ func TestCertificateService_Upload_WorkflowError(t *testing.T) {
 	cert := &model.Certificate{ID: "test-cert-1", FQDNID: "test-fqdn-1"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "UploadCustomCertWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "test-tenant-1"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Upload(ctx, cert)
 	require.Error(t, err)

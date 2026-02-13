@@ -27,12 +27,16 @@ func (s *EmailAliasService) Create(ctx context.Context, a *model.EmailAlias) err
 		return fmt.Errorf("insert email alias: %w", err)
 	}
 
-	workflowID := fmt.Sprintf("email-alias-%s", a.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "CreateEmailAliasWorkflow", a.ID)
+	tenantID, err := resolveTenantIDFromEmailAccount(ctx, s.db, a.EmailAccountID)
 	if err != nil {
+		return fmt.Errorf("create email alias: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateEmailAliasWorkflow",
+		WorkflowID:   fmt.Sprintf("email-alias-%s", a.ID),
+		Arg:          a.ID,
+	}); err != nil {
 		return fmt.Errorf("start CreateEmailAliasWorkflow: %w", err)
 	}
 
@@ -100,12 +104,16 @@ func (s *EmailAliasService) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("set email alias %s status to deleting: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("email-alias-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "DeleteEmailAliasWorkflow", id)
+	tenantID, err := resolveTenantIDFromEmailAlias(ctx, s.db, id)
 	if err != nil {
+		return fmt.Errorf("delete email alias: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "DeleteEmailAliasWorkflow",
+		WorkflowID:   fmt.Sprintf("email-alias-%s", id),
+		Arg:          id,
+	}); err != nil {
 		return fmt.Errorf("start DeleteEmailAliasWorkflow: %w", err)
 	}
 

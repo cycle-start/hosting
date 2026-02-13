@@ -45,10 +45,17 @@ func TestDatabaseUserService_Create_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		tid := "test-tenant-1"
+		*(dest[0].(**string)) = &tid
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "CreateDatabaseUserWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Create(ctx, user)
 	require.NoError(t, err)
@@ -81,7 +88,15 @@ func TestDatabaseUserService_Create_WorkflowError(t *testing.T) {
 	user := &model.DatabaseUser{ID: "test-dbuser-1", Username: "admin"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "CreateDatabaseUserWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		tid := "test-tenant-1"
+		*(dest[0].(**string)) = &tid
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Create(ctx, user)
 	require.Error(t, err)
@@ -222,10 +237,17 @@ func TestDatabaseUserService_Update_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		tid := "test-tenant-1"
+		*(dest[0].(**string)) = &tid
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "UpdateDatabaseUserWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Update(ctx, user)
 	require.NoError(t, err)
@@ -256,7 +278,15 @@ func TestDatabaseUserService_Update_WorkflowError(t *testing.T) {
 
 	user := &model.DatabaseUser{ID: "test-dbuser-1"}
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "UpdateDatabaseUserWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		tid := "test-tenant-1"
+		*(dest[0].(**string)) = &tid
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Update(ctx, user)
 	require.Error(t, err)
@@ -277,10 +307,17 @@ func TestDatabaseUserService_Delete_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		tid := "test-tenant-1"
+		*(dest[0].(**string)) = &tid
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "DeleteDatabaseUserWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Delete(ctx, userID)
 	require.NoError(t, err)
@@ -309,7 +346,15 @@ func TestDatabaseUserService_Delete_WorkflowError(t *testing.T) {
 	ctx := context.Background()
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "DeleteDatabaseUserWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		tid := "test-tenant-1"
+		*(dest[0].(**string)) = &tid
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Delete(ctx, "test-dbuser-1")
 	require.Error(t, err)

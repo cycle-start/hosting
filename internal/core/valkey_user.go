@@ -28,12 +28,16 @@ func (s *ValkeyUserService) Create(ctx context.Context, user *model.ValkeyUser) 
 		return fmt.Errorf("insert valkey user: %w", err)
 	}
 
-	workflowID := fmt.Sprintf("valkey-user-%s", user.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "CreateValkeyUserWorkflow", user.ID)
+	tenantID, err := resolveTenantIDFromValkeyInstance(ctx, s.db, user.ValkeyInstanceID)
 	if err != nil {
+		return fmt.Errorf("create valkey user: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateValkeyUserWorkflow",
+		WorkflowID:   fmt.Sprintf("valkey-user-%s", user.ID),
+		Arg:          user.ID,
+	}); err != nil {
 		return fmt.Errorf("start CreateValkeyUserWorkflow: %w", err)
 	}
 
@@ -104,12 +108,16 @@ func (s *ValkeyUserService) Update(ctx context.Context, user *model.ValkeyUser) 
 		return fmt.Errorf("update valkey user %s: %w", user.ID, err)
 	}
 
-	workflowID := fmt.Sprintf("valkey-user-%s", user.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "UpdateValkeyUserWorkflow", user.ID)
+	tenantID, err := resolveTenantIDFromValkeyInstance(ctx, s.db, user.ValkeyInstanceID)
 	if err != nil {
+		return fmt.Errorf("update valkey user: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "UpdateValkeyUserWorkflow",
+		WorkflowID:   fmt.Sprintf("valkey-user-%s", user.ID),
+		Arg:          user.ID,
+	}); err != nil {
 		return fmt.Errorf("start UpdateValkeyUserWorkflow: %w", err)
 	}
 
@@ -125,12 +133,16 @@ func (s *ValkeyUserService) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("set valkey user %s status to deleting: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("valkey-user-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "DeleteValkeyUserWorkflow", id)
+	tenantID, err := resolveTenantIDFromValkeyUser(ctx, s.db, id)
 	if err != nil {
+		return fmt.Errorf("delete valkey user: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "DeleteValkeyUserWorkflow",
+		WorkflowID:   fmt.Sprintf("valkey-user-%s", id),
+		Arg:          id,
+	}); err != nil {
 		return fmt.Errorf("start DeleteValkeyUserWorkflow: %w", err)
 	}
 

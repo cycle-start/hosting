@@ -49,7 +49,7 @@ func TestSFTPKeyService_Create_Success(t *testing.T) {
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "AddSFTPKeyWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Create(ctx, key)
 	require.NoError(t, err)
@@ -82,7 +82,7 @@ func TestSFTPKeyService_Create_WorkflowError(t *testing.T) {
 	key := &model.SFTPKey{ID: "test-key-1", TenantID: "test-tenant-1"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "AddSFTPKeyWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Create(ctx, key)
 	require.Error(t, err)
@@ -236,12 +236,17 @@ func TestSFTPKeyService_Delete_Success(t *testing.T) {
 	svc := NewSFTPKeyService(db, tc)
 	ctx := context.Background()
 
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "test-tenant-1"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "RemoveSFTPKeyWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Delete(ctx, "test-key-1")
 	require.NoError(t, err)
@@ -269,8 +274,13 @@ func TestSFTPKeyService_Delete_WorkflowError(t *testing.T) {
 	svc := NewSFTPKeyService(db, tc)
 	ctx := context.Background()
 
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "test-tenant-1"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "RemoveSFTPKeyWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Delete(ctx, "test-key-1")
 	require.Error(t, err)

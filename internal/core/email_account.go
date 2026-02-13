@@ -27,12 +27,16 @@ func (s *EmailAccountService) Create(ctx context.Context, a *model.EmailAccount)
 		return fmt.Errorf("insert email account: %w", err)
 	}
 
-	workflowID := fmt.Sprintf("email-account-%s", a.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "CreateEmailAccountWorkflow", a.ID)
+	tenantID, err := resolveTenantIDFromFQDN(ctx, s.db, a.FQDNID)
 	if err != nil {
+		return fmt.Errorf("create email account: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateEmailAccountWorkflow",
+		WorkflowID:   fmt.Sprintf("email-account-%s", a.ID),
+		Arg:          a.ID,
+	}); err != nil {
 		return fmt.Errorf("start CreateEmailAccountWorkflow: %w", err)
 	}
 
@@ -100,12 +104,16 @@ func (s *EmailAccountService) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("set email account %s status to deleting: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("email-account-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "DeleteEmailAccountWorkflow", id)
+	tenantID, err := resolveTenantIDFromEmailAccount(ctx, s.db, id)
 	if err != nil {
+		return fmt.Errorf("delete email account: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "DeleteEmailAccountWorkflow",
+		WorkflowID:   fmt.Sprintf("email-account-%s", id),
+		Arg:          id,
+	}); err != nil {
 		return fmt.Errorf("start DeleteEmailAccountWorkflow: %w", err)
 	}
 

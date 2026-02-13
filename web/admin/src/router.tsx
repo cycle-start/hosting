@@ -7,10 +7,16 @@ import { RegionsPage } from './pages/regions'
 import { ClustersPage } from './pages/clusters'
 import { TenantsPage } from './pages/tenants'
 import { TenantDetailPage } from './pages/tenant-detail'
+import { WebrootsPage } from './pages/webroots'
+import { WebrootDetailPage } from './pages/webroot-detail'
+import { FQDNDetailPage } from './pages/fqdn-detail'
+import { EmailAccountDetailPage } from './pages/email-account-detail'
 import { DatabasesPage } from './pages/databases'
+import { DatabaseDetailPage } from './pages/database-detail'
 import { ZonesPage } from './pages/zones'
 import { ZoneDetailPage } from './pages/zone-detail'
 import { ValkeyPage } from './pages/valkey'
+import { ValkeyDetailPage } from './pages/valkey-detail'
 import { PlatformConfigPage } from './pages/platform-config'
 import { APIKeysPage } from './pages/api-keys'
 import { AuditLogPage } from './pages/audit-log'
@@ -66,6 +72,42 @@ const tenantDetailRoute = createRoute({
   component: TenantDetailPage,
 })
 
+const webrootDetailRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/tenants/$id/webroots/$webrootId',
+  component: WebrootDetailPage,
+})
+
+const fqdnDetailRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/tenants/$id/fqdns/$fqdnId',
+  component: FQDNDetailPage,
+})
+
+const emailAccountDetailRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/tenants/$id/email-accounts/$accountId',
+  component: EmailAccountDetailPage,
+})
+
+const databaseDetailRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/tenants/$id/databases/$databaseId',
+  component: DatabaseDetailPage,
+})
+
+const valkeyDetailRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/tenants/$id/valkey/$instanceId',
+  component: ValkeyDetailPage,
+})
+
+const webrootsRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/webroots',
+  component: WebrootsPage,
+})
+
 const databasesRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/databases',
@@ -116,6 +158,12 @@ const routeTree = rootRoute.addChildren([
     clustersRoute,
     tenantsRoute,
     tenantDetailRoute,
+    webrootDetailRoute,
+    fqdnDetailRoute,
+    emailAccountDetailRoute,
+    databaseDetailRoute,
+    valkeyDetailRoute,
+    webrootsRoute,
     databasesRoute,
     zonesRoute,
     zoneDetailRoute,

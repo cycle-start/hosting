@@ -30,3 +30,12 @@ func (m *handlerMockDB) QueryRow(ctx context.Context, sql string, arguments ...a
 	args := m.Called(ctx, sql, arguments)
 	return args.Get(0).(pgx.Row)
 }
+
+// handlerMockRow implements pgx.Row for handler tests.
+type handlerMockRow struct {
+	scanFunc func(dest ...any) error
+}
+
+func (r *handlerMockRow) Scan(dest ...any) error {
+	return r.scanFunc(dest...)
+}

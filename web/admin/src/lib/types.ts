@@ -290,6 +290,28 @@ export interface PlatformConfig {
   value: string
 }
 
+export interface TenantResourceSummary {
+  webroots: Record<string, number>
+  fqdns: Record<string, number>
+  certificates: Record<string, number>
+  email_accounts: Record<string, number>
+  email_aliases: Record<string, number>
+  email_forwards: Record<string, number>
+  email_autoreplies: Record<string, number>
+  databases: Record<string, number>
+  database_users: Record<string, number>
+  zones: Record<string, number>
+  zone_records: Record<string, number>
+  valkey_instances: Record<string, number>
+  valkey_users: Record<string, number>
+  sftp_keys: Record<string, number>
+  backups: Record<string, number>
+  total: number
+  pending: number
+  provisioning: number
+  failed: number
+}
+
 export interface ListParams {
   limit?: number
   cursor?: string

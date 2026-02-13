@@ -47,12 +47,16 @@ func (s *EmailAutoReplyService) Upsert(ctx context.Context, ar *model.EmailAutoR
 	}
 	ar.ID = actualID
 
-	workflowID := fmt.Sprintf("email-autoreply-%s", actualID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "UpdateEmailAutoReplyWorkflow", actualID)
+	tenantID, err := resolveTenantIDFromEmailAccount(ctx, s.db, ar.EmailAccountID)
 	if err != nil {
+		return fmt.Errorf("upsert email autoreply: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "UpdateEmailAutoReplyWorkflow",
+		WorkflowID:   fmt.Sprintf("email-autoreply-%s", actualID),
+		Arg:          actualID,
+	}); err != nil {
 		return fmt.Errorf("start UpdateEmailAutoReplyWorkflow: %w", err)
 	}
 
@@ -88,12 +92,16 @@ func (s *EmailAutoReplyService) Delete(ctx context.Context, accountID string) er
 		return fmt.Errorf("set email autoreply %s status to deleting: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("email-autoreply-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "DeleteEmailAutoReplyWorkflow", id)
+	tenantID, err := resolveTenantIDFromEmailAccount(ctx, s.db, accountID)
 	if err != nil {
+		return fmt.Errorf("delete email autoreply: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "DeleteEmailAutoReplyWorkflow",
+		WorkflowID:   fmt.Sprintf("email-autoreply-%s", id),
+		Arg:          id,
+	}); err != nil {
 		return fmt.Errorf("start DeleteEmailAutoReplyWorkflow: %w", err)
 	}
 

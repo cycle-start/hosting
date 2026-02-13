@@ -30,12 +30,16 @@ func (s *CertificateService) Upload(ctx context.Context, cert *model.Certificate
 		return fmt.Errorf("insert certificate: %w", err)
 	}
 
-	workflowID := fmt.Sprintf("certificate-%s", cert.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "UploadCustomCertWorkflow", cert.ID)
+	tenantID, err := resolveTenantIDFromFQDN(ctx, s.db, cert.FQDNID)
 	if err != nil {
+		return fmt.Errorf("upload certificate: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "UploadCustomCertWorkflow",
+		WorkflowID:   fmt.Sprintf("certificate-%s", cert.ID),
+		Arg:          cert.ID,
+	}); err != nil {
 		return fmt.Errorf("start UploadCustomCertWorkflow: %w", err)
 	}
 

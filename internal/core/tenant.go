@@ -35,12 +35,11 @@ func (s *TenantService) Create(ctx context.Context, tenant *model.Tenant) error 
 		return fmt.Errorf("insert tenant: %w", err)
 	}
 
-	workflowID := fmt.Sprintf("tenant-%s", tenant.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "CreateTenantWorkflow", tenant.ID)
-	if err != nil {
+	if err := signalProvision(ctx, s.tc, tenant.ID, model.ProvisionTask{
+		WorkflowName: "CreateTenantWorkflow",
+		WorkflowID:   fmt.Sprintf("tenant-%s", tenant.ID),
+		Arg:          tenant.ID,
+	}); err != nil {
 		return fmt.Errorf("start CreateTenantWorkflow: %w", err)
 	}
 
@@ -175,12 +174,11 @@ func (s *TenantService) Update(ctx context.Context, tenant *model.Tenant) error 
 		return fmt.Errorf("update tenant %s: %w", tenant.ID, err)
 	}
 
-	workflowID := fmt.Sprintf("tenant-%s", tenant.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "UpdateTenantWorkflow", tenant.ID)
-	if err != nil {
+	if err := signalProvision(ctx, s.tc, tenant.ID, model.ProvisionTask{
+		WorkflowName: "UpdateTenantWorkflow",
+		WorkflowID:   fmt.Sprintf("tenant-%s", tenant.ID),
+		Arg:          tenant.ID,
+	}); err != nil {
 		return fmt.Errorf("start UpdateTenantWorkflow: %w", err)
 	}
 
@@ -196,12 +194,11 @@ func (s *TenantService) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("set tenant %s status to deleting: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("tenant-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "DeleteTenantWorkflow", id)
-	if err != nil {
+	if err := signalProvision(ctx, s.tc, id, model.ProvisionTask{
+		WorkflowName: "DeleteTenantWorkflow",
+		WorkflowID:   fmt.Sprintf("tenant-%s", id),
+		Arg:          id,
+	}); err != nil {
 		return fmt.Errorf("start DeleteTenantWorkflow: %w", err)
 	}
 
@@ -217,12 +214,11 @@ func (s *TenantService) Suspend(ctx context.Context, id string) error {
 		return fmt.Errorf("set tenant %s status to suspended: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("tenant-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "SuspendTenantWorkflow", id)
-	if err != nil {
+	if err := signalProvision(ctx, s.tc, id, model.ProvisionTask{
+		WorkflowName: "SuspendTenantWorkflow",
+		WorkflowID:   fmt.Sprintf("tenant-%s", id),
+		Arg:          id,
+	}); err != nil {
 		return fmt.Errorf("start SuspendTenantWorkflow: %w", err)
 	}
 
@@ -238,12 +234,11 @@ func (s *TenantService) Unsuspend(ctx context.Context, id string) error {
 		return fmt.Errorf("set tenant %s status to pending: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("tenant-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "UnsuspendTenantWorkflow", id)
-	if err != nil {
+	if err := signalProvision(ctx, s.tc, id, model.ProvisionTask{
+		WorkflowName: "UnsuspendTenantWorkflow",
+		WorkflowID:   fmt.Sprintf("tenant-%s", id),
+		Arg:          id,
+	}); err != nil {
 		return fmt.Errorf("start UnsuspendTenantWorkflow: %w", err)
 	}
 
@@ -259,17 +254,16 @@ func (s *TenantService) Migrate(ctx context.Context, id string, targetShardID st
 		return fmt.Errorf("set tenant %s status to provisioning: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("migrate-tenant-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "MigrateTenantWorkflow", MigrateTenantParams{
-		TenantID:      id,
-		TargetShardID: targetShardID,
-		MigrateZones:  migrateZones,
-		MigrateFQDNs:  migrateFQDNs,
-	})
-	if err != nil {
+	if err := signalProvision(ctx, s.tc, id, model.ProvisionTask{
+		WorkflowName: "MigrateTenantWorkflow",
+		WorkflowID:   fmt.Sprintf("migrate-tenant-%s", id),
+		Arg: MigrateTenantParams{
+			TenantID:      id,
+			TargetShardID: targetShardID,
+			MigrateZones:  migrateZones,
+			MigrateFQDNs:  migrateFQDNs,
+		},
+	}); err != nil {
 		return fmt.Errorf("start MigrateTenantWorkflow: %w", err)
 	}
 
@@ -282,6 +276,126 @@ type MigrateTenantParams struct {
 	TargetShardID string `json:"target_shard_id"`
 	MigrateZones  bool   `json:"migrate_zones"`
 	MigrateFQDNs  bool   `json:"migrate_fqdns"`
+}
+
+func (s *TenantService) ResourceSummary(ctx context.Context, tenantID string) (*model.TenantResourceSummary, error) {
+	const query = `
+		SELECT 'webroots' AS resource_type, status, count(*) FROM webroots WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status
+		UNION ALL
+		SELECT 'fqdns', f.status, count(*) FROM fqdns f JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND f.status != 'deleted' GROUP BY f.status
+		UNION ALL
+		SELECT 'certificates', c.status, count(*) FROM certificates c JOIN fqdns f ON f.id = c.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND c.status != 'deleted' GROUP BY c.status
+		UNION ALL
+		SELECT 'email_accounts', ea.status, count(*) FROM email_accounts ea JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND ea.status != 'deleted' GROUP BY ea.status
+		UNION ALL
+		SELECT 'email_aliases', al.status, count(*) FROM email_aliases al JOIN email_accounts ea ON ea.id = al.email_account_id JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND al.status != 'deleted' GROUP BY al.status
+		UNION ALL
+		SELECT 'email_forwards', ef.status, count(*) FROM email_forwards ef JOIN email_accounts ea ON ea.id = ef.email_account_id JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND ef.status != 'deleted' GROUP BY ef.status
+		UNION ALL
+		SELECT 'email_autoreplies', ar.status, count(*) FROM email_autoreplies ar JOIN email_accounts ea ON ea.id = ar.email_account_id JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND ar.status != 'deleted' GROUP BY ar.status
+		UNION ALL
+		SELECT 'databases', status, count(*) FROM databases WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status
+		UNION ALL
+		SELECT 'database_users', du.status, count(*) FROM database_users du JOIN databases d ON d.id = du.database_id WHERE d.tenant_id = $1 AND du.status != 'deleted' GROUP BY du.status
+		UNION ALL
+		SELECT 'zones', status, count(*) FROM zones WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status
+		UNION ALL
+		SELECT 'zone_records', zr.status, count(*) FROM zone_records zr JOIN zones z ON z.id = zr.zone_id WHERE z.tenant_id = $1 AND zr.status != 'deleted' GROUP BY zr.status
+		UNION ALL
+		SELECT 'valkey_instances', status, count(*) FROM valkey_instances WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status
+		UNION ALL
+		SELECT 'valkey_users', vu.status, count(*) FROM valkey_users vu JOIN valkey_instances vi ON vi.id = vu.valkey_instance_id WHERE vi.tenant_id = $1 AND vu.status != 'deleted' GROUP BY vu.status
+		UNION ALL
+		SELECT 'sftp_keys', status, count(*) FROM sftp_keys WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status
+		UNION ALL
+		SELECT 'backups', status, count(*) FROM backups WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status`
+
+	rows, err := s.db.Query(ctx, query, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("resource summary for tenant %s: %w", tenantID, err)
+	}
+	defer rows.Close()
+
+	// Collect per-resource-type status counts.
+	counts := map[string]model.ResourceStatusCounts{}
+	for rows.Next() {
+		var resourceType, status string
+		var count int
+		if err := rows.Scan(&resourceType, &status, &count); err != nil {
+			return nil, fmt.Errorf("scan resource summary row: %w", err)
+		}
+		if counts[resourceType] == nil {
+			counts[resourceType] = model.ResourceStatusCounts{}
+		}
+		counts[resourceType][status] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate resource summary: %w", err)
+	}
+
+	summary := &model.TenantResourceSummary{
+		Webroots:         counts["webroots"],
+		FQDNs:            counts["fqdns"],
+		Certificates:     counts["certificates"],
+		EmailAccounts:    counts["email_accounts"],
+		EmailAliases:     counts["email_aliases"],
+		EmailForwards:    counts["email_forwards"],
+		EmailAutoReplies: counts["email_autoreplies"],
+		Databases:        counts["databases"],
+		DatabaseUsers:    counts["database_users"],
+		Zones:            counts["zones"],
+		ZoneRecords:      counts["zone_records"],
+		ValkeyInstances:  counts["valkey_instances"],
+		ValkeyUsers:      counts["valkey_users"],
+		SFTPKeys:         counts["sftp_keys"],
+		Backups:          counts["backups"],
+	}
+
+	// Ensure nil maps become empty maps for clean JSON.
+	ensureMap := func(m *model.ResourceStatusCounts) {
+		if *m == nil {
+			*m = model.ResourceStatusCounts{}
+		}
+	}
+	ensureMap(&summary.Webroots)
+	ensureMap(&summary.FQDNs)
+	ensureMap(&summary.Certificates)
+	ensureMap(&summary.EmailAccounts)
+	ensureMap(&summary.EmailAliases)
+	ensureMap(&summary.EmailForwards)
+	ensureMap(&summary.EmailAutoReplies)
+	ensureMap(&summary.Databases)
+	ensureMap(&summary.DatabaseUsers)
+	ensureMap(&summary.Zones)
+	ensureMap(&summary.ZoneRecords)
+	ensureMap(&summary.ValkeyInstances)
+	ensureMap(&summary.ValkeyUsers)
+	ensureMap(&summary.SFTPKeys)
+	ensureMap(&summary.Backups)
+
+	// Compute aggregates.
+	for _, m := range []model.ResourceStatusCounts{
+		summary.Webroots, summary.FQDNs, summary.Certificates,
+		summary.EmailAccounts, summary.EmailAliases, summary.EmailForwards, summary.EmailAutoReplies,
+		summary.Databases, summary.DatabaseUsers,
+		summary.Zones, summary.ZoneRecords,
+		summary.ValkeyInstances, summary.ValkeyUsers,
+		summary.SFTPKeys, summary.Backups,
+	} {
+		for status, count := range m {
+			summary.Total += count
+			switch status {
+			case model.StatusPending:
+				summary.Pending += count
+			case model.StatusProvisioning:
+				summary.Provisioning += count
+			case model.StatusFailed:
+				summary.Failed += count
+			}
+		}
+	}
+
+	return summary, nil
 }
 
 func (s *TenantService) NextUID(ctx context.Context) (int, error) {

@@ -28,12 +28,11 @@ func (s *WebrootService) Create(ctx context.Context, webroot *model.Webroot) err
 		return fmt.Errorf("insert webroot: %w", err)
 	}
 
-	workflowID := fmt.Sprintf("webroot-%s", webroot.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "CreateWebrootWorkflow", webroot.ID)
-	if err != nil {
+	if err := signalProvision(ctx, s.tc, webroot.TenantID, model.ProvisionTask{
+		WorkflowName: "CreateWebrootWorkflow",
+		WorkflowID:   fmt.Sprintf("webroot-%s", webroot.ID),
+		Arg:          webroot.ID,
+	}); err != nil {
 		return fmt.Errorf("start CreateWebrootWorkflow: %w", err)
 	}
 
@@ -105,12 +104,11 @@ func (s *WebrootService) Update(ctx context.Context, webroot *model.Webroot) err
 		return fmt.Errorf("update webroot %s: %w", webroot.ID, err)
 	}
 
-	workflowID := fmt.Sprintf("webroot-%s", webroot.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "UpdateWebrootWorkflow", webroot.ID)
-	if err != nil {
+	if err := signalProvision(ctx, s.tc, webroot.TenantID, model.ProvisionTask{
+		WorkflowName: "UpdateWebrootWorkflow",
+		WorkflowID:   fmt.Sprintf("webroot-%s", webroot.ID),
+		Arg:          webroot.ID,
+	}); err != nil {
 		return fmt.Errorf("start UpdateWebrootWorkflow: %w", err)
 	}
 
@@ -126,12 +124,16 @@ func (s *WebrootService) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("set webroot %s status to deleting: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("webroot-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "DeleteWebrootWorkflow", id)
+	tenantID, err := resolveTenantIDFromWebroot(ctx, s.db, id)
 	if err != nil {
+		return fmt.Errorf("delete webroot: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "DeleteWebrootWorkflow",
+		WorkflowID:   fmt.Sprintf("webroot-%s", id),
+		Arg:          id,
+	}); err != nil {
 		return fmt.Errorf("start DeleteWebrootWorkflow: %w", err)
 	}
 

@@ -29,12 +29,16 @@ func (s *DatabaseService) Create(ctx context.Context, database *model.Database) 
 		return fmt.Errorf("insert database: %w", err)
 	}
 
-	workflowID := fmt.Sprintf("database-%s", database.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "CreateDatabaseWorkflow", database.ID)
-	if err != nil {
+	var tenantID string
+	if database.TenantID != nil {
+		tenantID = *database.TenantID
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateDatabaseWorkflow",
+		WorkflowID:   fmt.Sprintf("database-%s", database.ID),
+		Arg:          database.ID,
+	}); err != nil {
 		return fmt.Errorf("start CreateDatabaseWorkflow: %w", err)
 	}
 
@@ -168,12 +172,16 @@ func (s *DatabaseService) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("set database %s status to deleting: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("database-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "DeleteDatabaseWorkflow", id)
+	tenantID, err := resolveTenantIDFromDatabase(ctx, s.db, id)
 	if err != nil {
+		return fmt.Errorf("delete database: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "DeleteDatabaseWorkflow",
+		WorkflowID:   fmt.Sprintf("database-%s", id),
+		Arg:          id,
+	}); err != nil {
 		return fmt.Errorf("start DeleteDatabaseWorkflow: %w", err)
 	}
 
@@ -189,15 +197,19 @@ func (s *DatabaseService) Migrate(ctx context.Context, id string, targetShardID 
 		return fmt.Errorf("set database %s status to provisioning: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("migrate-database-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "MigrateDatabaseWorkflow", MigrateDatabaseParams{
-		DatabaseID:    id,
-		TargetShardID: targetShardID,
-	})
+	tenantID, err := resolveTenantIDFromDatabase(ctx, s.db, id)
 	if err != nil {
+		return fmt.Errorf("migrate database: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "MigrateDatabaseWorkflow",
+		WorkflowID:   fmt.Sprintf("migrate-database-%s", id),
+		Arg: MigrateDatabaseParams{
+			DatabaseID:    id,
+			TargetShardID: targetShardID,
+		},
+	}); err != nil {
 		return fmt.Errorf("start MigrateDatabaseWorkflow: %w", err)
 	}
 

@@ -28,12 +28,16 @@ func (s *FQDNService) Create(ctx context.Context, fqdn *model.FQDN) error {
 		return fmt.Errorf("insert fqdn: %w", err)
 	}
 
-	workflowID := fmt.Sprintf("fqdn-%s", fqdn.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "BindFQDNWorkflow", fqdn.ID)
+	tenantID, err := resolveTenantIDFromWebroot(ctx, s.db, fqdn.WebrootID)
 	if err != nil {
+		return fmt.Errorf("create fqdn: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "BindFQDNWorkflow",
+		WorkflowID:   fmt.Sprintf("fqdn-%s", fqdn.ID),
+		Arg:          fqdn.ID,
+	}); err != nil {
 		return fmt.Errorf("start BindFQDNWorkflow: %w", err)
 	}
 
@@ -103,12 +107,16 @@ func (s *FQDNService) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("set fqdn %s status to deleting: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("fqdn-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "UnbindFQDNWorkflow", id)
+	tenantID, err := resolveTenantIDFromFQDN(ctx, s.db, id)
 	if err != nil {
+		return fmt.Errorf("delete fqdn: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "UnbindFQDNWorkflow",
+		WorkflowID:   fmt.Sprintf("fqdn-%s", id),
+		Arg:          id,
+	}); err != nil {
 		return fmt.Errorf("start UnbindFQDNWorkflow: %w", err)
 	}
 

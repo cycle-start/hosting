@@ -243,12 +243,18 @@ func TestDatabaseMigrate_Success(t *testing.T) {
 	svc := core.NewDatabaseService(db, tc)
 	h := NewDatabase(svc)
 
+	resolveRow := &handlerMockRow{scanFunc: func(dest ...any) error {
+		tid := "test-tenant-1"
+		*(dest[0].(**string)) = &tid
+		return nil
+	}}
+	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
 	db.On("Exec", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", mock.Anything, mock.Anything, "MigrateDatabaseWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/databases/"+validID+"/migrate", map[string]any{

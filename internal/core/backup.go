@@ -29,12 +29,11 @@ func (s *BackupService) Create(ctx context.Context, backup *model.Backup) error 
 		return fmt.Errorf("insert backup: %w", err)
 	}
 
-	workflowID := fmt.Sprintf("backup-create-%s", backup.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "CreateBackupWorkflow", backup.ID)
-	if err != nil {
+	if err := signalProvision(ctx, s.tc, backup.TenantID, model.ProvisionTask{
+		WorkflowName: "CreateBackupWorkflow",
+		WorkflowID:   fmt.Sprintf("backup-create-%s", backup.ID),
+		Arg:          backup.ID,
+	}); err != nil {
 		return fmt.Errorf("start CreateBackupWorkflow: %w", err)
 	}
 
@@ -106,12 +105,16 @@ func (s *BackupService) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("set backup %s status to deleting: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("backup-delete-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "DeleteBackupWorkflow", id)
+	tenantID, err := resolveTenantIDFromBackup(ctx, s.db, id)
 	if err != nil {
+		return fmt.Errorf("delete backup: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "DeleteBackupWorkflow",
+		WorkflowID:   fmt.Sprintf("backup-delete-%s", id),
+		Arg:          id,
+	}); err != nil {
 		return fmt.Errorf("start DeleteBackupWorkflow: %w", err)
 	}
 
@@ -128,12 +131,11 @@ func (s *BackupService) Restore(ctx context.Context, id string) error {
 		return fmt.Errorf("backup %s is not active (status: %s)", id, backup.Status)
 	}
 
-	workflowID := fmt.Sprintf("backup-restore-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "RestoreBackupWorkflow", id)
-	if err != nil {
+	if err := signalProvision(ctx, s.tc, backup.TenantID, model.ProvisionTask{
+		WorkflowName: "RestoreBackupWorkflow",
+		WorkflowID:   fmt.Sprintf("backup-restore-%s", id),
+		Arg:          id,
+	}); err != nil {
 		return fmt.Errorf("start RestoreBackupWorkflow: %w", err)
 	}
 

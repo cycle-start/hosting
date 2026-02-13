@@ -29,12 +29,16 @@ func (s *ZoneRecordService) Create(ctx context.Context, record *model.ZoneRecord
 		return fmt.Errorf("insert zone record: %w", err)
 	}
 
-	workflowID := fmt.Sprintf("zone-record-%s", record.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "CreateZoneRecordWorkflow", record.ID)
+	tenantID, err := resolveTenantIDFromZone(ctx, s.db, record.ZoneID)
 	if err != nil {
+		return fmt.Errorf("create zone record: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateZoneRecordWorkflow",
+		WorkflowID:   fmt.Sprintf("zone-record-%s", record.ID),
+		Arg:          record.ID,
+	}); err != nil {
 		return fmt.Errorf("start CreateZoneRecordWorkflow: %w", err)
 	}
 
@@ -107,12 +111,16 @@ func (s *ZoneRecordService) Update(ctx context.Context, record *model.ZoneRecord
 		return fmt.Errorf("update zone record %s: %w", record.ID, err)
 	}
 
-	workflowID := fmt.Sprintf("zone-record-%s", record.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "UpdateZoneRecordWorkflow", record.ID)
+	tenantID, err := resolveTenantIDFromZone(ctx, s.db, record.ZoneID)
 	if err != nil {
+		return fmt.Errorf("update zone record: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "UpdateZoneRecordWorkflow",
+		WorkflowID:   fmt.Sprintf("zone-record-%s", record.ID),
+		Arg:          record.ID,
+	}); err != nil {
 		return fmt.Errorf("start UpdateZoneRecordWorkflow: %w", err)
 	}
 
@@ -128,12 +136,16 @@ func (s *ZoneRecordService) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("set zone record %s status to deleting: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("zone-record-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "DeleteZoneRecordWorkflow", id)
+	tenantID, err := resolveTenantIDFromZoneRecord(ctx, s.db, id)
 	if err != nil {
+		return fmt.Errorf("delete zone record: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "DeleteZoneRecordWorkflow",
+		WorkflowID:   fmt.Sprintf("zone-record-%s", id),
+		Arg:          id,
+	}); err != nil {
 		return fmt.Errorf("start DeleteZoneRecordWorkflow: %w", err)
 	}
 

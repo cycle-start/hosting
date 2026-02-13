@@ -29,12 +29,16 @@ func (s *ZoneService) Create(ctx context.Context, zone *model.Zone) error {
 		return fmt.Errorf("insert zone: %w", err)
 	}
 
-	workflowID := fmt.Sprintf("zone-%s", zone.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "CreateZoneWorkflow", zone.ID)
-	if err != nil {
+	var tenantID string
+	if zone.TenantID != nil {
+		tenantID = *zone.TenantID
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateZoneWorkflow",
+		WorkflowID:   fmt.Sprintf("zone-%s", zone.ID),
+		Arg:          zone.ID,
+	}); err != nil {
 		return fmt.Errorf("start CreateZoneWorkflow: %w", err)
 	}
 
@@ -139,12 +143,16 @@ func (s *ZoneService) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("set zone %s status to deleting: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("zone-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "DeleteZoneWorkflow", id)
+	tenantID, err := resolveTenantIDFromZone(ctx, s.db, id)
 	if err != nil {
+		return fmt.Errorf("delete zone: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "DeleteZoneWorkflow",
+		WorkflowID:   fmt.Sprintf("zone-%s", id),
+		Arg:          id,
+	}); err != nil {
 		return fmt.Errorf("start DeleteZoneWorkflow: %w", err)
 	}
 

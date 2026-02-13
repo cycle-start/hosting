@@ -31,12 +31,11 @@ func (s *SFTPKeyService) Create(ctx context.Context, key *model.SFTPKey) error {
 		return fmt.Errorf("insert sftp key: %w", err)
 	}
 
-	workflowID := fmt.Sprintf("sftp-key-%s", key.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "AddSFTPKeyWorkflow", key.ID)
-	if err != nil {
+	if err := signalProvision(ctx, s.tc, key.TenantID, model.ProvisionTask{
+		WorkflowName: "AddSFTPKeyWorkflow",
+		WorkflowID:   fmt.Sprintf("sftp-key-%s", key.ID),
+		Arg:          key.ID,
+	}); err != nil {
 		return fmt.Errorf("start AddSFTPKeyWorkflow: %w", err)
 	}
 
@@ -109,12 +108,16 @@ func (s *SFTPKeyService) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("set sftp key %s status to deleting: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("sftp-key-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "RemoveSFTPKeyWorkflow", id)
+	tenantID, err := resolveTenantIDFromSFTPKey(ctx, s.db, id)
 	if err != nil {
+		return fmt.Errorf("delete sftp key: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "RemoveSFTPKeyWorkflow",
+		WorkflowID:   fmt.Sprintf("sftp-key-%s", id),
+		Arg:          id,
+	}); err != nil {
 		return fmt.Errorf("start RemoveSFTPKeyWorkflow: %w", err)
 	}
 

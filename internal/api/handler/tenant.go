@@ -236,6 +236,32 @@ func (h *Tenant) Unsuspend(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// ResourceSummary godoc
+//
+//	@Summary		Get resource summary for a tenant
+//	@Tags			Tenants
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Tenant ID"
+//	@Success		200 {object} model.TenantResourceSummary
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants/{id}/resource-summary [get]
+func (h *Tenant) ResourceSummary(w http.ResponseWriter, r *http.Request) {
+	id, err := request.RequireID(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	summary, err := h.svc.ResourceSummary(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, summary)
+}
+
 // Migrate godoc
 //
 //	@Summary		Migrate a tenant to another shard

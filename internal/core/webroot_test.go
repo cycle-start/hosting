@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	temporalclient "go.temporal.io/sdk/client"
 	temporalmocks "go.temporal.io/sdk/mocks"
 )
 
@@ -52,9 +51,7 @@ func TestWebrootService_Create_Success(t *testing.T) {
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.MatchedBy(func(opts temporalclient.StartWorkflowOptions) bool {
-		return opts.TaskQueue == "hosting-tasks" && opts.ID == "webroot-"+webroot.ID
-	}), "CreateWebrootWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Create(ctx, webroot)
 	require.NoError(t, err)
@@ -280,7 +277,12 @@ func TestWebrootService_Delete_Success(t *testing.T) {
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "DeleteWebrootWorkflow", mock.Anything).Return(wfRun, nil)
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "test-tenant-1"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Delete(ctx, webrootID)
 	require.NoError(t, err)
@@ -309,7 +311,12 @@ func TestWebrootService_Delete_WorkflowError(t *testing.T) {
 	ctx := context.Background()
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "DeleteWebrootWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "test-tenant-1"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Delete(ctx, "test-webroot-1")
 	require.Error(t, err)

@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Boxes,
   FileText,
+  FolderOpen,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -55,6 +56,7 @@ const navSections: NavSection[] = [
     title: 'Hosting',
     items: [
       { label: 'Tenants', href: '/tenants', icon: Users },
+      { label: 'Webroots', href: '/webroots', icon: FolderOpen },
       { label: 'Databases', href: '/databases', icon: Database },
       { label: 'Zones', href: '/zones', icon: Globe },
     ],

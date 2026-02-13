@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	temporalclient "go.temporal.io/sdk/client"
 	temporalmocks "go.temporal.io/sdk/mocks"
 )
 
@@ -50,9 +49,7 @@ func TestZoneService_Create_Success(t *testing.T) {
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.MatchedBy(func(opts temporalclient.StartWorkflowOptions) bool {
-		return opts.TaskQueue == "hosting-tasks" && opts.ID == "zone-"+zone.ID
-	}), "CreateZoneWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Create(ctx, zone)
 	require.NoError(t, err)
@@ -240,10 +237,17 @@ func TestZoneService_Delete_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		tid := "test-tenant-1"
+		*(dest[0].(**string)) = &tid
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "DeleteZoneWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Delete(ctx, zoneID)
 	require.NoError(t, err)
@@ -272,7 +276,15 @@ func TestZoneService_Delete_WorkflowError(t *testing.T) {
 	ctx := context.Background()
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "DeleteZoneWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		tid := "test-tenant-1"
+		*(dest[0].(**string)) = &tid
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Delete(ctx, "test-zone-1")
 	require.Error(t, err)

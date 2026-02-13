@@ -49,10 +49,17 @@ func TestZoneRecordService_Create_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		tid := "test-tenant-1"
+		*(dest[0].(**string)) = &tid
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "CreateZoneRecordWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Create(ctx, record)
 	require.NoError(t, err)
@@ -85,7 +92,15 @@ func TestZoneRecordService_Create_WorkflowError(t *testing.T) {
 	record := &model.ZoneRecord{ID: "test-record-1", Type: "A"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "CreateZoneRecordWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		tid := "test-tenant-1"
+		*(dest[0].(**string)) = &tid
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Create(ctx, record)
 	require.Error(t, err)
@@ -228,10 +243,17 @@ func TestZoneRecordService_Update_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		tid := "test-tenant-1"
+		*(dest[0].(**string)) = &tid
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "UpdateZoneRecordWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Update(ctx, record)
 	require.NoError(t, err)
@@ -262,7 +284,15 @@ func TestZoneRecordService_Update_WorkflowError(t *testing.T) {
 
 	record := &model.ZoneRecord{ID: "test-record-1"}
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "UpdateZoneRecordWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		tid := "test-tenant-1"
+		*(dest[0].(**string)) = &tid
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Update(ctx, record)
 	require.Error(t, err)
@@ -283,10 +313,17 @@ func TestZoneRecordService_Delete_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		tid := "test-tenant-1"
+		*(dest[0].(**string)) = &tid
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "DeleteZoneRecordWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Delete(ctx, recordID)
 	require.NoError(t, err)
@@ -315,7 +352,15 @@ func TestZoneRecordService_Delete_WorkflowError(t *testing.T) {
 	ctx := context.Background()
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "DeleteZoneRecordWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+
+	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
+		tid := "test-tenant-1"
+		*(dest[0].(**string)) = &tid
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Delete(ctx, "test-record-1")
 	require.Error(t, err)

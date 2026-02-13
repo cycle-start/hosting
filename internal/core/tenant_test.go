@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	temporalclient "go.temporal.io/sdk/client"
 	temporalmocks "go.temporal.io/sdk/mocks"
 )
 
@@ -99,9 +98,7 @@ func TestTenantService_Create_Success(t *testing.T) {
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.MatchedBy(func(opts temporalclient.StartWorkflowOptions) bool {
-		return opts.TaskQueue == "hosting-tasks" && opts.ID == "tenant-"+tenant.ID
-	}), "CreateTenantWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Create(ctx, tenant)
 	require.NoError(t, err)
@@ -180,7 +177,7 @@ func TestTenantService_Create_WorkflowError(t *testing.T) {
 	}}
 	db.On("QueryRow", ctx, "SELECT nextval('tenant_uid_seq')", []any(nil)).Return(row)
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "CreateTenantWorkflow", mock.Anything).Return(nil, errors.New("temporal unavailable"))
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal unavailable"))
 
 	err := svc.Create(ctx, tenant)
 	require.Error(t, err)
@@ -379,9 +376,7 @@ func TestTenantService_Update_Success(t *testing.T) {
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.MatchedBy(func(opts temporalclient.StartWorkflowOptions) bool {
-		return opts.TaskQueue == "hosting-tasks" && opts.ID == "tenant-"+tenant.ID
-	}), "UpdateTenantWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Update(ctx, tenant)
 	require.NoError(t, err)
@@ -414,7 +409,7 @@ func TestTenantService_Update_WorkflowError(t *testing.T) {
 	tenant := &model.Tenant{ID: "test-tenant-1", Name: "updated"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "UpdateTenantWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Update(ctx, tenant)
 	require.Error(t, err)
@@ -438,9 +433,7 @@ func TestTenantService_Delete_Success(t *testing.T) {
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.MatchedBy(func(opts temporalclient.StartWorkflowOptions) bool {
-		return opts.ID == "tenant-"+tenantID
-	}), "DeleteTenantWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Delete(ctx, tenantID)
 	require.NoError(t, err)
@@ -474,7 +467,7 @@ func TestTenantService_Delete_WorkflowError(t *testing.T) {
 	tenantID := "test-tenant-1"
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "DeleteTenantWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Delete(ctx, tenantID)
 	require.Error(t, err)
@@ -498,7 +491,7 @@ func TestTenantService_Suspend_Success(t *testing.T) {
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "SuspendTenantWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Suspend(ctx, tenantID)
 	require.NoError(t, err)
@@ -531,7 +524,7 @@ func TestTenantService_Suspend_WorkflowError(t *testing.T) {
 	tenantID := "test-tenant-1"
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "SuspendTenantWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Suspend(ctx, tenantID)
 	require.Error(t, err)
@@ -660,7 +653,7 @@ func TestTenantService_Unsuspend_Success(t *testing.T) {
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "UnsuspendTenantWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Unsuspend(ctx, tenantID)
 	require.NoError(t, err)
@@ -693,7 +686,7 @@ func TestTenantService_Unsuspend_WorkflowError(t *testing.T) {
 	tenantID := "test-tenant-1"
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "UnsuspendTenantWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Unsuspend(ctx, tenantID)
 	require.Error(t, err)

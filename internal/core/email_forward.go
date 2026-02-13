@@ -27,12 +27,16 @@ func (s *EmailForwardService) Create(ctx context.Context, f *model.EmailForward)
 		return fmt.Errorf("insert email forward: %w", err)
 	}
 
-	workflowID := fmt.Sprintf("email-forward-%s", f.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "CreateEmailForwardWorkflow", f.ID)
+	tenantID, err := resolveTenantIDFromEmailAccount(ctx, s.db, f.EmailAccountID)
 	if err != nil {
+		return fmt.Errorf("create email forward: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateEmailForwardWorkflow",
+		WorkflowID:   fmt.Sprintf("email-forward-%s", f.ID),
+		Arg:          f.ID,
+	}); err != nil {
 		return fmt.Errorf("start CreateEmailForwardWorkflow: %w", err)
 	}
 
@@ -100,12 +104,16 @@ func (s *EmailForwardService) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("set email forward %s status to deleting: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("email-forward-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "DeleteEmailForwardWorkflow", id)
+	tenantID, err := resolveTenantIDFromEmailForward(ctx, s.db, id)
 	if err != nil {
+		return fmt.Errorf("delete email forward: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "DeleteEmailForwardWorkflow",
+		WorkflowID:   fmt.Sprintf("email-forward-%s", id),
+		Arg:          id,
+	}); err != nil {
 		return fmt.Errorf("start DeleteEmailForwardWorkflow: %w", err)
 	}
 

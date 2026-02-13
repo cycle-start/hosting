@@ -45,12 +45,16 @@ func (s *ValkeyInstanceService) Create(ctx context.Context, instance *model.Valk
 		return fmt.Errorf("insert valkey instance: %w", err)
 	}
 
-	workflowID := fmt.Sprintf("valkey-instance-%s", instance.ID)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "CreateValkeyInstanceWorkflow", instance.ID)
-	if err != nil {
+	var tenantID string
+	if instance.TenantID != nil {
+		tenantID = *instance.TenantID
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateValkeyInstanceWorkflow",
+		WorkflowID:   fmt.Sprintf("valkey-instance-%s", instance.ID),
+		Arg:          instance.ID,
+	}); err != nil {
 		return fmt.Errorf("start CreateValkeyInstanceWorkflow: %w", err)
 	}
 
@@ -120,12 +124,16 @@ func (s *ValkeyInstanceService) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("set valkey instance %s status to deleting: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("valkey-instance-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "DeleteValkeyInstanceWorkflow", id)
+	tenantID, err := resolveTenantIDFromValkeyInstance(ctx, s.db, id)
 	if err != nil {
+		return fmt.Errorf("delete valkey instance: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "DeleteValkeyInstanceWorkflow",
+		WorkflowID:   fmt.Sprintf("valkey-instance-%s", id),
+		Arg:          id,
+	}); err != nil {
 		return fmt.Errorf("start DeleteValkeyInstanceWorkflow: %w", err)
 	}
 
@@ -141,15 +149,19 @@ func (s *ValkeyInstanceService) Migrate(ctx context.Context, id string, targetSh
 		return fmt.Errorf("set valkey instance %s status to provisioning: %w", id, err)
 	}
 
-	workflowID := fmt.Sprintf("migrate-valkey-instance-%s", id)
-	_, err = s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: "hosting-tasks",
-	}, "MigrateValkeyInstanceWorkflow", MigrateValkeyInstanceParams{
-		InstanceID:    id,
-		TargetShardID: targetShardID,
-	})
+	tenantID, err := resolveTenantIDFromValkeyInstance(ctx, s.db, id)
 	if err != nil {
+		return fmt.Errorf("migrate valkey instance: %w", err)
+	}
+
+	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "MigrateValkeyInstanceWorkflow",
+		WorkflowID:   fmt.Sprintf("migrate-valkey-instance-%s", id),
+		Arg: MigrateValkeyInstanceParams{
+			InstanceID:    id,
+			TargetShardID: targetShardID,
+		},
+	}); err != nil {
 		return fmt.Errorf("start MigrateValkeyInstanceWorkflow: %w", err)
 	}
 

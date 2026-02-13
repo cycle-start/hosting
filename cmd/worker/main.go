@@ -97,6 +97,7 @@ func main() {
 	w.RegisterActivity(stalwartActivities)
 
 	// Register workflows
+	w.RegisterWorkflow(workflow.TenantProvisionWorkflow)
 	w.RegisterWorkflow(workflow.CreateTenantWorkflow)
 	w.RegisterWorkflow(workflow.UpdateTenantWorkflow)
 	w.RegisterWorkflow(workflow.SuspendTenantWorkflow)
