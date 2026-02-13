@@ -56,7 +56,7 @@ func (s *UpdateEmailAutoReplyWorkflowTestSuite) TestSuccess() {
 
 	fqdn := model.FQDN{ID: fqdnID, FQDN: "example.com", WebrootID: webrootID}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, ClusterID: clusterID}
+	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ClusterID: clusterID}
 	clusterConfig, _ := json.Marshal(map[string]string{
 		"stalwart_url":   "https://mail.example.com",
 		"stalwart_token": "admin-token",
@@ -121,7 +121,7 @@ func (s *UpdateEmailAutoReplyWorkflowTestSuite) TestSetVacationFails_SetsStatusF
 	account := model.EmailAccount{ID: accountID, FQDNID: fqdnID, Address: "user@example.com"}
 	fqdn := model.FQDN{ID: fqdnID, FQDN: "example.com", WebrootID: webrootID}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, ClusterID: clusterID}
+	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ClusterID: clusterID}
 	clusterConfig, _ := json.Marshal(map[string]string{
 		"stalwart_url":   "https://mail.example.com",
 		"stalwart_token": "admin-token",
@@ -185,7 +185,7 @@ func (s *DeleteEmailAutoReplyWorkflowTestSuite) TestSuccess() {
 	account := model.EmailAccount{ID: accountID, FQDNID: fqdnID, Address: "user@example.com"}
 	fqdn := model.FQDN{ID: fqdnID, FQDN: "example.com", WebrootID: webrootID}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, ClusterID: clusterID}
+	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ClusterID: clusterID}
 	clusterConfig, _ := json.Marshal(map[string]string{
 		"stalwart_url":   "https://mail.example.com",
 		"stalwart_token": "admin-token",

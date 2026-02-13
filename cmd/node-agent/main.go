@@ -62,6 +62,13 @@ func main() {
 	taskQueue := "node-" + cfg.NodeID
 	w := worker.New(tc, taskQueue, worker.Options{})
 
+	s3Mgr := agent.NewS3Manager(
+		logger,
+		getEnv("RGW_ENDPOINT", "http://localhost:7480"),
+		getEnv("RGW_ADMIN_ACCESS_KEY", ""),
+		getEnv("RGW_ADMIN_SECRET_KEY", ""),
+	)
+
 	nodeActs := activity.NewNodeLocal(
 		logger,
 		srv.TenantManager(),
@@ -69,6 +76,7 @@ func main() {
 		srv.NginxManager(),
 		srv.DatabaseManager(),
 		srv.ValkeyManager(),
+		s3Mgr,
 		srv.Runtimes(),
 	)
 	w.RegisterActivity(nodeActs)

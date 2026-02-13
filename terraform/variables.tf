@@ -124,3 +124,24 @@ variable "valkey_shard_name" {
   type        = string
   default     = "valkey-1"
 }
+
+# --- S3/Ceph storage nodes ---
+
+variable "s3_nodes" {
+  description = "S3/Ceph storage node definitions (runs Ceph mon+mgr+osd+rgw + node-agent)"
+  type = list(object({
+    name   = string
+    ip     = string
+    memory = optional(number, 2048)
+    vcpus  = optional(number, 2)
+  }))
+  default = [
+    { name = "s3-1-node-0", ip = "10.10.10.50" },
+  ]
+}
+
+variable "s3_shard_name" {
+  description = "Shard name for S3 nodes"
+  type        = string
+  default     = "s3-1"
+}

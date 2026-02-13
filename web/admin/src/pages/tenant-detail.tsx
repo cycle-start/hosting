@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Pause, Play, Trash2, Plus, RotateCcw, Loader2, FolderOpen, Database as DatabaseIcon, Globe, Boxes, Key, Archive } from 'lucide-react'
+import { Pause, Play, Trash2, Plus, RotateCcw, Loader2, FolderOpen, Database as DatabaseIcon, Globe, Boxes, HardDrive, Key, Archive } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -19,18 +19,21 @@ import { Breadcrumb } from '@/components/shared/breadcrumb'
 import { formatDate } from '@/lib/utils'
 import {
   useTenant, useTenantResourceSummary, useWebroots, useDatabases, useValkeyInstances,
+  useS3Buckets,
   useSFTPKeys, useBackups, useZones, useSuspendTenant, useUnsuspendTenant,
   useDeleteTenant, useCreateWebroot, useDeleteWebroot,
   useCreateDatabase, useDeleteDatabase,
   useCreateValkeyInstance, useDeleteValkeyInstance,
+  useCreateS3Bucket, useDeleteS3Bucket,
   useCreateSFTPKey, useDeleteSFTPKey,
   useCreateBackup, useDeleteBackup, useRestoreBackup,
   useCreateZone, useDeleteZone,
 } from '@/lib/hooks'
-import type { Webroot, Database, ValkeyInstance, SFTPKey, Backup, Zone, WebrootFormData, DatabaseFormData, ValkeyInstanceFormData, SFTPKeyFormData, ZoneFormData } from '@/lib/types'
+import type { Webroot, Database, ValkeyInstance, S3Bucket, SFTPKey, Backup, Zone, WebrootFormData, DatabaseFormData, ValkeyInstanceFormData, S3BucketFormData, SFTPKeyFormData, ZoneFormData } from '@/lib/types'
 import { WebrootFields } from '@/components/forms/webroot-fields'
 import { DatabaseFields } from '@/components/forms/database-fields'
 import { ValkeyInstanceFields } from '@/components/forms/valkey-instance-fields'
+import { S3BucketFields } from '@/components/forms/s3-bucket-fields'
 import { SFTPKeyFields } from '@/components/forms/sftp-key-fields'
 import { ZoneFields } from '@/components/forms/zone-fields'
 
@@ -43,6 +46,7 @@ export function TenantDetailPage() {
   const [createWebrootOpen, setCreateWebrootOpen] = useState(false)
   const [createDbOpen, setCreateDbOpen] = useState(false)
   const [createValkeyOpen, setCreateValkeyOpen] = useState(false)
+  const [createS3Open, setCreateS3Open] = useState(false)
   const [createSftpOpen, setCreateSftpOpen] = useState(false)
   const [createBackupOpen, setCreateBackupOpen] = useState(false)
   const [createZoneOpen, setCreateZoneOpen] = useState(false)
@@ -51,6 +55,7 @@ export function TenantDetailPage() {
   const [deleteWebroot, setDeleteWebroot] = useState<Webroot | null>(null)
   const [deleteDb, setDeleteDb] = useState<Database | null>(null)
   const [deleteValkey, setDeleteValkey] = useState<ValkeyInstance | null>(null)
+  const [deleteS3, setDeleteS3] = useState<S3Bucket | null>(null)
   const [deleteSftp, setDeleteSftp] = useState<SFTPKey | null>(null)
   const [deleteBackupTarget, setDeleteBackupTarget] = useState<Backup | null>(null)
   const [restoreBackupTarget, setRestoreBackupTarget] = useState<Backup | null>(null)
@@ -60,12 +65,14 @@ export function TenantDetailPage() {
   const defaultWebroot: WebrootFormData = { name: '', runtime: 'php', runtime_version: '8.5', public_folder: 'public' }
   const defaultDatabase: DatabaseFormData = { name: '', shard_id: '' }
   const defaultValkey: ValkeyInstanceFormData = { name: '', shard_id: '', max_memory_mb: 64 }
+  const defaultS3: S3BucketFormData = { name: '', shard_id: '' }
   const defaultSftp: SFTPKeyFormData = { name: '', public_key: '' }
   const defaultZone: ZoneFormData = { name: '' }
 
   const [wrForm, setWrForm] = useState<WebrootFormData>(defaultWebroot)
   const [dbForm, setDbForm] = useState<DatabaseFormData>(defaultDatabase)
   const [vkForm, setVkForm] = useState<ValkeyInstanceFormData>(defaultValkey)
+  const [s3Form, setS3Form] = useState<S3BucketFormData>(defaultS3)
   const [sftpForm, setSftpForm] = useState<SFTPKeyFormData>(defaultSftp)
   const [znForm, setZnForm] = useState<ZoneFormData>(defaultZone)
   const [bkType, setBkType] = useState('web')
@@ -81,6 +88,7 @@ export function TenantDetailPage() {
         case 'webroot': setCreateWebrootOpen(true); break
         case 'database': setCreateDbOpen(true); break
         case 'valkey': setCreateValkeyOpen(true); break
+        case 's3_bucket': setCreateS3Open(true); break
         case 'sftp_key': setCreateSftpOpen(true); break
         case 'zone': setCreateZoneOpen(true); break
       }
@@ -94,6 +102,7 @@ export function TenantDetailPage() {
   const { data: webrootsData, isLoading: webrootsLoading } = useWebroots(id)
   const { data: databasesData, isLoading: databasesLoading } = useDatabases(id)
   const { data: valkeyData, isLoading: valkeyLoading } = useValkeyInstances(id)
+  const { data: s3Data, isLoading: s3Loading } = useS3Buckets(id)
   const { data: sftpData, isLoading: sftpLoading } = useSFTPKeys(id)
   const { data: backupsData, isLoading: backupsLoading } = useBackups(id)
   const { data: zonesData, isLoading: zonesLoading } = useZones()
@@ -107,6 +116,8 @@ export function TenantDetailPage() {
   const deleteDbMut = useDeleteDatabase()
   const createValkeyMut = useCreateValkeyInstance()
   const deleteValkeyMut = useDeleteValkeyInstance()
+  const createS3Mut = useCreateS3Bucket()
+  const deleteS3Mut = useDeleteS3Bucket()
   const createSftpMut = useCreateSFTPKey()
   const deleteSftpMut = useDeleteSFTPKey()
   const createBackupMut = useCreateBackup()
@@ -138,6 +149,7 @@ export function TenantDetailPage() {
     setWrForm(defaultWebroot)
     setDbForm(defaultDatabase)
     setVkForm(defaultValkey)
+    setS3Form(defaultS3)
     setSftpForm(defaultSftp)
     setZnForm(defaultZone)
     setBkType('web'); setBkSource('')
@@ -188,6 +200,17 @@ export function TenantDetailPage() {
         users: vkForm.users?.length ? vkForm.users : undefined,
       })
       toast.success('Valkey instance created'); setCreateValkeyOpen(false); resetForm()
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
+  }
+
+  const handleCreateS3 = async () => {
+    if (!s3Form.name || !s3Form.shard_id) return
+    try {
+      await createS3Mut.mutateAsync({
+        tenant_id: id, name: s3Form.name, shard_id: s3Form.shard_id,
+        public: s3Form.public, quota_bytes: s3Form.quota_bytes,
+      })
+      toast.success('S3 bucket created'); setCreateS3Open(false); resetForm()
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }
 
@@ -287,6 +310,33 @@ export function TenantDetailPage() {
     },
   ]
 
+  const s3Columns: ColumnDef<S3Bucket>[] = [
+    {
+      accessorKey: 'name', header: 'Name',
+      cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+    },
+    {
+      accessorKey: 'public', header: 'Access',
+      cell: ({ row }) => row.original.public ? 'Public' : 'Private',
+    },
+    {
+      accessorKey: 'shard_id', header: 'Shard',
+      cell: ({ row }) => row.original.shard_id ? <code className="text-xs">{row.original.shard_id}</code> : '-',
+    },
+    {
+      accessorKey: 'status', header: 'Status',
+      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => (
+        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteS3(row.original) }}>
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+      ),
+    },
+  ]
+
   const zoneColumns: ColumnDef<Zone>[] = [
     {
       accessorKey: 'name', header: 'Name',
@@ -376,7 +426,7 @@ export function TenantDetailPage() {
 
       <ResourceHeader
         title={tenant.id}
-        subtitle={`UID: ${tenant.uid} | Region: ${tenant.region_id} | Cluster: ${tenant.cluster_id}`}
+        subtitle={`UID: ${tenant.uid} | Brand: ${tenant.brand_id} | Region: ${tenant.region_id} | Cluster: ${tenant.cluster_id}`}
         status={tenant.status}
         actions={
           <div className="flex gap-2">
@@ -434,6 +484,7 @@ export function TenantDetailPage() {
           <TabsTrigger value="databases">Databases ({databasesData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="zones">Zones ({tenantZones.length})</TabsTrigger>
           <TabsTrigger value="valkey">Valkey ({valkeyData?.items?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="s3">S3 Buckets ({s3Data?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="sftp">SFTP Keys ({sftpData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="backups">Backups ({backupsData?.items?.length ?? 0})</TabsTrigger>
         </TabsList>
@@ -494,6 +545,20 @@ export function TenantDetailPage() {
           )}
         </TabsContent>
 
+        <TabsContent value="s3">
+          <div className="mb-4 flex justify-end">
+            <Button size="sm" onClick={() => { resetForm(); setCreateS3Open(true) }}>
+              <Plus className="mr-2 h-4 w-4" /> Create S3 Bucket
+            </Button>
+          </div>
+          {!s3Loading && (s3Data?.items?.length ?? 0) === 0 ? (
+            <EmptyState icon={HardDrive} title="No S3 buckets" description="Create an S3-compatible object storage bucket." action={{ label: 'Create Bucket', onClick: () => { resetForm(); setCreateS3Open(true) } }} />
+          ) : (
+            <DataTable columns={s3Columns} data={s3Data?.items ?? []} loading={s3Loading} searchColumn="name" searchPlaceholder="Search buckets..."
+              onRowClick={(b) => navigate({ to: `/tenants/${id}/s3-buckets/${b.id}` })} />
+          )}
+        </TabsContent>
+
         <TabsContent value="sftp">
           <div className="mb-4 flex justify-end">
             <Button size="sm" onClick={() => { resetForm(); setCreateSftpOpen(true) }}>
@@ -543,6 +608,12 @@ export function TenantDetailPage() {
         description={`Delete Valkey instance "${deleteValkey?.name}"? All data will be lost.`}
         confirmLabel="Delete" variant="destructive" loading={deleteValkeyMut.isPending}
         onConfirm={async () => { try { await deleteValkeyMut.mutateAsync(deleteValkey!.id); toast.success('Valkey instance deleted'); setDeleteValkey(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
+
+      {/* Delete S3 Bucket */}
+      <ConfirmDialog open={!!deleteS3} onOpenChange={(o) => !o && setDeleteS3(null)} title="Delete S3 Bucket"
+        description={`Delete S3 bucket "${deleteS3?.name}"? All objects and access keys will be removed.`}
+        confirmLabel="Delete" variant="destructive" loading={deleteS3Mut.isPending}
+        onConfirm={async () => { try { await deleteS3Mut.mutateAsync(deleteS3!.id); toast.success('S3 bucket deleted'); setDeleteS3(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
 
       {/* Delete SFTP Key */}
       <ConfirmDialog open={!!deleteSftp} onOpenChange={(o) => !o && setDeleteSftp(null)} title="Delete SFTP Key"
@@ -605,6 +676,20 @@ export function TenantDetailPage() {
             <Button variant="outline" onClick={() => setCreateValkeyOpen(false)}>Cancel</Button>
             <Button onClick={handleCreateValkey} disabled={createValkeyMut.isPending || !vkForm.name || !vkForm.shard_id}>
               {createValkeyMut.isPending ? 'Creating...' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create S3 Bucket Dialog */}
+      <Dialog open={createS3Open} onOpenChange={setCreateS3Open}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Create S3 Bucket</DialogTitle></DialogHeader>
+          <S3BucketFields value={s3Form} onChange={setS3Form} clusterId={tenant.cluster_id} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateS3Open(false)}>Cancel</Button>
+            <Button onClick={handleCreateS3} disabled={createS3Mut.isPending || !s3Form.name || !s3Form.shard_id}>
+              {createS3Mut.isPending ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>
         </DialogContent>

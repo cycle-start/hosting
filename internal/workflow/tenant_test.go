@@ -34,6 +34,7 @@ func (s *CreateTenantWorkflowTestSuite) TestSuccess() {
 	shardID := "test-shard-1"
 	tenant := model.Tenant{
 		ID:          tenantID,
+		BrandID:     "test-brand",
 			UID:         5001,
 		ShardID:     &shardID,
 		SFTPEnabled: true,
@@ -80,6 +81,7 @@ func (s *CreateTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	shardID := "test-shard-3"
 	tenant := model.Tenant{
 		ID:          tenantID,
+		BrandID:     "test-brand",
 			UID:         5001,
 		ShardID:     &shardID,
 		SFTPEnabled: false,
@@ -105,8 +107,9 @@ func (s *CreateTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 func (s *CreateTenantWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 	tenantID := "test-tenant-no-shard"
 	tenant := model.Tenant{
-		ID:   tenantID,
-		UID:  5001,
+		ID:      tenantID,
+		BrandID: "test-brand",
+		UID:     5001,
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -154,6 +157,7 @@ func (s *UpdateTenantWorkflowTestSuite) TestSuccess() {
 	shardID := "test-shard-1"
 	tenant := model.Tenant{
 		ID:          tenantID,
+		BrandID:     "test-brand",
 			UID:         5001,
 		ShardID:     &shardID,
 		SFTPEnabled: true,
@@ -185,6 +189,7 @@ func (s *UpdateTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	shardID := "test-shard-2"
 	tenant := model.Tenant{
 		ID:          tenantID,
+		BrandID:     "test-brand",
 			UID:         5001,
 		ShardID:     &shardID,
 		SFTPEnabled: true,
@@ -233,6 +238,7 @@ func (s *SuspendTenantWorkflowTestSuite) TestSuccess() {
 	shardID := "test-shard-1"
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		UID:     5001,
 		ShardID: &shardID,
 	}
@@ -256,6 +262,7 @@ func (s *SuspendTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	shardID := "test-shard-2"
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		UID:     5001,
 		ShardID: &shardID,
 	}
@@ -305,6 +312,7 @@ func (s *UnsuspendTenantWorkflowTestSuite) TestSuccess() {
 	shardID := "test-shard-1"
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		UID:     5001,
 		ShardID: &shardID,
 	}
@@ -331,6 +339,7 @@ func (s *UnsuspendTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	shardID := "test-shard-2"
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		UID:     5001,
 		ShardID: &shardID,
 	}
@@ -374,6 +383,7 @@ func (s *DeleteTenantWorkflowTestSuite) TestSuccess() {
 	shardID := "test-shard-1"
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		UID:     5001,
 		ShardID: &shardID,
 	}
@@ -400,6 +410,7 @@ func (s *DeleteTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	shardID := "test-shard-2"
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		UID:     5001,
 		ShardID: &shardID,
 	}

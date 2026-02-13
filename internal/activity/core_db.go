@@ -43,13 +43,27 @@ func (a *CoreDB) UpdateResourceStatus(ctx context.Context, params UpdateResource
 	return err
 }
 
+// GetBrandByID retrieves a brand by its ID.
+func (a *CoreDB) GetBrandByID(ctx context.Context, id string) (*model.Brand, error) {
+	var b model.Brand
+	err := a.db.QueryRow(ctx,
+		`SELECT id, name, base_hostname, primary_ns, secondary_ns, hostmaster_email, status, created_at, updated_at
+		 FROM brands WHERE id = $1`, id,
+	).Scan(&b.ID, &b.Name, &b.BaseHostname, &b.PrimaryNS, &b.SecondaryNS,
+		&b.HostmasterEmail, &b.Status, &b.CreatedAt, &b.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get brand by id: %w", err)
+	}
+	return &b, nil
+}
+
 // GetTenantByID retrieves a tenant by its ID.
 func (a *CoreDB) GetTenantByID(ctx context.Context, id string) (*model.Tenant, error) {
 	var t model.Tenant
 	err := a.db.QueryRow(ctx,
-		`SELECT id, region_id, cluster_id, shard_id, uid, sftp_enabled, status, created_at, updated_at
+		`SELECT id, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, status, created_at, updated_at
 		 FROM tenants WHERE id = $1`, id,
-	).Scan(&t.ID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.Status, &t.CreatedAt, &t.UpdatedAt)
+	).Scan(&t.ID, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.Status, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get tenant by id: %w", err)
 	}
@@ -86,9 +100,9 @@ func (a *CoreDB) GetFQDNByID(ctx context.Context, id string) (*model.FQDN, error
 func (a *CoreDB) GetZoneByID(ctx context.Context, id string) (*model.Zone, error) {
 	var z model.Zone
 	err := a.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, region_id, status, created_at, updated_at
+		`SELECT id, brand_id, tenant_id, name, region_id, status, created_at, updated_at
 		 FROM zones WHERE id = $1`, id,
-	).Scan(&z.ID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.CreatedAt, &z.UpdatedAt)
+	).Scan(&z.ID, &z.BrandID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.CreatedAt, &z.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get zone by id: %w", err)
 	}
@@ -99,9 +113,9 @@ func (a *CoreDB) GetZoneByID(ctx context.Context, id string) (*model.Zone, error
 func (a *CoreDB) GetZoneByName(ctx context.Context, name string) (*model.Zone, error) {
 	var z model.Zone
 	err := a.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, region_id, status, created_at, updated_at
+		`SELECT id, brand_id, tenant_id, name, region_id, status, created_at, updated_at
 		 FROM zones WHERE name = $1 AND status = $2`, name, model.StatusActive,
-	).Scan(&z.ID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.CreatedAt, &z.UpdatedAt)
+	).Scan(&z.ID, &z.BrandID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.CreatedAt, &z.UpdatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -273,7 +287,7 @@ func (a *CoreDB) CreateCertificate(ctx context.Context, params CreateCertificate
 // ListTenantsByShard retrieves all tenants assigned to a shard.
 func (a *CoreDB) ListTenantsByShard(ctx context.Context, shardID string) ([]model.Tenant, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, region_id, cluster_id, shard_id, uid, sftp_enabled, status, created_at, updated_at
+		`SELECT id, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, status, created_at, updated_at
 		 FROM tenants WHERE shard_id = $1 ORDER BY id`, shardID,
 	)
 	if err != nil {
@@ -284,7 +298,7 @@ func (a *CoreDB) ListTenantsByShard(ctx context.Context, shardID string) ([]mode
 	var tenants []model.Tenant
 	for rows.Next() {
 		var t model.Tenant
-		if err := rows.Scan(&t.ID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.Status, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.Status, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan tenant row: %w", err)
 		}
 		tenants = append(tenants, t)
@@ -777,6 +791,34 @@ func (a *CoreDB) DeleteOldAuditLogs(ctx context.Context, retentionDays int) (int
 		return 0, fmt.Errorf("delete old audit logs: %w", err)
 	}
 	return tag.RowsAffected(), nil
+}
+
+// GetS3BucketByID retrieves an S3 bucket by its ID.
+func (a *CoreDB) GetS3BucketByID(ctx context.Context, id string) (*model.S3Bucket, error) {
+	var b model.S3Bucket
+	err := a.db.QueryRow(ctx,
+		`SELECT id, tenant_id, name, shard_id, public, quota_bytes, status, created_at, updated_at
+		 FROM s3_buckets WHERE id = $1`, id,
+	).Scan(&b.ID, &b.TenantID, &b.Name, &b.ShardID,
+		&b.Public, &b.QuotaBytes, &b.Status, &b.CreatedAt, &b.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get s3 bucket by id: %w", err)
+	}
+	return &b, nil
+}
+
+// GetS3AccessKeyByID retrieves an S3 access key by its ID.
+func (a *CoreDB) GetS3AccessKeyByID(ctx context.Context, id string) (*model.S3AccessKey, error) {
+	var k model.S3AccessKey
+	err := a.db.QueryRow(ctx,
+		`SELECT id, s3_bucket_id, access_key_id, secret_access_key, permissions, status, created_at, updated_at
+		 FROM s3_access_keys WHERE id = $1`, id,
+	).Scan(&k.ID, &k.S3BucketID, &k.AccessKeyID, &k.SecretAccessKey,
+		&k.Permissions, &k.Status, &k.CreatedAt, &k.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get s3 access key by id: %w", err)
+	}
+	return &k, nil
 }
 
 // GetOldBackups returns active backups that are older than the specified number of days.

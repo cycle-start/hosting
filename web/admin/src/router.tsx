@@ -3,6 +3,8 @@ import { api } from '@/lib/api'
 import { AuthLayout } from './app'
 import { LoginPage } from './pages/login'
 import { DashboardPage } from './pages/dashboard'
+import { BrandsPage } from './pages/brands'
+import { BrandDetailPage } from './pages/brand-detail'
 import { RegionsPage } from './pages/regions'
 import { ClustersPage } from './pages/clusters'
 import { TenantsPage } from './pages/tenants'
@@ -18,6 +20,8 @@ import { ZonesPage } from './pages/zones'
 import { ZoneDetailPage } from './pages/zone-detail'
 import { ValkeyPage } from './pages/valkey'
 import { ValkeyDetailPage } from './pages/valkey-detail'
+import { S3BucketsPage } from './pages/s3-buckets'
+import { S3BucketDetailPage } from './pages/s3-bucket-detail'
 import { PlatformConfigPage } from './pages/platform-config'
 import { APIKeysPage } from './pages/api-keys'
 import { AuditLogPage } from './pages/audit-log'
@@ -47,6 +51,18 @@ const dashboardRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/',
   component: DashboardPage,
+})
+
+const brandsRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/brands',
+  component: BrandsPage,
+})
+
+const brandDetailRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/brands/$id',
+  component: BrandDetailPage,
 })
 
 const regionsRoute = createRoute({
@@ -109,6 +125,12 @@ const valkeyDetailRoute = createRoute({
   component: ValkeyDetailPage,
 })
 
+const s3BucketDetailRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/tenants/$id/s3-buckets/$bucketId',
+  component: S3BucketDetailPage,
+})
+
 const webrootsRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/webroots',
@@ -139,6 +161,12 @@ const valkeyRoute = createRoute({
   component: ValkeyPage,
 })
 
+const s3BucketsRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/s3-buckets',
+  component: S3BucketsPage,
+})
+
 const platformConfigRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/platform-config',
@@ -161,6 +189,8 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   authLayout.addChildren([
     dashboardRoute,
+    brandsRoute,
+    brandDetailRoute,
     regionsRoute,
     clustersRoute,
     tenantsRoute,
@@ -171,11 +201,13 @@ const routeTree = rootRoute.addChildren([
     emailAccountDetailRoute,
     databaseDetailRoute,
     valkeyDetailRoute,
+    s3BucketDetailRoute,
     webrootsRoute,
     databasesRoute,
     zonesRoute,
     zoneDetailRoute,
     valkeyRoute,
+    s3BucketsRoute,
     platformConfigRoute,
     apiKeysRoute,
     auditLogRoute,

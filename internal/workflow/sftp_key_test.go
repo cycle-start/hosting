@@ -42,6 +42,7 @@ func (s *AddSFTPKeyWorkflowTestSuite) TestSuccess() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{{ID: "node-1"}}
@@ -85,6 +86,7 @@ func (s *AddSFTPKeyWorkflowTestSuite) TestWithExistingActiveKeys() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{{ID: "node-1"}}
@@ -133,7 +135,8 @@ func (s *AddSFTPKeyWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 		TenantID: tenantID,
 	}
 	tenant := model.Tenant{
-		ID:   tenantID,
+		ID:      tenantID,
+		BrandID: "test-brand",
 		// ShardID is nil
 	}
 
@@ -162,6 +165,7 @@ func (s *AddSFTPKeyWorkflowTestSuite) TestSyncFails_SetsStatusFailed() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{{ID: "node-1"}}
@@ -224,6 +228,7 @@ func (s *RemoveSFTPKeyWorkflowTestSuite) TestSuccess() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{{ID: "node-1"}}
@@ -263,6 +268,7 @@ func (s *RemoveSFTPKeyWorkflowTestSuite) TestWithRemainingKeys() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{{ID: "node-1"}}
@@ -306,7 +312,8 @@ func (s *RemoveSFTPKeyWorkflowTestSuite) TestNoShard() {
 		Status:   model.StatusDeleting,
 	}
 	tenant := model.Tenant{
-		ID:   tenantID,
+		ID:      tenantID,
+		BrandID: "test-brand",
 		// ShardID is nil
 	}
 
@@ -332,6 +339,7 @@ func (s *RemoveSFTPKeyWorkflowTestSuite) TestSyncFails() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{{ID: "node-1"}}

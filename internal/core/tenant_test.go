@@ -75,6 +75,7 @@ func TestTenantService_Create_Success(t *testing.T) {
 
 	tenant := &model.Tenant{
 		ID:          "test-tenant-1",
+		BrandID:     "test-brand",
 		RegionID:    "test-region-1",
 		ClusterID:   "test-cluster-1",
 		SFTPEnabled: true,
@@ -112,7 +113,7 @@ func TestTenantService_Create_NextUIDError(t *testing.T) {
 	svc := NewTenantService(db, tc)
 	ctx := context.Background()
 
-	tenant := &model.Tenant{ID: "test-tenant-1"}
+	tenant := &model.Tenant{ID: "test-tenant-1", BrandID: "test-brand"}
 
 	row := &mockRow{scanFunc: func(dest ...any) error {
 		return errors.New("sequence error")
@@ -133,6 +134,7 @@ func TestTenantService_Create_InsertError(t *testing.T) {
 
 	tenant := &model.Tenant{
 		ID:        "test-tenant-1",
+		BrandID:   "test-brand",
 		RegionID:  "test-region-1",
 		ClusterID: "test-cluster-1",
 		Status:    model.StatusPending,
@@ -161,6 +163,7 @@ func TestTenantService_Create_WorkflowError(t *testing.T) {
 
 	tenant := &model.Tenant{
 		ID:        "test-tenant-1",
+		BrandID:   "test-brand",
 		RegionID:  "test-region-1",
 		ClusterID: "test-cluster-1",
 		Status:    model.StatusPending,
@@ -199,14 +202,15 @@ func TestTenantService_GetByID_Success(t *testing.T) {
 
 	row := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = tenantID
-		*(dest[1].(*string)) = regionID
-		*(dest[2].(*string)) = clusterID
-		*(dest[3].(**string)) = &shardID
-		*(dest[4].(*int)) = 5001
-		*(dest[5].(*bool)) = true
-		*(dest[6].(*string)) = model.StatusActive
-		*(dest[7].(*time.Time)) = now
+		*(dest[1].(*string)) = "test-brand"
+		*(dest[2].(*string)) = regionID
+		*(dest[3].(*string)) = clusterID
+		*(dest[4].(**string)) = &shardID
+		*(dest[5].(*int)) = 5001
+		*(dest[6].(*bool)) = true
+		*(dest[7].(*string)) = model.StatusActive
 		*(dest[8].(*time.Time)) = now
+		*(dest[9].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -263,26 +267,28 @@ func TestTenantService_List_Success(t *testing.T) {
 	rows := newMockRows(
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
-			*(dest[1].(*string)) = regionID
-			*(dest[2].(*string)) = clusterID
-			*(dest[3].(**string)) = &shardID
-			*(dest[4].(*int)) = 5001
-			*(dest[5].(*bool)) = false
-			*(dest[6].(*string)) = model.StatusActive
-			*(dest[7].(*time.Time)) = now
+			*(dest[1].(*string)) = "test-brand"
+			*(dest[2].(*string)) = regionID
+			*(dest[3].(*string)) = clusterID
+			*(dest[4].(**string)) = &shardID
+			*(dest[5].(*int)) = 5001
+			*(dest[6].(*bool)) = false
+			*(dest[7].(*string)) = model.StatusActive
 			*(dest[8].(*time.Time)) = now
+			*(dest[9].(*time.Time)) = now
 			return nil
 		},
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id2
-			*(dest[1].(*string)) = regionID
-			*(dest[2].(*string)) = clusterID
-			*(dest[3].(**string)) = &shardID
-			*(dest[4].(*int)) = 5002
-			*(dest[5].(*bool)) = true
-			*(dest[6].(*string)) = model.StatusPending
-			*(dest[7].(*time.Time)) = now
+			*(dest[1].(*string)) = "test-brand"
+			*(dest[2].(*string)) = regionID
+			*(dest[3].(*string)) = clusterID
+			*(dest[4].(**string)) = &shardID
+			*(dest[5].(*int)) = 5002
+			*(dest[6].(*bool)) = true
+			*(dest[7].(*string)) = model.StatusPending
 			*(dest[8].(*time.Time)) = now
+			*(dest[9].(*time.Time)) = now
 			return nil
 		},
 	)
@@ -357,6 +363,7 @@ func TestTenantService_Update_Success(t *testing.T) {
 
 	tenant := &model.Tenant{
 		ID:          "test-tenant-1",
+		BrandID:     "test-brand",
 		RegionID:    "test-region-1",
 		ClusterID:   "test-cluster-1",
 		SFTPEnabled: true,
@@ -382,7 +389,7 @@ func TestTenantService_Update_DBError(t *testing.T) {
 	svc := NewTenantService(db, tc)
 	ctx := context.Background()
 
-	tenant := &model.Tenant{ID: "test-tenant-1"}
+	tenant := &model.Tenant{ID: "test-tenant-1", BrandID: "test-brand"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
 
@@ -398,7 +405,7 @@ func TestTenantService_Update_WorkflowError(t *testing.T) {
 	svc := NewTenantService(db, tc)
 	ctx := context.Background()
 
-	tenant := &model.Tenant{ID: "test-tenant-1"}
+	tenant := &model.Tenant{ID: "test-tenant-1", BrandID: "test-brand"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
@@ -542,26 +549,28 @@ func TestTenantService_ListByShard_Success(t *testing.T) {
 	rows := newMockRows(
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
-			*(dest[1].(*string)) = regionID
-			*(dest[2].(*string)) = clusterID
-			*(dest[3].(**string)) = &shardID
-			*(dest[4].(*int)) = 5001
-			*(dest[5].(*bool)) = false
-			*(dest[6].(*string)) = model.StatusActive
-			*(dest[7].(*time.Time)) = now
+			*(dest[1].(*string)) = "test-brand"
+			*(dest[2].(*string)) = regionID
+			*(dest[3].(*string)) = clusterID
+			*(dest[4].(**string)) = &shardID
+			*(dest[5].(*int)) = 5001
+			*(dest[6].(*bool)) = false
+			*(dest[7].(*string)) = model.StatusActive
 			*(dest[8].(*time.Time)) = now
+			*(dest[9].(*time.Time)) = now
 			return nil
 		},
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id2
-			*(dest[1].(*string)) = regionID
-			*(dest[2].(*string)) = clusterID
-			*(dest[3].(**string)) = &shardID
-			*(dest[4].(*int)) = 5002
-			*(dest[5].(*bool)) = true
-			*(dest[6].(*string)) = model.StatusPending
-			*(dest[7].(*time.Time)) = now
+			*(dest[1].(*string)) = "test-brand"
+			*(dest[2].(*string)) = regionID
+			*(dest[3].(*string)) = clusterID
+			*(dest[4].(**string)) = &shardID
+			*(dest[5].(*int)) = 5002
+			*(dest[6].(*bool)) = true
+			*(dest[7].(*string)) = model.StatusPending
 			*(dest[8].(*time.Time)) = now
+			*(dest[9].(*time.Time)) = now
 			return nil
 		},
 	)

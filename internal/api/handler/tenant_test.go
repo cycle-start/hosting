@@ -57,6 +57,7 @@ func TestTenantCreate_MissingRegionID(t *testing.T) {
 	h := newTenantHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants", map[string]any{
+		"brand_id":   "test-brand",
 		"cluster_id": validID2,
 		"shard_id":   "test-shard-1",
 	})
@@ -72,6 +73,7 @@ func TestTenantCreate_MissingClusterID(t *testing.T) {
 	h := newTenantHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants", map[string]any{
+		"brand_id":  "test-brand",
 		"region_id": validID,
 		"shard_id":  "test-shard-1",
 	})
@@ -281,6 +283,7 @@ func TestTenantCreate_ValidBodyParsing(t *testing.T) {
 	h := newTenantHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants", map[string]any{
+		"brand_id":     "test-brand",
 		"region_id":    "test-region-1",
 		"cluster_id":   "test-cluster-1",
 		"shard_id":     "test-shard-1",
@@ -301,6 +304,7 @@ func TestTenantCreate_OptionalSFTPEnabled(t *testing.T) {
 	h := newTenantHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants", map[string]any{
+		"brand_id":   "test-brand",
 		"region_id":  "test-region-1",
 		"cluster_id": "test-cluster-1",
 		"shard_id":   "test-shard-1",
@@ -319,6 +323,7 @@ func TestTenantCreate_ExtraFieldsIgnored(t *testing.T) {
 	h := newTenantHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants", map[string]any{
+		"brand_id":    "test-brand",
 		"region_id":   "test-region-1",
 		"cluster_id":  "test-cluster-1",
 		"shard_id":    "test-shard-1",
@@ -337,6 +342,7 @@ func TestTenantCreate_ExtraFieldsIgnored(t *testing.T) {
 
 func validTenantBody() map[string]any {
 	return map[string]any{
+		"brand_id":   "test-brand",
 		"region_id":  "test-region-1",
 		"cluster_id": "test-cluster-1",
 		"shard_id":   "test-shard-1",

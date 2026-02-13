@@ -180,6 +180,39 @@ type RestoreMySQLBackupParams struct {
 	BackupPath   string
 }
 
+// CreateS3BucketParams holds parameters for creating an S3 bucket on a node.
+type CreateS3BucketParams struct {
+	TenantID   string
+	Name       string
+	QuotaBytes int64
+}
+
+// DeleteS3BucketParams holds parameters for deleting an S3 bucket on a node.
+type DeleteS3BucketParams struct {
+	TenantID string
+	Name     string
+}
+
+// UpdateS3BucketPolicyParams holds parameters for updating an S3 bucket policy on a node.
+type UpdateS3BucketPolicyParams struct {
+	TenantID string
+	Name     string
+	Public   bool
+}
+
+// CreateS3AccessKeyParams holds parameters for creating an S3 access key on a node.
+type CreateS3AccessKeyParams struct {
+	TenantID        string
+	AccessKeyID     string
+	SecretAccessKey string
+}
+
+// DeleteS3AccessKeyParams holds parameters for deleting an S3 access key on a node.
+type DeleteS3AccessKeyParams struct {
+	TenantID    string
+	AccessKeyID string
+}
+
 // BackupResult holds the result of a backup operation.
 type BackupResult struct {
 	StoragePath string

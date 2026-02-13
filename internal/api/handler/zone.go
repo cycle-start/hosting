@@ -13,11 +13,12 @@ import (
 )
 
 type Zone struct {
-	svc *core.ZoneService
+	svc      *core.ZoneService
+	services *core.Services
 }
 
-func NewZone(svc *core.ZoneService) *Zone {
-	return &Zone{svc: svc}
+func NewZone(services *core.Services) *Zone {
+	return &Zone{svc: services.Zone, services: services}
 }
 
 // List godoc
@@ -68,9 +69,25 @@ func (h *Zone) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Derive brand_id: from tenant if provided, otherwise from request.
+	brandID := req.BrandID
+	if req.TenantID != nil && *req.TenantID != "" {
+		tenant, err := h.services.Tenant.GetByID(r.Context(), *req.TenantID)
+		if err != nil {
+			response.WriteError(w, http.StatusBadRequest, "invalid tenant_id: "+err.Error())
+			return
+		}
+		brandID = tenant.BrandID
+	}
+	if brandID == "" {
+		response.WriteError(w, http.StatusBadRequest, "brand_id is required when tenant_id is not provided")
+		return
+	}
+
 	now := time.Now()
 	zone := &model.Zone{
 		ID:        platform.NewID(),
+		BrandID:   brandID,
 		TenantID:  req.TenantID,
 		Name:      req.Name,
 		RegionID:  req.RegionID,

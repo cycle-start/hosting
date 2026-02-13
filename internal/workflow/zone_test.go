@@ -32,17 +32,19 @@ func (s *CreateZoneWorkflowTestSuite) AfterTest(suiteName, testName string) {
 func (s *CreateZoneWorkflowTestSuite) TestSuccess() {
 	zoneID := "test-zone-1"
 	zone := model.Zone{
-		ID:   zoneID,
-		Name: "example.com",
+		ID:      zoneID,
+		BrandID: "test-brand",
+		Name:    "example.com",
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "zones", ID: zoneID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetZoneByID", mock.Anything, zoneID).Return(&zone, nil)
-	s.env.OnActivity("GetPlatformConfig", mock.Anything, "primary_ns").Return("ns1.example.com", nil)
-	s.env.OnActivity("GetPlatformConfig", mock.Anything, "hostmaster_email").Return("hostmaster.example.com", nil)
-	s.env.OnActivity("GetPlatformConfig", mock.Anything, "secondary_ns").Return("ns2.example.com", nil)
+	s.env.OnActivity("GetBrandByID", mock.Anything, "test-brand").Return(&model.Brand{
+		ID: "test-brand", PrimaryNS: "ns1.example.com", SecondaryNS: "ns2.example.com",
+		HostmasterEmail: "hostmaster.example.com", BaseHostname: "example.com",
+	}, nil)
 	s.env.OnActivity("WriteDNSZone", mock.Anything, activity.WriteDNSZoneParams{
 		Name: "example.com",
 		Type: "NATIVE",
@@ -96,15 +98,16 @@ func (s *CreateZoneWorkflowTestSuite) TestGetZoneFails_SetsStatusFailed() {
 
 func (s *CreateZoneWorkflowTestSuite) TestWriteDNSZoneFails_SetsStatusFailed() {
 	zoneID := "test-zone-3"
-	zone := model.Zone{ID: zoneID, Name: "example.com"}
+	zone := model.Zone{ID: zoneID, BrandID: "test-brand", Name: "example.com"}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "zones", ID: zoneID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetZoneByID", mock.Anything, zoneID).Return(&zone, nil)
-	s.env.OnActivity("GetPlatformConfig", mock.Anything, "primary_ns").Return("ns1.example.com", nil)
-	s.env.OnActivity("GetPlatformConfig", mock.Anything, "hostmaster_email").Return("hostmaster.example.com", nil)
-	s.env.OnActivity("GetPlatformConfig", mock.Anything, "secondary_ns").Return("ns2.example.com", nil)
+	s.env.OnActivity("GetBrandByID", mock.Anything, "test-brand").Return(&model.Brand{
+		ID: "test-brand", PrimaryNS: "ns1.example.com", SecondaryNS: "ns2.example.com",
+		HostmasterEmail: "hostmaster.example.com", BaseHostname: "example.com",
+	}, nil)
 	s.env.OnActivity("WriteDNSZone", mock.Anything, activity.WriteDNSZoneParams{
 		Name: "example.com",
 		Type: "NATIVE",
@@ -119,15 +122,16 @@ func (s *CreateZoneWorkflowTestSuite) TestWriteDNSZoneFails_SetsStatusFailed() {
 
 func (s *CreateZoneWorkflowTestSuite) TestWriteSOAFails_SetsStatusFailed() {
 	zoneID := "test-zone-4"
-	zone := model.Zone{ID: zoneID, Name: "example.com"}
+	zone := model.Zone{ID: zoneID, BrandID: "test-brand", Name: "example.com"}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "zones", ID: zoneID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetZoneByID", mock.Anything, zoneID).Return(&zone, nil)
-	s.env.OnActivity("GetPlatformConfig", mock.Anything, "primary_ns").Return("ns1.example.com", nil)
-	s.env.OnActivity("GetPlatformConfig", mock.Anything, "hostmaster_email").Return("hostmaster.example.com", nil)
-	s.env.OnActivity("GetPlatformConfig", mock.Anything, "secondary_ns").Return("ns2.example.com", nil)
+	s.env.OnActivity("GetBrandByID", mock.Anything, "test-brand").Return(&model.Brand{
+		ID: "test-brand", PrimaryNS: "ns1.example.com", SecondaryNS: "ns2.example.com",
+		HostmasterEmail: "hostmaster.example.com", BaseHostname: "example.com",
+	}, nil)
 	s.env.OnActivity("WriteDNSZone", mock.Anything, mock.Anything).Return(42, nil)
 	// SOA write fails
 	s.env.OnActivity("WriteDNSRecord", mock.Anything, activity.WriteDNSRecordParams{
@@ -145,15 +149,15 @@ func (s *CreateZoneWorkflowTestSuite) TestWriteSOAFails_SetsStatusFailed() {
 	s.Error(s.env.GetWorkflowError())
 }
 
-func (s *CreateZoneWorkflowTestSuite) TestGetPlatformConfigFails_SetsStatusFailed() {
+func (s *CreateZoneWorkflowTestSuite) TestGetBrandFails_SetsStatusFailed() {
 	zoneID := "test-zone-5"
-	zone := model.Zone{ID: zoneID, Name: "example.com"}
+	zone := model.Zone{ID: zoneID, BrandID: "test-brand", Name: "example.com"}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "zones", ID: zoneID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetZoneByID", mock.Anything, zoneID).Return(&zone, nil)
-	s.env.OnActivity("GetPlatformConfig", mock.Anything, "primary_ns").Return("", fmt.Errorf("config not found"))
+	s.env.OnActivity("GetBrandByID", mock.Anything, "test-brand").Return(nil, fmt.Errorf("brand not found"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "zones", ID: zoneID, Status: model.StatusFailed,
 	}).Return(nil)
@@ -182,8 +186,9 @@ func (s *DeleteZoneWorkflowTestSuite) AfterTest(suiteName, testName string) {
 func (s *DeleteZoneWorkflowTestSuite) TestSuccess() {
 	zoneID := "test-zone-1"
 	zone := model.Zone{
-		ID:   zoneID,
-		Name: "example.com",
+		ID:      zoneID,
+		BrandID: "test-brand",
+		Name:    "example.com",
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -218,7 +223,7 @@ func (s *DeleteZoneWorkflowTestSuite) TestGetZoneFails_SetsStatusFailed() {
 
 func (s *DeleteZoneWorkflowTestSuite) TestDeleteDNSZoneFails_SetsStatusFailed() {
 	zoneID := "test-zone-3"
-	zone := model.Zone{ID: zoneID, Name: "example.com"}
+	zone := model.Zone{ID: zoneID, BrandID: "test-brand", Name: "example.com"}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "zones", ID: zoneID, Status: model.StatusDeleting,
@@ -237,7 +242,7 @@ func (s *DeleteZoneWorkflowTestSuite) TestDeleteDNSZoneFails_SetsStatusFailed() 
 
 func (s *DeleteZoneWorkflowTestSuite) TestDeleteRecordsByDomainFails_SetsStatusFailed() {
 	zoneID := "test-zone-4"
-	zone := model.Zone{ID: zoneID, Name: "example.com"}
+	zone := model.Zone{ID: zoneID, BrandID: "test-brand", Name: "example.com"}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "zones", ID: zoneID, Status: model.StatusDeleting,

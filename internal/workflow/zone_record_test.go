@@ -44,8 +44,9 @@ func (s *CreateZoneRecordWorkflowTestSuite) TestSuccess() {
 		Priority: &priority,
 	}
 	zone := model.Zone{
-		ID:   zoneID,
-		Name: "example.com",
+		ID:      zoneID,
+		BrandID: "test-brand",
+		Name:    "example.com",
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -84,8 +85,9 @@ func (s *CreateZoneRecordWorkflowTestSuite) TestNilPriority_Success() {
 		Priority: nil,
 	}
 	zone := model.Zone{
-		ID:   zoneID,
-		Name: "example.com",
+		ID:      zoneID,
+		BrandID: "test-brand",
+		Name:    "example.com",
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -137,7 +139,7 @@ func (s *CreateZoneRecordWorkflowTestSuite) TestWriteDNSRecordFails_SetsStatusFa
 		Content: "10.0.0.1",
 		TTL:     300,
 	}
-	zone := model.Zone{ID: zoneID, Name: "example.com"}
+	zone := model.Zone{ID: zoneID, BrandID: "test-brand", Name: "example.com"}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "zone_records", ID: recordID, Status: model.StatusProvisioning,
@@ -184,7 +186,7 @@ func (s *UpdateZoneRecordWorkflowTestSuite) TestSuccess() {
 		TTL:      600,
 		Priority: nil,
 	}
-	zone := model.Zone{ID: zoneID, Name: "example.com"}
+	zone := model.Zone{ID: zoneID, BrandID: "test-brand", Name: "example.com"}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "zone_records", ID: recordID, Status: model.StatusProvisioning,
@@ -220,7 +222,7 @@ func (s *UpdateZoneRecordWorkflowTestSuite) TestUpdateDNSRecordFails_SetsStatusF
 		Content: "10.0.0.2",
 		TTL:     600,
 	}
-	zone := model.Zone{ID: zoneID, Name: "example.com"}
+	zone := model.Zone{ID: zoneID, BrandID: "test-brand", Name: "example.com"}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "zone_records", ID: recordID, Status: model.StatusProvisioning,
@@ -281,7 +283,7 @@ func (s *DeleteZoneRecordWorkflowTestSuite) TestSuccess() {
 		Content: "10.0.0.1",
 		TTL:     300,
 	}
-	zone := model.Zone{ID: zoneID, Name: "example.com"}
+	zone := model.Zone{ID: zoneID, BrandID: "test-brand", Name: "example.com"}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "zone_records", ID: recordID, Status: model.StatusDeleting,
@@ -314,7 +316,7 @@ func (s *DeleteZoneRecordWorkflowTestSuite) TestDeleteDNSRecordFails_SetsStatusF
 		Content: "10.0.0.1",
 		TTL:     300,
 	}
-	zone := model.Zone{ID: zoneID, Name: "example.com"}
+	zone := model.Zone{ID: zoneID, BrandID: "test-brand", Name: "example.com"}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "zone_records", ID: recordID, Status: model.StatusDeleting,

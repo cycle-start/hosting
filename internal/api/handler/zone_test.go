@@ -11,7 +11,7 @@ import (
 )
 
 func newZoneHandler() *Zone {
-	return NewZone(nil)
+	return &Zone{svc: nil, services: nil}
 }
 
 // --- Create ---
@@ -84,6 +84,7 @@ func TestZoneCreate_ValidBody(t *testing.T) {
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/zones", map[string]any{
 		"name":      "example.com",
+		"brand_id":  "test-brand",
 		"region_id": "test-region-1",
 	})
 
@@ -117,6 +118,7 @@ func TestZoneCreate_OptionalTenantID(t *testing.T) {
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/zones", map[string]any{
 		"name":      "example.com",
+		"brand_id":  "test-brand",
 		"region_id": "test-region-2",
 	})
 

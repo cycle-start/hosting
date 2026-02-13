@@ -28,12 +28,13 @@ func UpdateServiceHostnamesWorkflow(ctx workflow.Context, tenantID string) error
 		return err
 	}
 
-	// Get the base hostname from platform config.
-	var baseHostname string
-	err = workflow.ExecuteActivity(ctx, "GetPlatformConfig", "base_hostname").Get(ctx, &baseHostname)
+	// Get the brand for base hostname.
+	var brand model.Brand
+	err = workflow.ExecuteActivity(ctx, "GetBrandByID", tenant.BrandID).Get(ctx, &brand)
 	if err != nil {
 		return err
 	}
+	baseHostname := brand.BaseHostname
 
 	// Look up tenant services.
 	var services []model.TenantService

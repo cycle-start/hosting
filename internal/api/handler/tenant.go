@@ -71,10 +71,31 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate cluster is in brand's allowed list (if any).
+	allowedClusters, err := h.services.Brand.ListClusters(r.Context(), req.BrandID)
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if len(allowedClusters) > 0 {
+		found := false
+		for _, c := range allowedClusters {
+			if c == req.ClusterID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			response.WriteError(w, http.StatusBadRequest, fmt.Sprintf("cluster %s is not allowed for brand %s", req.ClusterID, req.BrandID))
+			return
+		}
+	}
+
 	now := time.Now()
 	shardID := req.ShardID
 	tenant := &model.Tenant{
 		ID:        platform.NewShortID(),
+		BrandID:   req.BrandID,
 		RegionID:  req.RegionID,
 		ClusterID: req.ClusterID,
 		ShardID:   &shardID,
@@ -221,6 +242,32 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 				response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create valkey user %s: %s", ur.Username, err.Error()))
 				return
 			}
+		}
+	}
+
+	// Nested S3 bucket creation
+	for _, br := range req.S3Buckets {
+		now2 := time.Now()
+		tenantID := tenant.ID
+		s3ShardID := br.ShardID
+		bucket := &model.S3Bucket{
+			ID:        platform.NewID(),
+			TenantID:  &tenantID,
+			Name:      br.Name,
+			ShardID:   &s3ShardID,
+			Status:    model.StatusPending,
+			CreatedAt: now2,
+			UpdatedAt: now2,
+		}
+		if br.Public != nil && *br.Public {
+			bucket.Public = true
+		}
+		if br.QuotaBytes != nil {
+			bucket.QuotaBytes = *br.QuotaBytes
+		}
+		if err := h.services.S3Bucket.Create(r.Context(), bucket); err != nil {
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create s3 bucket %s: %s", br.Name, err.Error()))
+			return
 		}
 	}
 

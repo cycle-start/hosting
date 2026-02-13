@@ -59,6 +59,7 @@ func (s *CreateEmailAccountWorkflowTestSuite) TestSuccess() {
 
 	tenant := model.Tenant{
 		ID:        tenantID,
+		BrandID:   "test-brand",
 		ClusterID: clusterID,
 	}
 
@@ -163,7 +164,7 @@ func (s *CreateEmailAccountWorkflowTestSuite) TestStalwartCreateAccountFails_Set
 	}
 	fqdn := model.FQDN{ID: fqdnID, FQDN: "example.com", WebrootID: webrootID}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, ClusterID: clusterID}
+	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ClusterID: clusterID}
 	clusterConfig, _ := json.Marshal(map[string]string{
 		"stalwart_url":   "https://mail.example.com",
 		"stalwart_token": "admin-token",
@@ -230,7 +231,7 @@ func (s *DeleteEmailAccountWorkflowTestSuite) TestSuccess_LastAccount_CleansUpDo
 	}
 	fqdn := model.FQDN{ID: fqdnID, FQDN: "example.com", WebrootID: webrootID}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, ClusterID: clusterID}
+	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ClusterID: clusterID}
 	clusterConfig, _ := json.Marshal(map[string]string{
 		"stalwart_url":   "https://mail.example.com",
 		"stalwart_token": "admin-token",
@@ -280,7 +281,7 @@ func (s *DeleteEmailAccountWorkflowTestSuite) TestSuccess_OtherAccountsRemain_No
 	}
 	fqdn := model.FQDN{ID: fqdnID, FQDN: "example.com", WebrootID: webrootID}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, ClusterID: clusterID}
+	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ClusterID: clusterID}
 	clusterConfig, _ := json.Marshal(map[string]string{
 		"stalwart_url":   "https://mail.example.com",
 		"stalwart_token": "admin-token",
@@ -341,7 +342,7 @@ func (s *DeleteEmailAccountWorkflowTestSuite) TestStalwartDeleteAccountFails_Set
 	}
 	fqdn := model.FQDN{ID: fqdnID, FQDN: "example.com", WebrootID: webrootID}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, ClusterID: clusterID}
+	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ClusterID: clusterID}
 	clusterConfig, _ := json.Marshal(map[string]string{
 		"stalwart_url":   "https://mail.example.com",
 		"stalwart_token": "admin-token",

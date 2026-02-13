@@ -129,6 +129,13 @@ func Seed(configPath string, timeout time.Duration) error {
 			}
 		}
 
+		// Create S3 buckets
+		for _, s := range t.S3Buckets {
+			if err := seedS3Bucket(client, tenantID, clusterID, s, timeout); err != nil {
+				return fmt.Errorf("s3 bucket %q for tenant %q: %w", s.Name, t.Name, err)
+			}
+		}
+
 		// Create email accounts
 		for _, e := range t.EmailAccounts {
 			if err := seedEmailAccount(client, e, fqdnMap, timeout); err != nil {
@@ -316,6 +323,43 @@ func seedValkeyInstance(client *Client, tenantID, clusterID string, def ValkeyIn
 		}
 		fmt.Printf("      User %q: active\n", u.Username)
 	}
+
+	return nil
+}
+
+func seedS3Bucket(client *Client, tenantID, clusterID string, def S3BucketDef, timeout time.Duration) error {
+	shardID, err := client.FindShardByName(clusterID, def.Shard)
+	if err != nil {
+		return fmt.Errorf("resolve shard %q: %w", def.Shard, err)
+	}
+
+	body := map[string]any{
+		"name":     def.Name,
+		"shard_id": shardID,
+	}
+	if def.Public != nil {
+		body["public"] = *def.Public
+	}
+	if def.QuotaBytes != nil {
+		body["quota_bytes"] = *def.QuotaBytes
+	}
+
+	fmt.Printf("  Creating S3 bucket %q...\n", def.Name)
+	resp, err := client.Post(fmt.Sprintf("/tenants/%s/s3-buckets", tenantID), body)
+	if err != nil {
+		return fmt.Errorf("create: %w", err)
+	}
+
+	bucketID, err := extractID(resp)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("    S3 bucket %q: %s, waiting for active...\n", def.Name, bucketID)
+	if err := client.WaitForStatus(fmt.Sprintf("/s3-buckets/%s", bucketID), "active", timeout); err != nil {
+		return fmt.Errorf("wait: %w", err)
+	}
+	fmt.Printf("    S3 bucket %q: active\n", def.Name)
 
 	return nil
 }

@@ -51,8 +51,21 @@ export interface Node {
   updated_at: string
 }
 
+export interface Brand {
+  id: string
+  name: string
+  base_hostname: string
+  primary_ns: string
+  secondary_ns: string
+  hostmaster_email: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Tenant {
   id: string
+  brand_id: string
   region_id: string
   cluster_id: string
   shard_id?: string | null
@@ -103,6 +116,7 @@ export interface Certificate {
 
 export interface Zone {
   id: string
+  brand_id: string
   tenant_id?: string | null
   name: string
   region_id: string
@@ -227,6 +241,29 @@ export interface SFTPKey {
   updated_at: string
 }
 
+export interface S3Bucket {
+  id: string
+  tenant_id?: string | null
+  name: string
+  shard_id?: string | null
+  public: boolean
+  quota_bytes: number
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface S3AccessKey {
+  id: string
+  s3_bucket_id: string
+  access_key_id: string
+  secret_access_key?: string
+  permissions: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Backup {
   id: string
   tenant_id: string
@@ -303,6 +340,8 @@ export interface TenantResourceSummary {
   zone_records: Record<string, number>
   valkey_instances: Record<string, number>
   valkey_users: Record<string, number>
+  s3_buckets: Record<string, number>
+  s3_access_keys: Record<string, number>
   sftp_keys: Record<string, number>
   backups: Record<string, number>
   total: number
@@ -359,9 +398,14 @@ export interface ValkeyUserFormData {
   username: string; password: string; privileges: string[]
   key_pattern?: string
 }
+export interface S3BucketFormData {
+  name: string; shard_id: string; public?: boolean; quota_bytes?: number
+}
+
 export interface SFTPKeyFormData { name: string; public_key: string }
 
 export interface CreateTenantRequest {
+  brand_id: string
   region_id: string
   cluster_id: string
   shard_id: string
@@ -370,5 +414,6 @@ export interface CreateTenantRequest {
   webroots?: WebrootFormData[]
   databases?: DatabaseFormData[]
   valkey_instances?: ValkeyInstanceFormData[]
+  s3_buckets?: S3BucketFormData[]
   sftp_keys?: SFTPKeyFormData[]
 }

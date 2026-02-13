@@ -37,6 +37,11 @@ tenants:
             password: dev-valkey-123
             privileges: ["+@all"]
             key_pattern: "~*"
+    s3_buckets:
+      - name: media-uploads
+        shard: s3-1
+        public: true
+        quota_bytes: 10737418240
     email_accounts:
       - fqdn: acme.hosting.localhost
         address: info@acme.hosting.localhost

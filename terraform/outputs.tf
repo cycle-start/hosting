@@ -38,6 +38,16 @@ output "valkey_node_ids" {
   value       = { for k, v in random_uuid.valkey_node_id : var.valkey_nodes[k].name => v.result }
 }
 
+output "s3_node_ips" {
+  description = "IP addresses of S3/Ceph nodes"
+  value       = { for k, v in var.s3_nodes : v.name => v.ip }
+}
+
+output "s3_node_ids" {
+  description = "Generated UUIDs for S3 nodes"
+  value       = { for k, v in random_uuid.s3_node_id : var.s3_nodes[k].name => v.result }
+}
+
 output "cluster_yaml" {
   description = "Generated cluster YAML for hostctl cluster apply"
   value       = local.cluster_yaml

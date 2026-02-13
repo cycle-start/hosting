@@ -24,6 +24,7 @@ type NodeLocal struct {
 	nginx    *agent.NginxManager
 	database *agent.DatabaseManager
 	valkey   *agent.ValkeyManager
+	s3       *agent.S3Manager
 	runtimes map[string]runtime.Manager
 }
 
@@ -35,6 +36,7 @@ func NewNodeLocal(
 	nginx *agent.NginxManager,
 	database *agent.DatabaseManager,
 	valkey *agent.ValkeyManager,
+	s3 *agent.S3Manager,
 	runtimes map[string]runtime.Manager,
 ) *NodeLocal {
 	return &NodeLocal{
@@ -44,6 +46,7 @@ func NewNodeLocal(
 		nginx:    nginx,
 		database: database,
 		valkey:   valkey,
+		s3:       s3,
 		runtimes: runtimes,
 	}
 }
@@ -505,4 +508,38 @@ func (a *NodeLocal) RestoreMySQLBackup(ctx context.Context, params RestoreMySQLB
 func (a *NodeLocal) DeleteBackupFile(ctx context.Context, storagePath string) error {
 	a.logger.Info().Str("path", storagePath).Msg("DeleteBackupFile")
 	return os.Remove(storagePath)
+}
+
+// --------------------------------------------------------------------------
+// S3 activities
+// --------------------------------------------------------------------------
+
+// CreateS3Bucket creates an S3 bucket via RGW on this node.
+func (a *NodeLocal) CreateS3Bucket(ctx context.Context, params CreateS3BucketParams) error {
+	a.logger.Info().Str("tenant", params.TenantID).Str("bucket", params.Name).Msg("CreateS3Bucket")
+	return a.s3.CreateBucket(ctx, params.TenantID, params.Name, params.QuotaBytes)
+}
+
+// DeleteS3Bucket deletes an S3 bucket via RGW on this node.
+func (a *NodeLocal) DeleteS3Bucket(ctx context.Context, params DeleteS3BucketParams) error {
+	a.logger.Info().Str("tenant", params.TenantID).Str("bucket", params.Name).Msg("DeleteS3Bucket")
+	return a.s3.DeleteBucket(ctx, params.TenantID, params.Name)
+}
+
+// CreateS3AccessKey creates an S3 access key via RGW on this node.
+func (a *NodeLocal) CreateS3AccessKey(ctx context.Context, params CreateS3AccessKeyParams) error {
+	a.logger.Info().Str("tenant", params.TenantID).Str("access_key", params.AccessKeyID).Msg("CreateS3AccessKey")
+	return a.s3.CreateAccessKey(ctx, params.TenantID, params.AccessKeyID, params.SecretAccessKey)
+}
+
+// DeleteS3AccessKey deletes an S3 access key via RGW on this node.
+func (a *NodeLocal) DeleteS3AccessKey(ctx context.Context, params DeleteS3AccessKeyParams) error {
+	a.logger.Info().Str("tenant", params.TenantID).Str("access_key", params.AccessKeyID).Msg("DeleteS3AccessKey")
+	return a.s3.DeleteAccessKey(ctx, params.TenantID, params.AccessKeyID)
+}
+
+// UpdateS3BucketPolicy sets or removes a public-read policy on an S3 bucket.
+func (a *NodeLocal) UpdateS3BucketPolicy(ctx context.Context, params UpdateS3BucketPolicyParams) error {
+	a.logger.Info().Str("tenant", params.TenantID).Str("bucket", params.Name).Bool("public", params.Public).Msg("UpdateS3BucketPolicy")
+	return a.s3.SetBucketPolicy(ctx, params.TenantID, params.Name, params.Public)
 }

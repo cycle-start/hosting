@@ -4,6 +4,7 @@ import "time"
 
 type Zone struct {
 	ID        string  `json:"id" db:"id"`
+	BrandID   string  `json:"brand_id" db:"brand_id"`
 	TenantID  *string `json:"tenant_id,omitempty" db:"tenant_id"`
 	Name      string  `json:"name" db:"name"`
 	RegionID  string  `json:"region_id" db:"region_id"`

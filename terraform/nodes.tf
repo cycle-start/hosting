@@ -16,6 +16,10 @@ resource "random_uuid" "valkey_node_id" {
   count = length(var.valkey_nodes)
 }
 
+resource "random_uuid" "s3_node_id" {
+  count = length(var.s3_nodes)
+}
+
 # --- Volumes (backed by base image) ---
 
 resource "libvirt_volume" "web_node" {
@@ -64,6 +68,27 @@ resource "libvirt_volume" "valkey_node" {
     path   = libvirt_volume.ubuntu_base.path
     format = { type = "qcow2" }
   }
+}
+
+resource "libvirt_volume" "s3_node" {
+  count    = length(var.s3_nodes)
+  name     = "${var.s3_nodes[count.index].name}.qcow2"
+  pool     = libvirt_pool.hosting.name
+  capacity = 21474836480 # 20 GB
+  target   = { format = { type = "qcow2" } }
+  backing_store = {
+    path   = libvirt_volume.ubuntu_base.path
+    format = { type = "qcow2" }
+  }
+}
+
+# Dedicated OSD data disk for Ceph BlueStore.
+resource "libvirt_volume" "s3_node_osd" {
+  count    = length(var.s3_nodes)
+  name     = "${var.s3_nodes[count.index].name}-osd.raw"
+  pool     = libvirt_pool.hosting.name
+  capacity = 10737418240 # 10 GB
+  target   = { format = { type = "raw" } }
 }
 
 # --- Cloud-init ISOs ---
@@ -181,6 +206,36 @@ resource "libvirt_volume" "valkey_node_seed" {
   pool  = libvirt_pool.hosting.name
   create = {
     content = { url = libvirt_cloudinit_disk.valkey_node[count.index].path }
+  }
+}
+
+resource "libvirt_cloudinit_disk" "s3_node" {
+  count = length(var.s3_nodes)
+  name  = "${var.s3_nodes[count.index].name}-cloudinit.iso"
+  meta_data = yamlencode({
+    instance-id    = "i-${var.s3_nodes[count.index].name}"
+    local-hostname = var.s3_nodes[count.index].name
+  })
+  user_data = templatefile("${path.module}/cloud-init/s3-node.yaml.tpl", {
+    hostname         = var.s3_nodes[count.index].name
+    node_id          = random_uuid.s3_node_id[count.index].result
+    shard_name       = var.s3_shard_name
+    temporal_address = "${var.gateway_ip}:${var.temporal_port}"
+    ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
+    ip_address       = var.s3_nodes[count.index].ip
+  })
+  network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
+    ip_address = var.s3_nodes[count.index].ip
+    gateway    = var.gateway_ip
+  })
+}
+
+resource "libvirt_volume" "s3_node_seed" {
+  count = length(var.s3_nodes)
+  name  = "${var.s3_nodes[count.index].name}-seed.iso"
+  pool  = libvirt_pool.hosting.name
+  create = {
+    content = { url = libvirt_cloudinit_disk.s3_node[count.index].path }
   }
 }
 
@@ -410,6 +465,72 @@ resource "libvirt_domain" "valkey_node" {
   }
 }
 
+resource "libvirt_domain" "s3_node" {
+  count       = length(var.s3_nodes)
+  name        = var.s3_nodes[count.index].name
+  memory      = var.s3_nodes[count.index].memory
+  memory_unit = "MiB"
+  vcpu        = var.s3_nodes[count.index].vcpus
+  type        = "kvm"
+  running     = true
+  autostart   = true
+
+  os = { type = "hvm" }
+
+  devices = {
+    disks = [
+      {
+        source = {
+          volume = {
+            pool   = libvirt_pool.hosting.name
+            volume = libvirt_volume.s3_node[count.index].name
+          }
+        }
+        driver = { type = "qcow2" }
+        target = { dev = "vda", bus = "virtio" }
+      },
+      {
+        source = {
+          volume = {
+            pool   = libvirt_pool.hosting.name
+            volume = libvirt_volume.s3_node_seed[count.index].name
+          }
+        }
+        driver = { type = "raw" }
+        target = { dev = "vdb", bus = "virtio" }
+      },
+      {
+        source = {
+          volume = {
+            pool   = libvirt_pool.hosting.name
+            volume = libvirt_volume.s3_node_osd[count.index].name
+          }
+        }
+        driver = { type = "raw" }
+        target = { dev = "vdc", bus = "virtio" }
+      },
+    ]
+
+    interfaces = [{
+      type   = "network"
+      source = { network = { network = libvirt_network.hosting.name } }
+      model  = { type = "virtio" }
+    }]
+
+    filesystems = [{
+      type       = "mount"
+      accessmode = "passthrough"
+      source     = { mount = { dir = abspath("${path.module}/../bin") } }
+      target     = { dir = "hostbin" }
+    }]
+
+    consoles = [{
+      type   = "pty"
+      target = { type = "serial", port = "0" }
+    }]
+  }
+}
+
 # --- Cluster YAML generation ---
 
 locals {
@@ -441,6 +562,13 @@ locals {
       ip         = n.ip
       shard_name = var.valkey_shard_name
       role       = "valkey"
+    }],
+    [for i, n in var.s3_nodes : {
+      id         = random_uuid.s3_node_id[i].result
+      name       = n.name
+      ip         = n.ip
+      shard_name = var.s3_shard_name
+      role       = "s3"
     }],
   )
 

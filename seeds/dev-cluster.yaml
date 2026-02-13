@@ -20,6 +20,9 @@ cluster:
       - name: valkey-1
         role: valkey
         node_count: 1
+      - name: s3-1
+        role: s3
+        node_count: 1
     infrastructure:
       haproxy: true
       powerdns: true

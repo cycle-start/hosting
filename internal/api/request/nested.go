@@ -77,6 +77,13 @@ type CreateValkeyUserNested struct {
 	KeyPattern string   `json:"key_pattern"`
 }
 
+type CreateS3BucketNested struct {
+	Name       string `json:"name" validate:"required,slug"`
+	ShardID    string `json:"shard_id" validate:"required"`
+	Public     *bool  `json:"public"`
+	QuotaBytes *int64 `json:"quota_bytes"`
+}
+
 type CreateSFTPKeyNested struct {
 	Name      string `json:"name" validate:"required,min=1,max=255"`
 	PublicKey string `json:"public_key" validate:"required"`

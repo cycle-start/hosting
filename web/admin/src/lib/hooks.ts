@@ -4,7 +4,8 @@ import type {
   Region, Cluster, Shard, Node, Tenant, Webroot, FQDN, Certificate,
   Zone, ZoneRecord, Database, DatabaseUser,
   ValkeyInstance, ValkeyUser, EmailAccount, EmailAlias, EmailForward, EmailAutoReply,
-  SFTPKey, Backup,
+  S3Bucket, S3AccessKey,
+  SFTPKey, Backup, Brand,
   APIKey, APIKeyCreateResponse, AuditLogEntry, DashboardStats,
   PlatformConfig, ListParams, AuditListParams, TenantResourceSummary,
   CreateTenantRequest,
@@ -23,6 +24,68 @@ function buildQuery(params?: Record<string, unknown>): string {
 function listPath(base: string, params?: ListParams) {
   const q = buildQuery(params as Record<string, unknown>)
   return q ? `${base}?${q}` : base
+}
+
+// Brands
+export function useBrands(params?: ListParams) {
+  return useQuery({
+    queryKey: ['brands', params],
+    queryFn: () => api.get<PaginatedResponse<Brand>>(listPath('/brands', params)),
+  })
+}
+
+export function useBrand(id: string) {
+  return useQuery({
+    queryKey: ['brand', id],
+    queryFn: () => api.get<Brand>(`/brands/${id}`),
+    enabled: !!id,
+  })
+}
+
+export function useCreateBrand() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { id: string; name: string; base_hostname: string; primary_ns: string; secondary_ns: string; hostmaster_email: string }) =>
+      api.post<Brand>('/brands', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['brands'] }),
+  })
+}
+
+export function useUpdateBrand() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { id: string; name?: string; base_hostname?: string; primary_ns?: string; secondary_ns?: string; hostmaster_email?: string }) =>
+      api.put<Brand>(`/brands/${data.id}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['brands'] })
+      qc.invalidateQueries({ queryKey: ['brand'] })
+    },
+  })
+}
+
+export function useDeleteBrand() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/brands/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['brands'] }),
+  })
+}
+
+export function useBrandClusters(brandId: string) {
+  return useQuery({
+    queryKey: ['brand-clusters', brandId],
+    queryFn: () => api.get<{ cluster_ids: string[] }>(`/brands/${brandId}/clusters`),
+    enabled: !!brandId,
+  })
+}
+
+export function useSetBrandClusters() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { brand_id: string; cluster_ids: string[] }) =>
+      api.put(`/brands/${data.brand_id}/clusters`, { cluster_ids: data.cluster_ids }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['brand-clusters'] }),
+  })
 }
 
 // Dashboard
@@ -410,7 +473,7 @@ export function useZone(id: string) {
 export function useCreateZone() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { name: string; tenant_id: string; region_id: string }) =>
+    mutationFn: (data: { name: string; region_id: string; brand_id?: string; tenant_id?: string }) =>
       api.post<Zone>('/zones', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['zones'] }),
   })
@@ -600,6 +663,78 @@ export function useDeleteValkeyUser() {
   })
 }
 
+// S3 Buckets
+export function useS3Buckets(tenantId: string, params?: ListParams) {
+  return useQuery({
+    queryKey: ['s3-buckets', tenantId, params],
+    queryFn: () => api.get<PaginatedResponse<S3Bucket>>(listPath(`/tenants/${tenantId}/s3-buckets`, params)),
+    enabled: !!tenantId,
+  })
+}
+
+export function useS3Bucket(id: string) {
+  return useQuery({
+    queryKey: ['s3-bucket', id],
+    queryFn: () => api.get<S3Bucket>(`/s3-buckets/${id}`),
+    enabled: !!id,
+  })
+}
+
+export function useCreateS3Bucket() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { tenant_id: string; name: string; shard_id: string; public?: boolean; quota_bytes?: number }) =>
+      api.post<S3Bucket>(`/tenants/${data.tenant_id}/s3-buckets`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['s3-buckets'] }),
+  })
+}
+
+export function useUpdateS3Bucket() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { id: string; public?: boolean; quota_bytes?: number }) =>
+      api.put<S3Bucket>(`/s3-buckets/${data.id}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['s3-buckets'] })
+      qc.invalidateQueries({ queryKey: ['s3-bucket'] })
+    },
+  })
+}
+
+export function useDeleteS3Bucket() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/s3-buckets/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['s3-buckets'] }),
+  })
+}
+
+// S3 Access Keys
+export function useS3AccessKeys(bucketId: string) {
+  return useQuery({
+    queryKey: ['s3-access-keys', bucketId],
+    queryFn: () => api.get<PaginatedResponse<S3AccessKey>>(listPath(`/s3-buckets/${bucketId}/access-keys`)),
+    enabled: !!bucketId,
+  })
+}
+
+export function useCreateS3AccessKey() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { bucket_id: string; permissions?: string }) =>
+      api.post<S3AccessKey>(`/s3-buckets/${data.bucket_id}/access-keys`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['s3-access-keys'] }),
+  })
+}
+
+export function useDeleteS3AccessKey() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/s3-access-keys/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['s3-access-keys'] }),
+  })
+}
+
 // SFTP Keys
 export function useSFTPKeys(tenantId: string) {
   return useQuery({
@@ -711,7 +846,7 @@ export function useUpdatePlatformConfig() {
 
 // Search
 export interface SearchResult {
-  type: 'tenant' | 'zone' | 'fqdn' | 'webroot' | 'database' | 'email_account' | 'valkey_instance'
+  type: 'brand' | 'tenant' | 'zone' | 'fqdn' | 'webroot' | 'database' | 'email_account' | 'valkey_instance' | 's3_bucket'
   id: string
   label: string
   tenant_id?: string

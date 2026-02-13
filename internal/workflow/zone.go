@@ -40,23 +40,9 @@ func CreateZoneWorkflow(ctx workflow.Context, zoneID string) error {
 		return err
 	}
 
-	// Get platform config for SOA and NS records.
-	var primaryNS string
-	err = workflow.ExecuteActivity(ctx, "GetPlatformConfig", "primary_ns").Get(ctx, &primaryNS)
-	if err != nil {
-		_ = setResourceFailed(ctx, "zones", zoneID)
-		return err
-	}
-
-	var hostmasterEmail string
-	err = workflow.ExecuteActivity(ctx, "GetPlatformConfig", "hostmaster_email").Get(ctx, &hostmasterEmail)
-	if err != nil {
-		_ = setResourceFailed(ctx, "zones", zoneID)
-		return err
-	}
-
-	var secondaryNS string
-	err = workflow.ExecuteActivity(ctx, "GetPlatformConfig", "secondary_ns").Get(ctx, &secondaryNS)
+	// Get brand for DNS settings.
+	var brand model.Brand
+	err = workflow.ExecuteActivity(ctx, "GetBrandByID", zone.BrandID).Get(ctx, &brand)
 	if err != nil {
 		_ = setResourceFailed(ctx, "zones", zoneID)
 		return err
@@ -74,7 +60,7 @@ func CreateZoneWorkflow(ctx workflow.Context, zoneID string) error {
 	}
 
 	// Create SOA record.
-	soaContent := fmt.Sprintf("%s %s 1 10800 3600 604800 300", primaryNS, hostmasterEmail)
+	soaContent := fmt.Sprintf("%s %s 1 10800 3600 604800 300", brand.PrimaryNS, brand.HostmasterEmail)
 	err = workflow.ExecuteActivity(ctx, "WriteDNSRecord", activity.WriteDNSRecordParams{
 		DomainID: domainID,
 		Name:     zone.Name,
@@ -92,7 +78,7 @@ func CreateZoneWorkflow(ctx workflow.Context, zoneID string) error {
 		DomainID: domainID,
 		Name:     zone.Name,
 		Type:     "NS",
-		Content:  primaryNS,
+		Content:  brand.PrimaryNS,
 		TTL:      86400,
 	}).Get(ctx, nil)
 	if err != nil {
@@ -105,7 +91,7 @@ func CreateZoneWorkflow(ctx workflow.Context, zoneID string) error {
 		DomainID: domainID,
 		Name:     zone.Name,
 		Type:     "NS",
-		Content:  secondaryNS,
+		Content:  brand.SecondaryNS,
 		TTL:      86400,
 	}).Get(ctx, nil)
 	if err != nil {

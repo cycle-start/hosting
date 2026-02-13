@@ -36,6 +36,7 @@ func TestZoneService_Create_Success(t *testing.T) {
 	tenantID := "test-tenant-1"
 	zone := &model.Zone{
 		ID:        "test-zone-1",
+		BrandID:   "test-brand",
 		TenantID:  &tenantID,
 		Name:      "example.com",
 		RegionID:  "test-region-1",
@@ -63,7 +64,7 @@ func TestZoneService_Create_InsertError(t *testing.T) {
 	svc := NewZoneService(db, tc)
 	ctx := context.Background()
 
-	zone := &model.Zone{ID: "test-zone-1", Name: "example.com"}
+	zone := &model.Zone{ID: "test-zone-1", BrandID: "test-brand", Name: "example.com"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("duplicate"))
 
@@ -79,7 +80,7 @@ func TestZoneService_Create_WorkflowError(t *testing.T) {
 	svc := NewZoneService(db, tc)
 	ctx := context.Background()
 
-	zone := &model.Zone{ID: "test-zone-1", Name: "example.com"}
+	zone := &model.Zone{ID: "test-zone-1", BrandID: "test-brand", Name: "example.com"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 	tc.On("ExecuteWorkflow", ctx, mock.Anything, "CreateZoneWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
@@ -106,12 +107,13 @@ func TestZoneService_GetByID_Success(t *testing.T) {
 
 	row := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = zoneID
-		*(dest[1].(**string)) = &tenantID
-		*(dest[2].(*string)) = "example.com"
-		*(dest[3].(*string)) = regionID
-		*(dest[4].(*string)) = model.StatusActive
-		*(dest[5].(*time.Time)) = now
+		*(dest[1].(*string)) = "test-brand"
+		*(dest[2].(**string)) = &tenantID
+		*(dest[3].(*string)) = "example.com"
+		*(dest[4].(*string)) = regionID
+		*(dest[5].(*string)) = model.StatusActive
 		*(dest[6].(*time.Time)) = now
+		*(dest[7].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -159,12 +161,13 @@ func TestZoneService_List_Success(t *testing.T) {
 	rows := newMockRows(
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
-			*(dest[1].(**string)) = &tenantID
-			*(dest[2].(*string)) = "example.com"
-			*(dest[3].(*string)) = regionID
-			*(dest[4].(*string)) = model.StatusActive
-			*(dest[5].(*time.Time)) = now
+			*(dest[1].(*string)) = "test-brand"
+			*(dest[2].(**string)) = &tenantID
+			*(dest[3].(*string)) = "example.com"
+			*(dest[4].(*string)) = regionID
+			*(dest[5].(*string)) = model.StatusActive
 			*(dest[6].(*time.Time)) = now
+			*(dest[7].(*time.Time)) = now
 			return nil
 		},
 	)
@@ -201,7 +204,7 @@ func TestZoneService_Update_Success(t *testing.T) {
 	svc := NewZoneService(db, tc)
 	ctx := context.Background()
 
-	zone := &model.Zone{ID: "test-zone-1", Name: "updated.com", Status: model.StatusActive}
+	zone := &model.Zone{ID: "test-zone-1", BrandID: "test-brand", Name: "updated.com", Status: model.StatusActive}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
@@ -216,7 +219,7 @@ func TestZoneService_Update_DBError(t *testing.T) {
 	svc := NewZoneService(db, tc)
 	ctx := context.Background()
 
-	zone := &model.Zone{ID: "test-zone-1"}
+	zone := &model.Zone{ID: "test-zone-1", BrandID: "test-brand"}
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
 
 	err := svc.Update(ctx, zone)

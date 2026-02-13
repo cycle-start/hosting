@@ -18,4 +18,5 @@ const (
 	ServiceSSH   = "ssh"
 	ServiceMySQL = "mysql"
 	ServiceMail  = "mail"
+	ServiceS3    = "s3"
 )

@@ -7,6 +7,7 @@ import (
 type Services struct {
 	Dashboard        *DashboardService
 	PlatformConfig   *PlatformConfigService
+	Brand            *BrandService
 	Region           *RegionService
 	Cluster          *ClusterService
 	ClusterLBAddress *ClusterLBAddressService
@@ -26,6 +27,8 @@ type Services struct {
 	EmailAutoReply   *EmailAutoReplyService
 	ValkeyInstance   *ValkeyInstanceService
 	ValkeyUser       *ValkeyUserService
+	S3Bucket         *S3BucketService
+	S3AccessKey      *S3AccessKeyService
 	SFTPKey          *SFTPKeyService
 	Backup           *BackupService
 	APIKey           *APIKeyService
@@ -36,6 +39,7 @@ func NewServices(db DB, tc temporalclient.Client) *Services {
 	return &Services{
 		Dashboard:        NewDashboardService(db),
 		PlatformConfig:   NewPlatformConfigService(db),
+		Brand:            NewBrandService(db),
 		Region:           NewRegionService(db),
 		Cluster:          NewClusterService(db),
 		ClusterLBAddress: NewClusterLBAddressService(db),
@@ -55,6 +59,8 @@ func NewServices(db DB, tc temporalclient.Client) *Services {
 		EmailAutoReply:   NewEmailAutoReplyService(db, tc),
 		ValkeyInstance:   NewValkeyInstanceService(db, tc),
 		ValkeyUser:       NewValkeyUserService(db, tc),
+		S3Bucket:         NewS3BucketService(db, tc),
+		S3AccessKey:      NewS3AccessKeyService(db, tc),
 		SFTPKey:          NewSFTPKeyService(db, tc),
 		Backup:           NewBackupService(db, tc),
 		APIKey:           NewAPIKeyService(db),

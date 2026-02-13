@@ -23,4 +23,5 @@ const (
 	ShardRoleDNS      = "dns"
 	ShardRoleEmail    = "email"
 	ShardRoleValkey   = "valkey"
+	ShardRoleS3       = "s3"
 )

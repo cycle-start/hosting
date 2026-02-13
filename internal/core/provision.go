@@ -196,3 +196,29 @@ func resolveTenantIDFromEmailForward(ctx context.Context, db DB, forwardID strin
 	}
 	return tenantID, nil
 }
+
+func resolveTenantIDFromS3Bucket(ctx context.Context, db DB, bucketID string) (string, error) {
+	var tenantID *string
+	err := db.QueryRow(ctx, "SELECT tenant_id FROM s3_buckets WHERE id = $1", bucketID).Scan(&tenantID)
+	if err != nil {
+		return "", fmt.Errorf("resolve tenant from s3 bucket %s: %w", bucketID, err)
+	}
+	if tenantID == nil {
+		return "", nil
+	}
+	return *tenantID, nil
+}
+
+func resolveTenantIDFromS3AccessKey(ctx context.Context, db DB, keyID string) (string, error) {
+	var tenantID *string
+	err := db.QueryRow(ctx,
+		"SELECT b.tenant_id FROM s3_access_keys k JOIN s3_buckets b ON b.id = k.s3_bucket_id WHERE k.id = $1",
+		keyID).Scan(&tenantID)
+	if err != nil {
+		return "", fmt.Errorf("resolve tenant from s3 access key %s: %w", keyID, err)
+	}
+	if tenantID == nil {
+		return "", nil
+	}
+	return *tenantID, nil
+}

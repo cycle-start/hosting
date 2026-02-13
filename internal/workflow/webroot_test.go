@@ -47,6 +47,7 @@ func (s *CreateWebrootWorkflowTestSuite) TestSuccess() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		UID:     5001,
 		ShardID: &shardID,
 	}
@@ -100,6 +101,7 @@ func (s *CreateWebrootWorkflowTestSuite) TestNoFQDNs_Success() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		UID:     5001,
 		ShardID: &shardID,
 	}
@@ -148,6 +150,7 @@ func (s *CreateWebrootWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		UID:     5001,
 		ShardID: &shardID,
 	}
@@ -219,6 +222,7 @@ func (s *UpdateWebrootWorkflowTestSuite) TestSuccess() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{
@@ -266,6 +270,7 @@ func (s *UpdateWebrootWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{
@@ -317,6 +322,7 @@ func (s *DeleteWebrootWorkflowTestSuite) TestSuccess() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{
@@ -350,6 +356,7 @@ func (s *DeleteWebrootWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
+		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
 	nodes := []model.Node{

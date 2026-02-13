@@ -42,7 +42,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 		{ID: "node-2"},
 	}
 	tenants := []model.Tenant{
-		{ID: "tenant-1", ShardID: &tenantShardID, UID: 1000, SFTPEnabled: true, Status: model.StatusActive},
+		{ID: "tenant-1", BrandID: "test-brand", ShardID: &tenantShardID, UID: 1000, SFTPEnabled: true, Status: model.StatusActive},
 	}
 	webroots := []model.Webroot{
 		{ID: "wr-1", TenantID: "tenant-1", Name: "main", Runtime: "php", RuntimeVersion: "8.5", RuntimeConfig: json.RawMessage(`{}`), PublicFolder: "public", Status: model.StatusActive},
@@ -178,8 +178,8 @@ func (s *ConvergeShardWorkflowTestSuite) TestSkipsInactiveResources() {
 	}
 	// A provisioning tenant should be skipped.
 	tenants := []model.Tenant{
-		{ID: "tenant-active", UID: 1000, Status: model.StatusActive},
-		{ID: "tenant-prov", UID: 1001, Status: model.StatusProvisioning},
+		{ID: "tenant-active", BrandID: "test-brand", UID: 1000, Status: model.StatusActive},
+		{ID: "tenant-prov", BrandID: "test-brand", UID: 1001, Status: model.StatusProvisioning},
 	}
 
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)

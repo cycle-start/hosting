@@ -96,6 +96,16 @@ func (s *Server) setupRoutes() {
 		r.Get("/platform/config", platformCfg.Get)
 		r.Put("/platform/config", platformCfg.Update)
 
+		// Brands
+		brand := handler.NewBrand(s.services.Brand)
+		r.Get("/brands", brand.List)
+		r.Post("/brands", brand.Create)
+		r.Get("/brands/{id}", brand.Get)
+		r.Put("/brands/{id}", brand.Update)
+		r.Delete("/brands/{id}", brand.Delete)
+		r.Get("/brands/{id}/clusters", brand.ListClusters)
+		r.Put("/brands/{id}/clusters", brand.SetClusters)
+
 		// Regions
 		region := handler.NewRegion(s.services.Region)
 		r.Get("/regions", region.List)
@@ -174,7 +184,7 @@ func (s *Server) setupRoutes() {
 		r.Post("/fqdns/{fqdnID}/certificates", cert.Upload)
 
 		// Zones
-		zone := handler.NewZone(s.services.Zone)
+		zone := handler.NewZone(s.services)
 		r.Get("/zones", zone.List)
 		r.Post("/zones", zone.Create)
 		r.Get("/zones/{id}", zone.Get)
@@ -223,6 +233,20 @@ func (s *Server) setupRoutes() {
 		r.Get("/valkey-users/{id}", valkeyUser.Get)
 		r.Put("/valkey-users/{id}", valkeyUser.Update)
 		r.Delete("/valkey-users/{id}", valkeyUser.Delete)
+
+		// S3 buckets
+		s3Bucket := handler.NewS3Bucket(s.services.S3Bucket, s.services.S3AccessKey)
+		r.Get("/tenants/{tenantID}/s3-buckets", s3Bucket.ListByTenant)
+		r.Post("/tenants/{tenantID}/s3-buckets", s3Bucket.Create)
+		r.Get("/s3-buckets/{id}", s3Bucket.Get)
+		r.Put("/s3-buckets/{id}", s3Bucket.Update)
+		r.Delete("/s3-buckets/{id}", s3Bucket.Delete)
+
+		// S3 access keys
+		s3AccessKey := handler.NewS3AccessKey(s.services.S3AccessKey)
+		r.Get("/s3-buckets/{bucketID}/access-keys", s3AccessKey.ListByBucket)
+		r.Post("/s3-buckets/{bucketID}/access-keys", s3AccessKey.Create)
+		r.Delete("/s3-access-keys/{id}", s3AccessKey.Delete)
 
 		// SFTP keys
 		sftpKey := handler.NewSFTPKey(s.services.SFTPKey)

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
-import { Users, Globe, FolderOpen, Database, Boxes, Mail, Key, Plus } from 'lucide-react'
+import { Users, Globe, FolderOpen, Database, Boxes, HardDrive, Mail, Key, Plus, Tag } from 'lucide-react'
 import {
   CommandDialog,
   CommandInput,
@@ -18,6 +18,7 @@ interface CommandPaletteProps {
 }
 
 const typeConfig: Record<string, { label: string; plural: string; icon: React.ElementType }> = {
+  brand: { label: 'Brand', plural: 'Brands', icon: Tag },
   tenant: { label: 'Tenant', plural: 'Tenants', icon: Users },
   zone: { label: 'Zone', plural: 'Zones', icon: Globe },
   fqdn: { label: 'FQDN', plural: 'FQDNs', icon: Globe },
@@ -25,10 +26,13 @@ const typeConfig: Record<string, { label: string; plural: string; icon: React.El
   database: { label: 'Database', plural: 'Databases', icon: Database },
   email_account: { label: 'Email Account', plural: 'Email Accounts', icon: Mail },
   valkey_instance: { label: 'Valkey Instance', plural: 'Valkey Instances', icon: Boxes },
+  s3_bucket: { label: 'S3 Bucket', plural: 'S3 Buckets', icon: HardDrive },
 }
 
 function getDetailPath(result: SearchResult): string {
   switch (result.type) {
+    case 'brand':
+      return `/brands/${result.id}`
     case 'tenant':
       return `/tenants/${result.id}`
     case 'zone':
@@ -43,6 +47,8 @@ function getDetailPath(result: SearchResult): string {
       return `/tenants/${result.tenant_id}/email-accounts/${result.id}`
     case 'valkey_instance':
       return `/tenants/${result.tenant_id}/valkey/${result.id}`
+    case 's3_bucket':
+      return `/tenants/${result.tenant_id}/s3-buckets/${result.id}`
     default:
       return '/'
   }
@@ -101,6 +107,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         {showActions ? (
           <>
             <CommandGroup heading="Actions">
+              <CommandItem onSelect={() => handleSelect('/brands')}>
+                <Plus className="mr-2 h-4 w-4" />
+                Create Brand
+              </CommandItem>
               <CommandItem onSelect={() => handleSelect('/tenants/new')}>
                 <Plus className="mr-2 h-4 w-4" />
                 Create Tenant
@@ -123,6 +133,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 <CommandItem onSelect={() => handleSelect(`/tenants/${tenantId}?create=valkey`)}>
                   <Boxes className="mr-2 h-4 w-4" />
                   Create Valkey Instance
+                </CommandItem>
+                <CommandItem onSelect={() => handleSelect(`/tenants/${tenantId}?create=s3_bucket`)}>
+                  <HardDrive className="mr-2 h-4 w-4" />
+                  Create S3 Bucket
                 </CommandItem>
                 <CommandItem onSelect={() => handleSelect(`/tenants/${tenantId}?create=sftp_key`)}>
                   <Key className="mr-2 h-4 w-4" />

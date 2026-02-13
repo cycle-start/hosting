@@ -40,6 +40,12 @@ func (s *SearchService) Search(ctx context.Context, query string, limit int) ([]
 
 	queries := []queryDef{
 		{
+			sql: `SELECT 'brand', id, name, '', status FROM brands
+				WHERE status != 'deleted' AND (id ILIKE $1 OR name ILIKE $1)
+				LIMIT $2`,
+			args: []any{pattern, limit},
+		},
+		{
 			sql: `SELECT 'tenant', id, id, '', status FROM tenants
 				WHERE status != 'deleted' AND id ILIKE $1
 				LIMIT $2`,
@@ -79,6 +85,12 @@ func (s *SearchService) Search(ctx context.Context, query string, limit int) ([]
 		},
 		{
 			sql: `SELECT 'valkey_instance', id, name, tenant_id, status FROM valkey_instances
+				WHERE status != 'deleted' AND name ILIKE $1
+				LIMIT $2`,
+			args: []any{pattern, limit},
+		},
+		{
+			sql: `SELECT 's3_bucket', id, name, COALESCE(tenant_id, ''), status FROM s3_buckets
 				WHERE status != 'deleted' AND name ILIKE $1
 				LIMIT $2`,
 			args: []any{pattern, limit},

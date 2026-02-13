@@ -20,6 +20,7 @@ type TenantDef struct {
 	Webroots         []WebrootDef        `yaml:"webroots"`
 	Databases        []DatabaseDef       `yaml:"databases"`
 	ValkeyInstances  []ValkeyInstanceDef `yaml:"valkey_instances"`
+	S3Buckets        []S3BucketDef       `yaml:"s3_buckets"`
 	EmailAccounts    []EmailAcctDef      `yaml:"email_accounts"`
 }
 
@@ -61,6 +62,13 @@ type ValkeyUserDef struct {
 	Password   string   `yaml:"password"`
 	Privileges []string `yaml:"privileges"`
 	KeyPattern string   `yaml:"key_pattern"`
+}
+
+type S3BucketDef struct {
+	Name       string `yaml:"name"`
+	Shard      string `yaml:"shard"`
+	Public     *bool  `yaml:"public"`
+	QuotaBytes *int64 `yaml:"quota_bytes"`
 }
 
 type EmailAcctDef struct {

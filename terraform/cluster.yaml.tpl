@@ -37,6 +37,11 @@ cluster:
         role: valkey
         node_count: ${length([for n in nodes : n if n.shard_name == node.shard_name])}
 %{ endif ~}
+%{ if node.role == "s3" && endswith(node.name, "node-0") ~}
+      - name: ${node.shard_name}
+        role: s3
+        node_count: ${length([for n in nodes : n if n.shard_name == node.shard_name])}
+%{ endif ~}
 %{ endfor ~}
     infrastructure:
       haproxy: false

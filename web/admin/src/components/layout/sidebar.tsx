@@ -6,6 +6,7 @@ import {
   Server,
   Users,
   Database,
+  HardDrive,
   MapPin,
   KeyRound,
   ScrollText,
@@ -16,6 +17,7 @@ import {
   FileText,
   FolderOpen,
   Search,
+  Tag,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -56,16 +58,13 @@ const navSections: NavSection[] = [
   {
     title: 'Hosting',
     items: [
+      { label: 'Brands', href: '/brands', icon: Tag },
       { label: 'Tenants', href: '/tenants', icon: Users },
       { label: 'Webroots', href: '/webroots', icon: FolderOpen },
       { label: 'Databases', href: '/databases', icon: Database },
-      { label: 'Zones', href: '/zones', icon: Globe },
-    ],
-  },
-  {
-    title: 'Services',
-    items: [
       { label: 'Valkey', href: '/valkey', icon: Boxes },
+      { label: 'S3 Buckets', href: '/s3-buckets', icon: HardDrive },
+      { label: 'Zones', href: '/zones', icon: Globe },
     ],
   },
   {
