@@ -278,6 +278,23 @@ services:
       - POWERDNS_DATABASE_URL=postgres://hosting:hosting@powerdns-db:5432/hosting_powerdns
       - TEMPORAL_ADDRESS=temporal:7233
       - REGISTRY_URL=registry:5000
+
+  admin-ui:
+    container_name: hosting-admin-ui
+    build:
+      context: .
+      dockerfile: docker/admin-ui.Dockerfile
+    profiles: ["platform"]
+    depends_on:
+      core-api:
+        condition: service_started
+    environment:
+      - CORE_API_URL=http://core-api:8090
+      - STATIC_DIR=/app/dist
+      - LISTEN_ADDR=:3001
+    ports:
+      - "3001:3001"
+
 volumes:
   core-db-data:
   powerdns-db-data:

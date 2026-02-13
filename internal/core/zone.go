@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/edvin/hosting/internal/api/request"
 	"github.com/edvin/hosting/internal/model"
 	temporalclient "go.temporal.io/sdk/client"
 )
@@ -53,20 +54,43 @@ func (s *ZoneService) GetByID(ctx context.Context, id string) (*model.Zone, erro
 	return &z, nil
 }
 
-func (s *ZoneService) List(ctx context.Context, limit int, cursor string) ([]model.Zone, bool, error) {
-	query := `SELECT id, tenant_id, name, region_id, status, created_at, updated_at FROM zones`
+func (s *ZoneService) List(ctx context.Context, params request.ListParams) ([]model.Zone, bool, error) {
+	query := `SELECT id, tenant_id, name, region_id, status, created_at, updated_at FROM zones WHERE status != 'deleted'`
 	args := []any{}
 	argIdx := 1
 
-	if cursor != "" {
-		query += fmt.Sprintf(` WHERE id > $%d`, argIdx)
-		args = append(args, cursor)
+	if params.Search != "" {
+		query += fmt.Sprintf(` AND name ILIKE $%d`, argIdx)
+		args = append(args, "%"+params.Search+"%")
+		argIdx++
+	}
+	if params.Status != "" {
+		query += fmt.Sprintf(` AND status = $%d`, argIdx)
+		args = append(args, params.Status)
+		argIdx++
+	}
+	if params.Cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, params.Cursor)
 		argIdx++
 	}
 
-	query += ` ORDER BY id`
+	sortCol := "created_at"
+	switch params.Sort {
+	case "name":
+		sortCol = "name"
+	case "status":
+		sortCol = "status"
+	case "created_at":
+		sortCol = "created_at"
+	}
+	order := "DESC"
+	if params.Order == "asc" {
+		order = "ASC"
+	}
+	query += fmt.Sprintf(` ORDER BY %s %s`, sortCol, order)
 	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
-	args = append(args, limit+1)
+	args = append(args, params.Limit+1)
 
 	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
@@ -87,9 +111,9 @@ func (s *ZoneService) List(ctx context.Context, limit int, cursor string) ([]mod
 		return nil, false, fmt.Errorf("iterate zones: %w", err)
 	}
 
-	hasMore := len(zones) > limit
+	hasMore := len(zones) > params.Limit
 	if hasMore {
-		zones = zones[:limit]
+		zones = zones[:params.Limit]
 	}
 	return zones, hasMore, nil
 }

@@ -27,9 +27,9 @@ func (h *Database) ListByTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pg := request.ParsePagination(r)
+	params := request.ParseListParams(r, "created_at")
 
-	databases, hasMore, err := h.svc.ListByTenant(r.Context(), tenantID, pg.Limit, pg.Cursor)
+	databases, hasMore, err := h.svc.ListByTenant(r.Context(), tenantID, params)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return

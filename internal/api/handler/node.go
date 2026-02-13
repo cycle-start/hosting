@@ -27,9 +27,9 @@ func (h *Node) ListByCluster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pg := request.ParsePagination(r)
+	params := request.ParseListParams(r, "created_at")
 
-	nodes, hasMore, err := h.svc.ListByCluster(r.Context(), clusterID, pg.Limit, pg.Cursor)
+	nodes, hasMore, err := h.svc.ListByCluster(r.Context(), clusterID, params)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return

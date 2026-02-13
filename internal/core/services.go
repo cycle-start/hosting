@@ -5,6 +5,7 @@ import (
 )
 
 type Services struct {
+	Dashboard        *DashboardService
 	PlatformConfig   *PlatformConfigService
 	Region           *RegionService
 	Cluster          *ClusterService
@@ -32,6 +33,7 @@ type Services struct {
 
 func NewServices(db DB, tc temporalclient.Client) *Services {
 	return &Services{
+		Dashboard:        NewDashboardService(db),
 		PlatformConfig:   NewPlatformConfigService(db),
 		Region:           NewRegionService(db),
 		Cluster:          NewClusterService(db),

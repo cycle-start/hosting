@@ -21,9 +21,9 @@ func NewZone(svc *core.ZoneService) *Zone {
 }
 
 func (h *Zone) List(w http.ResponseWriter, r *http.Request) {
-	pg := request.ParsePagination(r)
+	params := request.ParseListParams(r, "created_at")
 
-	zones, hasMore, err := h.svc.List(r.Context(), pg.Limit, pg.Cursor)
+	zones, hasMore, err := h.svc.List(r.Context(), params)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return

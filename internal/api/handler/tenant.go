@@ -21,9 +21,9 @@ func NewTenant(svc *core.TenantService) *Tenant {
 }
 
 func (h *Tenant) List(w http.ResponseWriter, r *http.Request) {
-	pg := request.ParsePagination(r)
+	params := request.ParseListParams(r, "created_at")
 
-	tenants, hasMore, err := h.svc.List(r.Context(), pg.Limit, pg.Cursor)
+	tenants, hasMore, err := h.svc.List(r.Context(), params)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return

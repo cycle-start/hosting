@@ -21,6 +21,14 @@ proto:
         --go-grpc_out=. --go-grpc_opt=module=github.com/edvin/hosting \
         proto/agent/v1/agent.proto proto/agent/v1/types.proto
 
+# Build admin UI for development
+build-admin:
+    cd web/admin && npm run build
+
+# Start admin UI dev server (with API proxy to localhost:8090)
+dev-admin:
+    cd web/admin && npm run dev
+
 # --- Test ---
 
 # Run unit tests

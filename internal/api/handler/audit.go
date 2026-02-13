@@ -34,30 +34,66 @@ func NewAudit(pool *pgxpool.Pool) *Audit {
 }
 
 func (h *Audit) List(w http.ResponseWriter, r *http.Request) {
-	pg := request.ParsePagination(r)
+	params := request.ParseListParams(r, "created_at")
 
 	resourceType := r.URL.Query().Get("resource_type")
+	action := r.URL.Query().Get("action")
+	dateFrom := r.URL.Query().Get("date_from")
+	dateTo := r.URL.Query().Get("date_to")
 
 	query := `SELECT id, api_key_id, method, path, resource_type, resource_id, status_code, request_body, created_at
               FROM audit_logs WHERE 1=1`
 	args := []any{}
 	argIdx := 1
 
+	if params.Search != "" {
+		query += fmt.Sprintf(` AND (resource_type ILIKE $%d OR method ILIKE $%d)`, argIdx, argIdx+1)
+		args = append(args, "%"+params.Search+"%", "%"+params.Search+"%")
+		argIdx += 2
+	}
 	if resourceType != "" {
 		query += fmt.Sprintf(` AND resource_type = $%d`, argIdx)
 		args = append(args, resourceType)
 		argIdx++
 	}
-
-	if pg.Cursor != "" {
-		query += fmt.Sprintf(` AND id > $%d`, argIdx)
-		args = append(args, pg.Cursor)
+	if action != "" {
+		query += fmt.Sprintf(` AND method = $%d`, argIdx)
+		args = append(args, action)
+		argIdx++
+	}
+	if dateFrom != "" {
+		query += fmt.Sprintf(` AND created_at >= $%d`, argIdx)
+		args = append(args, dateFrom)
+		argIdx++
+	}
+	if dateTo != "" {
+		query += fmt.Sprintf(` AND created_at <= $%d`, argIdx)
+		args = append(args, dateTo)
 		argIdx++
 	}
 
-	query += ` ORDER BY created_at DESC`
+	if params.Cursor != "" {
+		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		args = append(args, params.Cursor)
+		argIdx++
+	}
+
+	sortCol := "created_at"
+	switch params.Sort {
+	case "method":
+		sortCol = "method"
+	case "resource_type":
+		sortCol = "resource_type"
+	case "created_at":
+		sortCol = "created_at"
+	}
+	order := "DESC"
+	if params.Order == "asc" {
+		order = "ASC"
+	}
+	query += fmt.Sprintf(` ORDER BY %s %s`, sortCol, order)
 	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
-	args = append(args, pg.Limit+1)
+	args = append(args, params.Limit+1)
 
 	rows, err := h.pool.Query(r.Context(), query, args...)
 	if err != nil {
@@ -76,9 +112,9 @@ func (h *Audit) List(w http.ResponseWriter, r *http.Request) {
 		logs = append(logs, l)
 	}
 
-	hasMore := len(logs) > pg.Limit
+	hasMore := len(logs) > params.Limit
 	if hasMore {
-		logs = logs[:pg.Limit]
+		logs = logs[:params.Limit]
 	}
 	var nextCursor string
 	if hasMore && len(logs) > 0 {

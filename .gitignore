@@ -29,6 +29,10 @@ Thumbs.db
 # Certificates
 certs/
 
+# Admin UI
+web/admin/node_modules/
+web/admin/dist/
+
 # Test/build artifacts
 coverage.out
 *.prof

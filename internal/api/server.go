@@ -71,6 +71,10 @@ func (s *Server) setupRoutes() {
 		}
 		r.Use(s.auditLogger.Middleware)
 
+		// Dashboard
+		dashboard := handler.NewDashboard(s.services.Dashboard)
+		r.Get("/dashboard/stats", dashboard.Stats)
+
 		// Audit logs
 		audit := handler.NewAudit(s.corePool)
 		r.Get("/audit-logs", audit.List)

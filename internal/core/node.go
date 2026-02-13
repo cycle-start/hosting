@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/edvin/hosting/internal/api/request"
 	"github.com/edvin/hosting/internal/model"
 )
 
@@ -41,20 +42,43 @@ func (s *NodeService) GetByID(ctx context.Context, id string) (*model.Node, erro
 	return &n, nil
 }
 
-func (s *NodeService) ListByCluster(ctx context.Context, clusterID string, limit int, cursor string) ([]model.Node, bool, error) {
-	query := `SELECT id, cluster_id, shard_id, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at FROM nodes WHERE cluster_id = $1`
+func (s *NodeService) ListByCluster(ctx context.Context, clusterID string, params request.ListParams) ([]model.Node, bool, error) {
+	query := `SELECT id, cluster_id, shard_id, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at FROM nodes WHERE cluster_id = $1 AND status != 'deleted'`
 	args := []any{clusterID}
 	argIdx := 2
 
-	if cursor != "" {
+	if params.Search != "" {
+		query += fmt.Sprintf(` AND hostname ILIKE $%d`, argIdx)
+		args = append(args, "%"+params.Search+"%")
+		argIdx++
+	}
+	if params.Status != "" {
+		query += fmt.Sprintf(` AND status = $%d`, argIdx)
+		args = append(args, params.Status)
+		argIdx++
+	}
+	if params.Cursor != "" {
 		query += fmt.Sprintf(` AND id > $%d`, argIdx)
-		args = append(args, cursor)
+		args = append(args, params.Cursor)
 		argIdx++
 	}
 
-	query += ` ORDER BY id`
+	sortCol := "created_at"
+	switch params.Sort {
+	case "hostname":
+		sortCol = "hostname"
+	case "status":
+		sortCol = "status"
+	case "created_at":
+		sortCol = "created_at"
+	}
+	order := "DESC"
+	if params.Order == "asc" {
+		order = "ASC"
+	}
+	query += fmt.Sprintf(` ORDER BY %s %s`, sortCol, order)
 	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
-	args = append(args, limit+1)
+	args = append(args, params.Limit+1)
 
 	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
@@ -75,9 +99,9 @@ func (s *NodeService) ListByCluster(ctx context.Context, clusterID string, limit
 		return nil, false, fmt.Errorf("iterate nodes: %w", err)
 	}
 
-	hasMore := len(nodes) > limit
+	hasMore := len(nodes) > params.Limit
 	if hasMore {
-		nodes = nodes[:limit]
+		nodes = nodes[:params.Limit]
 	}
 	return nodes, hasMore, nil
 }

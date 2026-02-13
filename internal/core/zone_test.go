@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/edvin/hosting/internal/api/request"
 	"github.com/edvin/hosting/internal/model"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
@@ -172,7 +173,7 @@ func TestZoneService_List_Success(t *testing.T) {
 	)
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
 
-	result, hasMore, err := svc.List(ctx, 50, "")
+	result, hasMore, err := svc.List(ctx, request.ListParams{Limit: 50})
 	require.NoError(t, err)
 	assert.False(t, hasMore)
 	require.Len(t, result, 1)
@@ -188,7 +189,7 @@ func TestZoneService_List_QueryError(t *testing.T) {
 
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("connection lost"))
 
-	result, _, err := svc.List(ctx, 50, "")
+	result, _, err := svc.List(ctx, request.ListParams{Limit: 50})
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "list zones")

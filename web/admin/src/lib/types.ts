@@ -1,0 +1,307 @@
+export interface Region {
+  id: string
+  name: string
+  config: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Cluster {
+  id: string
+  region_id: string
+  name: string
+  config: Record<string, unknown> | null
+  status: string
+  spec: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ClusterLBAddress {
+  id: string
+  cluster_id: string
+  address: string
+  family: number
+  label: string
+  created_at: string
+}
+
+export interface Shard {
+  id: string
+  cluster_id: string
+  name: string
+  role: string
+  lb_backend: string
+  config: Record<string, unknown> | null
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Node {
+  id: string
+  cluster_id: string
+  shard_id?: string | null
+  hostname: string
+  ip_address?: string | null
+  ip6_address?: string | null
+  roles: string[]
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Tenant {
+  id: string
+  name: string
+  region_id: string
+  cluster_id: string
+  shard_id?: string | null
+  uid: number
+  sftp_enabled: boolean
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Webroot {
+  id: string
+  tenant_id: string
+  name: string
+  runtime: string
+  runtime_version: string
+  runtime_config: Record<string, unknown> | null
+  public_folder: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface FQDN {
+  id: string
+  fqdn: string
+  webroot_id: string
+  ssl_enabled: boolean
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Certificate {
+  id: string
+  fqdn_id: string
+  type: string
+  cert_pem?: string
+  key_pem?: string
+  chain_pem?: string
+  issued_at?: string | null
+  expires_at?: string | null
+  status: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface Zone {
+  id: string
+  tenant_id?: string | null
+  name: string
+  region_id: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ZoneRecord {
+  id: string
+  zone_id: string
+  type: string
+  name: string
+  content: string
+  ttl: number
+  priority?: number | null
+  managed_by: string
+  source_fqdn_id?: string | null
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Database {
+  id: string
+  tenant_id?: string | null
+  name: string
+  shard_id?: string | null
+  node_id?: string | null
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface DatabaseUser {
+  id: string
+  database_id: string
+  username: string
+  password?: string
+  privileges: string[]
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ValkeyInstance {
+  id: string
+  tenant_id?: string | null
+  name: string
+  shard_id?: string | null
+  port: number
+  max_memory_mb: number
+  password?: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ValkeyUser {
+  id: string
+  valkey_instance_id: string
+  username: string
+  password?: string
+  privileges: string[]
+  key_pattern: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface EmailAccount {
+  id: string
+  fqdn_id: string
+  address: string
+  display_name: string
+  quota_bytes: number
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface EmailAlias {
+  id: string
+  email_account_id: string
+  address: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface EmailForward {
+  id: string
+  email_account_id: string
+  destination: string
+  keep_copy: boolean
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface EmailAutoReply {
+  id: string
+  email_account_id: string
+  subject: string
+  body: string
+  start_date?: string | null
+  end_date?: string | null
+  enabled: boolean
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface SFTPKey {
+  id: string
+  tenant_id: string
+  name: string
+  public_key?: string
+  fingerprint: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Backup {
+  id: string
+  tenant_id: string
+  type: string
+  source_id: string
+  source_name: string
+  storage_path?: string
+  size_bytes: number
+  status: string
+  started_at?: string | null
+  completed_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface APIKey {
+  id: string
+  name: string
+  key_prefix?: string
+  scopes: string[]
+  created_at: string
+  revoked_at?: string | null
+}
+
+export interface APIKeyCreateResponse extends APIKey {
+  key: string
+}
+
+export interface AuditLogEntry {
+  id: string
+  api_key_id: string
+  method: string
+  path: string
+  resource_type: string
+  resource_id: string
+  status_code: number
+  request_body: string
+  created_at: string
+}
+
+export interface DashboardStats {
+  regions: number
+  clusters: number
+  shards: number
+  nodes: number
+  tenants: number
+  tenants_active: number
+  tenants_suspended: number
+  databases: number
+  zones: number
+  valkey_instances: number
+  fqdns: number
+  tenants_per_shard: { shard_id: string; shard_name: string; role: string; count: number }[]
+  nodes_per_cluster: { cluster_id: string; cluster_name: string; count: number }[]
+  tenants_by_status: { status: string; count: number }[]
+}
+
+export interface PlatformConfig {
+  key: string
+  value: string
+}
+
+export interface ListParams {
+  limit?: number
+  cursor?: string
+  search?: string
+  status?: string
+  sort?: string
+  order?: 'asc' | 'desc'
+}
+
+export interface AuditListParams extends ListParams {
+  resource_type?: string
+  action?: string
+  date_from?: string
+  date_to?: string
+}

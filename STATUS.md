@@ -86,6 +86,15 @@ Runs on each VM node, connecting to Temporal via a node-specific task queue:
 - Consistent hashing on Host header within shard backends
 - HAProxy runs in Docker Compose, Runtime API exposed on port 9999
 
+### Admin UI
+
+- Go reverse-proxy binary (`cmd/admin-ui`) serves the built React SPA and proxies `/api/` requests to core-api
+- Configurable via environment variables: `LISTEN_ADDR`, `CORE_API_URL`, `STATIC_DIR`
+- SPA fallback to `index.html` for client-side routing, aggressive caching for `/assets/`
+- Multi-stage Dockerfile (`docker/admin-ui.Dockerfile`): Node build for SPA, Go build for binary, minimal final image
+- Docker Compose service on port 3001, depends on core-api
+- Dev workflow: `just dev-admin` runs Vite dev server with proxy; `just build-admin` produces production build
+
 ### CLI Tooling (`hostctl`)
 
 - `hostctl cluster apply -f <yaml>`: bootstraps full cluster from declarative YAML (region, cluster, LB addresses, shards, nodes, converge)
