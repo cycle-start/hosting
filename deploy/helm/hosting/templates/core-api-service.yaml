@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hosting.fullname" . }}-core-api
+  labels:
+    {{- include "hosting.labels" . | nindent 4 }}
+    app.kubernetes.io/component: core-api
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.coreApi.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "hosting.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: core-api

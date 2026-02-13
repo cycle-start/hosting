@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hosting.fullname" . }}-admin-ui
+  labels:
+    {{- include "hosting.labels" . | nindent 4 }}
+    app.kubernetes.io/component: admin-ui
+spec:
+  replicas: {{ .Values.adminUi.replicas }}
+  selector:
+    matchLabels:
+      {{- include "hosting.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: admin-ui
+  template:
+    metadata:
+      labels:
+        {{- include "hosting.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: admin-ui
+    spec:
+      containers:
+        - name: admin-ui
+          image: "{{ .Values.image.adminUi.repository }}:{{ .Values.image.adminUi.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.adminUi.port }}
+              protocol: TCP
+          env:
+            - name: CORE_API_URL
+              value: "http://{{ include "hosting.fullname" . }}-core-api:{{ .Values.coreApi.port }}"
+            - name: STATIC_DIR
+              value: /app/dist
+            - name: LISTEN_ADDR
+              value: ":{{ .Values.adminUi.port }}"
+            {{- with .Values.adminUi.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          {{- with .Values.adminUi.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

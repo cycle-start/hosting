@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hosting.fullname" . }}-worker
+  labels:
+    {{- include "hosting.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      {{- include "hosting.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "hosting.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      containers:
+        - name: worker
+          image: "{{ .Values.image.worker.repository }}:{{ .Values.image.worker.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "hosting.fullname" . }}
+            - secretRef:
+                name: {{ include "hosting.secretName" . }}
+          {{- if or .Values.temporal.tls.enabled .Values.worker.extraEnv }}
+          env:
+            {{- if .Values.temporal.tls.enabled }}
+            - name: TEMPORAL_TLS_CERT
+              value: /tls/temporal/tls.crt
+            - name: TEMPORAL_TLS_KEY
+              value: /tls/temporal/tls.key
+            - name: TEMPORAL_TLS_CA_CERT
+              value: /tls/temporal/ca.crt
+            {{- end }}
+            {{- with .Values.worker.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.temporal.tls.enabled }}
+          volumeMounts:
+            - name: temporal-tls
+              mountPath: /tls/temporal
+              readOnly: true
+          {{- end }}
+          {{- with .Values.worker.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- if .Values.temporal.tls.enabled }}
+      volumes:
+        - name: temporal-tls
+          secret:
+            secretName: {{ .Values.temporal.tls.existingSecret }}
+      {{- end }}

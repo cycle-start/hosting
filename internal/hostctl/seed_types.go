@@ -5,17 +5,30 @@ type SeedConfig struct {
 	APIKey  string      `yaml:"api_key"`
 	Region  string      `yaml:"region"`
 	Cluster string      `yaml:"cluster"`
+	Brands  []BrandDef  `yaml:"brands"`
 	Zones   []ZoneDef   `yaml:"zones"`
 	Tenants []TenantDef `yaml:"tenants"`
 }
 
+type BrandDef struct {
+	ID              string   `yaml:"id"`
+	Name            string   `yaml:"name"`
+	BaseHostname    string   `yaml:"base_hostname"`
+	PrimaryNS       string   `yaml:"primary_ns"`
+	SecondaryNS     string   `yaml:"secondary_ns"`
+	HostmasterEmail string   `yaml:"hostmaster_email"`
+	AllowedClusters []string `yaml:"allowed_clusters"`
+}
+
 type ZoneDef struct {
 	Name   string `yaml:"name"`
+	Brand  string `yaml:"brand"`
 	Tenant string `yaml:"tenant"`
 }
 
 type TenantDef struct {
 	Name             string              `yaml:"name"`
+	Brand            string              `yaml:"brand"`
 	Shard            string              `yaml:"shard"`
 	SFTPEnabled      bool                `yaml:"sftp_enabled"`
 	Webroots         []WebrootDef        `yaml:"webroots"`

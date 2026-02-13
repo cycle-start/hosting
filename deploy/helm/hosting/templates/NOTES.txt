@@ -1,0 +1,24 @@
+Hosting platform control plane has been deployed.
+
+Components:
+  - core-api: REST API server
+  - worker: Temporal workflow worker
+  - admin-ui: Admin dashboard
+
+{{- if .Values.ingress.enabled }}
+
+Access the platform via your ingress:
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else }}
+
+To access core-api, run:
+  kubectl port-forward svc/{{ include "hosting.fullname" . }}-core-api {{ .Values.coreApi.port }}:{{ .Values.coreApi.port }}
+
+To access admin-ui, run:
+  kubectl port-forward svc/{{ include "hosting.fullname" . }}-admin-ui {{ .Values.adminUi.port }}:{{ .Values.adminUi.port }}
+{{- end }}
+
+To create an initial API key:
+  kubectl exec -it deploy/{{ include "hosting.fullname" . }}-core-api -- /bin/core-api create-api-key --name admin

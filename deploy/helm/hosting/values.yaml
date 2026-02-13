@@ -1,0 +1,89 @@
+image:
+  coreApi:
+    repository: hosting-core-api
+    tag: latest
+  worker:
+    repository: hosting-worker
+    tag: latest
+  adminUi:
+    repository: hosting-admin-ui
+    tag: latest
+  pullPolicy: IfNotPresent
+
+coreApi:
+  replicas: 1
+  port: 8090
+  migrate: true
+  migrateDir: /migrations/core
+  resources: {}
+  extraEnv: []
+
+worker:
+  replicas: 1
+  resources: {}
+  extraEnv: []
+
+adminUi:
+  replicas: 1
+  port: 3001
+  resources: {}
+  extraEnv: []
+
+# Shared application config (non-secret, goes into ConfigMap)
+config:
+  logLevel: info
+  registryUrl: ""
+  acmeEmail: ""
+  acmeDirectoryUrl: "https://acme-v02.api.letsencrypt.org/directory"
+  auditLogRetentionDays: "90"
+  backupRetentionDays: "30"
+
+# Secrets — either inline or reference an existing K8s Secret
+secrets:
+  # If set, use this existing secret instead of creating one
+  existingSecret: ""
+  # Only used if existingSecret is empty:
+  coreDatabaseUrl: ""
+  powerdnsDatabaseUrl: ""
+  stalwartAdminToken: ""
+
+# Temporal connection
+temporal:
+  address: "temporal:7233"
+  tls:
+    enabled: false
+    # Secret containing tls.crt, tls.key, ca.crt
+    existingSecret: ""
+  # Set to true to deploy Temporal via sub-chart (evaluation only).
+  server:
+    enabled: false
+
+# ---------------------------------------------------------------
+# Optional bundled PostgreSQL (evaluation only — not for production).
+# In production, use a managed PostgreSQL service and set
+# secrets.coreDatabaseUrl / secrets.powerdnsDatabaseUrl directly.
+# ---------------------------------------------------------------
+postgresql:
+  enabled: false
+  # auth:
+  #   username: hosting
+  #   password: hosting
+  #   database: hosting_core
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  #  - host: hosting.example.com
+  #    paths:
+  #      - path: /api/
+  #        service: core-api
+  #      - path: /docs
+  #        service: core-api
+  #      - path: /
+  #        service: admin-ui
+  tls: []
+  #  - secretName: hosting-tls
+  #    hosts:
+  #      - hosting.example.com

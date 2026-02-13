@@ -2,14 +2,26 @@ api_url: http://localhost:8090/api/v1
 api_key: hst_dev_e2e_test_key_00000000
 
 region: dev
-cluster: dev-cluster-1
+cluster: vm-cluster-1
+
+brands:
+  - id: acme-brand
+    name: "Acme Hosting"
+    base_hostname: "hosting.localhost"
+    primary_ns: "ns1.hosting.localhost"
+    secondary_ns: "ns2.hosting.localhost"
+    hostmaster_email: "hostmaster@hosting.localhost"
+    allowed_clusters:
+      - vm-cluster-1
 
 zones:
   - name: example.com
+    brand: acme-brand
     tenant: acme-corp
 
 tenants:
   - name: acme-corp
+    brand: acme-brand
     shard: web-1
     sftp_enabled: true
     webroots:

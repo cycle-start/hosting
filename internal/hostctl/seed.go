@@ -35,17 +35,63 @@ func Seed(configPath string, timeout time.Duration) error {
 	fmt.Printf("Cluster %q: %s\n", cfg.Cluster, clusterID)
 
 	// In-memory maps for tracking created resources
-	fqdnMap := map[string]string{}  // fqdn string -> ID
-	zoneMap := map[string]string{}  // zone name -> ID
+	fqdnMap := map[string]string{}   // fqdn string -> ID
+	zoneMap := map[string]string{}   // zone name -> ID
 	tenantMap := map[string]string{} // tenant name -> ID
 
-	// 1. Create zones (without tenant link first)
+	// 1. Create brands and set allowed clusters
+	for _, b := range cfg.Brands {
+		// Check if brand already exists.
+		_, err := client.Get(fmt.Sprintf("/brands/%s", b.ID))
+		if err == nil {
+			fmt.Printf("Brand %q: exists (skipping)\n", b.ID)
+		} else {
+			fmt.Printf("Creating brand %q...\n", b.ID)
+			_, err = client.Post("/brands", map[string]any{
+				"id":               b.ID,
+				"name":             b.Name,
+				"base_hostname":    b.BaseHostname,
+				"primary_ns":       b.PrimaryNS,
+				"secondary_ns":     b.SecondaryNS,
+				"hostmaster_email": b.HostmasterEmail,
+			})
+			if err != nil {
+				return fmt.Errorf("create brand %q: %w", b.ID, err)
+			}
+			fmt.Printf("  Brand %q: created\n", b.ID)
+		}
+
+		// Set allowed clusters (resolve names to IDs).
+		if len(b.AllowedClusters) > 0 {
+			var clusterIDs []string
+			for _, cName := range b.AllowedClusters {
+				cID, err := client.FindClusterByName(regionID, cName)
+				if err != nil {
+					return fmt.Errorf("resolve cluster %q for brand %q: %w", cName, b.ID, err)
+				}
+				clusterIDs = append(clusterIDs, cID)
+			}
+			_, err := client.Put(fmt.Sprintf("/brands/%s/clusters", b.ID), map[string]any{
+				"cluster_ids": clusterIDs,
+			})
+			if err != nil {
+				return fmt.Errorf("set brand %q clusters: %w", b.ID, err)
+			}
+			fmt.Printf("  Brand %q: allowed clusters set (%v)\n", b.ID, b.AllowedClusters)
+		}
+	}
+
+	// 2. Create zones (without tenant link first)
 	for _, z := range cfg.Zones {
 		fmt.Printf("Creating zone %q...\n", z.Name)
-		resp, err := client.Post("/zones", map[string]any{
+		zoneBody := map[string]any{
 			"name":      z.Name,
 			"region_id": regionID,
-		})
+		}
+		if z.Brand != "" {
+			zoneBody["brand_id"] = z.Brand
+		}
+		resp, err := client.Post("/zones", zoneBody)
 		if err != nil {
 			return fmt.Errorf("create zone %q: %w", z.Name, err)
 		}
@@ -63,7 +109,7 @@ func Seed(configPath string, timeout time.Duration) error {
 		fmt.Printf("  Zone %q: active\n", z.Name)
 	}
 
-	// 2. Create tenants and their resources
+	// 3. Create tenants and their resources
 	for _, t := range cfg.Tenants {
 		shardID, err := client.FindShardByName(clusterID, t.Shard)
 		if err != nil {
@@ -71,13 +117,16 @@ func Seed(configPath string, timeout time.Duration) error {
 		}
 
 		fmt.Printf("Creating tenant %q...\n", t.Name)
-		resp, err := client.Post("/tenants", map[string]any{
-			"name":         t.Name,
+		tenantBody := map[string]any{
 			"region_id":    regionID,
 			"cluster_id":   clusterID,
 			"shard_id":     shardID,
 			"sftp_enabled": t.SFTPEnabled,
-		})
+		}
+		if t.Brand != "" {
+			tenantBody["brand_id"] = t.Brand
+		}
+		resp, err := client.Post("/tenants", tenantBody)
 		if err != nil {
 			return fmt.Errorf("create tenant %q: %w", t.Name, err)
 		}
