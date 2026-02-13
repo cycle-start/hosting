@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -13,11 +14,12 @@ import (
 )
 
 type EmailAccount struct {
-	svc *core.EmailAccountService
+	svc      *core.EmailAccountService
+	services *core.Services
 }
 
-func NewEmailAccount(svc *core.EmailAccountService) *EmailAccount {
-	return &EmailAccount{svc: svc}
+func NewEmailAccount(services *core.Services) *EmailAccount {
+	return &EmailAccount{svc: services.EmailAccount, services: services}
 }
 
 // ListByFQDN godoc
@@ -93,6 +95,66 @@ func (h *EmailAccount) Create(w http.ResponseWriter, r *http.Request) {
 	if err := h.svc.Create(r.Context(), account); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	// Nested alias creation
+	for _, al := range req.Aliases {
+		now2 := time.Now()
+		alias := &model.EmailAlias{
+			ID:             platform.NewID(),
+			EmailAccountID: account.ID,
+			Address:        al.Address,
+			Status:         model.StatusPending,
+			CreatedAt:      now2,
+			UpdatedAt:      now2,
+		}
+		if err := h.services.EmailAlias.Create(r.Context(), alias); err != nil {
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create email alias %s: %s", al.Address, err.Error()))
+			return
+		}
+	}
+
+	// Nested forward creation
+	for _, fw := range req.Forwards {
+		keepCopy := true
+		if fw.KeepCopy != nil {
+			keepCopy = *fw.KeepCopy
+		}
+		now2 := time.Now()
+		fwd := &model.EmailForward{
+			ID:             platform.NewID(),
+			EmailAccountID: account.ID,
+			Destination:    fw.Destination,
+			KeepCopy:       keepCopy,
+			Status:         model.StatusPending,
+			CreatedAt:      now2,
+			UpdatedAt:      now2,
+		}
+		if err := h.services.EmailForward.Create(r.Context(), fwd); err != nil {
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create email forward %s: %s", fw.Destination, err.Error()))
+			return
+		}
+	}
+
+	// Nested auto-reply creation
+	if req.AutoReply != nil {
+		now2 := time.Now()
+		autoReply := &model.EmailAutoReply{
+			ID:             platform.NewID(),
+			EmailAccountID: account.ID,
+			Subject:        req.AutoReply.Subject,
+			Body:           req.AutoReply.Body,
+			StartDate:      req.AutoReply.StartDate,
+			EndDate:        req.AutoReply.EndDate,
+			Enabled:        req.AutoReply.Enabled,
+			Status:         model.StatusPending,
+			CreatedAt:      now2,
+			UpdatedAt:      now2,
+		}
+		if err := h.services.EmailAutoReply.Upsert(r.Context(), autoReply); err != nil {
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create email autoreply for %s: %s", req.Address, err.Error()))
+			return
+		}
 	}
 
 	response.WriteJSON(w, http.StatusAccepted, account)

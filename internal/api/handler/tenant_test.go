@@ -11,7 +11,7 @@ import (
 )
 
 func newTenantHandler() *Tenant {
-	return NewTenant(nil)
+	return &Tenant{svc: nil, services: nil}
 }
 
 // --- Create ---
@@ -376,6 +376,412 @@ func TestTenantCreate_ExtraFieldsIgnored(t *testing.T) {
 		"shard_id":    "test-shard-1",
 		"extra_field": "should be ignored",
 	})
+
+	func() {
+		defer func() { recover() }()
+		h.Create(rec, r)
+	}()
+
+	assert.NotEqual(t, http.StatusBadRequest, rec.Code)
+}
+
+// --- Nested resource validation ---
+
+func validTenantBody() map[string]any {
+	return map[string]any{
+		"name":       "my-tenant",
+		"region_id":  "test-region-1",
+		"cluster_id": "test-cluster-1",
+		"shard_id":   "test-shard-1",
+	}
+}
+
+func TestTenantCreate_WithNestedZones_ValidationPasses(t *testing.T) {
+	h := newTenantHandler()
+	rec := httptest.NewRecorder()
+	body := validTenantBody()
+	body["zones"] = []map[string]any{
+		{"name": "example.com"},
+		{"name": "example.org"},
+	}
+	r := newRequest(http.MethodPost, "/tenants", body)
+
+	func() {
+		defer func() { recover() }()
+		h.Create(rec, r)
+	}()
+
+	assert.NotEqual(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestTenantCreate_WithNestedWebroots_ValidationPasses(t *testing.T) {
+	h := newTenantHandler()
+	rec := httptest.NewRecorder()
+	body := validTenantBody()
+	body["webroots"] = []map[string]any{
+		{
+			"name":            "my-site",
+			"runtime":         "php",
+			"runtime_version": "8.5",
+			"fqdns": []map[string]any{
+				{"fqdn": "example.com"},
+			},
+		},
+	}
+	r := newRequest(http.MethodPost, "/tenants", body)
+
+	func() {
+		defer func() { recover() }()
+		h.Create(rec, r)
+	}()
+
+	assert.NotEqual(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestTenantCreate_WithNestedDatabases_ValidationPasses(t *testing.T) {
+	h := newTenantHandler()
+	rec := httptest.NewRecorder()
+	body := validTenantBody()
+	body["databases"] = []map[string]any{
+		{
+			"name":     "mydb",
+			"shard_id": "test-db-shard",
+			"users": []map[string]any{
+				{
+					"username":   "admin",
+					"password":   "securepassword123",
+					"privileges": []string{"ALL"},
+				},
+			},
+		},
+	}
+	r := newRequest(http.MethodPost, "/tenants", body)
+
+	func() {
+		defer func() { recover() }()
+		h.Create(rec, r)
+	}()
+
+	assert.NotEqual(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestTenantCreate_WithNestedValkeyInstances_ValidationPasses(t *testing.T) {
+	h := newTenantHandler()
+	rec := httptest.NewRecorder()
+	body := validTenantBody()
+	body["valkey_instances"] = []map[string]any{
+		{
+			"name":     "my-cache",
+			"shard_id": "test-valkey-shard",
+			"users": []map[string]any{
+				{
+					"username":   "cacheuser",
+					"password":   "securepassword123",
+					"privileges": []string{"allcommands"},
+				},
+			},
+		},
+	}
+	r := newRequest(http.MethodPost, "/tenants", body)
+
+	func() {
+		defer func() { recover() }()
+		h.Create(rec, r)
+	}()
+
+	assert.NotEqual(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestTenantCreate_WithNestedSFTPKeys_ValidationPasses(t *testing.T) {
+	h := newTenantHandler()
+	rec := httptest.NewRecorder()
+	body := validTenantBody()
+	body["sftp_keys"] = []map[string]any{
+		{
+			"name":       "my-key",
+			"public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGKCwmDZb5JjFMYnbPPM6MvxMCEjMltcGacM4AiSuKiP test@localhost",
+		},
+	}
+	r := newRequest(http.MethodPost, "/tenants", body)
+
+	func() {
+		defer func() { recover() }()
+		h.Create(rec, r)
+	}()
+
+	assert.NotEqual(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestTenantCreate_WithEmptyNestedArrays_ValidationPasses(t *testing.T) {
+	h := newTenantHandler()
+	rec := httptest.NewRecorder()
+	body := validTenantBody()
+	body["zones"] = []map[string]any{}
+	body["webroots"] = []map[string]any{}
+	body["databases"] = []map[string]any{}
+	body["valkey_instances"] = []map[string]any{}
+	body["sftp_keys"] = []map[string]any{}
+	r := newRequest(http.MethodPost, "/tenants", body)
+
+	func() {
+		defer func() { recover() }()
+		h.Create(rec, r)
+	}()
+
+	assert.NotEqual(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestTenantCreate_WithInvalidNestedZone_ValidationFails(t *testing.T) {
+	h := newTenantHandler()
+	rec := httptest.NewRecorder()
+	body := validTenantBody()
+	body["zones"] = []map[string]any{
+		{}, // missing name
+	}
+	r := newRequest(http.MethodPost, "/tenants", body)
+
+	h.Create(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	errBody := decodeErrorResponse(rec)
+	assert.Contains(t, errBody["error"], "validation error")
+}
+
+func TestTenantCreate_WithInvalidNestedWebroot_ValidationFails(t *testing.T) {
+	h := newTenantHandler()
+	rec := httptest.NewRecorder()
+	body := validTenantBody()
+	body["webroots"] = []map[string]any{
+		{
+			"name":            "my-site",
+			"runtime_version": "8.5",
+			// missing runtime
+		},
+	}
+	r := newRequest(http.MethodPost, "/tenants", body)
+
+	h.Create(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	errBody := decodeErrorResponse(rec)
+	assert.Contains(t, errBody["error"], "validation error")
+}
+
+func TestTenantCreate_WithInvalidNestedDatabase_ValidationFails(t *testing.T) {
+	h := newTenantHandler()
+	rec := httptest.NewRecorder()
+	body := validTenantBody()
+	body["databases"] = []map[string]any{
+		{
+			"name": "mydb",
+			// missing shard_id
+		},
+	}
+	r := newRequest(http.MethodPost, "/tenants", body)
+
+	h.Create(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	errBody := decodeErrorResponse(rec)
+	assert.Contains(t, errBody["error"], "validation error")
+}
+
+func TestTenantCreate_WithInvalidNestedDatabaseUser_ValidationFails(t *testing.T) {
+	h := newTenantHandler()
+	rec := httptest.NewRecorder()
+	body := validTenantBody()
+	body["databases"] = []map[string]any{
+		{
+			"name":     "mydb",
+			"shard_id": "test-shard",
+			"users": []map[string]any{
+				{
+					"username":   "admin",
+					"password":   "short", // too short, min=8
+					"privileges": []string{"ALL"},
+				},
+			},
+		},
+	}
+	r := newRequest(http.MethodPost, "/tenants", body)
+
+	h.Create(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	errBody := decodeErrorResponse(rec)
+	assert.Contains(t, errBody["error"], "validation error")
+}
+
+func TestTenantCreate_WithInvalidNestedValkeyUser_ValidationFails(t *testing.T) {
+	h := newTenantHandler()
+	rec := httptest.NewRecorder()
+	body := validTenantBody()
+	body["valkey_instances"] = []map[string]any{
+		{
+			"name":     "my-cache",
+			"shard_id": "test-shard",
+			"users": []map[string]any{
+				{
+					"username": "cacheuser",
+					"password": "securepassword123",
+					// missing privileges
+				},
+			},
+		},
+	}
+	r := newRequest(http.MethodPost, "/tenants", body)
+
+	h.Create(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	errBody := decodeErrorResponse(rec)
+	assert.Contains(t, errBody["error"], "validation error")
+}
+
+func TestTenantCreate_WithInvalidNestedSFTPKey_ValidationFails(t *testing.T) {
+	h := newTenantHandler()
+	rec := httptest.NewRecorder()
+	body := validTenantBody()
+	body["sftp_keys"] = []map[string]any{
+		{
+			"name": "my-key",
+			// missing public_key
+		},
+	}
+	r := newRequest(http.MethodPost, "/tenants", body)
+
+	h.Create(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	errBody := decodeErrorResponse(rec)
+	assert.Contains(t, errBody["error"], "validation error")
+}
+
+func TestTenantCreate_WithInvalidNestedFQDN_ValidationFails(t *testing.T) {
+	h := newTenantHandler()
+	rec := httptest.NewRecorder()
+	body := validTenantBody()
+	body["webroots"] = []map[string]any{
+		{
+			"name":            "my-site",
+			"runtime":         "php",
+			"runtime_version": "8.5",
+			"fqdns": []map[string]any{
+				{}, // missing fqdn
+			},
+		},
+	}
+	r := newRequest(http.MethodPost, "/tenants", body)
+
+	h.Create(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	errBody := decodeErrorResponse(rec)
+	assert.Contains(t, errBody["error"], "validation error")
+}
+
+func TestTenantCreate_WithInvalidNestedEmailAccount_ValidationFails(t *testing.T) {
+	h := newTenantHandler()
+	rec := httptest.NewRecorder()
+	body := validTenantBody()
+	body["webroots"] = []map[string]any{
+		{
+			"name":            "my-site",
+			"runtime":         "php",
+			"runtime_version": "8.5",
+			"fqdns": []map[string]any{
+				{
+					"fqdn": "example.com",
+					"email_accounts": []map[string]any{
+						{"address": "not-an-email"}, // invalid email
+					},
+				},
+			},
+		},
+	}
+	r := newRequest(http.MethodPost, "/tenants", body)
+
+	h.Create(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	errBody := decodeErrorResponse(rec)
+	assert.Contains(t, errBody["error"], "validation error")
+}
+
+func TestTenantCreate_FullNested_ValidationPasses(t *testing.T) {
+	h := newTenantHandler()
+	rec := httptest.NewRecorder()
+	body := validTenantBody()
+	body["zones"] = []map[string]any{
+		{"name": "example.com"},
+	}
+	body["webroots"] = []map[string]any{
+		{
+			"name":            "my-site",
+			"runtime":         "php",
+			"runtime_version": "8.5",
+			"public_folder":   "public",
+			"fqdns": []map[string]any{
+				{
+					"fqdn":        "example.com",
+					"ssl_enabled": true,
+					"email_accounts": []map[string]any{
+						{
+							"address":      "admin@example.com",
+							"display_name": "Admin",
+							"quota_bytes":  1073741824,
+							"aliases": []map[string]any{
+								{"address": "postmaster@example.com"},
+							},
+							"forwards": []map[string]any{
+								{"destination": "backup@other.com", "keep_copy": true},
+							},
+							"autoreply": map[string]any{
+								"subject": "Out of office",
+								"body":    "I am away",
+								"enabled": true,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	body["databases"] = []map[string]any{
+		{
+			"name":     "mydb",
+			"shard_id": "test-db-shard",
+			"users": []map[string]any{
+				{
+					"username":   "admin",
+					"password":   "securepassword123",
+					"privileges": []string{"ALL"},
+				},
+			},
+		},
+	}
+	body["valkey_instances"] = []map[string]any{
+		{
+			"name":          "my-cache",
+			"shard_id":      "test-valkey-shard",
+			"max_memory_mb": 128,
+			"users": []map[string]any{
+				{
+					"username":    "cacheuser",
+					"password":    "securepassword123",
+					"privileges":  []string{"allcommands"},
+					"key_pattern": "~app:*",
+				},
+			},
+		},
+	}
+	body["sftp_keys"] = []map[string]any{
+		{
+			"name":       "deploy-key",
+			"public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGKCwmDZb5JjFMYnbPPM6MvxMCEjMltcGacM4AiSuKiP test@localhost",
+		},
+	}
+	r := newRequest(http.MethodPost, "/tenants", body)
 
 	func() {
 		defer func() { recover() }()

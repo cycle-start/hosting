@@ -6,6 +6,7 @@ import { DashboardPage } from './pages/dashboard'
 import { RegionsPage } from './pages/regions'
 import { ClustersPage } from './pages/clusters'
 import { TenantsPage } from './pages/tenants'
+import { CreateTenantPage } from './pages/create-tenant'
 import { TenantDetailPage } from './pages/tenant-detail'
 import { WebrootsPage } from './pages/webroots'
 import { WebrootDetailPage } from './pages/webroot-detail'
@@ -64,6 +65,12 @@ const tenantsRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/tenants',
   component: TenantsPage,
+})
+
+const createTenantRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/tenants/new',
+  component: CreateTenantPage,
 })
 
 const tenantDetailRoute = createRoute({
@@ -157,6 +164,7 @@ const routeTree = rootRoute.addChildren([
     regionsRoute,
     clustersRoute,
     tenantsRoute,
+    createTenantRoute,
     tenantDetailRoute,
     webrootDetailRoute,
     fqdnDetailRoute,

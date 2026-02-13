@@ -327,3 +327,50 @@ export interface AuditListParams extends ListParams {
   date_from?: string
   date_to?: string
 }
+
+// --- Nested creation form data types ---
+
+export interface ZoneFormData { name: string }
+export interface WebrootFormData {
+  name: string; runtime: string; runtime_version: string
+  public_folder: string; fqdns?: FQDNFormData[]
+}
+export interface FQDNFormData {
+  fqdn: string; ssl_enabled?: boolean
+  email_accounts?: EmailAccountFormData[]
+}
+export interface EmailAccountFormData {
+  address: string; display_name?: string; quota_bytes?: number
+  aliases?: { address: string }[]
+  forwards?: { destination: string; keep_copy?: boolean }[]
+  autoreply?: { subject: string; body: string; enabled: boolean }
+}
+export interface DatabaseFormData {
+  name: string; shard_id: string
+  users?: DatabaseUserFormData[]
+}
+export interface DatabaseUserFormData {
+  username: string; password: string; privileges: string[]
+}
+export interface ValkeyInstanceFormData {
+  name: string; shard_id: string; max_memory_mb?: number
+  users?: ValkeyUserFormData[]
+}
+export interface ValkeyUserFormData {
+  username: string; password: string; privileges: string[]
+  key_pattern?: string
+}
+export interface SFTPKeyFormData { name: string; public_key: string }
+
+export interface CreateTenantRequest {
+  name: string
+  region_id: string
+  cluster_id: string
+  shard_id: string
+  sftp_enabled?: boolean
+  zones?: ZoneFormData[]
+  webroots?: WebrootFormData[]
+  databases?: DatabaseFormData[]
+  valkey_instances?: ValkeyInstanceFormData[]
+  sftp_keys?: SFTPKeyFormData[]
+}

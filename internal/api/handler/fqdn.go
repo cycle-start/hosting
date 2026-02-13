@@ -13,11 +13,12 @@ import (
 )
 
 type FQDN struct {
-	svc *core.FQDNService
+	svc      *core.FQDNService
+	services *core.Services
 }
 
-func NewFQDN(svc *core.FQDNService) *FQDN {
-	return &FQDN{svc: svc}
+func NewFQDN(services *core.Services) *FQDN {
+	return &FQDN{svc: services.FQDN, services: services}
 }
 
 // ListByWebroot godoc
@@ -92,6 +93,12 @@ func (h *FQDN) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Create(r.Context(), fqdn); err != nil {
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Nested email account creation
+	if err := createNestedEmailAccounts(r.Context(), h.services, fqdn.ID, req.EmailAccounts); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

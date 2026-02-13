@@ -6,6 +6,12 @@ type CreateTenant struct {
 	ClusterID   string `json:"cluster_id" validate:"required"`
 	ShardID     string `json:"shard_id" validate:"required"`
 	SFTPEnabled *bool  `json:"sftp_enabled"`
+	// Nested (all optional)
+	Zones           []CreateZoneNested           `json:"zones" validate:"omitempty,dive"`
+	Webroots        []CreateWebrootNested        `json:"webroots" validate:"omitempty,dive"`
+	Databases       []CreateDatabaseNested       `json:"databases" validate:"omitempty,dive"`
+	ValkeyInstances []CreateValkeyInstanceNested `json:"valkey_instances" validate:"omitempty,dive"`
+	SFTPKeys        []CreateSFTPKeyNested        `json:"sftp_keys" validate:"omitempty,dive"`
 }
 
 type UpdateTenant struct {

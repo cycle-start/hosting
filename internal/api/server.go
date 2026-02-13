@@ -142,7 +142,7 @@ func (s *Server) setupRoutes() {
 		r.Delete("/nodes/{id}", node.Delete)
 
 		// Tenants
-		tenant := handler.NewTenant(s.services.Tenant)
+		tenant := handler.NewTenant(s.services)
 		r.Get("/tenants", tenant.List)
 		r.Post("/tenants", tenant.Create)
 		r.Get("/tenants/{id}", tenant.Get)
@@ -154,7 +154,7 @@ func (s *Server) setupRoutes() {
 		r.Get("/tenants/{id}/resource-summary", tenant.ResourceSummary)
 
 		// Webroots
-		webroot := handler.NewWebroot(s.services.Webroot)
+		webroot := handler.NewWebroot(s.services)
 		r.Get("/tenants/{tenantID}/webroots", webroot.ListByTenant)
 		r.Post("/tenants/{tenantID}/webroots", webroot.Create)
 		r.Get("/webroots/{id}", webroot.Get)
@@ -162,7 +162,7 @@ func (s *Server) setupRoutes() {
 		r.Delete("/webroots/{id}", webroot.Delete)
 
 		// FQDNs
-		fqdn := handler.NewFQDN(s.services.FQDN)
+		fqdn := handler.NewFQDN(s.services)
 		r.Get("/webroots/{webrootID}/fqdns", fqdn.ListByWebroot)
 		r.Post("/webroots/{webrootID}/fqdns", fqdn.Create)
 		r.Get("/fqdns/{id}", fqdn.Get)
@@ -191,7 +191,7 @@ func (s *Server) setupRoutes() {
 		r.Delete("/zone-records/{id}", zoneRecord.Delete)
 
 		// Databases
-		database := handler.NewDatabase(s.services.Database)
+		database := handler.NewDatabase(s.services.Database, s.services.DatabaseUser)
 		r.Get("/tenants/{tenantID}/databases", database.ListByTenant)
 		r.Post("/tenants/{tenantID}/databases", database.Create)
 		r.Get("/databases/{id}", database.Get)
@@ -208,7 +208,7 @@ func (s *Server) setupRoutes() {
 		r.Delete("/database-users/{id}", dbUser.Delete)
 
 		// Valkey instances
-		valkeyInstance := handler.NewValkeyInstance(s.services.ValkeyInstance)
+		valkeyInstance := handler.NewValkeyInstance(s.services.ValkeyInstance, s.services.ValkeyUser)
 		r.Get("/tenants/{tenantID}/valkey-instances", valkeyInstance.ListByTenant)
 		r.Post("/tenants/{tenantID}/valkey-instances", valkeyInstance.Create)
 		r.Get("/valkey-instances/{id}", valkeyInstance.Get)
@@ -232,7 +232,7 @@ func (s *Server) setupRoutes() {
 		r.Delete("/sftp-keys/{id}", sftpKey.Delete)
 
 		// Email accounts
-		emailAccount := handler.NewEmailAccount(s.services.EmailAccount)
+		emailAccount := handler.NewEmailAccount(s.services)
 		r.Get("/fqdns/{fqdnID}/email-accounts", emailAccount.ListByFQDN)
 		r.Post("/fqdns/{fqdnID}/email-accounts", emailAccount.Create)
 		r.Get("/email-accounts/{id}", emailAccount.Get)

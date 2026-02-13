@@ -13,7 +13,88 @@ import (
 )
 
 func newValkeyInstanceHandler() *ValkeyInstance {
-	return NewValkeyInstance(nil)
+	return &ValkeyInstance{svc: nil, userSvc: nil}
+}
+
+// --- Create with nested ---
+
+func TestValkeyInstanceCreate_WithNestedUsers_ValidationPasses(t *testing.T) {
+	h := newValkeyInstanceHandler()
+	rec := httptest.NewRecorder()
+	tid := "test-tenant-1"
+	r := newRequest(http.MethodPost, "/tenants/"+tid+"/valkey-instances", map[string]any{
+		"name":     "my-cache",
+		"shard_id": "test-shard-1",
+		"users": []map[string]any{
+			{
+				"username":    "cacheuser",
+				"password":    "securepassword123",
+				"privileges":  []string{"allcommands"},
+				"key_pattern": "~app:*",
+			},
+			{
+				"username":   "readonly",
+				"password":   "anotherpassword1",
+				"privileges": []string{"get"},
+			},
+		},
+	})
+	r = withChiURLParam(r, "tenantID", tid)
+
+	func() {
+		defer func() { recover() }()
+		h.Create(rec, r)
+	}()
+
+	assert.NotEqual(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestValkeyInstanceCreate_WithInvalidNestedUser_ValidationFails(t *testing.T) {
+	h := newValkeyInstanceHandler()
+	rec := httptest.NewRecorder()
+	tid := "test-tenant-1"
+	r := newRequest(http.MethodPost, "/tenants/"+tid+"/valkey-instances", map[string]any{
+		"name":     "my-cache",
+		"shard_id": "test-shard-1",
+		"users": []map[string]any{
+			{
+				"username": "cacheuser",
+				"password": "securepassword123",
+				// missing privileges
+			},
+		},
+	})
+	r = withChiURLParam(r, "tenantID", tid)
+
+	h.Create(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	body := decodeErrorResponse(rec)
+	assert.Contains(t, body["error"], "validation error")
+}
+
+func TestValkeyInstanceCreate_WithNestedUserShortPassword_ValidationFails(t *testing.T) {
+	h := newValkeyInstanceHandler()
+	rec := httptest.NewRecorder()
+	tid := "test-tenant-1"
+	r := newRequest(http.MethodPost, "/tenants/"+tid+"/valkey-instances", map[string]any{
+		"name":     "my-cache",
+		"shard_id": "test-shard-1",
+		"users": []map[string]any{
+			{
+				"username":   "cacheuser",
+				"password":   "short", // too short, min=8
+				"privileges": []string{"allcommands"},
+			},
+		},
+	})
+	r = withChiURLParam(r, "tenantID", tid)
+
+	h.Create(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	body := decodeErrorResponse(rec)
+	assert.Contains(t, body["error"], "validation error")
 }
 
 // --- Migrate ---
@@ -22,7 +103,7 @@ func TestValkeyInstanceMigrate_Success(t *testing.T) {
 	db := &handlerMockDB{}
 	tc := &temporalmocks.Client{}
 	svc := core.NewValkeyInstanceService(db, tc)
-	h := NewValkeyInstance(svc)
+	h := &ValkeyInstance{svc: svc, userSvc: nil}
 
 	resolveRow := &handlerMockRow{scanFunc: func(dest ...any) error {
 		tid := "test-tenant-1"

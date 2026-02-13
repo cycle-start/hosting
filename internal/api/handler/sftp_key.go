@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"golang.org/x/crypto/ssh"
-
 	"github.com/edvin/hosting/internal/api/request"
 	"github.com/edvin/hosting/internal/api/response"
 	"github.com/edvin/hosting/internal/core"
@@ -83,12 +81,11 @@ func (h *SFTPKey) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse the public key and compute its fingerprint.
-	pubKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(req.PublicKey))
+	fingerprint, err := parseSSHKey(req.PublicKey)
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid SSH public key: "+err.Error())
 		return
 	}
-	fingerprint := ssh.FingerprintSHA256(pubKey)
 
 	now := time.Now()
 	key := &model.SFTPKey{

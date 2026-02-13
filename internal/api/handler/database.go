@@ -1,11 +1,12 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/edvin/hosting/internal/api/response"
 	"github.com/edvin/hosting/internal/api/request"
+	"github.com/edvin/hosting/internal/api/response"
 	"github.com/edvin/hosting/internal/core"
 	"github.com/edvin/hosting/internal/model"
 	"github.com/edvin/hosting/internal/platform"
@@ -13,11 +14,12 @@ import (
 )
 
 type Database struct {
-	svc *core.DatabaseService
+	svc     *core.DatabaseService
+	userSvc *core.DatabaseUserService
 }
 
-func NewDatabase(svc *core.DatabaseService) *Database {
-	return &Database{svc: svc}
+func NewDatabase(svc *core.DatabaseService, userSvc *core.DatabaseUserService) *Database {
+	return &Database{svc: svc, userSvc: userSvc}
 }
 
 // ListByTenant godoc
@@ -97,6 +99,25 @@ func (h *Database) Create(w http.ResponseWriter, r *http.Request) {
 	if err := h.svc.Create(r.Context(), database); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	// Nested user creation
+	for _, ur := range req.Users {
+		now2 := time.Now()
+		user := &model.DatabaseUser{
+			ID:         platform.NewID(),
+			DatabaseID: database.ID,
+			Username:   ur.Username,
+			Password:   ur.Password,
+			Privileges: ur.Privileges,
+			Status:     model.StatusPending,
+			CreatedAt:  now2,
+			UpdatedAt:  now2,
+		}
+		if err := h.userSvc.Create(r.Context(), user); err != nil {
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create database user %s: %s", ur.Username, err.Error()))
+			return
+		}
 	}
 
 	response.WriteJSON(w, http.StatusAccepted, database)

@@ -14,11 +14,12 @@ import (
 )
 
 type Webroot struct {
-	svc *core.WebrootService
+	svc      *core.WebrootService
+	services *core.Services
 }
 
-func NewWebroot(svc *core.WebrootService) *Webroot {
-	return &Webroot{svc: svc}
+func NewWebroot(services *core.Services) *Webroot {
+	return &Webroot{svc: services.Webroot, services: services}
 }
 
 // ListByTenant godoc
@@ -98,6 +99,12 @@ func (h *Webroot) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Create(r.Context(), webroot); err != nil {
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Nested FQDN creation
+	if err := createNestedFQDNs(r.Context(), h.services, webroot.ID, req.FQDNs); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

@@ -11,7 +11,7 @@ import (
 )
 
 func newWebrootHandler() *Webroot {
-	return NewWebroot(nil)
+	return &Webroot{svc: nil, services: nil}
 }
 
 // --- ListByTenant ---
@@ -204,6 +204,79 @@ func TestWebrootCreate_ValidBody(t *testing.T) {
 		"runtime_version": "8.3",
 		"public_folder":   "public",
 		"runtime_config":  map[string]any{"max_workers": 4},
+	})
+	r = withChiURLParam(r, "tenantID", validID)
+
+	func() {
+		defer func() { recover() }()
+		h.Create(rec, r)
+	}()
+
+	assert.NotEqual(t, http.StatusBadRequest, rec.Code)
+}
+
+// --- Nested resource validation ---
+
+func TestWebrootCreate_WithNestedFQDNs_ValidationPasses(t *testing.T) {
+	h := newWebrootHandler()
+	rec := httptest.NewRecorder()
+	r := newRequest(http.MethodPost, "/tenants/"+validID+"/webroots", map[string]any{
+		"name":            "my-webroot",
+		"runtime":         "php",
+		"runtime_version": "8.5",
+		"fqdns": []map[string]any{
+			{"fqdn": "example.com"},
+			{"fqdn": "www.example.com", "ssl_enabled": true},
+		},
+	})
+	r = withChiURLParam(r, "tenantID", validID)
+
+	func() {
+		defer func() { recover() }()
+		h.Create(rec, r)
+	}()
+
+	assert.NotEqual(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestWebrootCreate_WithInvalidNestedFQDN_ValidationFails(t *testing.T) {
+	h := newWebrootHandler()
+	rec := httptest.NewRecorder()
+	r := newRequest(http.MethodPost, "/tenants/"+validID+"/webroots", map[string]any{
+		"name":            "my-webroot",
+		"runtime":         "php",
+		"runtime_version": "8.5",
+		"fqdns": []map[string]any{
+			{}, // missing fqdn
+		},
+	})
+	r = withChiURLParam(r, "tenantID", validID)
+
+	h.Create(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	body := decodeErrorResponse(rec)
+	assert.Contains(t, body["error"], "validation error")
+}
+
+func TestWebrootCreate_WithNestedFQDNAndEmail_ValidationPasses(t *testing.T) {
+	h := newWebrootHandler()
+	rec := httptest.NewRecorder()
+	r := newRequest(http.MethodPost, "/tenants/"+validID+"/webroots", map[string]any{
+		"name":            "my-webroot",
+		"runtime":         "php",
+		"runtime_version": "8.5",
+		"fqdns": []map[string]any{
+			{
+				"fqdn": "example.com",
+				"email_accounts": []map[string]any{
+					{
+						"address":      "admin@example.com",
+						"display_name": "Admin",
+					},
+				},
+			},
+		},
 	})
 	r = withChiURLParam(r, "tenantID", validID)
 

@@ -11,7 +11,7 @@ import (
 )
 
 func newFQDNHandler() *FQDN {
-	return NewFQDN(nil)
+	return &FQDN{svc: nil, services: nil}
 }
 
 // --- ListByWebroot ---
@@ -167,6 +167,54 @@ func TestFQDNCreate_WithoutSSLEnabled(t *testing.T) {
 	}()
 
 	assert.NotEqual(t, http.StatusBadRequest, rec.Code)
+}
+
+// --- Nested resource validation ---
+
+func TestFQDNCreate_WithNestedEmailAccounts_ValidationPasses(t *testing.T) {
+	h := newFQDNHandler()
+	rec := httptest.NewRecorder()
+	wid := "test-webroot-1"
+	r := newRequest(http.MethodPost, "/webroots/"+wid+"/fqdns", map[string]any{
+		"fqdn": "example.com",
+		"email_accounts": []map[string]any{
+			{
+				"address":      "admin@example.com",
+				"display_name": "Admin",
+				"quota_bytes":  1073741824,
+			},
+			{
+				"address": "info@example.com",
+			},
+		},
+	})
+	r = withChiURLParam(r, "webrootID", wid)
+
+	func() {
+		defer func() { recover() }()
+		h.Create(rec, r)
+	}()
+
+	assert.NotEqual(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestFQDNCreate_WithInvalidNestedEmail_ValidationFails(t *testing.T) {
+	h := newFQDNHandler()
+	rec := httptest.NewRecorder()
+	wid := "test-webroot-1"
+	r := newRequest(http.MethodPost, "/webroots/"+wid+"/fqdns", map[string]any{
+		"fqdn": "example.com",
+		"email_accounts": []map[string]any{
+			{"address": "not-an-email"}, // invalid email
+		},
+	})
+	r = withChiURLParam(r, "webrootID", wid)
+
+	h.Create(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	body := decodeErrorResponse(rec)
+	assert.Contains(t, body["error"], "validation error")
 }
 
 // --- Get ---

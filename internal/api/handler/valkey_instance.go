@@ -1,8 +1,7 @@
 package handler
 
 import (
-	"crypto/rand"
-	"encoding/hex"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -15,11 +14,12 @@ import (
 )
 
 type ValkeyInstance struct {
-	svc *core.ValkeyInstanceService
+	svc     *core.ValkeyInstanceService
+	userSvc *core.ValkeyUserService
 }
 
-func NewValkeyInstance(svc *core.ValkeyInstanceService) *ValkeyInstance {
-	return &ValkeyInstance{svc: svc}
+func NewValkeyInstance(svc *core.ValkeyInstanceService, userSvc *core.ValkeyUserService) *ValkeyInstance {
+	return &ValkeyInstance{svc: svc, userSvc: userSvc}
 }
 
 // ListByTenant godoc
@@ -105,6 +105,30 @@ func (h *ValkeyInstance) Create(w http.ResponseWriter, r *http.Request) {
 	if err := h.svc.Create(r.Context(), instance); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	// Nested user creation
+	for _, ur := range req.Users {
+		keyPattern := ur.KeyPattern
+		if keyPattern == "" {
+			keyPattern = "~*"
+		}
+		now2 := time.Now()
+		user := &model.ValkeyUser{
+			ID:               platform.NewID(),
+			ValkeyInstanceID: instance.ID,
+			Username:         ur.Username,
+			Password:         ur.Password,
+			Privileges:       ur.Privileges,
+			KeyPattern:       keyPattern,
+			Status:           model.StatusPending,
+			CreatedAt:        now2,
+			UpdatedAt:        now2,
+		}
+		if err := h.userSvc.Create(r.Context(), user); err != nil {
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create valkey user %s: %s", ur.Username, err.Error()))
+			return
+		}
 	}
 
 	instance.Password = ""
@@ -234,9 +258,3 @@ func (h *ValkeyInstance) ReassignTenant(w http.ResponseWriter, r *http.Request) 
 	response.WriteJSON(w, http.StatusOK, instance)
 }
 
-// generatePassword creates a random 32-character hex password.
-func generatePassword() string {
-	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
-}

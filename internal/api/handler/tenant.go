@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/edvin/hosting/internal/api/response"
 	"github.com/edvin/hosting/internal/api/request"
+	"github.com/edvin/hosting/internal/api/response"
 	"github.com/edvin/hosting/internal/core"
 	"github.com/edvin/hosting/internal/model"
 	"github.com/edvin/hosting/internal/platform"
@@ -13,11 +15,12 @@ import (
 )
 
 type Tenant struct {
-	svc *core.TenantService
+	svc      *core.TenantService
+	services *core.Services
 }
 
-func NewTenant(svc *core.TenantService) *Tenant {
-	return &Tenant{svc: svc}
+func NewTenant(services *core.Services) *Tenant {
+	return &Tenant{svc: services.Tenant, services: services}
 }
 
 // List godoc
@@ -87,6 +90,163 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 	if err := h.svc.Create(r.Context(), tenant); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	// Nested zone creation
+	for _, zr := range req.Zones {
+		now2 := time.Now()
+		tenantID := tenant.ID
+		zone := &model.Zone{
+			ID:        platform.NewID(),
+			TenantID:  &tenantID,
+			Name:      zr.Name,
+			RegionID:  tenant.RegionID,
+			Status:    model.StatusPending,
+			CreatedAt: now2,
+			UpdatedAt: now2,
+		}
+		if err := h.services.Zone.Create(r.Context(), zone); err != nil {
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create zone %s: %s", zr.Name, err.Error()))
+			return
+		}
+	}
+
+	// Nested webroot creation
+	for _, wr := range req.Webroots {
+		now2 := time.Now()
+		runtimeConfig := wr.RuntimeConfig
+		if runtimeConfig == nil {
+			runtimeConfig = json.RawMessage(`{}`)
+		}
+		webroot := &model.Webroot{
+			ID:             platform.NewShortID(),
+			TenantID:       tenant.ID,
+			Name:           wr.Name,
+			Runtime:        wr.Runtime,
+			RuntimeVersion: wr.RuntimeVersion,
+			RuntimeConfig:  runtimeConfig,
+			PublicFolder:   wr.PublicFolder,
+			Status:         model.StatusPending,
+			CreatedAt:      now2,
+			UpdatedAt:      now2,
+		}
+		if err := h.services.Webroot.Create(r.Context(), webroot); err != nil {
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create webroot %s: %s", wr.Name, err.Error()))
+			return
+		}
+		if err := createNestedFQDNs(r.Context(), h.services, webroot.ID, wr.FQDNs); err != nil {
+			response.WriteError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+
+	// Nested database creation
+	for _, dr := range req.Databases {
+		now2 := time.Now()
+		tenantID := tenant.ID
+		dbShardID := dr.ShardID
+		database := &model.Database{
+			ID:        platform.NewID(),
+			TenantID:  &tenantID,
+			Name:      dr.Name,
+			ShardID:   &dbShardID,
+			Status:    model.StatusPending,
+			CreatedAt: now2,
+			UpdatedAt: now2,
+		}
+		if err := h.services.Database.Create(r.Context(), database); err != nil {
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create database %s: %s", dr.Name, err.Error()))
+			return
+		}
+		for _, ur := range dr.Users {
+			now3 := time.Now()
+			user := &model.DatabaseUser{
+				ID:         platform.NewID(),
+				DatabaseID: database.ID,
+				Username:   ur.Username,
+				Password:   ur.Password,
+				Privileges: ur.Privileges,
+				Status:     model.StatusPending,
+				CreatedAt:  now3,
+				UpdatedAt:  now3,
+			}
+			if err := h.services.DatabaseUser.Create(r.Context(), user); err != nil {
+				response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create database user %s: %s", ur.Username, err.Error()))
+				return
+			}
+		}
+	}
+
+	// Nested valkey instance creation
+	for _, vr := range req.ValkeyInstances {
+		now2 := time.Now()
+		tenantID := tenant.ID
+		vShardID := vr.ShardID
+		maxMemoryMB := vr.MaxMemoryMB
+		if maxMemoryMB == 0 {
+			maxMemoryMB = 64
+		}
+		instance := &model.ValkeyInstance{
+			ID:          platform.NewID(),
+			TenantID:    &tenantID,
+			Name:        vr.Name,
+			ShardID:     &vShardID,
+			MaxMemoryMB: maxMemoryMB,
+			Password:    generatePassword(),
+			Status:      model.StatusPending,
+			CreatedAt:   now2,
+			UpdatedAt:   now2,
+		}
+		if err := h.services.ValkeyInstance.Create(r.Context(), instance); err != nil {
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create valkey instance %s: %s", vr.Name, err.Error()))
+			return
+		}
+		for _, ur := range vr.Users {
+			keyPattern := ur.KeyPattern
+			if keyPattern == "" {
+				keyPattern = "~*"
+			}
+			now3 := time.Now()
+			user := &model.ValkeyUser{
+				ID:               platform.NewID(),
+				ValkeyInstanceID: instance.ID,
+				Username:         ur.Username,
+				Password:         ur.Password,
+				Privileges:       ur.Privileges,
+				KeyPattern:       keyPattern,
+				Status:           model.StatusPending,
+				CreatedAt:        now3,
+				UpdatedAt:        now3,
+			}
+			if err := h.services.ValkeyUser.Create(r.Context(), user); err != nil {
+				response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create valkey user %s: %s", ur.Username, err.Error()))
+				return
+			}
+		}
+	}
+
+	// Nested SFTP key creation
+	for _, kr := range req.SFTPKeys {
+		fingerprint, err := parseSSHKey(kr.PublicKey)
+		if err != nil {
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create sftp key %s: invalid SSH public key: %s", kr.Name, err.Error()))
+			return
+		}
+		now2 := time.Now()
+		key := &model.SFTPKey{
+			ID:          platform.NewID(),
+			TenantID:    tenant.ID,
+			Name:        kr.Name,
+			PublicKey:   kr.PublicKey,
+			Fingerprint: fingerprint,
+			Status:      model.StatusPending,
+			CreatedAt:   now2,
+			UpdatedAt:   now2,
+		}
+		if err := h.services.SFTPKey.Create(r.Context(), key); err != nil {
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create sftp key %s: %s", kr.Name, err.Error()))
+			return
+		}
 	}
 
 	response.WriteJSON(w, http.StatusAccepted, tenant)

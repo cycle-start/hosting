@@ -7,6 +7,8 @@ import type {
   SFTPKey, Backup,
   APIKey, APIKeyCreateResponse, AuditLogEntry, DashboardStats,
   PlatformConfig, ListParams, AuditListParams, TenantResourceSummary,
+  CreateTenantRequest,
+  FQDNFormData, DatabaseUserFormData, ValkeyUserFormData,
 } from './types'
 
 function buildQuery(params?: Record<string, unknown>): string {
@@ -134,7 +136,7 @@ export function useTenant(id: string) {
 export function useCreateTenant() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { name: string; region_id: string; cluster_id: string; shard_id: string }) =>
+    mutationFn: (data: CreateTenantRequest) =>
       api.post<Tenant>('/tenants', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tenants'] }),
   })
@@ -199,7 +201,7 @@ export function useWebroot(id: string) {
 export function useCreateWebroot() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { tenant_id: string; name: string; runtime: string; runtime_version: string; runtime_config?: Record<string, unknown>; public_folder?: string }) =>
+    mutationFn: (data: { tenant_id: string; name: string; runtime: string; runtime_version: string; runtime_config?: Record<string, unknown>; public_folder?: string; fqdns?: FQDNFormData[] }) =>
       api.post<Webroot>(`/tenants/${data.tenant_id}/webroots`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['webroots'] }),
   })
@@ -480,7 +482,7 @@ export function useDatabase(id: string) {
 export function useCreateDatabase() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { tenant_id: string; name: string; shard_id: string }) =>
+    mutationFn: (data: { tenant_id: string; name: string; shard_id: string; users?: DatabaseUserFormData[] }) =>
       api.post<Database>(`/tenants/${data.tenant_id}/databases`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['databases'] }),
   })
@@ -549,7 +551,7 @@ export function useValkeyInstance(id: string) {
 export function useCreateValkeyInstance() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { tenant_id: string; name: string; shard_id: string; max_memory_mb?: number }) =>
+    mutationFn: (data: { tenant_id: string; name: string; shard_id: string; max_memory_mb?: number; users?: ValkeyUserFormData[] }) =>
       api.post<ValkeyInstance>(`/tenants/${data.tenant_id}/valkey-instances`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['valkey-instances'] }),
   })

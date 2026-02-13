@@ -15,7 +15,7 @@ import (
 )
 
 func newDatabaseHandler() *Database {
-	return NewDatabase(nil)
+	return &Database{svc: nil, userSvc: nil}
 }
 
 // --- ListByTenant ---
@@ -164,6 +164,86 @@ func TestDatabaseCreate_ValidBody(t *testing.T) {
 	assert.NotEqual(t, http.StatusBadRequest, rec.Code)
 }
 
+// --- Nested resource validation ---
+
+func TestDatabaseCreate_WithNestedUsers_ValidationPasses(t *testing.T) {
+	h := newDatabaseHandler()
+	rec := httptest.NewRecorder()
+	tid := "test-tenant-1"
+	r := newRequest(http.MethodPost, "/tenants/"+tid+"/databases", map[string]any{
+		"name":     "mydb",
+		"shard_id": "test-shard-1",
+		"users": []map[string]any{
+			{
+				"username":   "admin",
+				"password":   "securepassword123",
+				"privileges": []string{"ALL"},
+			},
+			{
+				"username":   "readonly",
+				"password":   "anotherpassword1",
+				"privileges": []string{"SELECT"},
+			},
+		},
+	})
+	r = withChiURLParam(r, "tenantID", tid)
+
+	func() {
+		defer func() { recover() }()
+		h.Create(rec, r)
+	}()
+
+	assert.NotEqual(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestDatabaseCreate_WithInvalidNestedUser_ValidationFails(t *testing.T) {
+	h := newDatabaseHandler()
+	rec := httptest.NewRecorder()
+	tid := "test-tenant-1"
+	r := newRequest(http.MethodPost, "/tenants/"+tid+"/databases", map[string]any{
+		"name":     "mydb",
+		"shard_id": "test-shard-1",
+		"users": []map[string]any{
+			{
+				"username":   "admin",
+				"password":   "short", // too short, min=8
+				"privileges": []string{"ALL"},
+			},
+		},
+	})
+	r = withChiURLParam(r, "tenantID", tid)
+
+	h.Create(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	body := decodeErrorResponse(rec)
+	assert.Contains(t, body["error"], "validation error")
+}
+
+func TestDatabaseCreate_WithNestedUserMissingPrivileges_ValidationFails(t *testing.T) {
+	h := newDatabaseHandler()
+	rec := httptest.NewRecorder()
+	tid := "test-tenant-1"
+	r := newRequest(http.MethodPost, "/tenants/"+tid+"/databases", map[string]any{
+		"name":     "mydb",
+		"shard_id": "test-shard-1",
+		"users": []map[string]any{
+			{
+				"username": "admin",
+				"password": "securepassword123",
+				// missing privileges
+			},
+		},
+	})
+	r = withChiURLParam(r, "tenantID", tid)
+
+	h.Create(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	body := decodeErrorResponse(rec)
+	assert.Contains(t, body["error"], "validation error")
+}
+
 // --- Get ---
 
 func TestDatabaseGet_EmptyID(t *testing.T) {
@@ -241,7 +321,7 @@ func TestDatabaseMigrate_Success(t *testing.T) {
 	db := &handlerMockDB{}
 	tc := &temporalmocks.Client{}
 	svc := core.NewDatabaseService(db, tc)
-	h := NewDatabase(svc)
+	h := &Database{svc: svc, userSvc: nil}
 
 	resolveRow := &handlerMockRow{scanFunc: func(dest ...any) error {
 		tid := "test-tenant-1"

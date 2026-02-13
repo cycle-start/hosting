@@ -4,9 +4,7 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { Pause, Play, Trash2, Plus, RotateCcw, Loader2, FolderOpen, Database as DatabaseIcon, Globe, Boxes, Key, Archive } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -19,7 +17,6 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { Breadcrumb } from '@/components/shared/breadcrumb'
 import { formatDate } from '@/lib/utils'
-import { rules, validateField } from '@/lib/validation'
 import {
   useTenant, useTenantResourceSummary, useWebroots, useDatabases, useValkeyInstances,
   useSFTPKeys, useBackups, useZones, useSuspendTenant, useUnsuspendTenant,
@@ -30,9 +27,12 @@ import {
   useCreateBackup, useDeleteBackup, useRestoreBackup,
   useCreateZone, useDeleteZone,
 } from '@/lib/hooks'
-import type { Webroot, Database, ValkeyInstance, SFTPKey, Backup, Zone } from '@/lib/types'
-
-const runtimes = ['php', 'node', 'python', 'ruby', 'static']
+import type { Webroot, Database, ValkeyInstance, SFTPKey, Backup, Zone, WebrootFormData, DatabaseFormData, ValkeyInstanceFormData, SFTPKeyFormData, ZoneFormData } from '@/lib/types'
+import { WebrootFields } from '@/components/forms/webroot-fields'
+import { DatabaseFields } from '@/components/forms/database-fields'
+import { ValkeyInstanceFields } from '@/components/forms/valkey-instance-fields'
+import { SFTPKeyFields } from '@/components/forms/sftp-key-fields'
+import { ZoneFields } from '@/components/forms/zone-fields'
 
 export function TenantDetailPage() {
   const { id } = useParams({ from: '/tenants/$id' as never })
@@ -57,21 +57,19 @@ export function TenantDetailPage() {
   const [deleteZoneTarget, setDeleteZoneTarget] = useState<Zone | null>(null)
 
   // Form state
-  const [wrName, setWrName] = useState('')
-  const [wrRuntime, setWrRuntime] = useState('php')
-  const [wrVersion, setWrVersion] = useState('8.5')
-  const [wrPublicFolder, setWrPublicFolder] = useState('public')
-  const [dbName, setDbName] = useState('')
-  const [dbShard, setDbShard] = useState('')
-  const [vkName, setVkName] = useState('')
-  const [vkShard, setVkShard] = useState('')
-  const [vkMemory, setVkMemory] = useState('64')
-  const [sftpName, setSftpName] = useState('')
-  const [sftpKey, setSftpKey] = useState('')
+  const defaultWebroot: WebrootFormData = { name: '', runtime: 'php', runtime_version: '8.5', public_folder: 'public' }
+  const defaultDatabase: DatabaseFormData = { name: '', shard_id: '' }
+  const defaultValkey: ValkeyInstanceFormData = { name: '', shard_id: '', max_memory_mb: 64 }
+  const defaultSftp: SFTPKeyFormData = { name: '', public_key: '' }
+  const defaultZone: ZoneFormData = { name: '' }
+
+  const [wrForm, setWrForm] = useState<WebrootFormData>(defaultWebroot)
+  const [dbForm, setDbForm] = useState<DatabaseFormData>(defaultDatabase)
+  const [vkForm, setVkForm] = useState<ValkeyInstanceFormData>(defaultValkey)
+  const [sftpForm, setSftpForm] = useState<SFTPKeyFormData>(defaultSftp)
+  const [znForm, setZnForm] = useState<ZoneFormData>(defaultZone)
   const [bkType, setBkType] = useState('web')
   const [bkSource, setBkSource] = useState('')
-  const [znName, setZnName] = useState('')
-  const [formTouched, setFormTouched] = useState<Record<string, boolean>>({})
 
   const { data: tenant, isLoading } = useTenant(id)
   const { data: summary } = useTenantResourceSummary(id)
@@ -118,28 +116,13 @@ export function TenantDetailPage() {
     ? (webrootsData?.items ?? []).map(w => ({ id: w.id, name: w.name }))
     : (databasesData?.items ?? []).map(d => ({ id: d.id, name: d.name }))
 
-  const touch = (field: string) => setFormTouched(p => ({ ...p, [field]: true }))
-  const err = (field: string, value: string, fieldRules: ((v: string) => string | null)[]) =>
-    formTouched[field] ? validateField(value, fieldRules) : null
-
-  const wrNameErr = err('wrName', wrName, [rules.required(), rules.slug()])
-  const dbNameErr = err('dbName', dbName, [rules.required(), rules.slug()])
-  const dbShardErr = err('dbShard', dbShard, [rules.required()])
-  const vkNameErr = err('vkName', vkName, [rules.required(), rules.slug()])
-  const vkShardErr = err('vkShard', vkShard, [rules.required()])
-  const vkMemErr = err('vkMemory', vkMemory, [rules.required(), rules.min(1)])
-  const sftpNameErr = err('sftpName', sftpName, [rules.required(), rules.minLength(1), rules.maxLength(255)])
-  const sftpKeyErr = err('sftpKey', sftpKey, [rules.required()])
-  const znNameErr = err('znName', znName, [rules.required()])
-
   const resetForm = () => {
-    setWrName(''); setWrRuntime('php'); setWrVersion('8.5'); setWrPublicFolder('public')
-    setDbName(''); setDbShard('')
-    setVkName(''); setVkShard(''); setVkMemory('64')
-    setSftpName(''); setSftpKey('')
+    setWrForm(defaultWebroot)
+    setDbForm(defaultDatabase)
+    setVkForm(defaultValkey)
+    setSftpForm(defaultSftp)
+    setZnForm(defaultZone)
     setBkType('web'); setBkSource('')
-    setZnName('')
-    setFormTouched({})
   }
 
   const handleSuspend = async () => {
@@ -156,37 +139,44 @@ export function TenantDetailPage() {
   }
 
   const handleCreateWebroot = async () => {
-    setFormTouched({ wrName: true })
-    if (validateField(wrName, [rules.required(), rules.slug()])) return
+    if (!wrForm.name || !wrForm.runtime || !wrForm.runtime_version) return
     try {
-      await createWebrootMut.mutateAsync({ tenant_id: id, name: wrName, runtime: wrRuntime, runtime_version: wrVersion, public_folder: wrPublicFolder || undefined })
+      await createWebrootMut.mutateAsync({
+        tenant_id: id, name: wrForm.name, runtime: wrForm.runtime,
+        runtime_version: wrForm.runtime_version, public_folder: wrForm.public_folder || undefined,
+        fqdns: wrForm.fqdns?.length ? wrForm.fqdns : undefined,
+      })
       toast.success('Webroot created'); setCreateWebrootOpen(false); resetForm()
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }
 
   const handleCreateDb = async () => {
-    setFormTouched({ dbName: true, dbShard: true })
-    if (validateField(dbName, [rules.required(), rules.slug()]) || validateField(dbShard, [rules.required()])) return
+    if (!dbForm.name || !dbForm.shard_id) return
     try {
-      await createDbMut.mutateAsync({ tenant_id: id, name: dbName, shard_id: dbShard })
+      await createDbMut.mutateAsync({
+        tenant_id: id, name: dbForm.name, shard_id: dbForm.shard_id,
+        users: dbForm.users?.length ? dbForm.users : undefined,
+      })
       toast.success('Database created'); setCreateDbOpen(false); resetForm()
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }
 
   const handleCreateValkey = async () => {
-    setFormTouched({ vkName: true, vkShard: true, vkMemory: true })
-    if (validateField(vkName, [rules.required(), rules.slug()]) || validateField(vkShard, [rules.required()]) || validateField(vkMemory, [rules.required(), rules.min(1)])) return
+    if (!vkForm.name || !vkForm.shard_id) return
     try {
-      await createValkeyMut.mutateAsync({ tenant_id: id, name: vkName, shard_id: vkShard, max_memory_mb: parseInt(vkMemory) || 64 })
+      await createValkeyMut.mutateAsync({
+        tenant_id: id, name: vkForm.name, shard_id: vkForm.shard_id,
+        max_memory_mb: vkForm.max_memory_mb || 64,
+        users: vkForm.users?.length ? vkForm.users : undefined,
+      })
       toast.success('Valkey instance created'); setCreateValkeyOpen(false); resetForm()
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }
 
   const handleCreateSftp = async () => {
-    setFormTouched({ sftpName: true, sftpKey: true })
-    if (validateField(sftpName, [rules.required(), rules.minLength(1), rules.maxLength(255)]) || validateField(sftpKey, [rules.required()])) return
+    if (!sftpForm.name || !sftpForm.public_key) return
     try {
-      await createSftpMut.mutateAsync({ tenant_id: id, name: sftpName, public_key: sftpKey })
+      await createSftpMut.mutateAsync({ tenant_id: id, name: sftpForm.name, public_key: sftpForm.public_key })
       toast.success('SFTP key created'); setCreateSftpOpen(false); resetForm()
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }
@@ -200,10 +190,9 @@ export function TenantDetailPage() {
   }
 
   const handleCreateZone = async () => {
-    setFormTouched({ znName: true })
-    if (validateField(znName, [rules.required()])) return
+    if (!znForm.name) return
     try {
-      await createZoneMut.mutateAsync({ name: znName, tenant_id: id, region_id: tenant.region_id })
+      await createZoneMut.mutateAsync({ name: znForm.name, tenant_id: id, region_id: tenant.region_id })
       toast.success('Zone created'); setCreateZoneOpen(false); resetForm()
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }
@@ -359,9 +348,6 @@ export function TenantDetailPage() {
       ),
     },
   ]
-
-  const FieldError = ({ error }: { error: string | null }) =>
-    error ? <p className="text-xs text-destructive">{error}</p> : null
 
   return (
     <div className="space-y-6">
@@ -566,37 +552,12 @@ export function TenantDetailPage() {
 
       {/* Create Webroot Dialog */}
       <Dialog open={createWebrootOpen} onOpenChange={setCreateWebrootOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Create Webroot</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <Input placeholder="my-site" value={wrName} onChange={(e) => setWrName(e.target.value)} onBlur={() => touch('wrName')} />
-              <FieldError error={wrNameErr} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Runtime</Label>
-                <Select value={wrRuntime} onValueChange={setWrRuntime}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {runtimes.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Version</Label>
-                <Input placeholder="8.5" value={wrVersion} onChange={(e) => setWrVersion(e.target.value)} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Public Folder</Label>
-              <Input placeholder="public" value={wrPublicFolder} onChange={(e) => setWrPublicFolder(e.target.value)} />
-            </div>
-          </div>
+          <WebrootFields value={wrForm} onChange={setWrForm} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateWebrootOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateWebroot} disabled={createWebrootMut.isPending}>
+            <Button onClick={handleCreateWebroot} disabled={createWebrootMut.isPending || !wrForm.name || !wrForm.runtime}>
               {createWebrootMut.isPending ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>
@@ -605,23 +566,12 @@ export function TenantDetailPage() {
 
       {/* Create Database Dialog */}
       <Dialog open={createDbOpen} onOpenChange={setCreateDbOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Create Database</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <Input placeholder="my-database" value={dbName} onChange={(e) => setDbName(e.target.value)} onBlur={() => touch('dbName')} />
-              <FieldError error={dbNameErr} />
-            </div>
-            <div className="space-y-2">
-              <Label>Shard ID</Label>
-              <Input placeholder="Shard ID for database placement" value={dbShard} onChange={(e) => setDbShard(e.target.value)} onBlur={() => touch('dbShard')} />
-              <FieldError error={dbShardErr} />
-            </div>
-          </div>
+          <DatabaseFields value={dbForm} onChange={setDbForm} clusterId={tenant.cluster_id} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateDbOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateDb} disabled={createDbMut.isPending}>
+            <Button onClick={handleCreateDb} disabled={createDbMut.isPending || !dbForm.name || !dbForm.shard_id}>
               {createDbMut.isPending ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>
@@ -630,28 +580,12 @@ export function TenantDetailPage() {
 
       {/* Create Valkey Dialog */}
       <Dialog open={createValkeyOpen} onOpenChange={setCreateValkeyOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Create Valkey Instance</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <Input placeholder="my-cache" value={vkName} onChange={(e) => setVkName(e.target.value)} onBlur={() => touch('vkName')} />
-              <FieldError error={vkNameErr} />
-            </div>
-            <div className="space-y-2">
-              <Label>Shard ID</Label>
-              <Input placeholder="Shard ID for Valkey placement" value={vkShard} onChange={(e) => setVkShard(e.target.value)} onBlur={() => touch('vkShard')} />
-              <FieldError error={vkShardErr} />
-            </div>
-            <div className="space-y-2">
-              <Label>Max Memory (MB)</Label>
-              <Input type="number" value={vkMemory} onChange={(e) => setVkMemory(e.target.value)} onBlur={() => touch('vkMemory')} />
-              <FieldError error={vkMemErr} />
-            </div>
-          </div>
+          <ValkeyInstanceFields value={vkForm} onChange={setVkForm} clusterId={tenant.cluster_id} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateValkeyOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateValkey} disabled={createValkeyMut.isPending}>
+            <Button onClick={handleCreateValkey} disabled={createValkeyMut.isPending || !vkForm.name || !vkForm.shard_id}>
               {createValkeyMut.isPending ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>
@@ -662,21 +596,10 @@ export function TenantDetailPage() {
       <Dialog open={createSftpOpen} onOpenChange={setCreateSftpOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add SFTP Key</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <Input placeholder="My laptop key" value={sftpName} onChange={(e) => setSftpName(e.target.value)} onBlur={() => touch('sftpName')} />
-              <FieldError error={sftpNameErr} />
-            </div>
-            <div className="space-y-2">
-              <Label>Public Key</Label>
-              <Textarea placeholder="ssh-ed25519 AAAA..." rows={4} value={sftpKey} onChange={(e) => setSftpKey(e.target.value)} onBlur={() => touch('sftpKey')} />
-              <FieldError error={sftpKeyErr} />
-            </div>
-          </div>
+          <SFTPKeyFields value={sftpForm} onChange={setSftpForm} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateSftpOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateSftp} disabled={createSftpMut.isPending}>
+            <Button onClick={handleCreateSftp} disabled={createSftpMut.isPending || !sftpForm.name || !sftpForm.public_key}>
               {createSftpMut.isPending ? 'Adding...' : 'Add Key'}
             </Button>
           </DialogFooter>
@@ -726,16 +649,12 @@ export function TenantDetailPage() {
         <DialogContent>
           <DialogHeader><DialogTitle>Create Zone</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Zone Name</Label>
-              <Input placeholder="example.com" value={znName} onChange={(e) => setZnName(e.target.value)} onBlur={() => touch('znName')} />
-              <FieldError error={znNameErr} />
-            </div>
+            <ZoneFields value={znForm} onChange={setZnForm} />
             <p className="text-xs text-muted-foreground">Region: {tenant.region_id} (inherited from tenant)</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateZoneOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateZone} disabled={createZoneMut.isPending}>
+            <Button onClick={handleCreateZone} disabled={createZoneMut.isPending || !znForm.name}>
               {createZoneMut.isPending ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>
