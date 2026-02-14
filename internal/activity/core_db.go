@@ -2,6 +2,7 @@ package activity
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -831,6 +832,256 @@ func (a *CoreDB) GetS3AccessKeyByID(ctx context.Context, id string) (*model.S3Ac
 		return nil, fmt.Errorf("get s3 access key by id: %w", err)
 	}
 	return &k, nil
+}
+
+// GetWebrootContext fetches a webroot and its related tenant, FQDNs, and nodes in a single activity.
+func (a *CoreDB) GetWebrootContext(ctx context.Context, webrootID string) (*WebrootContext, error) {
+	var wc WebrootContext
+
+	// JOIN webroots with tenants.
+	err := a.db.QueryRow(ctx,
+		`SELECT w.id, w.tenant_id, w.name, w.runtime, w.runtime_version, w.runtime_config, w.public_folder, w.status, w.status_message, w.created_at, w.updated_at,
+		        t.id, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.status, t.status_message, t.created_at, t.updated_at
+		 FROM webroots w
+		 JOIN tenants t ON t.id = w.tenant_id
+		 WHERE w.id = $1`, webrootID,
+	).Scan(&wc.Webroot.ID, &wc.Webroot.TenantID, &wc.Webroot.Name, &wc.Webroot.Runtime, &wc.Webroot.RuntimeVersion, &wc.Webroot.RuntimeConfig, &wc.Webroot.PublicFolder, &wc.Webroot.Status, &wc.Webroot.StatusMessage, &wc.Webroot.CreatedAt, &wc.Webroot.UpdatedAt,
+		&wc.Tenant.ID, &wc.Tenant.BrandID, &wc.Tenant.RegionID, &wc.Tenant.ClusterID, &wc.Tenant.ShardID, &wc.Tenant.UID, &wc.Tenant.SFTPEnabled, &wc.Tenant.Status, &wc.Tenant.StatusMessage, &wc.Tenant.CreatedAt, &wc.Tenant.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get webroot context: %w", err)
+	}
+
+	// Fetch FQDNs for this webroot.
+	fqdns, err := a.GetFQDNsByWebrootID(ctx, webrootID)
+	if err != nil {
+		return nil, err
+	}
+	wc.FQDNs = fqdns
+
+	// Fetch nodes if tenant has a shard.
+	if wc.Tenant.ShardID != nil {
+		nodes, err := a.ListNodesByShard(ctx, *wc.Tenant.ShardID)
+		if err != nil {
+			return nil, err
+		}
+		wc.Nodes = nodes
+	}
+
+	return &wc, nil
+}
+
+// GetFQDNContext fetches an FQDN and its related webroot, tenant, shard, nodes, and LB addresses.
+func (a *CoreDB) GetFQDNContext(ctx context.Context, fqdnID string) (*FQDNContext, error) {
+	var fc FQDNContext
+
+	// JOIN fqdns -> webroots -> tenants.
+	err := a.db.QueryRow(ctx,
+		`SELECT f.id, f.fqdn, f.webroot_id, f.ssl_enabled, f.status, f.status_message, f.created_at, f.updated_at,
+		        w.id, w.tenant_id, w.name, w.runtime, w.runtime_version, w.runtime_config, w.public_folder, w.status, w.status_message, w.created_at, w.updated_at,
+		        t.id, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.status, t.status_message, t.created_at, t.updated_at
+		 FROM fqdns f
+		 JOIN webroots w ON w.id = f.webroot_id
+		 JOIN tenants t ON t.id = w.tenant_id
+		 WHERE f.id = $1`, fqdnID,
+	).Scan(&fc.FQDN.ID, &fc.FQDN.FQDN, &fc.FQDN.WebrootID, &fc.FQDN.SSLEnabled, &fc.FQDN.Status, &fc.FQDN.StatusMessage, &fc.FQDN.CreatedAt, &fc.FQDN.UpdatedAt,
+		&fc.Webroot.ID, &fc.Webroot.TenantID, &fc.Webroot.Name, &fc.Webroot.Runtime, &fc.Webroot.RuntimeVersion, &fc.Webroot.RuntimeConfig, &fc.Webroot.PublicFolder, &fc.Webroot.Status, &fc.Webroot.StatusMessage, &fc.Webroot.CreatedAt, &fc.Webroot.UpdatedAt,
+		&fc.Tenant.ID, &fc.Tenant.BrandID, &fc.Tenant.RegionID, &fc.Tenant.ClusterID, &fc.Tenant.ShardID, &fc.Tenant.UID, &fc.Tenant.SFTPEnabled, &fc.Tenant.Status, &fc.Tenant.StatusMessage, &fc.Tenant.CreatedAt, &fc.Tenant.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get fqdn context: %w", err)
+	}
+
+	// Fetch LB addresses.
+	lbAddresses, err := a.GetClusterLBAddresses(ctx, fc.Tenant.ClusterID)
+	if err != nil {
+		return nil, err
+	}
+	fc.LBAddresses = lbAddresses
+
+	// Fetch shard and nodes if tenant has a shard.
+	if fc.Tenant.ShardID != nil {
+		shard, err := a.GetShardByID(ctx, *fc.Tenant.ShardID)
+		if err != nil {
+			return nil, err
+		}
+		fc.Shard = *shard
+
+		nodes, err := a.ListNodesByShard(ctx, *fc.Tenant.ShardID)
+		if err != nil {
+			return nil, err
+		}
+		fc.Nodes = nodes
+	}
+
+	return &fc, nil
+}
+
+// GetDatabaseUserContext fetches a database user and its related database and nodes.
+func (a *CoreDB) GetDatabaseUserContext(ctx context.Context, userID string) (*DatabaseUserContext, error) {
+	var dc DatabaseUserContext
+
+	// JOIN database_users with databases.
+	err := a.db.QueryRow(ctx,
+		`SELECT u.id, u.database_id, u.username, u.password, u.privileges, u.status, u.status_message, u.created_at, u.updated_at,
+		        d.id, d.tenant_id, d.name, d.shard_id, d.node_id, d.status, d.status_message, d.created_at, d.updated_at
+		 FROM database_users u
+		 JOIN databases d ON d.id = u.database_id
+		 WHERE u.id = $1`, userID,
+	).Scan(&dc.User.ID, &dc.User.DatabaseID, &dc.User.Username, &dc.User.Password, &dc.User.Privileges, &dc.User.Status, &dc.User.StatusMessage, &dc.User.CreatedAt, &dc.User.UpdatedAt,
+		&dc.Database.ID, &dc.Database.TenantID, &dc.Database.Name, &dc.Database.ShardID, &dc.Database.NodeID, &dc.Database.Status, &dc.Database.StatusMessage, &dc.Database.CreatedAt, &dc.Database.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get database user context: %w", err)
+	}
+
+	// Fetch nodes if database has a shard.
+	if dc.Database.ShardID != nil {
+		nodes, err := a.ListNodesByShard(ctx, *dc.Database.ShardID)
+		if err != nil {
+			return nil, err
+		}
+		dc.Nodes = nodes
+	}
+
+	return &dc, nil
+}
+
+// GetValkeyUserContext fetches a Valkey user and its related instance and nodes.
+func (a *CoreDB) GetValkeyUserContext(ctx context.Context, userID string) (*ValkeyUserContext, error) {
+	var vc ValkeyUserContext
+
+	// JOIN valkey_users with valkey_instances.
+	err := a.db.QueryRow(ctx,
+		`SELECT u.id, u.valkey_instance_id, u.username, u.password, u.privileges, u.key_pattern, u.status, u.status_message, u.created_at, u.updated_at,
+		        i.id, i.tenant_id, i.name, i.shard_id, i.port, i.max_memory_mb, i.password, i.status, i.status_message, i.created_at, i.updated_at
+		 FROM valkey_users u
+		 JOIN valkey_instances i ON i.id = u.valkey_instance_id
+		 WHERE u.id = $1`, userID,
+	).Scan(&vc.User.ID, &vc.User.ValkeyInstanceID, &vc.User.Username, &vc.User.Password, &vc.User.Privileges, &vc.User.KeyPattern, &vc.User.Status, &vc.User.StatusMessage, &vc.User.CreatedAt, &vc.User.UpdatedAt,
+		&vc.Instance.ID, &vc.Instance.TenantID, &vc.Instance.Name, &vc.Instance.ShardID, &vc.Instance.Port, &vc.Instance.MaxMemoryMB, &vc.Instance.Password, &vc.Instance.Status, &vc.Instance.StatusMessage, &vc.Instance.CreatedAt, &vc.Instance.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get valkey user context: %w", err)
+	}
+
+	// Fetch nodes if instance has a shard.
+	if vc.Instance.ShardID != nil {
+		nodes, err := a.ListNodesByShard(ctx, *vc.Instance.ShardID)
+		if err != nil {
+			return nil, err
+		}
+		vc.Nodes = nodes
+	}
+
+	return &vc, nil
+}
+
+// GetZoneRecordContext fetches a zone record and its parent zone name.
+func (a *CoreDB) GetZoneRecordContext(ctx context.Context, recordID string) (*ZoneRecordContext, error) {
+	var zc ZoneRecordContext
+
+	// JOIN zone_records with zones.
+	err := a.db.QueryRow(ctx,
+		`SELECT r.id, r.zone_id, r.type, r.name, r.content, r.ttl, r.priority, r.managed_by, r.source_fqdn_id, r.status, r.status_message, r.created_at, r.updated_at,
+		        z.name
+		 FROM zone_records r
+		 JOIN zones z ON z.id = r.zone_id
+		 WHERE r.id = $1`, recordID,
+	).Scan(&zc.Record.ID, &zc.Record.ZoneID, &zc.Record.Type, &zc.Record.Name, &zc.Record.Content, &zc.Record.TTL, &zc.Record.Priority, &zc.Record.ManagedBy, &zc.Record.SourceFQDNID, &zc.Record.Status, &zc.Record.StatusMessage, &zc.Record.CreatedAt, &zc.Record.UpdatedAt,
+		&zc.ZoneName)
+	if err != nil {
+		return nil, fmt.Errorf("get zone record context: %w", err)
+	}
+
+	return &zc, nil
+}
+
+// GetBackupContext fetches a backup and its related tenant and nodes.
+func (a *CoreDB) GetBackupContext(ctx context.Context, backupID string) (*BackupContext, error) {
+	var bc BackupContext
+
+	// JOIN backups with tenants.
+	err := a.db.QueryRow(ctx,
+		`SELECT b.id, b.tenant_id, b.type, b.source_id, b.source_name, b.storage_path, b.size_bytes, b.status, b.status_message, b.started_at, b.completed_at, b.created_at, b.updated_at,
+		        t.id, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.status, t.status_message, t.created_at, t.updated_at
+		 FROM backups b
+		 JOIN tenants t ON t.id = b.tenant_id
+		 WHERE b.id = $1`, backupID,
+	).Scan(&bc.Backup.ID, &bc.Backup.TenantID, &bc.Backup.Type, &bc.Backup.SourceID, &bc.Backup.SourceName, &bc.Backup.StoragePath, &bc.Backup.SizeBytes, &bc.Backup.Status, &bc.Backup.StatusMessage, &bc.Backup.StartedAt, &bc.Backup.CompletedAt, &bc.Backup.CreatedAt, &bc.Backup.UpdatedAt,
+		&bc.Tenant.ID, &bc.Tenant.BrandID, &bc.Tenant.RegionID, &bc.Tenant.ClusterID, &bc.Tenant.ShardID, &bc.Tenant.UID, &bc.Tenant.SFTPEnabled, &bc.Tenant.Status, &bc.Tenant.StatusMessage, &bc.Tenant.CreatedAt, &bc.Tenant.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get backup context: %w", err)
+	}
+
+	// Fetch nodes if tenant has a shard.
+	if bc.Tenant.ShardID != nil {
+		nodes, err := a.ListNodesByShard(ctx, *bc.Tenant.ShardID)
+		if err != nil {
+			return nil, err
+		}
+		bc.Nodes = nodes
+	}
+
+	return &bc, nil
+}
+
+// GetS3AccessKeyContext fetches an S3 access key and its related bucket and nodes.
+func (a *CoreDB) GetS3AccessKeyContext(ctx context.Context, keyID string) (*S3AccessKeyContext, error) {
+	var sc S3AccessKeyContext
+
+	// JOIN s3_access_keys with s3_buckets.
+	err := a.db.QueryRow(ctx,
+		`SELECT k.id, k.s3_bucket_id, k.access_key_id, k.secret_access_key, k.permissions, k.status, k.status_message, k.created_at, k.updated_at,
+		        b.id, b.tenant_id, b.name, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.created_at, b.updated_at
+		 FROM s3_access_keys k
+		 JOIN s3_buckets b ON b.id = k.s3_bucket_id
+		 WHERE k.id = $1`, keyID,
+	).Scan(&sc.Key.ID, &sc.Key.S3BucketID, &sc.Key.AccessKeyID, &sc.Key.SecretAccessKey, &sc.Key.Permissions, &sc.Key.Status, &sc.Key.StatusMessage, &sc.Key.CreatedAt, &sc.Key.UpdatedAt,
+		&sc.Bucket.ID, &sc.Bucket.TenantID, &sc.Bucket.Name, &sc.Bucket.ShardID, &sc.Bucket.Public, &sc.Bucket.QuotaBytes, &sc.Bucket.Status, &sc.Bucket.StatusMessage, &sc.Bucket.CreatedAt, &sc.Bucket.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get s3 access key context: %w", err)
+	}
+
+	// Fetch nodes if bucket has a shard.
+	if sc.Bucket.ShardID != nil {
+		nodes, err := a.ListNodesByShard(ctx, *sc.Bucket.ShardID)
+		if err != nil {
+			return nil, err
+		}
+		sc.Nodes = nodes
+	}
+
+	return &sc, nil
+}
+
+// GetStalwartContext resolves Stalwart connection info by traversing FQDN -> webroot -> tenant -> cluster.
+func (a *CoreDB) GetStalwartContext(ctx context.Context, fqdnID string) (*StalwartContext, error) {
+	var sc StalwartContext
+	var clusterConfig []byte
+
+	err := a.db.QueryRow(ctx,
+		`SELECT f.id, f.fqdn, c.config
+		 FROM fqdns f
+		 JOIN webroots w ON w.id = f.webroot_id
+		 JOIN tenants t ON t.id = w.tenant_id
+		 JOIN clusters c ON c.id = t.cluster_id
+		 WHERE f.id = $1`, fqdnID,
+	).Scan(&sc.FQDNID, &sc.FQDN, &clusterConfig)
+	if err != nil {
+		return nil, fmt.Errorf("get stalwart context: %w", err)
+	}
+
+	var cfg struct {
+		StalwartURL   string `json:"stalwart_url"`
+		StalwartToken string `json:"stalwart_token"`
+		MailHostname  string `json:"mail_hostname"`
+	}
+	if err := json.Unmarshal(clusterConfig, &cfg); err != nil {
+		return nil, fmt.Errorf("parse cluster config for stalwart: %w", err)
+	}
+
+	sc.StalwartURL = cfg.StalwartURL
+	sc.StalwartToken = cfg.StalwartToken
+	sc.MailHostname = cfg.MailHostname
+
+	return &sc, nil
 }
 
 // GetOldBackups returns active backups that are older than the specified number of days.

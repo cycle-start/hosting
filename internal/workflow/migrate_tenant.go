@@ -66,14 +66,16 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 
 	// Validate: same cluster.
 	if sourceShard.ClusterID != targetShard.ClusterID {
-		_ = setResourceFailed(ctx, "tenants", tenantID, err)
-		return fmt.Errorf("source shard cluster %s != target shard cluster %s", sourceShard.ClusterID, targetShard.ClusterID)
+		clusterErr := fmt.Errorf("source shard cluster %s != target shard cluster %s", sourceShard.ClusterID, targetShard.ClusterID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, clusterErr)
+		return clusterErr
 	}
 
 	// Validate: target shard is a web shard.
 	if targetShard.Role != model.ShardRoleWeb {
-		_ = setResourceFailed(ctx, "tenants", tenantID, err)
-		return fmt.Errorf("target shard %s is not a web shard (role: %s)", targetShard.ID, targetShard.Role)
+		roleErr := fmt.Errorf("target shard %s is not a web shard (role: %s)", targetShard.ID, targetShard.Role)
+		_ = setResourceFailed(ctx, "tenants", tenantID, roleErr)
+		return roleErr
 	}
 
 	// Get target shard nodes.

@@ -61,10 +61,12 @@ func (s *CreateWebrootWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "webroots", ID: webrootID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return(fqdns, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetWebrootContext", mock.Anything, webrootID).Return(&activity.WebrootContext{
+		Webroot: webroot,
+		Tenant:  tenant,
+		Nodes:   nodes,
+		FQDNs:   fqdns,
+	}, nil)
 	s.env.OnActivity("CreateWebroot", mock.Anything, activity.CreateWebrootParams{
 		ID:             webrootID,
 		TenantName:     tenantID,
@@ -112,10 +114,12 @@ func (s *CreateWebrootWorkflowTestSuite) TestNoFQDNs_Success() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "webroots", ID: webrootID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return([]model.FQDN{}, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetWebrootContext", mock.Anything, webrootID).Return(&activity.WebrootContext{
+		Webroot: webroot,
+		Tenant:  tenant,
+		Nodes:   nodes,
+		FQDNs:   []model.FQDN{},
+	}, nil)
 	s.env.OnActivity("CreateWebroot", mock.Anything, activity.CreateWebrootParams{
 		ID:             webrootID,
 		TenantName:     tenantID,
@@ -161,10 +165,12 @@ func (s *CreateWebrootWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "webroots", ID: webrootID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return([]model.FQDN{}, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetWebrootContext", mock.Anything, webrootID).Return(&activity.WebrootContext{
+		Webroot: webroot,
+		Tenant:  tenant,
+		Nodes:   nodes,
+		FQDNs:   []model.FQDN{},
+	}, nil)
 	s.env.OnActivity("CreateWebroot", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("webroots", webrootID)).Return(nil)
 	s.env.ExecuteWorkflow(CreateWebrootWorkflow, webrootID)
@@ -178,7 +184,7 @@ func (s *CreateWebrootWorkflowTestSuite) TestGetWebrootFails_SetsStatusFailed() 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "webroots", ID: webrootID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(nil, fmt.Errorf("not found"))
+	s.env.OnActivity("GetWebrootContext", mock.Anything, webrootID).Return(nil, fmt.Errorf("not found"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("webroots", webrootID)).Return(nil)
 	s.env.ExecuteWorkflow(CreateWebrootWorkflow, webrootID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -228,10 +234,12 @@ func (s *UpdateWebrootWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "webroots", ID: webrootID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return([]model.FQDN{}, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetWebrootContext", mock.Anything, webrootID).Return(&activity.WebrootContext{
+		Webroot: webroot,
+		Tenant:  tenant,
+		Nodes:   nodes,
+		FQDNs:   []model.FQDN{},
+	}, nil)
 	s.env.OnActivity("UpdateWebroot", mock.Anything, activity.UpdateWebrootParams{
 		ID:             webrootID,
 		TenantName:     tenantID,
@@ -276,10 +284,12 @@ func (s *UpdateWebrootWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "webroots", ID: webrootID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return([]model.FQDN{}, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetWebrootContext", mock.Anything, webrootID).Return(&activity.WebrootContext{
+		Webroot: webroot,
+		Tenant:  tenant,
+		Nodes:   nodes,
+		FQDNs:   []model.FQDN{},
+	}, nil)
 	s.env.OnActivity("UpdateWebroot", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("webroots", webrootID)).Return(nil)
 	s.env.ExecuteWorkflow(UpdateWebrootWorkflow, webrootID)
@@ -326,9 +336,11 @@ func (s *DeleteWebrootWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "webroots", ID: webrootID, Status: model.StatusDeleting,
 	}).Return(nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetWebrootContext", mock.Anything, webrootID).Return(&activity.WebrootContext{
+		Webroot: webroot,
+		Tenant:  tenant,
+		Nodes:   nodes,
+	}, nil)
 	s.env.OnActivity("DeleteWebroot", mock.Anything, tenantID, "mysite").Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "webroots", ID: webrootID, Status: model.StatusDeleted,
@@ -360,9 +372,11 @@ func (s *DeleteWebrootWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "webroots", ID: webrootID, Status: model.StatusDeleting,
 	}).Return(nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetWebrootContext", mock.Anything, webrootID).Return(&activity.WebrootContext{
+		Webroot: webroot,
+		Tenant:  tenant,
+		Nodes:   nodes,
+	}, nil)
 	s.env.OnActivity("DeleteWebroot", mock.Anything, tenantID, "mysite").Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("webroots", webrootID)).Return(nil)
 	s.env.ExecuteWorkflow(DeleteWebrootWorkflow, webrootID)
@@ -376,7 +390,7 @@ func (s *DeleteWebrootWorkflowTestSuite) TestGetWebrootFails_SetsStatusFailed() 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "webroots", ID: webrootID, Status: model.StatusDeleting,
 	}).Return(nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(nil, fmt.Errorf("not found"))
+	s.env.OnActivity("GetWebrootContext", mock.Anything, webrootID).Return(nil, fmt.Errorf("not found"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("webroots", webrootID)).Return(nil)
 	s.env.ExecuteWorkflow(DeleteWebrootWorkflow, webrootID)
 	s.True(s.env.IsWorkflowCompleted())

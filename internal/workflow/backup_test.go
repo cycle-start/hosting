@@ -58,9 +58,11 @@ func (s *CreateBackupWorkflowTestSuite) TestSuccess_WebBackup() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "backups", ID: backupID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetBackupByID", mock.Anything, backupID).Return(&backup, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetBackupContext", mock.Anything, backupID).Return(&activity.BackupContext{
+		Backup: backup,
+		Tenant: tenant,
+		Nodes:  nodes,
+	}, nil)
 	s.env.OnActivity("GetWebrootByID", mock.Anything, "test-webroot-1").Return(&webroot, nil)
 	s.env.OnActivity("CreateWebBackup", mock.Anything, mock.Anything).Return(&activity.BackupResult{
 		StoragePath: "/var/backups/hosting/test-tenant-1/test-backup-1.tar.gz",
@@ -100,9 +102,11 @@ func (s *CreateBackupWorkflowTestSuite) TestSuccess_DatabaseBackup() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "backups", ID: backupID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetBackupByID", mock.Anything, backupID).Return(&backup, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetBackupContext", mock.Anything, backupID).Return(&activity.BackupContext{
+		Backup: backup,
+		Tenant: tenant,
+		Nodes:  nodes,
+	}, nil)
 	s.env.OnActivity("CreateMySQLBackup", mock.Anything, mock.Anything).Return(&activity.BackupResult{
 		StoragePath: "/var/backups/hosting/test-tenant-1/test-backup-2.sql.gz",
 		SizeBytes:   4096,
@@ -123,7 +127,7 @@ func (s *CreateBackupWorkflowTestSuite) TestGetBackupFails_SetsStatusFailed() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "backups", ID: backupID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetBackupByID", mock.Anything, backupID).Return(nil, fmt.Errorf("not found"))
+	s.env.OnActivity("GetBackupContext", mock.Anything, backupID).Return(nil, fmt.Errorf("not found"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("backups", backupID)).Return(nil)
 
 	s.env.ExecuteWorkflow(CreateBackupWorkflow, backupID)
@@ -149,8 +153,11 @@ func (s *CreateBackupWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "backups", ID: backupID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetBackupByID", mock.Anything, backupID).Return(&backup, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
+	s.env.OnActivity("GetBackupContext", mock.Anything, backupID).Return(&activity.BackupContext{
+		Backup: backup,
+		Tenant: tenant,
+		Nodes:  nil,
+	}, nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("backups", backupID)).Return(nil)
 	s.env.ExecuteWorkflow(CreateBackupWorkflow, backupID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -197,9 +204,11 @@ func (s *CreateBackupWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "backups", ID: backupID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetBackupByID", mock.Anything, backupID).Return(&backup, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetBackupContext", mock.Anything, backupID).Return(&activity.BackupContext{
+		Backup: backup,
+		Tenant: tenant,
+		Nodes:  nodes,
+	}, nil)
 	s.env.OnActivity("GetWebrootByID", mock.Anything, "test-webroot-1").Return(&webroot, nil)
 	s.env.OnActivity("CreateWebBackup", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("backups", backupID)).Return(nil)
@@ -257,12 +266,14 @@ func (s *RestoreBackupWorkflowTestSuite) TestSuccess_WebRestore() {
 		Name: "mysite",
 	}
 
-	s.env.OnActivity("GetBackupByID", mock.Anything, backupID).Return(&backup, nil)
+	s.env.OnActivity("GetBackupContext", mock.Anything, backupID).Return(&activity.BackupContext{
+		Backup: backup,
+		Tenant: tenant,
+		Nodes:  nodes,
+	}, nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "backups", ID: backupID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("GetWebrootByID", mock.Anything, "test-webroot-1").Return(&webroot, nil)
 	s.env.OnActivity("RestoreWebBackup", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -301,12 +312,14 @@ func (s *RestoreBackupWorkflowTestSuite) TestSuccess_DatabaseRestore() {
 		{ID: "node-1"},
 	}
 
-	s.env.OnActivity("GetBackupByID", mock.Anything, backupID).Return(&backup, nil)
+	s.env.OnActivity("GetBackupContext", mock.Anything, backupID).Return(&activity.BackupContext{
+		Backup: backup,
+		Tenant: tenant,
+		Nodes:  nodes,
+	}, nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "backups", ID: backupID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("RestoreMySQLBackup", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "backups", ID: backupID, Status: model.StatusActive,
@@ -320,7 +333,7 @@ func (s *RestoreBackupWorkflowTestSuite) TestSuccess_DatabaseRestore() {
 func (s *RestoreBackupWorkflowTestSuite) TestGetBackupFails() {
 	backupID := "test-backup-3"
 
-	s.env.OnActivity("GetBackupByID", mock.Anything, backupID).Return(nil, fmt.Errorf("not found"))
+	s.env.OnActivity("GetBackupContext", mock.Anything, backupID).Return(nil, fmt.Errorf("not found"))
 
 	s.env.ExecuteWorkflow(RestoreBackupWorkflow, backupID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -353,12 +366,14 @@ func (s *RestoreBackupWorkflowTestSuite) TestRestoreFails_SetsStatusFailed() {
 		{ID: "node-1"},
 	}
 
-	s.env.OnActivity("GetBackupByID", mock.Anything, backupID).Return(&backup, nil)
+	s.env.OnActivity("GetBackupContext", mock.Anything, backupID).Return(&activity.BackupContext{
+		Backup: backup,
+		Tenant: tenant,
+		Nodes:  nodes,
+	}, nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "backups", ID: backupID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("RestoreMySQLBackup", mock.Anything, mock.Anything).Return(fmt.Errorf("restore failed"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("backups", backupID)).Return(nil)
 
@@ -410,9 +425,11 @@ func (s *DeleteBackupWorkflowTestSuite) TestSuccess() {
 		{ID: "node-1"},
 	}
 
-	s.env.OnActivity("GetBackupByID", mock.Anything, backupID).Return(&backup, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetBackupContext", mock.Anything, backupID).Return(&activity.BackupContext{
+		Backup: backup,
+		Tenant: tenant,
+		Nodes:  nodes,
+	}, nil)
 	s.env.OnActivity("DeleteBackupFile", mock.Anything, backup.StoragePath).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "backups", ID: backupID, Status: model.StatusDeleted,
@@ -426,7 +443,7 @@ func (s *DeleteBackupWorkflowTestSuite) TestSuccess() {
 func (s *DeleteBackupWorkflowTestSuite) TestGetBackupFails_SetsStatusFailed() {
 	backupID := "test-backup-2"
 
-	s.env.OnActivity("GetBackupByID", mock.Anything, backupID).Return(nil, fmt.Errorf("not found"))
+	s.env.OnActivity("GetBackupContext", mock.Anything, backupID).Return(nil, fmt.Errorf("not found"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("backups", backupID)).Return(nil)
 
 	s.env.ExecuteWorkflow(DeleteBackupWorkflow, backupID)
@@ -458,9 +475,11 @@ func (s *DeleteBackupWorkflowTestSuite) TestDeleteFileFails_SetsStatusFailed() {
 		{ID: "node-1"},
 	}
 
-	s.env.OnActivity("GetBackupByID", mock.Anything, backupID).Return(&backup, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetBackupContext", mock.Anything, backupID).Return(&activity.BackupContext{
+		Backup: backup,
+		Tenant: tenant,
+		Nodes:  nodes,
+	}, nil)
 	s.env.OnActivity("DeleteBackupFile", mock.Anything, mock.Anything).Return(fmt.Errorf("file not found"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("backups", backupID)).Return(nil)
 

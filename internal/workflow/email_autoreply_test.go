@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -35,9 +34,6 @@ func (s *UpdateEmailAutoReplyWorkflowTestSuite) TestSuccess() {
 	autoReplyID := "test-autoreply-1"
 	accountID := "test-account-1"
 	fqdnID := "test-fqdn-1"
-	webrootID := "test-webroot-1"
-	tenantID := "test-tenant-1"
-	clusterID := "test-cluster-1"
 
 	ar := model.EmailAutoReply{
 		ID:             autoReplyID,
@@ -54,24 +50,17 @@ func (s *UpdateEmailAutoReplyWorkflowTestSuite) TestSuccess() {
 		Address: "user@example.com",
 	}
 
-	fqdn := model.FQDN{ID: fqdnID, FQDN: "example.com", WebrootID: webrootID}
-	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ClusterID: clusterID}
-	clusterConfig, _ := json.Marshal(map[string]string{
-		"stalwart_url":   "https://mail.example.com",
-		"stalwart_token": "admin-token",
-	})
-	cluster := model.Cluster{ID: clusterID, Config: clusterConfig}
-
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "email_autoreplies", ID: autoReplyID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetEmailAutoReplyByID", mock.Anything, autoReplyID).Return(&ar, nil)
 	s.env.OnActivity("GetEmailAccountByID", mock.Anything, accountID).Return(&account, nil)
-	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(&fqdn, nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetClusterByID", mock.Anything, clusterID).Return(&cluster, nil)
+	s.env.OnActivity("GetStalwartContext", mock.Anything, fqdnID).Return(&activity.StalwartContext{
+		StalwartURL:   "https://mail.example.com",
+		StalwartToken: "admin-token",
+		FQDNID:        fqdnID,
+		FQDN:          "example.com",
+	}, nil)
 	s.env.OnActivity("StalwartSetVacation", mock.Anything, activity.StalwartVacationParams{
 		BaseURL:     "https://mail.example.com",
 		AdminToken:  "admin-token",
@@ -109,32 +98,23 @@ func (s *UpdateEmailAutoReplyWorkflowTestSuite) TestSetVacationFails_SetsStatusF
 	autoReplyID := "test-autoreply-3"
 	accountID := "test-account-3"
 	fqdnID := "test-fqdn-3"
-	webrootID := "test-webroot-3"
-	tenantID := "test-tenant-3"
-	clusterID := "test-cluster-3"
 
 	ar := model.EmailAutoReply{
 		ID: autoReplyID, EmailAccountID: accountID, Subject: "OOO", Body: "Gone.", Enabled: true,
 	}
 	account := model.EmailAccount{ID: accountID, FQDNID: fqdnID, Address: "user@example.com"}
-	fqdn := model.FQDN{ID: fqdnID, FQDN: "example.com", WebrootID: webrootID}
-	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ClusterID: clusterID}
-	clusterConfig, _ := json.Marshal(map[string]string{
-		"stalwart_url":   "https://mail.example.com",
-		"stalwart_token": "admin-token",
-	})
-	cluster := model.Cluster{ID: clusterID, Config: clusterConfig}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "email_autoreplies", ID: autoReplyID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetEmailAutoReplyByID", mock.Anything, autoReplyID).Return(&ar, nil)
 	s.env.OnActivity("GetEmailAccountByID", mock.Anything, accountID).Return(&account, nil)
-	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(&fqdn, nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetClusterByID", mock.Anything, clusterID).Return(&cluster, nil)
+	s.env.OnActivity("GetStalwartContext", mock.Anything, fqdnID).Return(&activity.StalwartContext{
+		StalwartURL:   "https://mail.example.com",
+		StalwartToken: "admin-token",
+		FQDNID:        fqdnID,
+		FQDN:          "example.com",
+	}, nil)
 	s.env.OnActivity("StalwartSetVacation", mock.Anything, activity.StalwartVacationParams{
 		BaseURL:     "https://mail.example.com",
 		AdminToken:  "admin-token",
@@ -173,30 +153,21 @@ func (s *DeleteEmailAutoReplyWorkflowTestSuite) TestSuccess() {
 	autoReplyID := "test-autoreply-1"
 	accountID := "test-account-1"
 	fqdnID := "test-fqdn-1"
-	webrootID := "test-webroot-1"
-	tenantID := "test-tenant-1"
-	clusterID := "test-cluster-1"
 
 	ar := model.EmailAutoReply{ID: autoReplyID, EmailAccountID: accountID}
 	account := model.EmailAccount{ID: accountID, FQDNID: fqdnID, Address: "user@example.com"}
-	fqdn := model.FQDN{ID: fqdnID, FQDN: "example.com", WebrootID: webrootID}
-	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ClusterID: clusterID}
-	clusterConfig, _ := json.Marshal(map[string]string{
-		"stalwart_url":   "https://mail.example.com",
-		"stalwart_token": "admin-token",
-	})
-	cluster := model.Cluster{ID: clusterID, Config: clusterConfig}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "email_autoreplies", ID: autoReplyID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetEmailAutoReplyByID", mock.Anything, autoReplyID).Return(&ar, nil)
 	s.env.OnActivity("GetEmailAccountByID", mock.Anything, accountID).Return(&account, nil)
-	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(&fqdn, nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetClusterByID", mock.Anything, clusterID).Return(&cluster, nil)
+	s.env.OnActivity("GetStalwartContext", mock.Anything, fqdnID).Return(&activity.StalwartContext{
+		StalwartURL:   "https://mail.example.com",
+		StalwartToken: "admin-token",
+		FQDNID:        fqdnID,
+		FQDN:          "example.com",
+	}, nil)
 	s.env.OnActivity("StalwartSetVacation", mock.Anything, activity.StalwartVacationParams{
 		BaseURL:     "https://mail.example.com",
 		AdminToken:  "admin-token",

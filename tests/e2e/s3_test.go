@@ -1,5 +1,3 @@
-//go:build e2e
-
 package e2e
 
 import (
@@ -441,44 +439,3 @@ func findStorageShard(t *testing.T, clusterID string) string {
 	return ""
 }
 
-// findNodeIPsByRole returns all node IPs for the given role in a cluster.
-func findNodeIPsByRole(t *testing.T, clusterID, role string) []string {
-	t.Helper()
-
-	// Find the shard ID for this role.
-	resp, body := httpGet(t, fmt.Sprintf("%s/clusters/%s/shards", coreAPIURL, clusterID))
-	require.Equal(t, 200, resp.StatusCode)
-
-	shards := parsePaginatedItems(t, body)
-	var shardID string
-	for _, s := range shards {
-		if r, _ := s["role"].(string); r == role {
-			shardID, _ = s["id"].(string)
-			break
-		}
-	}
-	if shardID == "" {
-		return nil
-	}
-
-	// List all nodes in the cluster, filter by shard_id.
-	resp, body = httpGet(t, fmt.Sprintf("%s/clusters/%s/nodes", coreAPIURL, clusterID))
-	if resp.StatusCode != 200 {
-		return nil
-	}
-
-	nodes := parsePaginatedItems(t, body)
-	var ips []string
-	for _, n := range nodes {
-		if sid, _ := n["shard_id"].(string); sid == shardID {
-			if ip, ok := n["ip_address"].(string); ok && ip != "" {
-				// Strip CIDR suffix if present (e.g., "10.10.10.50/32" -> "10.10.10.50").
-				if idx := strings.Index(ip, "/"); idx != -1 {
-					ip = ip[:idx]
-				}
-				ips = append(ips, ip)
-			}
-		}
-	}
-	return ips
-}

@@ -64,8 +64,9 @@ func MigrateDatabaseWorkflow(ctx workflow.Context, params MigrateDatabaseParams)
 		return err
 	}
 	if len(sourceNodes) == 0 {
-		_ = setResourceFailed(ctx, "databases", databaseID, err)
-		return fmt.Errorf("source shard %s has no nodes", sourceShardID)
+		noNodesErr := fmt.Errorf("source shard %s has no nodes", sourceShardID)
+		_ = setResourceFailed(ctx, "databases", databaseID, noNodesErr)
+		return noNodesErr
 	}
 
 	// Get target shard nodes.
@@ -76,8 +77,9 @@ func MigrateDatabaseWorkflow(ctx workflow.Context, params MigrateDatabaseParams)
 		return err
 	}
 	if len(targetNodes) == 0 {
-		_ = setResourceFailed(ctx, "databases", databaseID, err)
-		return fmt.Errorf("target shard %s has no nodes", params.TargetShardID)
+		noNodesErr := fmt.Errorf("target shard %s has no nodes", params.TargetShardID)
+		_ = setResourceFailed(ctx, "databases", databaseID, noNodesErr)
+		return noNodesErr
 	}
 
 	sourceNode := sourceNodes[0]

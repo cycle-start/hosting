@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"encoding/json"
 	"time"
 
 	"go.temporal.io/sdk/temporal"
@@ -136,42 +135,14 @@ func DeleteEmailAliasWorkflow(ctx workflow.Context, aliasID string) error {
 	}).Get(ctx, nil)
 }
 
-// resolveClusterStalwart traverses FQDN → webroot → tenant → cluster to get
-// Stalwart URL and token. On failure, it sets the resource to failed.
+// resolveClusterStalwart uses GetStalwartContext to resolve Stalwart URL and
+// token for a given FQDN. On failure, it sets the resource to failed.
 func resolveClusterStalwart(ctx workflow.Context, fqdnID, table, resourceID string) (baseURL, adminToken string, err error) {
-	var fqdn model.FQDN
-	err = workflow.ExecuteActivity(ctx, "GetFQDNByID", fqdnID).Get(ctx, &fqdn)
+	var sctx activity.StalwartContext
+	err = workflow.ExecuteActivity(ctx, "GetStalwartContext", fqdnID).Get(ctx, &sctx)
 	if err != nil {
 		_ = setResourceFailed(ctx, table, resourceID, err)
 		return "", "", err
 	}
-
-	var webroot model.Webroot
-	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", fqdn.WebrootID).Get(ctx, &webroot)
-	if err != nil {
-		_ = setResourceFailed(ctx, table, resourceID, err)
-		return "", "", err
-	}
-
-	var tenant model.Tenant
-	err = workflow.ExecuteActivity(ctx, "GetTenantByID", webroot.TenantID).Get(ctx, &tenant)
-	if err != nil {
-		_ = setResourceFailed(ctx, table, resourceID, err)
-		return "", "", err
-	}
-
-	var cluster model.Cluster
-	err = workflow.ExecuteActivity(ctx, "GetClusterByID", tenant.ClusterID).Get(ctx, &cluster)
-	if err != nil {
-		_ = setResourceFailed(ctx, table, resourceID, err)
-		return "", "", err
-	}
-
-	var cfg struct {
-		StalwartURL   string `json:"stalwart_url"`
-		StalwartToken string `json:"stalwart_token"`
-	}
-	_ = json.Unmarshal(cluster.Config, &cfg)
-
-	return cfg.StalwartURL, cfg.StalwartToken, nil
+	return sctx.StalwartURL, sctx.StalwartToken, nil
 }

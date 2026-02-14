@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -33,9 +32,6 @@ func (s *CreateEmailAccountWorkflowTestSuite) AfterTest(suiteName, testName stri
 func (s *CreateEmailAccountWorkflowTestSuite) TestSuccess() {
 	accountID := "test-account-1"
 	fqdnID := "test-fqdn-1"
-	webrootID := "test-webroot-1"
-	tenantID := "test-tenant-1"
-	clusterID := "test-cluster-1"
 
 	account := model.EmailAccount{
 		ID:          accountID,
@@ -46,42 +42,17 @@ func (s *CreateEmailAccountWorkflowTestSuite) TestSuccess() {
 		Status:      model.StatusPending,
 	}
 
-	fqdn := model.FQDN{
-		ID:        fqdnID,
-		FQDN:      "example.com",
-		WebrootID: webrootID,
-	}
-
-	webroot := model.Webroot{
-		ID:       webrootID,
-		TenantID: tenantID,
-	}
-
-	tenant := model.Tenant{
-		ID:        tenantID,
-		BrandID:   "test-brand",
-		ClusterID: clusterID,
-	}
-
-	clusterConfig, _ := json.Marshal(map[string]string{
-		"stalwart_url":   "https://mail.example.com",
-		"stalwart_token": "admin-token",
-		"mail_hostname":  "mail.cluster1.example.com",
-	})
-	cluster := model.Cluster{
-		ID:     clusterID,
-		Name:   "cluster-1",
-		Config: clusterConfig,
-	}
-
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "email_accounts", ID: accountID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetEmailAccountByID", mock.Anything, accountID).Return(&account, nil)
-	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(&fqdn, nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetClusterByID", mock.Anything, clusterID).Return(&cluster, nil)
+	s.env.OnActivity("GetStalwartContext", mock.Anything, fqdnID).Return(&activity.StalwartContext{
+		StalwartURL:   "https://mail.example.com",
+		StalwartToken: "admin-token",
+		MailHostname:  "mail.cluster1.example.com",
+		FQDNID:        fqdnID,
+		FQDN:          "example.com",
+	}, nil)
 	s.env.OnActivity("StalwartCreateDomain", mock.Anything, activity.StalwartDomainParams{
 		BaseURL:    "https://mail.example.com",
 		AdminToken: "admin-token",
@@ -122,7 +93,7 @@ func (s *CreateEmailAccountWorkflowTestSuite) TestGetEmailAccountFails_SetsStatu
 	s.Error(s.env.GetWorkflowError())
 }
 
-func (s *CreateEmailAccountWorkflowTestSuite) TestGetFQDNFails_SetsStatusFailed() {
+func (s *CreateEmailAccountWorkflowTestSuite) TestGetStalwartContextFails_SetsStatusFailed() {
 	accountID := "test-account-3"
 	fqdnID := "test-fqdn-3"
 
@@ -136,7 +107,7 @@ func (s *CreateEmailAccountWorkflowTestSuite) TestGetFQDNFails_SetsStatusFailed(
 		Table: "email_accounts", ID: accountID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetEmailAccountByID", mock.Anything, accountID).Return(&account, nil)
-	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(nil, fmt.Errorf("fqdn not found"))
+	s.env.OnActivity("GetStalwartContext", mock.Anything, fqdnID).Return(nil, fmt.Errorf("stalwart context not found"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("email_accounts", accountID)).Return(nil)
 
 	s.env.ExecuteWorkflow(CreateEmailAccountWorkflow, accountID)
@@ -147,9 +118,6 @@ func (s *CreateEmailAccountWorkflowTestSuite) TestGetFQDNFails_SetsStatusFailed(
 func (s *CreateEmailAccountWorkflowTestSuite) TestStalwartCreateAccountFails_SetsStatusFailed() {
 	accountID := "test-account-4"
 	fqdnID := "test-fqdn-4"
-	webrootID := "test-webroot-4"
-	tenantID := "test-tenant-4"
-	clusterID := "test-cluster-4"
 
 	account := model.EmailAccount{
 		ID:          accountID,
@@ -158,23 +126,17 @@ func (s *CreateEmailAccountWorkflowTestSuite) TestStalwartCreateAccountFails_Set
 		DisplayName: "Test User",
 		QuotaBytes:  1073741824,
 	}
-	fqdn := model.FQDN{ID: fqdnID, FQDN: "example.com", WebrootID: webrootID}
-	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ClusterID: clusterID}
-	clusterConfig, _ := json.Marshal(map[string]string{
-		"stalwart_url":   "https://mail.example.com",
-		"stalwart_token": "admin-token",
-	})
-	cluster := model.Cluster{ID: clusterID, Config: clusterConfig}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "email_accounts", ID: accountID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetEmailAccountByID", mock.Anything, accountID).Return(&account, nil)
-	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(&fqdn, nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetClusterByID", mock.Anything, clusterID).Return(&cluster, nil)
+	s.env.OnActivity("GetStalwartContext", mock.Anything, fqdnID).Return(&activity.StalwartContext{
+		StalwartURL:   "https://mail.example.com",
+		StalwartToken: "admin-token",
+		FQDNID:        fqdnID,
+		FQDN:          "example.com",
+	}, nil)
 	s.env.OnActivity("StalwartCreateDomain", mock.Anything, activity.StalwartDomainParams{
 		BaseURL:    "https://mail.example.com",
 		AdminToken: "admin-token",
@@ -214,32 +176,23 @@ func (s *DeleteEmailAccountWorkflowTestSuite) AfterTest(suiteName, testName stri
 func (s *DeleteEmailAccountWorkflowTestSuite) TestSuccess_LastAccount_CleansUpDomain() {
 	accountID := "test-account-1"
 	fqdnID := "test-fqdn-1"
-	webrootID := "test-webroot-1"
-	tenantID := "test-tenant-1"
-	clusterID := "test-cluster-1"
 
 	account := model.EmailAccount{
 		ID:      accountID,
 		FQDNID:  fqdnID,
 		Address: "user@example.com",
 	}
-	fqdn := model.FQDN{ID: fqdnID, FQDN: "example.com", WebrootID: webrootID}
-	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ClusterID: clusterID}
-	clusterConfig, _ := json.Marshal(map[string]string{
-		"stalwart_url":   "https://mail.example.com",
-		"stalwart_token": "admin-token",
-	})
-	cluster := model.Cluster{ID: clusterID, Config: clusterConfig}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "email_accounts", ID: accountID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetEmailAccountByID", mock.Anything, accountID).Return(&account, nil)
-	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(&fqdn, nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetClusterByID", mock.Anything, clusterID).Return(&cluster, nil)
+	s.env.OnActivity("GetStalwartContext", mock.Anything, fqdnID).Return(&activity.StalwartContext{
+		StalwartURL:   "https://mail.example.com",
+		StalwartToken: "admin-token",
+		FQDNID:        fqdnID,
+		FQDN:          "example.com",
+	}, nil)
 	s.env.OnActivity("StalwartDeleteAccount", mock.Anything, activity.StalwartDeleteAccountParams{
 		BaseURL:    "https://mail.example.com",
 		AdminToken: "admin-token",
@@ -264,32 +217,23 @@ func (s *DeleteEmailAccountWorkflowTestSuite) TestSuccess_LastAccount_CleansUpDo
 func (s *DeleteEmailAccountWorkflowTestSuite) TestSuccess_OtherAccountsRemain_NoDomainCleanup() {
 	accountID := "test-account-2"
 	fqdnID := "test-fqdn-2"
-	webrootID := "test-webroot-2"
-	tenantID := "test-tenant-2"
-	clusterID := "test-cluster-2"
 
 	account := model.EmailAccount{
 		ID:      accountID,
 		FQDNID:  fqdnID,
 		Address: "user@example.com",
 	}
-	fqdn := model.FQDN{ID: fqdnID, FQDN: "example.com", WebrootID: webrootID}
-	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ClusterID: clusterID}
-	clusterConfig, _ := json.Marshal(map[string]string{
-		"stalwart_url":   "https://mail.example.com",
-		"stalwart_token": "admin-token",
-	})
-	cluster := model.Cluster{ID: clusterID, Config: clusterConfig}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "email_accounts", ID: accountID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetEmailAccountByID", mock.Anything, accountID).Return(&account, nil)
-	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(&fqdn, nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetClusterByID", mock.Anything, clusterID).Return(&cluster, nil)
+	s.env.OnActivity("GetStalwartContext", mock.Anything, fqdnID).Return(&activity.StalwartContext{
+		StalwartURL:   "https://mail.example.com",
+		StalwartToken: "admin-token",
+		FQDNID:        fqdnID,
+		FQDN:          "example.com",
+	}, nil)
 	s.env.OnActivity("StalwartDeleteAccount", mock.Anything, activity.StalwartDeleteAccountParams{
 		BaseURL:    "https://mail.example.com",
 		AdminToken: "admin-token",
@@ -323,32 +267,23 @@ func (s *DeleteEmailAccountWorkflowTestSuite) TestGetEmailAccountFails_SetsStatu
 func (s *DeleteEmailAccountWorkflowTestSuite) TestStalwartDeleteAccountFails_SetsStatusFailed() {
 	accountID := "test-account-4"
 	fqdnID := "test-fqdn-4"
-	webrootID := "test-webroot-4"
-	tenantID := "test-tenant-4"
-	clusterID := "test-cluster-4"
 
 	account := model.EmailAccount{
 		ID:      accountID,
 		FQDNID:  fqdnID,
 		Address: "user@example.com",
 	}
-	fqdn := model.FQDN{ID: fqdnID, FQDN: "example.com", WebrootID: webrootID}
-	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ClusterID: clusterID}
-	clusterConfig, _ := json.Marshal(map[string]string{
-		"stalwart_url":   "https://mail.example.com",
-		"stalwart_token": "admin-token",
-	})
-	cluster := model.Cluster{ID: clusterID, Config: clusterConfig}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "email_accounts", ID: accountID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetEmailAccountByID", mock.Anything, accountID).Return(&account, nil)
-	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(&fqdn, nil)
-	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
-	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetClusterByID", mock.Anything, clusterID).Return(&cluster, nil)
+	s.env.OnActivity("GetStalwartContext", mock.Anything, fqdnID).Return(&activity.StalwartContext{
+		StalwartURL:   "https://mail.example.com",
+		StalwartToken: "admin-token",
+		FQDNID:        fqdnID,
+		FQDN:          "example.com",
+	}, nil)
 	s.env.OnActivity("StalwartDeleteAccount", mock.Anything, activity.StalwartDeleteAccountParams{
 		BaseURL:    "https://mail.example.com",
 		AdminToken: "admin-token",

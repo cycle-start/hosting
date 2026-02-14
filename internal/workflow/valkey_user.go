@@ -31,46 +31,30 @@ func CreateValkeyUserWorkflow(ctx workflow.Context, userID string) error {
 		return err
 	}
 
-	// Look up the valkey user.
-	var vUser model.ValkeyUser
-	err = workflow.ExecuteActivity(ctx, "GetValkeyUserByID", userID).Get(ctx, &vUser)
+	// Look up the valkey user, instance, and nodes.
+	var vctx activity.ValkeyUserContext
+	err = workflow.ExecuteActivity(ctx, "GetValkeyUserContext", userID).Get(ctx, &vctx)
 	if err != nil {
 		_ = setResourceFailed(ctx, "valkey_users", userID, err)
 		return err
 	}
 
-	// Look up the instance to get its name and port.
-	var instance model.ValkeyInstance
-	err = workflow.ExecuteActivity(ctx, "GetValkeyInstanceByID", vUser.ValkeyInstanceID).Get(ctx, &instance)
-	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID, err)
-		return err
-	}
-
-	// Look up nodes in the instance's shard.
-	if instance.ShardID == nil {
-		noShardErr := fmt.Errorf("valkey instance %s has no shard assigned", vUser.ValkeyInstanceID)
+	if vctx.Instance.ShardID == nil {
+		noShardErr := fmt.Errorf("valkey instance %s has no shard assigned", vctx.User.ValkeyInstanceID)
 		_ = setResourceFailed(ctx, "valkey_users", userID, noShardErr)
 		return noShardErr
 	}
 
-	var nodes []model.Node
-	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *instance.ShardID).Get(ctx, &nodes)
-	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID, err)
-		return err
-	}
-
 	// Create valkey user on each node in the shard.
-	for _, node := range nodes {
+	for _, node := range vctx.Nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "CreateValkeyUser", activity.CreateValkeyUserParams{
-			InstanceName: instance.Name,
-			Port:         instance.Port,
-			Username:     vUser.Username,
-			Password:     vUser.Password,
-			Privileges:   vUser.Privileges,
-			KeyPattern:   vUser.KeyPattern,
+			InstanceName: vctx.Instance.Name,
+			Port:         vctx.Instance.Port,
+			Username:     vctx.User.Username,
+			Password:     vctx.User.Password,
+			Privileges:   vctx.User.Privileges,
+			KeyPattern:   vctx.User.KeyPattern,
 		}).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "valkey_users", userID, err)
@@ -106,46 +90,30 @@ func UpdateValkeyUserWorkflow(ctx workflow.Context, userID string) error {
 		return err
 	}
 
-	// Look up the valkey user.
-	var vUser model.ValkeyUser
-	err = workflow.ExecuteActivity(ctx, "GetValkeyUserByID", userID).Get(ctx, &vUser)
+	// Look up the valkey user, instance, and nodes.
+	var vctx activity.ValkeyUserContext
+	err = workflow.ExecuteActivity(ctx, "GetValkeyUserContext", userID).Get(ctx, &vctx)
 	if err != nil {
 		_ = setResourceFailed(ctx, "valkey_users", userID, err)
 		return err
 	}
 
-	// Look up the instance to get its name and port.
-	var instance model.ValkeyInstance
-	err = workflow.ExecuteActivity(ctx, "GetValkeyInstanceByID", vUser.ValkeyInstanceID).Get(ctx, &instance)
-	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID, err)
-		return err
-	}
-
-	// Look up nodes in the instance's shard.
-	if instance.ShardID == nil {
-		noShardErr := fmt.Errorf("valkey instance %s has no shard assigned", vUser.ValkeyInstanceID)
+	if vctx.Instance.ShardID == nil {
+		noShardErr := fmt.Errorf("valkey instance %s has no shard assigned", vctx.User.ValkeyInstanceID)
 		_ = setResourceFailed(ctx, "valkey_users", userID, noShardErr)
 		return noShardErr
 	}
 
-	var nodes []model.Node
-	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *instance.ShardID).Get(ctx, &nodes)
-	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID, err)
-		return err
-	}
-
 	// Update valkey user on each node in the shard.
-	for _, node := range nodes {
+	for _, node := range vctx.Nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "UpdateValkeyUser", activity.UpdateValkeyUserParams{
-			InstanceName: instance.Name,
-			Port:         instance.Port,
-			Username:     vUser.Username,
-			Password:     vUser.Password,
-			Privileges:   vUser.Privileges,
-			KeyPattern:   vUser.KeyPattern,
+			InstanceName: vctx.Instance.Name,
+			Port:         vctx.Instance.Port,
+			Username:     vctx.User.Username,
+			Password:     vctx.User.Password,
+			Privileges:   vctx.User.Privileges,
+			KeyPattern:   vctx.User.KeyPattern,
 		}).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "valkey_users", userID, err)
@@ -181,43 +149,27 @@ func DeleteValkeyUserWorkflow(ctx workflow.Context, userID string) error {
 		return err
 	}
 
-	// Look up the valkey user.
-	var vUser model.ValkeyUser
-	err = workflow.ExecuteActivity(ctx, "GetValkeyUserByID", userID).Get(ctx, &vUser)
+	// Look up the valkey user, instance, and nodes.
+	var vctx activity.ValkeyUserContext
+	err = workflow.ExecuteActivity(ctx, "GetValkeyUserContext", userID).Get(ctx, &vctx)
 	if err != nil {
 		_ = setResourceFailed(ctx, "valkey_users", userID, err)
 		return err
 	}
 
-	// Look up the instance to get its name and port.
-	var instance model.ValkeyInstance
-	err = workflow.ExecuteActivity(ctx, "GetValkeyInstanceByID", vUser.ValkeyInstanceID).Get(ctx, &instance)
-	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID, err)
-		return err
-	}
-
-	// Look up nodes in the instance's shard.
-	if instance.ShardID == nil {
-		noShardErr := fmt.Errorf("valkey instance %s has no shard assigned", vUser.ValkeyInstanceID)
+	if vctx.Instance.ShardID == nil {
+		noShardErr := fmt.Errorf("valkey instance %s has no shard assigned", vctx.User.ValkeyInstanceID)
 		_ = setResourceFailed(ctx, "valkey_users", userID, noShardErr)
 		return noShardErr
 	}
 
-	var nodes []model.Node
-	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *instance.ShardID).Get(ctx, &nodes)
-	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID, err)
-		return err
-	}
-
 	// Delete valkey user on each node in the shard.
-	for _, node := range nodes {
+	for _, node := range vctx.Nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "DeleteValkeyUser", activity.DeleteValkeyUserParams{
-			InstanceName: instance.Name,
-			Port:         instance.Port,
-			Username:     vUser.Username,
+			InstanceName: vctx.Instance.Name,
+			Port:         vctx.Instance.Port,
+			Username:     vctx.User.Username,
 		}).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "valkey_users", userID, err)

@@ -1,5 +1,3 @@
-//go:build e2e
-
 package e2e
 
 import (
@@ -38,7 +36,7 @@ func TestBackupWebroot(t *testing.T) {
 	t.Logf("webroot active")
 
 	// Write a test file on a web node.
-	ips := findNodeIPs(t, clusterName, "web")
+	ips := findNodeIPsByRole(t, clusterName, "web")
 	nodeIP := ips[0]
 	tenantName := "e2e-backup-web"
 	testFilePath := fmt.Sprintf("/var/www/storage/%s/backup-site/public/backup-test.txt", tenantName)

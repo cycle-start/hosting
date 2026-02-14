@@ -9,10 +9,9 @@ go test ./...
 go vet ./...
 ```
 
-Docker Compose (local dev):
+E2E tests (requires running control plane at `api.hosting.test`):
 ```bash
-docker compose --profile platform up -d          # start everything
-docker compose --profile platform build admin-ui && docker compose --profile platform up -d admin-ui  # rebuild admin-ui after frontend changes
+HOSTING_E2E=1 go test ./tests/e2e/... -v
 ```
 
 ## Conventions
@@ -27,7 +26,6 @@ docker compose --profile platform build admin-ui && docker compose --profile pla
 When modifying any of these, update the Helm chart in `deploy/helm/hosting/` to match:
 
 - `internal/config/config.go` — new/changed env vars → update `templates/configmap.yaml` or `templates/secret.yaml`, and add defaults to `values.yaml`
-- `docker-compose.yml` — new services, changed ports, health checks → update corresponding deployment/service templates
 - Health check endpoints (`/healthz`, `/readyz`) — update probe paths in deployment templates
 
-Keep `values.yaml` defaults in sync with `config.go` defaults and `docker-compose.yml` values.
+Keep `values.yaml` defaults in sync with `config.go` defaults.

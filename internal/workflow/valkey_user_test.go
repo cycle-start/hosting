@@ -55,9 +55,11 @@ func (s *CreateValkeyUserWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_users", ID: userID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetValkeyUserByID", mock.Anything, userID).Return(&vUser, nil)
-	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(&instance, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetValkeyUserContext", mock.Anything, userID).Return(&activity.ValkeyUserContext{
+		User:     vUser,
+		Instance: instance,
+		Nodes:    nodes,
+	}, nil)
 	s.env.OnActivity("CreateValkeyUser", mock.Anything, activity.CreateValkeyUserParams{
 		InstanceName: "myvalkey",
 		Port:         6379,
@@ -80,7 +82,7 @@ func (s *CreateValkeyUserWorkflowTestSuite) TestGetUserFails_SetsStatusFailed() 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_users", ID: userID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetValkeyUserByID", mock.Anything, userID).Return(nil, fmt.Errorf("not found"))
+	s.env.OnActivity("GetValkeyUserContext", mock.Anything, userID).Return(nil, fmt.Errorf("not found"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("valkey_users", userID)).Return(nil)
 	s.env.ExecuteWorkflow(CreateValkeyUserWorkflow, userID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -89,22 +91,11 @@ func (s *CreateValkeyUserWorkflowTestSuite) TestGetUserFails_SetsStatusFailed() 
 
 func (s *CreateValkeyUserWorkflowTestSuite) TestGetInstanceFails_SetsStatusFailed() {
 	userID := "test-vuser-3"
-	instanceID := "test-valkey-3"
-
-	vUser := model.ValkeyUser{
-		ID:               userID,
-		ValkeyInstanceID: instanceID,
-		Username:         "appuser",
-		Password:         "secret123",
-		Privileges:       []string{"allcommands"},
-		KeyPattern:       "*",
-	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_users", ID: userID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetValkeyUserByID", mock.Anything, userID).Return(&vUser, nil)
-	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(nil, fmt.Errorf("not found"))
+	s.env.OnActivity("GetValkeyUserContext", mock.Anything, userID).Return(nil, fmt.Errorf("not found"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("valkey_users", userID)).Return(nil)
 	s.env.ExecuteWorkflow(CreateValkeyUserWorkflow, userID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -137,9 +128,11 @@ func (s *CreateValkeyUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_users", ID: userID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetValkeyUserByID", mock.Anything, userID).Return(&vUser, nil)
-	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(&instance, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetValkeyUserContext", mock.Anything, userID).Return(&activity.ValkeyUserContext{
+		User:     vUser,
+		Instance: instance,
+		Nodes:    nodes,
+	}, nil)
 	s.env.OnActivity("CreateValkeyUser", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("valkey_users", userID)).Return(nil)
 	s.env.ExecuteWorkflow(CreateValkeyUserWorkflow, userID)
@@ -168,8 +161,10 @@ func (s *CreateValkeyUserWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_users", ID: userID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetValkeyUserByID", mock.Anything, userID).Return(&vUser, nil)
-	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(&instance, nil)
+	s.env.OnActivity("GetValkeyUserContext", mock.Anything, userID).Return(&activity.ValkeyUserContext{
+		User:     vUser,
+		Instance: instance,
+	}, nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("valkey_users", userID)).Return(nil)
 	s.env.ExecuteWorkflow(CreateValkeyUserWorkflow, userID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -228,9 +223,11 @@ func (s *UpdateValkeyUserWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_users", ID: userID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetValkeyUserByID", mock.Anything, userID).Return(&vUser, nil)
-	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(&instance, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetValkeyUserContext", mock.Anything, userID).Return(&activity.ValkeyUserContext{
+		User:     vUser,
+		Instance: instance,
+		Nodes:    nodes,
+	}, nil)
 	s.env.OnActivity("UpdateValkeyUser", mock.Anything, activity.UpdateValkeyUserParams{
 		InstanceName: "myvalkey",
 		Port:         6379,
@@ -271,9 +268,11 @@ func (s *UpdateValkeyUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_users", ID: userID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetValkeyUserByID", mock.Anything, userID).Return(&vUser, nil)
-	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(&instance, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetValkeyUserContext", mock.Anything, userID).Return(&activity.ValkeyUserContext{
+		User:     vUser,
+		Instance: instance,
+		Nodes:    nodes,
+	}, nil)
 	s.env.OnActivity("UpdateValkeyUser", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("valkey_users", userID)).Return(nil)
 	s.env.ExecuteWorkflow(UpdateValkeyUserWorkflow, userID)
@@ -287,7 +286,7 @@ func (s *UpdateValkeyUserWorkflowTestSuite) TestGetUserFails_SetsStatusFailed() 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_users", ID: userID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetValkeyUserByID", mock.Anything, userID).Return(nil, fmt.Errorf("not found"))
+	s.env.OnActivity("GetValkeyUserContext", mock.Anything, userID).Return(nil, fmt.Errorf("not found"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("valkey_users", userID)).Return(nil)
 	s.env.ExecuteWorkflow(UpdateValkeyUserWorkflow, userID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -333,9 +332,11 @@ func (s *DeleteValkeyUserWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_users", ID: userID, Status: model.StatusDeleting,
 	}).Return(nil)
-	s.env.OnActivity("GetValkeyUserByID", mock.Anything, userID).Return(&vUser, nil)
-	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(&instance, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetValkeyUserContext", mock.Anything, userID).Return(&activity.ValkeyUserContext{
+		User:     vUser,
+		Instance: instance,
+		Nodes:    nodes,
+	}, nil)
 	s.env.OnActivity("DeleteValkeyUser", mock.Anything, activity.DeleteValkeyUserParams{
 		InstanceName: "myvalkey",
 		Port:         6379,
@@ -371,9 +372,11 @@ func (s *DeleteValkeyUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_users", ID: userID, Status: model.StatusDeleting,
 	}).Return(nil)
-	s.env.OnActivity("GetValkeyUserByID", mock.Anything, userID).Return(&vUser, nil)
-	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(&instance, nil)
-	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("GetValkeyUserContext", mock.Anything, userID).Return(&activity.ValkeyUserContext{
+		User:     vUser,
+		Instance: instance,
+		Nodes:    nodes,
+	}, nil)
 	s.env.OnActivity("DeleteValkeyUser", mock.Anything, activity.DeleteValkeyUserParams{
 		InstanceName: "myvalkey",
 		Port:         6379,
@@ -391,7 +394,7 @@ func (s *DeleteValkeyUserWorkflowTestSuite) TestGetUserFails_SetsStatusFailed() 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_users", ID: userID, Status: model.StatusDeleting,
 	}).Return(nil)
-	s.env.OnActivity("GetValkeyUserByID", mock.Anything, userID).Return(nil, fmt.Errorf("not found"))
+	s.env.OnActivity("GetValkeyUserContext", mock.Anything, userID).Return(nil, fmt.Errorf("not found"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("valkey_users", userID)).Return(nil)
 	s.env.ExecuteWorkflow(DeleteValkeyUserWorkflow, userID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -400,19 +403,11 @@ func (s *DeleteValkeyUserWorkflowTestSuite) TestGetUserFails_SetsStatusFailed() 
 
 func (s *DeleteValkeyUserWorkflowTestSuite) TestGetInstanceFails_SetsStatusFailed() {
 	userID := "test-vuser-4"
-	instanceID := "test-valkey-4"
-
-	vUser := model.ValkeyUser{
-		ID:               userID,
-		ValkeyInstanceID: instanceID,
-		Username:         "appuser",
-	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_users", ID: userID, Status: model.StatusDeleting,
 	}).Return(nil)
-	s.env.OnActivity("GetValkeyUserByID", mock.Anything, userID).Return(&vUser, nil)
-	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(nil, fmt.Errorf("not found"))
+	s.env.OnActivity("GetValkeyUserContext", mock.Anything, userID).Return(nil, fmt.Errorf("not found"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("valkey_users", userID)).Return(nil)
 	s.env.ExecuteWorkflow(DeleteValkeyUserWorkflow, userID)
 	s.True(s.env.IsWorkflowCompleted())

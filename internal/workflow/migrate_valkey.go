@@ -65,8 +65,9 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 		return err
 	}
 	if len(sourceNodes) == 0 {
-		_ = setResourceFailed(ctx, "valkey_instances", instanceID, err)
-		return fmt.Errorf("source shard %s has no nodes", sourceShardID)
+		noNodesErr := fmt.Errorf("source shard %s has no nodes", sourceShardID)
+		_ = setResourceFailed(ctx, "valkey_instances", instanceID, noNodesErr)
+		return noNodesErr
 	}
 
 	// Get target shard nodes.
@@ -77,8 +78,9 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 		return err
 	}
 	if len(targetNodes) == 0 {
-		_ = setResourceFailed(ctx, "valkey_instances", instanceID, err)
-		return fmt.Errorf("target shard %s has no nodes", params.TargetShardID)
+		noNodesErr := fmt.Errorf("target shard %s has no nodes", params.TargetShardID)
+		_ = setResourceFailed(ctx, "valkey_instances", instanceID, noNodesErr)
+		return noNodesErr
 	}
 
 	sourceNode := sourceNodes[0]

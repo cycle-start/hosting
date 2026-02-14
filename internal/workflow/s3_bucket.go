@@ -51,8 +51,9 @@ func CreateS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 		tenantID = *bucket.TenantID
 	}
 	if tenantID == "" {
-		_ = setResourceFailed(ctx, "s3_buckets", bucketID, err)
-		return fmt.Errorf("s3 bucket %s has no tenant assigned", bucketID)
+		noTenantErr := fmt.Errorf("s3 bucket %s has no tenant assigned", bucketID)
+		_ = setResourceFailed(ctx, "s3_buckets", bucketID, noTenantErr)
+		return noTenantErr
 	}
 
 	// Look up nodes in the S3 shard.
@@ -64,8 +65,9 @@ func CreateS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 	}
 
 	if len(nodes) == 0 {
-		_ = setResourceFailed(ctx, "s3_buckets", bucketID, err)
-		return fmt.Errorf("no nodes found in S3 shard %s", *bucket.ShardID)
+		noNodesErr := fmt.Errorf("no nodes found in S3 shard %s", *bucket.ShardID)
+		_ = setResourceFailed(ctx, "s3_buckets", bucketID, noNodesErr)
+		return noNodesErr
 	}
 
 	// RGW is cluster-wide, so we only need to execute on the first node.
@@ -213,8 +215,9 @@ func DeleteS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 	}
 
 	if len(nodes) == 0 {
-		_ = setResourceFailed(ctx, "s3_buckets", bucketID, err)
-		return fmt.Errorf("no nodes found in S3 shard %s", *bucket.ShardID)
+		noNodesErr := fmt.Errorf("no nodes found in S3 shard %s", *bucket.ShardID)
+		_ = setResourceFailed(ctx, "s3_buckets", bucketID, noNodesErr)
+		return noNodesErr
 	}
 
 	internalName := tenantID + "--" + bucket.Name

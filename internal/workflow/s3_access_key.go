@@ -31,51 +31,37 @@ func CreateS3AccessKeyWorkflow(ctx workflow.Context, keyID string) error {
 		return err
 	}
 
-	// Look up the key.
-	var key model.S3AccessKey
-	err = workflow.ExecuteActivity(ctx, "GetS3AccessKeyByID", keyID).Get(ctx, &key)
+	// Look up the key, bucket, and nodes.
+	var sctx activity.S3AccessKeyContext
+	err = workflow.ExecuteActivity(ctx, "GetS3AccessKeyContext", keyID).Get(ctx, &sctx)
 	if err != nil {
 		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
 		return err
 	}
 
-	// Look up the bucket.
-	var bucket model.S3Bucket
-	err = workflow.ExecuteActivity(ctx, "GetS3BucketByID", key.S3BucketID).Get(ctx, &bucket)
-	if err != nil {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
-		return err
-	}
-
-	if bucket.ShardID == nil {
-		noShardErr := fmt.Errorf("s3 bucket %s has no shard assigned", key.S3BucketID)
+	if sctx.Bucket.ShardID == nil {
+		noShardErr := fmt.Errorf("s3 bucket %s has no shard assigned", sctx.Key.S3BucketID)
 		_ = setResourceFailed(ctx, "s3_access_keys", keyID, noShardErr)
 		return noShardErr
 	}
 
 	var tenantID string
-	if bucket.TenantID != nil {
-		tenantID = *bucket.TenantID
+	if sctx.Bucket.TenantID != nil {
+		tenantID = *sctx.Bucket.TenantID
 	}
 
-	var nodes []model.Node
-	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *bucket.ShardID).Get(ctx, &nodes)
-	if err != nil {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
-		return err
+	if len(sctx.Nodes) == 0 {
+		noNodesErr := fmt.Errorf("no nodes found in S3 shard %s", *sctx.Bucket.ShardID)
+		_ = setResourceFailed(ctx, "s3_access_keys", keyID, noNodesErr)
+		return noNodesErr
 	}
 
-	if len(nodes) == 0 {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
-		return fmt.Errorf("no nodes found in S3 shard %s", *bucket.ShardID)
-	}
-
-	nodeCtx := nodeActivityCtx(ctx, nodes[0].ID)
+	nodeCtx := nodeActivityCtx(ctx, sctx.Nodes[0].ID)
 
 	err = workflow.ExecuteActivity(nodeCtx, "CreateS3AccessKey", activity.CreateS3AccessKeyParams{
 		TenantID:        tenantID,
-		AccessKeyID:     key.AccessKeyID,
-		SecretAccessKey: key.SecretAccessKey,
+		AccessKeyID:     sctx.Key.AccessKeyID,
+		SecretAccessKey: sctx.Key.SecretAccessKey,
 	}).Get(ctx, nil)
 	if err != nil {
 		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
@@ -110,50 +96,36 @@ func DeleteS3AccessKeyWorkflow(ctx workflow.Context, keyID string) error {
 		return err
 	}
 
-	// Look up the key.
-	var key model.S3AccessKey
-	err = workflow.ExecuteActivity(ctx, "GetS3AccessKeyByID", keyID).Get(ctx, &key)
+	// Look up the key, bucket, and nodes.
+	var sctx activity.S3AccessKeyContext
+	err = workflow.ExecuteActivity(ctx, "GetS3AccessKeyContext", keyID).Get(ctx, &sctx)
 	if err != nil {
 		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
 		return err
 	}
 
-	// Look up the bucket.
-	var bucket model.S3Bucket
-	err = workflow.ExecuteActivity(ctx, "GetS3BucketByID", key.S3BucketID).Get(ctx, &bucket)
-	if err != nil {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
-		return err
-	}
-
-	if bucket.ShardID == nil {
-		noShardErr := fmt.Errorf("s3 bucket %s has no shard assigned", key.S3BucketID)
+	if sctx.Bucket.ShardID == nil {
+		noShardErr := fmt.Errorf("s3 bucket %s has no shard assigned", sctx.Key.S3BucketID)
 		_ = setResourceFailed(ctx, "s3_access_keys", keyID, noShardErr)
 		return noShardErr
 	}
 
 	var tenantID string
-	if bucket.TenantID != nil {
-		tenantID = *bucket.TenantID
+	if sctx.Bucket.TenantID != nil {
+		tenantID = *sctx.Bucket.TenantID
 	}
 
-	var nodes []model.Node
-	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *bucket.ShardID).Get(ctx, &nodes)
-	if err != nil {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
-		return err
+	if len(sctx.Nodes) == 0 {
+		noNodesErr := fmt.Errorf("no nodes found in S3 shard %s", *sctx.Bucket.ShardID)
+		_ = setResourceFailed(ctx, "s3_access_keys", keyID, noNodesErr)
+		return noNodesErr
 	}
 
-	if len(nodes) == 0 {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
-		return fmt.Errorf("no nodes found in S3 shard %s", *bucket.ShardID)
-	}
-
-	nodeCtx := nodeActivityCtx(ctx, nodes[0].ID)
+	nodeCtx := nodeActivityCtx(ctx, sctx.Nodes[0].ID)
 
 	err = workflow.ExecuteActivity(nodeCtx, "DeleteS3AccessKey", activity.DeleteS3AccessKeyParams{
 		TenantID:    tenantID,
-		AccessKeyID: key.AccessKeyID,
+		AccessKeyID: sctx.Key.AccessKeyID,
 	}).Get(ctx, nil)
 	if err != nil {
 		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)

@@ -1,9 +1,8 @@
-//go:build e2e
-
 package e2e
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,9 +12,37 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
-const coreAPIURL = "http://localhost:8090/api/v1"
+// coreAPIURL is the base URL for the hosting core API.
+// Override with CORE_API_URL env var.
+var coreAPIURL = "https://api.hosting.test/api/v1"
+
+// webTrafficURL is the base URL for testing web traffic through HAProxy.
+// Override with WEB_TRAFFIC_URL env var.
+var webTrafficURL = "https://hosting.test"
+
+// tlsTransport skips certificate verification for self-signed dev certs.
+var tlsTransport = &http.Transport{
+	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+}
+
+func TestMain(m *testing.M) {
+	if os.Getenv("HOSTING_E2E") == "" {
+		fmt.Println("Skipping e2e tests (set HOSTING_E2E=1 to run)")
+		os.Exit(0)
+	}
+	if u := os.Getenv("CORE_API_URL"); u != "" {
+		coreAPIURL = u
+	}
+	if u := os.Getenv("WEB_TRAFFIC_URL"); u != "" {
+		webTrafficURL = u
+	}
+	http.DefaultTransport = tlsTransport
+	os.Exit(m.Run())
+}
 
 // apiKey returns the API key for authenticating with the core API.
 // Set via HOSTING_API_KEY env var; defaults to the dev test key.
@@ -55,79 +82,56 @@ func sshExec(t *testing.T, ip string, cmd string) string {
 	return string(out)
 }
 
-// findNodeIPs queries the core API for node IPs matching a shard role.
-func findNodeIPs(t *testing.T, clusterName, role string) []string {
+// findNodeIPsByRole returns all node IPs for the given role in a cluster.
+// It finds the shard with the matching role, then filters nodes by shard_id.
+func findNodeIPsByRole(t *testing.T, clusterID, role string) []string {
 	t.Helper()
 
-	// Find cluster ID by listing regions/clusters
-	resp, body, err := httpGetWithHost(coreAPIURL+"/regions", "")
-	if err != nil || resp.StatusCode != 200 {
-		t.Fatalf("list regions: %v (status=%d body=%s)", err, resp.StatusCode, body)
-	}
+	// Find the shard ID for this role.
+	resp, body := httpGet(t, fmt.Sprintf("%s/clusters/%s/shards", coreAPIURL, clusterID))
+	require.Equal(t, 200, resp.StatusCode, "list shards: %s", body)
 
-	var regions []struct {
-		ID string `json:"id"`
-	}
-	json.Unmarshal([]byte(body), &regions)
-
-	var clusterID string
-	for _, r := range regions {
-		cResp, cBody, err := httpGetWithHost(fmt.Sprintf("%s/regions/%s/clusters", coreAPIURL, r.ID), "")
-		if err != nil || cResp.StatusCode != 200 {
-			continue
-		}
-		var clusters []struct {
-			ID   string `json:"id"`
-			Name string `json:"name"`
-		}
-		json.Unmarshal([]byte(cBody), &clusters)
-		for _, c := range clusters {
-			if c.Name == clusterName {
-				clusterID = c.ID
-				break
-			}
-		}
-		if clusterID != "" {
+	shards := parsePaginatedItems(t, body)
+	var shardID string
+	for _, s := range shards {
+		if r, _ := s["role"].(string); r == role {
+			shardID, _ = s["id"].(string)
 			break
 		}
 	}
-	if clusterID == "" {
-		t.Fatalf("cluster %q not found", clusterName)
+	if shardID == "" {
+		t.Fatalf("no shard with role %q in cluster %s", role, clusterID)
 	}
 
-	// List nodes in the cluster
-	nResp, nBody, err := httpGetWithHost(fmt.Sprintf("%s/clusters/%s/nodes", coreAPIURL, clusterID), "")
-	if err != nil || nResp.StatusCode != 200 {
-		t.Fatalf("list nodes: %v", err)
+	// List all nodes in the cluster, filter by shard_id.
+	resp, body = httpGet(t, fmt.Sprintf("%s/clusters/%s/nodes", coreAPIURL, clusterID))
+	if resp.StatusCode != 200 {
+		t.Fatalf("list nodes: status %d body=%s", resp.StatusCode, body)
 	}
 
-	var nodes []struct {
-		IPAddress *string  `json:"ip_address"`
-		Roles     []string `json:"roles"`
-	}
-	json.Unmarshal([]byte(nBody), &nodes)
-
+	nodes := parsePaginatedItems(t, body)
 	var ips []string
 	for _, n := range nodes {
-		if n.IPAddress == nil {
-			continue
-		}
-		for _, r := range n.Roles {
-			if r == role {
-				ips = append(ips, *n.IPAddress)
-				break
+		if sid, _ := n["shard_id"].(string); sid == shardID {
+			if ip, ok := n["ip_address"].(string); ok && ip != "" {
+				// Strip CIDR suffix if present (e.g., "10.10.10.50/32" -> "10.10.10.50").
+				if idx := strings.Index(ip, "/"); idx != -1 {
+					ip = ip[:idx]
+				}
+				ips = append(ips, ip)
 			}
 		}
 	}
 
 	if len(ips) == 0 {
-		t.Fatalf("no nodes with role %q found in cluster %q", role, clusterName)
+		t.Fatalf("no nodes with role %q found in cluster %s", role, clusterID)
 	}
 	return ips
 }
 
 // noRedirectClient is an HTTP client that does not follow redirects.
 var noRedirectClient = &http.Client{
+	Transport: tlsTransport,
 	CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		return http.ErrUseLastResponse
 	},

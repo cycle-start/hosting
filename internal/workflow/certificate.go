@@ -23,11 +23,15 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
 
-	// Look up the FQDN.
-	var fqdn model.FQDN
-	err := workflow.ExecuteActivity(ctx, "GetFQDNByID", fqdnID).Get(ctx, &fqdn)
+	// Fetch FQDN context (FQDN, webroot, tenant, nodes).
+	var fctx activity.FQDNContext
+	err := workflow.ExecuteActivity(ctx, "GetFQDNContext", fqdnID).Get(ctx, &fctx)
 	if err != nil {
 		return err
+	}
+
+	if fctx.Tenant.ShardID == nil {
+		return fmt.Errorf("tenant %s has no shard assigned", fctx.Tenant.ID)
 	}
 
 	// Create a certificate record in the core DB.
@@ -58,38 +62,10 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 		return err
 	}
 
-	// Look up the webroot and tenant to find the shard nodes.
-	var certWebroot model.Webroot
-	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", fqdn.WebrootID).Get(ctx, &certWebroot)
-	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID, err)
-		return err
-	}
-
-	var certTenant model.Tenant
-	err = workflow.ExecuteActivity(ctx, "GetTenantByID", certWebroot.TenantID).Get(ctx, &certTenant)
-	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID, err)
-		return err
-	}
-
-	if certTenant.ShardID == nil {
-		noShardErr := fmt.Errorf("tenant %s has no shard assigned", certWebroot.TenantID)
-		_ = setResourceFailed(ctx, "certificates", certID, noShardErr)
-		return noShardErr
-	}
-
-	var certNodes []model.Node
-	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *certTenant.ShardID).Get(ctx, &certNodes)
-	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID, err)
-		return err
-	}
-
 	// Step 1: Create ACME order.
 	var orderResult activity.ACMEOrderResult
 	err = workflow.ExecuteActivity(ctx, "CreateOrder", activity.ACMEOrderParams{
-		FQDN: fqdn.FQDN,
+		FQDN: fctx.FQDN.FQDN,
 	}).Get(ctx, &orderResult)
 	if err != nil {
 		_ = setResourceFailed(ctx, "certificates", certID, err)
@@ -98,7 +74,7 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 
 	// Step 2: For each authorization, get the HTTP-01 challenge.
 	// Typically there is one authz per domain; we handle them all.
-	webrootPath := fmt.Sprintf("/var/www/storage/%s/%s/%s", certTenant.ID, certWebroot.Name, certWebroot.PublicFolder)
+	webrootPath := fmt.Sprintf("/var/www/storage/%s/%s/%s", fctx.Tenant.ID, fctx.Webroot.Name, fctx.Webroot.PublicFolder)
 
 	for _, authzURL := range orderResult.AuthzURLs {
 		var challengeResult activity.ACMEChallengeResult
@@ -112,7 +88,7 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 		}
 
 		// Step 3: Place the challenge file on all shard nodes.
-		for _, node := range certNodes {
+		for _, node := range fctx.Nodes {
 			nodeCtx := nodeActivityCtx(ctx, node.ID)
 			err = workflow.ExecuteActivity(nodeCtx, "PlaceHTTP01Challenge", activity.PlaceHTTP01ChallengeParams{
 				WebrootPath: webrootPath,
@@ -132,7 +108,7 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 		}).Get(ctx, nil)
 		if err != nil {
 			// Best-effort cleanup of challenge files.
-			for _, node := range certNodes {
+			for _, node := range fctx.Nodes {
 				nodeCtx := nodeActivityCtx(ctx, node.ID)
 				_ = workflow.ExecuteActivity(nodeCtx, "CleanupHTTP01Challenge", activity.CleanupHTTP01ChallengeParams{
 					WebrootPath: webrootPath,
@@ -148,7 +124,7 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 	var finalizeResult activity.ACMEFinalizeResult
 	err = workflow.ExecuteActivity(ctx, "FinalizeOrder", activity.ACMEFinalizeParams{
 		OrderURL:   orderResult.OrderURL,
-		FQDN:       fqdn.FQDN,
+		FQDN:       fctx.FQDN.FQDN,
 		AccountKey: orderResult.AccountKey,
 	}).Get(ctx, &finalizeResult)
 	if err != nil {
@@ -166,7 +142,7 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 			AccountKey: orderResult.AccountKey,
 		}).Get(ctx, &cleanupChallenge)
 
-		for _, node := range certNodes {
+		for _, node := range fctx.Nodes {
 			nodeCtx := nodeActivityCtx(ctx, node.ID)
 			_ = workflow.ExecuteActivity(nodeCtx, "CleanupHTTP01Challenge", activity.CleanupHTTP01ChallengeParams{
 				WebrootPath: webrootPath,
@@ -190,10 +166,10 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 	}
 
 	// Step 8: Install the certificate on each node in the shard.
-	for _, node := range certNodes {
+	for _, node := range fctx.Nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "InstallCertificate", activity.InstallCertificateParams{
-			FQDN:     fqdn.FQDN,
+			FQDN:     fctx.FQDN.FQDN,
 			CertPEM:  finalizeResult.CertPEM,
 			KeyPEM:   finalizeResult.KeyPEM,
 			ChainPEM: finalizeResult.ChainPEM,
@@ -256,47 +232,25 @@ func UploadCustomCertWorkflow(ctx workflow.Context, certID string) error {
 		return err
 	}
 
-	// Look up the FQDN for the certificate.
-	var fqdn model.FQDN
-	err = workflow.ExecuteActivity(ctx, "GetFQDNByID", cert.FQDNID).Get(ctx, &fqdn)
+	// Fetch FQDN context (FQDN, webroot, tenant, nodes).
+	var fctx activity.FQDNContext
+	err = workflow.ExecuteActivity(ctx, "GetFQDNContext", cert.FQDNID).Get(ctx, &fctx)
 	if err != nil {
 		_ = setResourceFailed(ctx, "certificates", certID, err)
 		return err
 	}
 
-	// Look up the webroot and tenant to find the shard nodes.
-	var ucWebroot model.Webroot
-	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", fqdn.WebrootID).Get(ctx, &ucWebroot)
-	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID, err)
-		return err
-	}
-
-	var ucTenant model.Tenant
-	err = workflow.ExecuteActivity(ctx, "GetTenantByID", ucWebroot.TenantID).Get(ctx, &ucTenant)
-	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID, err)
-		return err
-	}
-
-	if ucTenant.ShardID == nil {
-		noShardErr := fmt.Errorf("tenant %s has no shard assigned", ucWebroot.TenantID)
+	if fctx.Tenant.ShardID == nil {
+		noShardErr := fmt.Errorf("tenant %s has no shard assigned", fctx.Tenant.ID)
 		_ = setResourceFailed(ctx, "certificates", certID, noShardErr)
 		return noShardErr
 	}
 
-	var ucNodes []model.Node
-	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *ucTenant.ShardID).Get(ctx, &ucNodes)
-	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID, err)
-		return err
-	}
-
 	// Install the certificate on each node in the shard.
-	for _, node := range ucNodes {
+	for _, node := range fctx.Nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "InstallCertificate", activity.InstallCertificateParams{
-			FQDN:     fqdn.FQDN,
+			FQDN:     fctx.FQDN.FQDN,
 			CertPEM:  cert.CertPEM,
 			KeyPEM:   cert.KeyPEM,
 			ChainPEM: cert.ChainPEM,

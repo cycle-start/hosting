@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"encoding/json"
 	"time"
 
 	"go.temporal.io/sdk/temporal"
@@ -40,53 +39,19 @@ func CreateEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 		return err
 	}
 
-	// Look up the FQDN.
-	var fqdn model.FQDN
-	err = workflow.ExecuteActivity(ctx, "GetFQDNByID", account.FQDNID).Get(ctx, &fqdn)
+	// Resolve Stalwart context (FQDN → webroot → tenant → cluster in one query).
+	var sctx activity.StalwartContext
+	err = workflow.ExecuteActivity(ctx, "GetStalwartContext", account.FQDNID).Get(ctx, &sctx)
 	if err != nil {
 		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
 		return err
 	}
-
-	// Look up the webroot.
-	var webroot model.Webroot
-	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", fqdn.WebrootID).Get(ctx, &webroot)
-	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
-		return err
-	}
-
-	// Look up the tenant.
-	var tenant model.Tenant
-	err = workflow.ExecuteActivity(ctx, "GetTenantByID", webroot.TenantID).Get(ctx, &tenant)
-	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
-		return err
-	}
-
-	// Get the cluster config.
-	var cluster model.Cluster
-	err = workflow.ExecuteActivity(ctx, "GetClusterByID", tenant.ClusterID).Get(ctx, &cluster)
-	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
-		return err
-	}
-
-	var clusterCfg struct {
-		StalwartURL   string `json:"stalwart_url"`
-		StalwartToken string `json:"stalwart_token"`
-		MailHostname  string `json:"mail_hostname"`
-	}
-	_ = json.Unmarshal(cluster.Config, &clusterCfg)
-
-	// Extract domain from email address.
-	domain := fqdn.FQDN
 
 	// Create domain in Stalwart (idempotent).
 	err = workflow.ExecuteActivity(ctx, "StalwartCreateDomain", activity.StalwartDomainParams{
-		BaseURL:    clusterCfg.StalwartURL,
-		AdminToken: clusterCfg.StalwartToken,
-		Domain:     domain,
+		BaseURL:    sctx.StalwartURL,
+		AdminToken: sctx.StalwartToken,
+		Domain:     sctx.FQDN,
 	}).Get(ctx, nil)
 	if err != nil {
 		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
@@ -95,8 +60,8 @@ func CreateEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 
 	// Create account in Stalwart.
 	err = workflow.ExecuteActivity(ctx, "StalwartCreateAccount", activity.StalwartCreateAccountParams{
-		BaseURL:     clusterCfg.StalwartURL,
-		AdminToken:  clusterCfg.StalwartToken,
+		BaseURL:     sctx.StalwartURL,
+		AdminToken:  sctx.StalwartToken,
 		Address:     account.Address,
 		DisplayName: account.DisplayName,
 		QuotaBytes:  account.QuotaBytes,
@@ -107,14 +72,14 @@ func CreateEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 	}
 
 	// Auto-create email DNS records (MX, SPF) if a zone exists.
-	mailHostname := clusterCfg.MailHostname
+	mailHostname := sctx.MailHostname
 	if mailHostname == "" {
-		mailHostname = "mail." + domain
+		mailHostname = "mail." + sctx.FQDN
 	}
 	err = workflow.ExecuteActivity(ctx, "AutoCreateEmailDNSRecords", activity.AutoCreateEmailDNSRecordsParams{
-		FQDN:         domain,
+		FQDN:         sctx.FQDN,
 		MailHostname: mailHostname,
-		SourceFQDNID: fqdn.ID,
+		SourceFQDNID: sctx.FQDNID,
 	}).Get(ctx, nil)
 	if err != nil {
 		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
@@ -159,48 +124,18 @@ func DeleteEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 		return err
 	}
 
-	// Look up the FQDN.
-	var fqdn model.FQDN
-	err = workflow.ExecuteActivity(ctx, "GetFQDNByID", account.FQDNID).Get(ctx, &fqdn)
+	// Resolve Stalwart context (FQDN → webroot → tenant → cluster in one query).
+	var sctx activity.StalwartContext
+	err = workflow.ExecuteActivity(ctx, "GetStalwartContext", account.FQDNID).Get(ctx, &sctx)
 	if err != nil {
 		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
 		return err
 	}
-
-	// Look up the webroot.
-	var webroot model.Webroot
-	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", fqdn.WebrootID).Get(ctx, &webroot)
-	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
-		return err
-	}
-
-	// Look up the tenant.
-	var tenant model.Tenant
-	err = workflow.ExecuteActivity(ctx, "GetTenantByID", webroot.TenantID).Get(ctx, &tenant)
-	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
-		return err
-	}
-
-	// Get the cluster config.
-	var cluster model.Cluster
-	err = workflow.ExecuteActivity(ctx, "GetClusterByID", tenant.ClusterID).Get(ctx, &cluster)
-	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
-		return err
-	}
-
-	var clusterCfg struct {
-		StalwartURL   string `json:"stalwart_url"`
-		StalwartToken string `json:"stalwart_token"`
-	}
-	_ = json.Unmarshal(cluster.Config, &clusterCfg)
 
 	// Delete account from Stalwart.
 	err = workflow.ExecuteActivity(ctx, "StalwartDeleteAccount", activity.StalwartDeleteAccountParams{
-		BaseURL:    clusterCfg.StalwartURL,
-		AdminToken: clusterCfg.StalwartToken,
+		BaseURL:    sctx.StalwartURL,
+		AdminToken: sctx.StalwartToken,
 		Address:    account.Address,
 	}).Get(ctx, nil)
 	if err != nil {
@@ -228,13 +163,13 @@ func DeleteEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 	if remaining == 0 {
 		// Delete domain from Stalwart.
 		_ = workflow.ExecuteActivity(ctx, "StalwartDeleteDomain", activity.StalwartDomainParams{
-			BaseURL:    clusterCfg.StalwartURL,
-			AdminToken: clusterCfg.StalwartToken,
-			Domain:     fqdn.FQDN,
+			BaseURL:    sctx.StalwartURL,
+			AdminToken: sctx.StalwartToken,
+			Domain:     sctx.FQDN,
 		}).Get(ctx, nil)
 
 		// Delete email DNS records.
-		_ = workflow.ExecuteActivity(ctx, "AutoDeleteEmailDNSRecords", fqdn.FQDN).Get(ctx, nil)
+		_ = workflow.ExecuteActivity(ctx, "AutoDeleteEmailDNSRecords", sctx.FQDN).Get(ctx, nil)
 	}
 
 	return nil

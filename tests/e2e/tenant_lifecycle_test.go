@@ -1,5 +1,3 @@
-//go:build e2e
-
 package e2e
 
 import (
@@ -18,8 +16,9 @@ func TestTenantLifecycle(t *testing.T) {
 	webShardID, _ := webShard["id"].(string)
 
 	// Step 1: Create a tenant.
+	brandID := findOrCreateBrand(t)
 	resp, body := httpPost(t, coreAPIURL+"/tenants", map[string]interface{}{
-		"name":       "e2e-lifecycle",
+		"brand_id":   brandID,
 		"region_id":  regionID,
 		"cluster_id": clusterID,
 		"shard_id":   webShardID,

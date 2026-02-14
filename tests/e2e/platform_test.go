@@ -1,5 +1,3 @@
-//go:build e2e
-
 package e2e
 
 import (
@@ -28,7 +26,7 @@ func clusterConfigPath() string {
 
 func TestPlatformE2E(t *testing.T) {
 	t.Run("health", func(t *testing.T) {
-		resp, body, err := httpGetWithHost("http://localhost:8090/api/v1/regions", "")
+		resp, body, err := httpGetWithHost(coreAPIURL+"/regions", "")
 		if err != nil {
 			t.Fatalf("health check failed: %v", err)
 		}
@@ -58,7 +56,7 @@ func TestPlatformE2E(t *testing.T) {
 	})
 
 	t.Run("shared_storage", func(t *testing.T) {
-		ips := findNodeIPs(t, clusterName, "web")
+		ips := findNodeIPsByRole(t, clusterName, "web")
 		if len(ips) < 2 {
 			t.Skip("need at least 2 web nodes to test shared storage")
 		}
@@ -82,7 +80,7 @@ func TestPlatformE2E(t *testing.T) {
 	})
 
 	t.Run("web_traffic", func(t *testing.T) {
-		ips := findNodeIPs(t, clusterName, "web")
+		ips := findNodeIPsByRole(t, clusterName, "web")
 		nodeIP := ips[0]
 		t.Logf("writing index.php to web node %s", nodeIP)
 
@@ -91,7 +89,7 @@ func TestPlatformE2E(t *testing.T) {
 		sshExec(t, nodeIP, "echo '"+phpContent+"' | sudo tee /var/www/storage/acme-corp/main-site/public/index.php")
 
 		// Wait for the page to be served through HAProxy
-		resp, body := waitForHTTP(t, "http://localhost:80", "acme.hosting.test", httpTimeout)
+		resp, body := waitForHTTP(t, webTrafficURL, "acme.hosting.test", httpTimeout)
 
 		// Assert response body
 		if resp.StatusCode != 200 {

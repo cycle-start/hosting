@@ -30,17 +30,9 @@ func CreateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 		return err
 	}
 
-	// Look up the zone record.
-	var record model.ZoneRecord
-	err = workflow.ExecuteActivity(ctx, "GetZoneRecordByID", recordID).Get(ctx, &record)
-	if err != nil {
-		_ = setResourceFailed(ctx, "zone_records", recordID, err)
-		return err
-	}
-
-	// Look up the zone to get the zone name.
-	var zone model.Zone
-	err = workflow.ExecuteActivity(ctx, "GetZoneByID", record.ZoneID).Get(ctx, &zone)
+	// Look up the zone record and zone name.
+	var zctx activity.ZoneRecordContext
+	err = workflow.ExecuteActivity(ctx, "GetZoneRecordContext", recordID).Get(ctx, &zctx)
 	if err != nil {
 		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
@@ -48,7 +40,7 @@ func CreateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 
 	// Get the PowerDNS domain ID.
 	var domainID int
-	err = workflow.ExecuteActivity(ctx, "GetDNSZoneIDByName", zone.Name).Get(ctx, &domainID)
+	err = workflow.ExecuteActivity(ctx, "GetDNSZoneIDByName", zctx.ZoneName).Get(ctx, &domainID)
 	if err != nil {
 		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
@@ -57,11 +49,11 @@ func CreateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	// Write the record to PowerDNS DB.
 	err = workflow.ExecuteActivity(ctx, "WriteDNSRecord", activity.WriteDNSRecordParams{
 		DomainID: domainID,
-		Name:     record.Name,
-		Type:     record.Type,
-		Content:  record.Content,
-		TTL:      record.TTL,
-		Priority: record.Priority,
+		Name:     zctx.Record.Name,
+		Type:     zctx.Record.Type,
+		Content:  zctx.Record.Content,
+		TTL:      zctx.Record.TTL,
+		Priority: zctx.Record.Priority,
 	}).Get(ctx, nil)
 	if err != nil {
 		_ = setResourceFailed(ctx, "zone_records", recordID, err)
@@ -96,17 +88,9 @@ func UpdateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 		return err
 	}
 
-	// Look up the zone record.
-	var record model.ZoneRecord
-	err = workflow.ExecuteActivity(ctx, "GetZoneRecordByID", recordID).Get(ctx, &record)
-	if err != nil {
-		_ = setResourceFailed(ctx, "zone_records", recordID, err)
-		return err
-	}
-
-	// Look up the zone to get the zone name.
-	var zone model.Zone
-	err = workflow.ExecuteActivity(ctx, "GetZoneByID", record.ZoneID).Get(ctx, &zone)
+	// Look up the zone record and zone name.
+	var zctx activity.ZoneRecordContext
+	err = workflow.ExecuteActivity(ctx, "GetZoneRecordContext", recordID).Get(ctx, &zctx)
 	if err != nil {
 		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
@@ -114,7 +98,7 @@ func UpdateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 
 	// Get the PowerDNS domain ID.
 	var domainID int
-	err = workflow.ExecuteActivity(ctx, "GetDNSZoneIDByName", zone.Name).Get(ctx, &domainID)
+	err = workflow.ExecuteActivity(ctx, "GetDNSZoneIDByName", zctx.ZoneName).Get(ctx, &domainID)
 	if err != nil {
 		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
@@ -123,11 +107,11 @@ func UpdateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	// Update the record in PowerDNS DB.
 	err = workflow.ExecuteActivity(ctx, "UpdateDNSRecord", activity.UpdateDNSRecordParams{
 		DomainID: domainID,
-		Name:     record.Name,
-		Type:     record.Type,
-		Content:  record.Content,
-		TTL:      record.TTL,
-		Priority: record.Priority,
+		Name:     zctx.Record.Name,
+		Type:     zctx.Record.Type,
+		Content:  zctx.Record.Content,
+		TTL:      zctx.Record.TTL,
+		Priority: zctx.Record.Priority,
 	}).Get(ctx, nil)
 	if err != nil {
 		_ = setResourceFailed(ctx, "zone_records", recordID, err)
@@ -162,17 +146,9 @@ func DeleteZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 		return err
 	}
 
-	// Look up the zone record.
-	var record model.ZoneRecord
-	err = workflow.ExecuteActivity(ctx, "GetZoneRecordByID", recordID).Get(ctx, &record)
-	if err != nil {
-		_ = setResourceFailed(ctx, "zone_records", recordID, err)
-		return err
-	}
-
-	// Look up the zone to get the zone name.
-	var zone model.Zone
-	err = workflow.ExecuteActivity(ctx, "GetZoneByID", record.ZoneID).Get(ctx, &zone)
+	// Look up the zone record and zone name.
+	var zctx activity.ZoneRecordContext
+	err = workflow.ExecuteActivity(ctx, "GetZoneRecordContext", recordID).Get(ctx, &zctx)
 	if err != nil {
 		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
@@ -180,7 +156,7 @@ func DeleteZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 
 	// Get the PowerDNS domain ID.
 	var domainID int
-	err = workflow.ExecuteActivity(ctx, "GetDNSZoneIDByName", zone.Name).Get(ctx, &domainID)
+	err = workflow.ExecuteActivity(ctx, "GetDNSZoneIDByName", zctx.ZoneName).Get(ctx, &domainID)
 	if err != nil {
 		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
@@ -189,8 +165,8 @@ func DeleteZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	// Delete the record from PowerDNS DB.
 	err = workflow.ExecuteActivity(ctx, "DeleteDNSRecord", activity.DeleteDNSRecordParams{
 		DomainID: domainID,
-		Name:     record.Name,
-		Type:     record.Type,
+		Name:     zctx.Record.Name,
+		Type:     zctx.Record.Type,
 	}).Get(ctx, nil)
 	if err != nil {
 		_ = setResourceFailed(ctx, "zone_records", recordID, err)
