@@ -28,6 +28,7 @@ spec:
     spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+      enableServiceLinks: false
       containers:
         - name: temporal-ui
           image: temporalio/ui:latest
@@ -36,3 +37,5 @@ spec:
           env:
             - name: TEMPORAL_ADDRESS
               value: "127.0.0.1:7233"
+            - name: TEMPORAL_CSRF_COOKIE_INSECURE
+              value: "true"

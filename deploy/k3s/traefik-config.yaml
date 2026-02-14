@@ -6,12 +6,42 @@ metadata:
 spec:
   valuesContent: |-
     hostNetwork: true
+    securityContext:
+      capabilities:
+        drop: []
+        add:
+          - NET_BIND_SERVICE
+      runAsUser: 0
+      runAsGroup: 0
+      runAsNonRoot: false
+    api:
+      dashboard: true
+      insecure: true
     ports:
       web:
         port: 80
       websecure:
         port: 443
+      traefik:
+        port: 9080
+        exposedPort: 9080
     tlsStore:
       default:
         defaultCertificate:
           secretName: traefik-default-cert
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-dashboard
+  namespace: kube-system
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`traefik.hosting.test`)
+      kind: Rule
+      services:
+        - name: api@internal
+          kind: TraefikService

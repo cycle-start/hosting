@@ -96,7 +96,7 @@ Edit `C:\Windows\System32\drivers\etc\hosts` as Administrator:
 
 ```
 # Control plane services (Traefik on controlplane VM)
-10.10.10.2  admin.hosting.test api.hosting.test temporal.hosting.test grafana.hosting.test prometheus.hosting.test loki.hosting.test
+10.10.10.2  admin.hosting.test api.hosting.test temporal.hosting.test grafana.hosting.test prometheus.hosting.test loki.hosting.test traefik.hosting.test
 
 # DB Admin (runs on its own VM, not via Traefik)
 10.10.10.60  dbadmin.hosting.test
@@ -159,6 +159,7 @@ Both HTTP and HTTPS work simultaneously — no forced redirect.
 | `https://grafana.hosting.test` | Grafana (logs/metrics) | Traefik | 10.10.10.2 |
 | `https://prometheus.hosting.test` | Prometheus | Traefik | 10.10.10.2 |
 | `https://loki.hosting.test` | Loki (log aggregation) | Traefik | 10.10.10.2 |
+| `https://traefik.hosting.test` | Traefik dashboard | Traefik | 10.10.10.2 |
 | `https://dbadmin.hosting.test` | DB Admin (CloudBeaver) | Direct | 10.10.10.60 |
 | `https://acme.hosting.test` | Tenant site | HAProxy | 10.10.10.70 |
 
