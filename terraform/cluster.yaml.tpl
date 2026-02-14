@@ -9,9 +9,12 @@ region:
 cluster:
   name: vm-cluster-1
   lb_addresses:
-    - address: "${controlplane_ip}"
+%{ for node in nodes ~}
+%{ if node.role == "lb" ~}
+    - address: "${node.ip}"
+%{ endif ~}
+%{ endfor ~}
   config:
-    haproxy_admin_addr: "${controlplane_ip}:9999"
     stalwart_url: "http://${gateway_ip}:8082"
     stalwart_token: "dev-token"
     mail_hostname: "mail.${base_domain}"
@@ -46,6 +49,11 @@ cluster:
 %{ if node.role == "dbadmin" && endswith(node.name, "node-0") ~}
       - name: ${node.shard_name}
         role: dbadmin
+        node_count: ${length([for n in nodes : n if n.shard_name == node.shard_name])}
+%{ endif ~}
+%{ if node.role == "lb" && endswith(node.name, "node-0") ~}
+      - name: ${node.shard_name}
+        role: lb
         node_count: ${length([for n in nodes : n if n.shard_name == node.shard_name])}
 %{ endif ~}
 %{ endfor ~}

@@ -15,9 +15,8 @@ WSL2 (eth0: 172.x.x.x, virbr1: 10.10.10.1)
   v
 libvirt network 10.10.10.0/24
   |
-  |-- controlplane-0 (10.10.10.2) — k3s
-  |     |-- HAProxy :80/:443     (routes all HTTP/HTTPS by Host header)
-  |     |-- HAProxy stats :8404
+  |-- controlplane-0 (10.10.10.2) — k3s + Traefik
+  |     |-- Traefik :80/:443      (routes control plane HTTP by Host header)
   |     |-- core-api :8090
   |     |-- admin-ui :3001
   |     |-- Temporal :7233
@@ -29,6 +28,11 @@ libvirt network 10.10.10.0/24
   |     |-- Valkey :6379
   |     '-- Registry :5000
   |
+  |-- lb-1-node-0     (10.10.10.70) — HAProxy + node-agent (tenant traffic)
+  |     |-- HAProxy :80/:443       (FQDN→shard map, tenant-only)
+  |     |-- HAProxy stats :8404
+  |     '-- HAProxy Runtime API :9999
+  |
   |-- web-1-node-0  (10.10.10.10)  — nginx + PHP-FPM + node-agent
   |-- web-1-node-1  (10.10.10.11)  — nginx + PHP-FPM + node-agent
   |-- db-1-node-0   (10.10.10.20)  — MySQL + node-agent
@@ -38,16 +42,18 @@ libvirt network 10.10.10.0/24
   '-- dbadmin-1-node-0 (10.10.10.60) — CloudBeaver + node-agent
 ```
 
-All k3s pods use `hostNetwork: true`, so services bind directly to `10.10.10.2`. HAProxy on port 80 routes requests based on the `Host` header — this is the single entry point for all HTTP traffic.
+Control plane and tenant traffic are split across two separate entry points:
+
+- **Traefik** on the controlplane VM (10.10.10.2) handles all control plane HTTP (admin UI, API, Temporal UI, Grafana, Prometheus, Loki). Configured via k8s Ingress resources.
+- **HAProxy** on the LB VM (10.10.10.70) handles all tenant HTTP traffic. Routes requests via a dynamic FQDN→shard map managed by the node-agent through the HAProxy Runtime API.
 
 ## How it works
 
-1. Windows hosts file maps `*.hosting.test` hostnames to `10.10.10.2`
+1. Windows hosts file maps control plane hostnames to `10.10.10.2` and tenant FQDNs to `10.10.10.70`
 2. Windows route sends `10.10.10.0/24` traffic to WSL2
 3. WSL2 iptables forwards the traffic to the libvirt bridge (`virbr1`)
-4. HAProxy on the controlplane VM matches the `Host` header and routes to the appropriate backend
-
-For control plane services (admin UI, API, Temporal UI), HAProxy forwards to `127.0.0.1:<port>` on the same VM. For tenant sites, HAProxy looks up the FQDN in a dynamic map file and forwards to the web shard's node VMs.
+4. Traefik matches the `Host` header and routes to the appropriate k3s Service
+5. HAProxy matches tenant FQDNs in its map file and routes to the web shard's node VMs
 
 ## Setup
 
@@ -89,18 +95,19 @@ Note: if WSL2's IP changes, you'll need to update the persistent route.
 Edit `C:\Windows\System32\drivers\etc\hosts` as Administrator:
 
 ```
-10.10.10.2  admin.hosting.test api.hosting.test temporal.hosting.test dbadmin.hosting.test grafana.hosting.test prometheus.hosting.test loki.hosting.test
-```
+# Control plane services (Traefik on controlplane VM)
+10.10.10.2  admin.hosting.test api.hosting.test temporal.hosting.test grafana.hosting.test prometheus.hosting.test loki.hosting.test
 
-Add tenant FQDNs as needed:
+# DB Admin (runs on its own VM, not via Traefik)
+10.10.10.60  dbadmin.hosting.test
 
-```
-10.10.10.2  acme.hosting.test www.acme.hosting.test
+# Tenant sites (HAProxy on LB VM)
+10.10.10.70  acme.hosting.test www.acme.hosting.test
 ```
 
 ## SSL/TLS (optional)
 
-HTTPS works out of the box with a self-signed certificate (created during `just vm-deploy`). Browsers will show a security warning which you can click through.
+HTTPS works out of the box with a self-signed certificate (created during `just vm-deploy` for Traefik, and during cloud-init for the LB VM). Browsers will show a security warning which you can click through.
 
 For trusted certificates with no warnings, use [mkcert](https://github.com/FiloSottile/mkcert):
 
@@ -132,7 +139,7 @@ Then on Windows either:
 just ssl-init
 ```
 
-This generates a wildcard cert for `*.hosting.test`, creates a k8s Secret, and restarts HAProxy. All `https://*.hosting.test` URLs will work without warnings.
+This generates a wildcard cert for `*.hosting.test` and deploys it to both Traefik (as a k8s TLS Secret) and the LB VM HAProxy. All `https://*.hosting.test` URLs will work without warnings.
 
 ### Verify
 
@@ -144,20 +151,20 @@ Both HTTP and HTTPS work simultaneously — no forced redirect.
 
 ## Hostname reference
 
-| URL | Service | Backend |
-|-----|---------|---------|
-| `https://admin.hosting.test` | Admin UI | `127.0.0.1:3001` |
-| `https://api.hosting.test` | Core API | `127.0.0.1:8090` |
-| `https://temporal.hosting.test` | Temporal UI | `127.0.0.1:8080` |
-| `https://dbadmin.hosting.test` | DB Admin (CloudBeaver) | `127.0.0.1:4180` |
-| `https://grafana.hosting.test` | Grafana (logs/metrics) | `127.0.0.1:3000` |
-| `https://prometheus.hosting.test` | Prometheus | `127.0.0.1:9090` |
-| `https://loki.hosting.test` | Loki (log aggregation) | `127.0.0.1:3100` |
-| `https://acme.hosting.test` | Tenant site | web shard VMs |
+| URL | Service | Routed by | IP |
+|-----|---------|-----------|-----|
+| `https://admin.hosting.test` | Admin UI | Traefik | 10.10.10.2 |
+| `https://api.hosting.test` | Core API | Traefik | 10.10.10.2 |
+| `https://temporal.hosting.test` | Temporal UI | Traefik | 10.10.10.2 |
+| `https://grafana.hosting.test` | Grafana (logs/metrics) | Traefik | 10.10.10.2 |
+| `https://prometheus.hosting.test` | Prometheus | Traefik | 10.10.10.2 |
+| `https://loki.hosting.test` | Loki (log aggregation) | Traefik | 10.10.10.2 |
+| `https://dbadmin.hosting.test` | DB Admin (CloudBeaver) | Direct | 10.10.10.60 |
+| `https://acme.hosting.test` | Tenant site | HAProxy | 10.10.10.70 |
 
 HTTP (`http://`) also works on all URLs — no forced redirect.
 
-These hostnames are configured in the HAProxy config template at `terraform/templates/haproxy.cfg.tpl`. The domain is controlled by the `base_domain` Terraform variable (default: `hosting.test`).
+Control plane hostnames are configured via k8s Ingress resources in `deploy/k3s/ingress.yaml`. Tenant routing is via the HAProxy FQDN map on the LB VM. The domain is controlled by the `base_domain` Terraform variable (default: `hosting.test`).
 
 ## Adding and reaching tenant sites
 
@@ -165,9 +172,9 @@ These hostnames are configured in the HAProxy config template at `terraform/temp
 2. Create a webroot on the tenant
 3. Add an FQDN using a `.hosting.test` subdomain, e.g. `mysite.hosting.test`
 4. The FQDN binding workflow:
-   - Adds the FQDN to the HAProxy map via Runtime API
+   - Adds the FQDN to the HAProxy map on each LB node via the node-agent
    - Creates DNS records in PowerDNS (if a matching zone exists)
-5. Add `10.10.10.2  mysite.hosting.test` to your Windows hosts file
+5. Add `10.10.10.70  mysite.hosting.test` to your Windows hosts file
 6. Visit `http://mysite.hosting.test` in the browser
 
 The seed file (`seeds/dev-tenants.yaml`) creates a zone `hosting.test` under the `acme-brand`. Any FQDN ending in `.hosting.test` will match this zone and get auto-DNS records created.
@@ -193,7 +200,7 @@ curl -X POST http://api.hosting.test/api/v1/webroots/<id>/fqdns \
   -H "Content-Type: application/json" \
   -d '{"fqdn": "newsite.hosting.test"}'
 
-# Add to Windows hosts file, then visit
+# Add to Windows hosts file (point to LB VM), then visit
 open http://newsite.hosting.test
 ```
 
@@ -221,9 +228,12 @@ Browsers hardcode `.localhost` to resolve to `127.0.0.1` per [RFC 6761](https://
 # Check route exists
 route print | findstr 10.10.10
 
-# Test connectivity
+# Test connectivity to control plane
 ping 10.10.10.2
 curl http://10.10.10.2:8090/healthz
+
+# Test connectivity to LB
+ping 10.10.10.70
 ```
 
 ### Verify from WSL2
@@ -232,14 +242,14 @@ curl http://10.10.10.2:8090/healthz
 # Direct API access
 curl http://10.10.10.2:8090/healthz
 
-# Via HAProxy
+# Via Traefik
 curl -H "Host: api.hosting.test" http://10.10.10.2/api/v1/healthz
 
 # Check forwarding rules
 just forward-status
 ```
 
-### Check HAProxy map
+### Check HAProxy map (on LB VM)
 
 ```bash
 just lb-show

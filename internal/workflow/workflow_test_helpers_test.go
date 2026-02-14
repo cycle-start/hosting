@@ -21,7 +21,7 @@ func registerActivities(env *testsuite.TestWorkflowEnvironment) {
 	env.RegisterActivity(&activity.CertificateActivity{})
 	env.RegisterActivity(&activity.ACMEActivity{})
 	env.RegisterActivity(&activity.NodeACMEActivity{})
-	env.RegisterActivity(&activity.LB{})
+	env.RegisterActivity(&activity.NodeLB{})
 	env.RegisterActivity(&activity.Migrate{})
 	env.RegisterActivity(&activity.Stalwart{})
 }

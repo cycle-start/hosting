@@ -18,6 +18,7 @@ type FQDNContext struct {
 	Shard       model.Shard              `json:"shard"`
 	Nodes       []model.Node             `json:"nodes"`
 	LBAddresses []model.ClusterLBAddress `json:"lb_addresses"`
+	LBNodes     []model.Node             `json:"lb_nodes"`
 }
 
 // DatabaseUserContext bundles all data needed by database user workflows.

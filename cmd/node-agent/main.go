@@ -85,6 +85,9 @@ func main() {
 	nodeACMEActs := activity.NewNodeACMEActivity()
 	w.RegisterActivity(nodeACMEActs)
 
+	nodeLBActs := activity.NewNodeLB(logger)
+	w.RegisterActivity(nodeLBActs)
+
 	if cfg.MetricsAddr != "" {
 		infoGauge := prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "node_agent_info",

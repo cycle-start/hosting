@@ -25,6 +25,7 @@ const (
 	ShardRoleValkey   = "valkey"
 	ShardRoleStorage     = "storage"
 	ShardRoleDBAdmin = "dbadmin"
+	ShardRoleLB      = "lb"
 )
 
 type StorageShardConfig struct {

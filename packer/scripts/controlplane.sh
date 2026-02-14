@@ -13,7 +13,7 @@ apt-get install -y curl
 
 # Install k3s (don't start — cloud-init will start it on first boot).
 curl -sfL https://get.k3s.io | INSTALL_K3S_SKIP_START=true sh -s - \
-  --disable=traefik --disable=servicelb
+  --disable=servicelb
 
 # Install Helm.
 curl -sfL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash

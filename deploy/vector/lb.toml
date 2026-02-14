@@ -1,0 +1,28 @@
+# Additional Vector sources for LB (HAProxy) nodes.
+
+[sources.haproxy_log]
+type = "file"
+include = ["/var/log/haproxy.log"]
+read_from = "end"
+
+[transforms.label_haproxy]
+type = "remap"
+inputs = ["haproxy_log"]
+source = '''
+.service = "haproxy"
+.level = "info"
+.log_type = "access"
+'''
+
+[sinks.loki_lb]
+type = "loki"
+inputs = ["label_haproxy"]
+endpoint = "http://10.10.10.2:3100"
+encoding.codec = "text"
+
+[sinks.loki_lb.labels]
+service = "{{ service }}"
+hostname = "{{ host }}"
+level = "{{ level }}"
+log_type = "{{ log_type }}"
+job = "haproxy"

@@ -8,10 +8,12 @@ region:
 cluster:
   name: dev-cluster-1
   lb_addresses:
-    - address: "127.0.0.1"
-    - address: "::1"
+    - address: "10.10.10.70"
   spec:
     shards:
+      - name: lb-1
+        role: lb
+        node_count: 1
       - name: web-1
         role: web
         node_count: 2
@@ -25,7 +27,7 @@ cluster:
         role: storage
         node_count: 1
     infrastructure:
-      haproxy: true
+      haproxy: false
       powerdns: true
 
 hosts:

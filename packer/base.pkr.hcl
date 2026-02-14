@@ -156,6 +156,26 @@ source "qemu" "dbadmin" {
   cd_label         = "cidata"
 }
 
+source "qemu" "lb" {
+  iso_url          = var.ubuntu_image_url
+  iso_checksum     = var.ubuntu_image_checksum
+  disk_image       = true
+  disk_size        = "10G"
+  format           = "qcow2"
+  accelerator      = "kvm"
+  vm_name          = "lb.qcow2"
+  output_directory = "${var.output_dir}/lb-build"
+  net_device       = "virtio-net"
+  disk_interface   = "virtio"
+  headless         = true
+  ssh_username     = "ubuntu"
+  ssh_password     = "ubuntu"
+  ssh_timeout      = "10m"
+  shutdown_command = "sudo shutdown -P now"
+  cd_files         = ["http/meta-data", "http/user-data"]
+  cd_label         = "cidata"
+}
+
 source "qemu" "controlplane" {
   iso_url          = var.ubuntu_image_url
   iso_checksum     = var.ubuntu_image_checksum
@@ -436,6 +456,49 @@ build {
     inline = [
       "cp ${var.output_dir}/dbadmin-build/dbadmin.qcow2 ${var.output_dir}/dbadmin.qcow2",
       "rm -rf ${var.output_dir}/dbadmin-build",
+    ]
+  }
+}
+
+# --- LB image ---
+
+build {
+  name = "lb"
+
+  sources = ["source.qemu.lb"]
+
+  provisioner "file" {
+    source      = var.node_agent_binary
+    destination = "/tmp/node-agent"
+  }
+
+  provisioner "file" {
+    source      = "files/node-agent.service"
+    destination = "/tmp/node-agent.service"
+  }
+
+  provisioner "file" {
+    source      = "../deploy/vector/base.toml"
+    destination = "/tmp/vector.toml"
+  }
+
+  provisioner "file" {
+    source      = "../deploy/vector/lb.toml"
+    destination = "/tmp/vector-lb.toml"
+  }
+
+  provisioner "shell" {
+    execute_command = "sudo sh -c '{{ .Vars }} {{ .Path }}'"
+    scripts = [
+      "scripts/common.sh",
+      "scripts/lb.sh",
+    ]
+  }
+
+  post-processor "shell-local" {
+    inline = [
+      "cp ${var.output_dir}/lb-build/lb.qcow2 ${var.output_dir}/lb.qcow2",
+      "rm -rf ${var.output_dir}/lb-build",
     ]
   }
 }

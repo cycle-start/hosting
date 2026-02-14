@@ -897,6 +897,13 @@ func (a *CoreDB) GetFQDNContext(ctx context.Context, fqdnID string) (*FQDNContex
 	}
 	fc.LBAddresses = lbAddresses
 
+	// Fetch LB nodes for this cluster.
+	lbNodes, err := a.GetNodesByClusterAndRole(ctx, fc.Tenant.ClusterID, model.ShardRoleLB)
+	if err != nil {
+		return nil, err
+	}
+	fc.LBNodes = lbNodes
+
 	// Fetch shard and nodes if tenant has a shard.
 	if fc.Tenant.ShardID != nil {
 		shard, err := a.GetShardByID(ctx, *fc.Tenant.ShardID)
@@ -1082,6 +1089,40 @@ func (a *CoreDB) GetStalwartContext(ctx context.Context, fqdnID string) (*Stalwa
 	sc.MailHostname = cfg.MailHostname
 
 	return &sc, nil
+}
+
+// FQDNMapping represents an active FQDN-to-shard-backend mapping for LB convergence.
+type FQDNMapping struct {
+	FQDN      string `json:"fqdn"`
+	LBBackend string `json:"lb_backend"`
+}
+
+// ListActiveFQDNMappings returns all active FQDN-to-shard-backend mappings for a cluster.
+// Used by LB shard convergence to populate the HAProxy map on LB nodes.
+func (a *CoreDB) ListActiveFQDNMappings(ctx context.Context, clusterID string) ([]FQDNMapping, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT f.fqdn, s.lb_backend
+		 FROM fqdns f
+		 JOIN webroots w ON w.id = f.webroot_id
+		 JOIN tenants t ON t.id = w.tenant_id
+		 JOIN shards s ON s.id = t.shard_id
+		 WHERE t.cluster_id = $1 AND f.status = $2`,
+		clusterID, model.StatusActive,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list active fqdn mappings: %w", err)
+	}
+	defer rows.Close()
+
+	var mappings []FQDNMapping
+	for rows.Next() {
+		var m FQDNMapping
+		if err := rows.Scan(&m.FQDN, &m.LBBackend); err != nil {
+			return nil, fmt.Errorf("scan fqdn mapping: %w", err)
+		}
+		mappings = append(mappings, m)
+	}
+	return mappings, rows.Err()
 }
 
 // GetOldBackups returns active backups that are older than the specified number of days.

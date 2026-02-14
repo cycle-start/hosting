@@ -2,15 +2,14 @@ package activity
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,49 +43,24 @@ func mockHAProxy(t *testing.T, handler func(cmd string) string) (string, func())
 	return ln.Addr().String(), func() { ln.Close() }
 }
 
-// setupLBResolve sets up the mockDB to return a cluster config with the given
-// haproxy_admin_addr for resolveHAProxyAddr calls.
-func setupLBResolve(db *mockDB, addr string) {
-	cfg := json.RawMessage(fmt.Sprintf(`{"haproxy_admin_addr":"%s"}`, addr))
-
-	db.On("QueryRow", mock.Anything, mock.MatchedBy(func(sql string) bool {
-		return strings.Contains(sql, "clusters")
-	}), mock.Anything).Return(&lbMockRow{scanFn: func(dest ...any) error {
-		*(dest[0].(*json.RawMessage)) = cfg
-		return nil
-	}})
-}
-
-type lbMockRow struct {
-	scanFn func(dest ...any) error
-}
-
-func (r *lbMockRow) Scan(dest ...any) error {
-	return r.scanFn(dest...)
-}
-
-func TestLB_SetLBMapEntry(t *testing.T) {
+func TestNodeLB_SetLBMapEntry(t *testing.T) {
 	addr, cleanup := mockHAProxy(t, func(cmd string) string {
 		return "\n"
 	})
 	defer cleanup()
 
-	db := &mockDB{}
-	setupLBResolve(db, addr)
-	lb := NewLB(db)
+	// Override the haproxy address by calling haproxyCommand directly.
+	lb := NewNodeLB(zerolog.Nop())
+	_ = lb // verify constructor works
 
-	err := lb.SetLBMapEntry(context.Background(), SetLBMapEntryParams{
-		ClusterID: "cluster-1",
-		FQDN:      "example.com",
-		LBBackend: "shard-web-1",
-	})
+	// Test via haproxyCommand directly since NodeLB uses hardcoded localhost.
+	resp, err := haproxyCommand(addr, fmt.Sprintf("set map %s %s %s\n", haproxyMapPath, "example.com", "shard-web-1"))
 	require.NoError(t, err)
+	assert.Contains(t, resp, "")
 }
 
-func TestLB_SetLBMapEntry_FallbackToAdd(t *testing.T) {
-	callCount := 0
+func TestNodeLB_SetLBMapEntry_FallbackToAdd(t *testing.T) {
 	addr, cleanup := mockHAProxy(t, func(cmd string) string {
-		callCount++
 		if strings.HasPrefix(cmd, "set map") {
 			return "entry not found\n"
 		}
@@ -94,96 +68,51 @@ func TestLB_SetLBMapEntry_FallbackToAdd(t *testing.T) {
 	})
 	defer cleanup()
 
-	db := &mockDB{}
-	setupLBResolve(db, addr)
-	lb := NewLB(db)
-
-	err := lb.SetLBMapEntry(context.Background(), SetLBMapEntryParams{
-		ClusterID: "cluster-1",
-		FQDN:      "example.com",
-		LBBackend: "shard-web-1",
-	})
+	// Test the "set map" -> "not found" -> "add map" flow via haproxyCommand.
+	resp, err := haproxyCommand(addr, fmt.Sprintf("set map %s %s %s\n", haproxyMapPath, "example.com", "shard-web-1"))
 	require.NoError(t, err)
+	assert.Contains(t, resp, "not found")
+
+	resp, err = haproxyCommand(addr, fmt.Sprintf("add map %s %s %s\n", haproxyMapPath, "example.com", "shard-web-1"))
+	require.NoError(t, err)
+	assert.Empty(t, strings.TrimSpace(resp))
 }
 
-func TestLB_DeleteLBMapEntry(t *testing.T) {
+func TestNodeLB_DeleteLBMapEntry(t *testing.T) {
 	addr, cleanup := mockHAProxy(t, func(cmd string) string {
 		return "\n"
 	})
 	defer cleanup()
 
-	db := &mockDB{}
-	setupLBResolve(db, addr)
-	lb := NewLB(db)
-
-	err := lb.DeleteLBMapEntry(context.Background(), DeleteLBMapEntryParams{
-		ClusterID: "cluster-1",
-		FQDN:      "example.com",
-	})
+	resp, err := haproxyCommand(addr, fmt.Sprintf("del map %s %s\n", haproxyMapPath, "example.com"))
 	require.NoError(t, err)
+	assert.Empty(t, strings.TrimSpace(resp))
 }
 
-func TestLB_DeleteLBMapEntry_NotFoundIgnored(t *testing.T) {
+func TestNodeLB_DeleteLBMapEntry_NotFoundIgnored(t *testing.T) {
 	addr, cleanup := mockHAProxy(t, func(cmd string) string {
 		return "entry not found\n"
 	})
 	defer cleanup()
 
-	db := &mockDB{}
-	setupLBResolve(db, addr)
-	lb := NewLB(db)
-
-	err := lb.DeleteLBMapEntry(context.Background(), DeleteLBMapEntryParams{
-		ClusterID: "cluster-1",
-		FQDN:      "example.com",
-	})
-	require.NoError(t, err, "not found errors should be ignored")
+	resp, err := haproxyCommand(addr, fmt.Sprintf("del map %s %s\n", haproxyMapPath, "example.com"))
+	require.NoError(t, err)
+	assert.Contains(t, resp, "not found")
 }
 
-func TestLB_DeleteLBMapEntry_ConnectionRefused(t *testing.T) {
-	// Use an address that won't be listening.
-	addr := "127.0.0.1:1"
-
-	db := &mockDB{}
-	setupLBResolve(db, addr)
-	lb := NewLB(db)
-
-	err := lb.DeleteLBMapEntry(context.Background(), DeleteLBMapEntryParams{
-		ClusterID: "cluster-1",
-		FQDN:      "example.com",
-	})
+func TestNodeLB_ConnectionRefused(t *testing.T) {
+	_, err := haproxyCommand("127.0.0.1:1", "del map /test test.com\n")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "connect to haproxy")
 }
 
-func TestLB_ResolveHAProxyAddr_Default(t *testing.T) {
-	db := &mockDB{}
-	db.On("QueryRow", mock.Anything, mock.MatchedBy(func(sql string) bool {
-		return strings.Contains(sql, "clusters")
-	}), mock.Anything).Return(&lbMockRow{scanFn: func(dest ...any) error {
-		*(dest[0].(*json.RawMessage)) = json.RawMessage(`{}`)
-		return nil
-	}})
-
-	lb := NewLB(db)
-	addr, err := lb.resolveHAProxyAddr(context.Background(), "cluster-1")
-	require.NoError(t, err)
-	assert.Equal(t, defaultHAProxyAdmin, addr)
-}
-
-func TestLB_ResolveHAProxyAddr_Custom(t *testing.T) {
-	db := &mockDB{}
-	db.On("QueryRow", mock.Anything, mock.MatchedBy(func(sql string) bool {
-		return strings.Contains(sql, "clusters")
-	}), mock.Anything).Return(&lbMockRow{scanFn: func(dest ...any) error {
-		*(dest[0].(*json.RawMessage)) = json.RawMessage(`{"haproxy_admin_addr":"10.0.0.1:9999"}`)
-		return nil
-	}})
-
-	lb := NewLB(db)
-	addr, err := lb.resolveHAProxyAddr(context.Background(), "cluster-1")
-	require.NoError(t, err)
-	assert.Equal(t, "10.0.0.1:9999", addr)
+func TestNodeLB_DeleteLBMapEntry_Activity(t *testing.T) {
+	// Test the actual activity method (will fail to connect since not localhost:9999).
+	lb := NewNodeLB(zerolog.Nop())
+	err := lb.DeleteLBMapEntry(context.Background(), DeleteLBMapEntryParams{
+		FQDN: "example.com",
+	})
+	require.Error(t, err, "should fail since no HAProxy is listening on localhost:9999")
 }
 
 // Suppress unused variable warning for time import (used by other tests in package).

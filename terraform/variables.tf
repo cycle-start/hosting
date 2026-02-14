@@ -193,3 +193,24 @@ variable "dbadmin_shard_name" {
   type        = string
   default     = "dbadmin-1"
 }
+
+# --- LB nodes ---
+
+variable "lb_nodes" {
+  description = "LB node definitions (runs HAProxy + node-agent)"
+  type = list(object({
+    name   = string
+    ip     = string
+    memory = optional(number, 1024)
+    vcpus  = optional(number, 2)
+  }))
+  default = [
+    { name = "lb-1-node-0", ip = "10.10.10.70" },
+  ]
+}
+
+variable "lb_shard_name" {
+  description = "Shard name for LB nodes"
+  type        = string
+  default     = "lb-1"
+}

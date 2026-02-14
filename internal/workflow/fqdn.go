@@ -80,10 +80,10 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 		}
 	}
 
-	// Update the LB map entry if the tenant is assigned to a shard.
-	if fctx.Tenant.ShardID != nil {
-		err = workflow.ExecuteActivity(ctx, "SetLBMapEntry", activity.SetLBMapEntryParams{
-			ClusterID: fctx.Tenant.ClusterID,
+	// Update the LB map entry on all LB nodes.
+	for _, lbNode := range fctx.LBNodes {
+		lbCtx := nodeActivityCtx(ctx, lbNode.ID)
+		err = workflow.ExecuteActivity(lbCtx, "SetLBMapEntry", activity.SetLBMapEntryParams{
 			FQDN:      fctx.FQDN.FQDN,
 			LBBackend: fctx.Shard.LBBackend,
 		}).Get(ctx, nil)
@@ -148,14 +148,16 @@ func UnbindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 		}
 	}
 
-	// Delete the LB map entry.
-	err = workflow.ExecuteActivity(ctx, "DeleteLBMapEntry", activity.DeleteLBMapEntryParams{
-		ClusterID: fctx.Tenant.ClusterID,
-		FQDN:      fctx.FQDN.FQDN,
-	}).Get(ctx, nil)
-	if err != nil {
-		_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
-		return err
+	// Delete the LB map entry on all LB nodes.
+	for _, lbNode := range fctx.LBNodes {
+		lbCtx := nodeActivityCtx(ctx, lbNode.ID)
+		err = workflow.ExecuteActivity(lbCtx, "DeleteLBMapEntry", activity.DeleteLBMapEntryParams{
+			FQDN: fctx.FQDN.FQDN,
+		}).Get(ctx, nil)
+		if err != nil {
+			_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
+			return err
+		}
 	}
 
 	// Set status to deleted.

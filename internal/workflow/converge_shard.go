@@ -58,10 +58,37 @@ func ConvergeShardWorkflow(ctx workflow.Context, params ConvergeShardParams) err
 	case model.ShardRoleDBAdmin:
 		// DB admin nodes are configured at boot via cloud-init; no convergence needed.
 		return nil
+	case model.ShardRoleLB:
+		return convergeLBShard(ctx, shard, nodes)
 	default:
 		// DNS/email shards don't have convergence yet.
 		return nil
 	}
+}
+
+func convergeLBShard(ctx workflow.Context, shard model.Shard, nodes []model.Node) error {
+	// Fetch all active FQDN-to-backend mappings for this cluster.
+	var mappings []activity.FQDNMapping
+	err := workflow.ExecuteActivity(ctx, "ListActiveFQDNMappings", shard.ClusterID).Get(ctx, &mappings)
+	if err != nil {
+		return fmt.Errorf("list active fqdn mappings: %w", err)
+	}
+
+	// Set each mapping on every LB node.
+	for _, m := range mappings {
+		for _, node := range nodes {
+			nodeCtx := nodeActivityCtx(ctx, node.ID)
+			err = workflow.ExecuteActivity(nodeCtx, "SetLBMapEntry", activity.SetLBMapEntryParams{
+				FQDN:      m.FQDN,
+				LBBackend: m.LBBackend,
+			}).Get(ctx, nil)
+			if err != nil {
+				return fmt.Errorf("set lb map %s on node %s: %w", m.FQDN, node.ID, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) error {

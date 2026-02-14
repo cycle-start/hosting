@@ -3,59 +3,54 @@ package activity
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
+
+	"github.com/rs/zerolog"
 )
 
 const (
-	haproxyMapPath       = "/var/lib/haproxy/maps/fqdn-to-shard.map"
-	defaultHAProxyAdmin  = "localhost:9999"
+	haproxyMapPath      = "/var/lib/haproxy/maps/fqdn-to-shard.map"
+	haproxyRuntimeAddr  = "localhost:9999"
 )
 
-// LB contains activities for managing the cluster-level HAProxy load balancer
-// map files via the HAProxy Runtime API over TCP.
-type LB struct {
-	db DB
+// NodeLB contains activities for managing the local HAProxy load balancer
+// map files via the HAProxy Runtime API. These activities run on LB node-agents
+// and always connect to localhost:9999.
+type NodeLB struct {
+	logger zerolog.Logger
 }
 
-// NewLB creates a new LB activity struct.
-func NewLB(db DB) *LB {
-	return &LB{db: db}
+// NewNodeLB creates a new NodeLB activity struct.
+func NewNodeLB(logger zerolog.Logger) *NodeLB {
+	return &NodeLB{logger: logger}
 }
 
 // SetLBMapEntryParams holds parameters for SetLBMapEntry.
 type SetLBMapEntryParams struct {
-	ClusterID string `json:"cluster_id"`
 	FQDN      string `json:"fqdn"`
 	LBBackend string `json:"lb_backend"`
 }
 
 // DeleteLBMapEntryParams holds parameters for DeleteLBMapEntry.
 type DeleteLBMapEntryParams struct {
-	ClusterID string `json:"cluster_id"`
-	FQDN      string `json:"fqdn"`
+	FQDN string `json:"fqdn"`
 }
 
 // SetLBMapEntry sets a mapping from an FQDN to an LB backend in the HAProxy map file
 // via the Runtime API. It uses "set map" to update existing entries, falling back
 // to "add map" for new entries.
-func (a *LB) SetLBMapEntry(ctx context.Context, params SetLBMapEntryParams) error {
-	addr, err := a.resolveHAProxyAddr(ctx, params.ClusterID)
-	if err != nil {
-		return fmt.Errorf("resolve haproxy: %w", err)
-	}
-
+func (a *NodeLB) SetLBMapEntry(ctx context.Context, params SetLBMapEntryParams) error {
 	// Try "set map" first (updates existing entry).
-	resp, err := haproxyCommand(addr, fmt.Sprintf("set map %s %s %s\n", haproxyMapPath, params.FQDN, params.LBBackend))
+	resp, err := haproxyCommand(haproxyRuntimeAddr, fmt.Sprintf("set map %s %s %s\n", haproxyMapPath, params.FQDN, params.LBBackend))
 	if err != nil {
 		return fmt.Errorf("set map entry %s -> %s: %w", params.FQDN, params.LBBackend, err)
 	}
 
 	if strings.Contains(strings.ToLower(resp), "not found") {
 		// Entry doesn't exist yet — use "add map" to create it.
-		resp, err = haproxyCommand(addr, fmt.Sprintf("add map %s %s %s\n", haproxyMapPath, params.FQDN, params.LBBackend))
+		resp, err = haproxyCommand(haproxyRuntimeAddr, fmt.Sprintf("add map %s %s %s\n", haproxyMapPath, params.FQDN, params.LBBackend))
 		if err != nil {
 			return fmt.Errorf("add map entry %s -> %s: %w", params.FQDN, params.LBBackend, err)
 		}
@@ -70,13 +65,8 @@ func (a *LB) SetLBMapEntry(ctx context.Context, params SetLBMapEntryParams) erro
 
 // DeleteLBMapEntry removes an FQDN mapping from the HAProxy map file
 // via the Runtime API.
-func (a *LB) DeleteLBMapEntry(ctx context.Context, params DeleteLBMapEntryParams) error {
-	addr, err := a.resolveHAProxyAddr(ctx, params.ClusterID)
-	if err != nil {
-		return fmt.Errorf("resolve haproxy: %w", err)
-	}
-
-	resp, err := haproxyCommand(addr, fmt.Sprintf("del map %s %s\n", haproxyMapPath, params.FQDN))
+func (a *NodeLB) DeleteLBMapEntry(ctx context.Context, params DeleteLBMapEntryParams) error {
+	resp, err := haproxyCommand(haproxyRuntimeAddr, fmt.Sprintf("del map %s %s\n", haproxyMapPath, params.FQDN))
 	if err != nil {
 		return fmt.Errorf("del map entry %s: %w", params.FQDN, err)
 	}
@@ -87,27 +77,6 @@ func (a *LB) DeleteLBMapEntry(ctx context.Context, params DeleteLBMapEntryParams
 		return fmt.Errorf("del map entry %s: %s", params.FQDN, resp)
 	}
 	return nil
-}
-
-// resolveHAProxyAddr reads the HAProxy admin address from the cluster config JSON.
-// Falls back to defaultHAProxyAdmin if not set.
-func (a *LB) resolveHAProxyAddr(ctx context.Context, clusterID string) (string, error) {
-	var configRaw json.RawMessage
-	err := a.db.QueryRow(ctx,
-		`SELECT config FROM clusters WHERE id = $1`, clusterID,
-	).Scan(&configRaw)
-	if err != nil {
-		return "", fmt.Errorf("get cluster %s: %w", clusterID, err)
-	}
-
-	var cfg struct {
-		HAProxyAdminAddr string `json:"haproxy_admin_addr"`
-	}
-	if json.Unmarshal(configRaw, &cfg) == nil && cfg.HAProxyAdminAddr != "" {
-		return cfg.HAProxyAdminAddr, nil
-	}
-
-	return defaultHAProxyAdmin, nil
 }
 
 // haproxyCommand sends a command to HAProxy's Runtime API via TCP and returns

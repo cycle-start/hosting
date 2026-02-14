@@ -20,6 +20,7 @@ NODES=(
   "valkey-1-node-0   10.10.10.40  valkey"
   "storage-1-node-0  10.10.10.50  storage"
   "dbadmin-1-node-0  10.10.10.60  dbadmin"
+  "lb-1-node-0      10.10.10.70  lb"
 )
 
 install_vector() {

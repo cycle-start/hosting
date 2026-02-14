@@ -66,6 +66,15 @@ resource "libvirt_volume" "image_dbadmin" {
   }
 }
 
+resource "libvirt_volume" "image_lb" {
+  name = "golden-lb.qcow2"
+  pool = libvirt_pool.hosting.name
+  create = {
+    content = { url = "${var.image_dir}/lb.qcow2" }
+    format  = "qcow2"
+  }
+}
+
 resource "libvirt_volume" "image_controlplane" {
   name = "golden-controlplane.qcow2"
   pool = libvirt_pool.hosting.name

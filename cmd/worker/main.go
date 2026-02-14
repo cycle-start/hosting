@@ -87,9 +87,6 @@ func main() {
 	acmeActivities := activity.NewACMEActivity(cfg.ACMEEmail, cfg.ACMEDirectoryURL)
 	w.RegisterActivity(acmeActivities)
 
-	lbActivities := activity.NewLB(corePool)
-	w.RegisterActivity(lbActivities)
-
 	migrateActivities := activity.NewMigrate(corePool)
 	w.RegisterActivity(migrateActivities)
 

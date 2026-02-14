@@ -3,6 +3,9 @@
 # Control plane VM IP (k3s). Change if using a different Terraform controlplane_ip.
 cp := "10.10.10.2"
 
+# LB VM IP (HAProxy for tenant traffic).
+lb := "10.10.10.70"
+
 # Default: show available commands
 default:
     @just --list
@@ -129,15 +132,15 @@ ceph-status:
 
 # Update HAProxy map entry (e.g. just lb-set www.example.com shard-web-a)
 lb-set fqdn backend:
-    echo "set map /var/lib/haproxy/maps/fqdn-to-shard.map {{fqdn}} {{backend}}" | nc {{cp}} 9999
+    echo "set map /var/lib/haproxy/maps/fqdn-to-shard.map {{fqdn}} {{backend}}" | nc {{lb}} 9999
 
 # Delete HAProxy map entry
 lb-del fqdn:
-    echo "del map /var/lib/haproxy/maps/fqdn-to-shard.map {{fqdn}}" | nc {{cp}} 9999
+    echo "del map /var/lib/haproxy/maps/fqdn-to-shard.map {{fqdn}}" | nc {{lb}} 9999
 
 # Show HAProxy map
 lb-show:
-    echo "show map /var/lib/haproxy/maps/fqdn-to-shard.map" | nc {{cp}} 9999
+    echo "show map /var/lib/haproxy/maps/fqdn-to-shard.map" | nc {{lb}} 9999
 
 # --- Packer (Golden Images) ---
 
@@ -180,15 +183,10 @@ vm-deploy:
     # Import into k3s containerd
     docker save hosting-core-api:latest hosting-worker:latest hosting-admin-ui:latest | \
       ssh -o StrictHostKeyChecking=no ubuntu@{{cp}} "sudo k3s ctr images import -"
-    # Apply infra manifests
+    # Apply infra manifests (includes Traefik config and Ingress)
     kubectl --context hosting apply -f deploy/k3s/
-    # Create self-signed SSL cert for HAProxy (replace with `just ssl-init` for trusted certs)
+    # Create self-signed SSL cert for Traefik (replace with `just ssl-init` for trusted certs)
     just _ssl-self-signed
-    # Create HAProxy ConfigMap from Terraform-generated config (delete first if exists)
-    kubectl --context hosting delete configmap haproxy-config --ignore-not-found
-    kubectl --context hosting create configmap haproxy-config \
-      --from-file=haproxy.cfg=docker/haproxy/haproxy.cfg \
-      --from-literal=fqdn-to-shard.map=""
     # Create Grafana dashboards ConfigMap
     kubectl --context hosting delete configmap grafana-dashboards --ignore-not-found
     kubectl --context hosting create configmap grafana-dashboards \
@@ -231,29 +229,35 @@ dev-k3s: build-node-agent
 
 # --- SSL ---
 
-# Generate trusted SSL certs with mkcert and deploy to HAProxy
+# Generate trusted SSL certs with mkcert and deploy to Traefik + LB VM
 ssl-init:
-    mkcert -cert-file /tmp/haproxy-cert.pem -key-file /tmp/haproxy-key.pem "*.hosting.test" "hosting.test"
-    cat /tmp/haproxy-cert.pem /tmp/haproxy-key.pem > /tmp/hosting.pem
-    kubectl --context hosting create secret generic haproxy-certs \
-      --from-file=hosting.pem=/tmp/hosting.pem \
-      --dry-run=client -o yaml | kubectl --context hosting apply -f -
-    rm /tmp/haproxy-cert.pem /tmp/haproxy-key.pem /tmp/hosting.pem
-    kubectl --context hosting rollout restart deployment/haproxy
-    kubectl --context hosting rollout status deployment/haproxy --timeout=30s
-    @echo "Trusted SSL certs installed. Visit https://admin.hosting.test"
+    mkcert -cert-file /tmp/hosting-cert.pem -key-file /tmp/hosting-key.pem "*.hosting.test" "hosting.test"
+    # Deploy to Traefik (k3s)
+    kubectl --context hosting -n kube-system create secret tls traefik-default-cert \
+      --cert=/tmp/hosting-cert.pem --key=/tmp/hosting-key.pem \
+      --dry-run=client -o yaml | kubectl --context hosting -n kube-system apply -f -
+    # Deploy to LB VM HAProxy
+    cat /tmp/hosting-cert.pem /tmp/hosting-key.pem > /tmp/hosting.pem
+    scp -o StrictHostKeyChecking=no /tmp/hosting.pem ubuntu@{{lb}}:/tmp/hosting.pem
+    ssh -o StrictHostKeyChecking=no ubuntu@{{lb}} "sudo cp /tmp/hosting.pem /etc/haproxy/certs/hosting.pem && sudo systemctl reload haproxy"
+    rm /tmp/hosting-cert.pem /tmp/hosting-key.pem /tmp/hosting.pem
+    @echo "Trusted SSL certs installed on Traefik and LB VM. Visit https://admin.hosting.test"
 
 # Generate self-signed SSL cert (used by vm-deploy, no browser trust)
 _ssl-self-signed:
     openssl req -x509 -newkey rsa:2048 \
-      -keyout /tmp/haproxy-key.pem -out /tmp/haproxy-cert.pem \
+      -keyout /tmp/hosting-key.pem -out /tmp/hosting-cert.pem \
       -days 365 -nodes -subj '/CN=*.hosting.test' \
       -addext 'subjectAltName=DNS:*.hosting.test,DNS:hosting.test' 2>/dev/null
-    cat /tmp/haproxy-cert.pem /tmp/haproxy-key.pem > /tmp/hosting.pem
-    kubectl --context hosting create secret generic haproxy-certs \
-      --from-file=hosting.pem=/tmp/hosting.pem \
-      --dry-run=client -o yaml | kubectl --context hosting apply -f -
-    rm /tmp/haproxy-cert.pem /tmp/haproxy-key.pem /tmp/hosting.pem
+    # Deploy to Traefik (k3s)
+    kubectl --context hosting -n kube-system create secret tls traefik-default-cert \
+      --cert=/tmp/hosting-cert.pem --key=/tmp/hosting-key.pem \
+      --dry-run=client -o yaml | kubectl --context hosting -n kube-system apply -f -
+    # Deploy to LB VM HAProxy
+    cat /tmp/hosting-cert.pem /tmp/hosting-key.pem > /tmp/hosting.pem
+    scp -o StrictHostKeyChecking=no /tmp/hosting.pem ubuntu@{{lb}}:/tmp/hosting.pem
+    ssh -o StrictHostKeyChecking=no ubuntu@{{lb}} "sudo cp /tmp/hosting.pem /etc/haproxy/certs/hosting.pem && sudo systemctl reload haproxy" || true
+    rm /tmp/hosting-cert.pem /tmp/hosting-key.pem /tmp/hosting.pem
 
 # --- Networking ---
 
