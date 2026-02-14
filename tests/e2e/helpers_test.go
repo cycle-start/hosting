@@ -22,7 +22,7 @@ var coreAPIURL = "https://api.hosting.test/api/v1"
 
 // webTrafficURL is the base URL for testing web traffic through HAProxy.
 // Override with WEB_TRAFFIC_URL env var.
-var webTrafficURL = "https://hosting.test"
+var webTrafficURL = "https://10.10.10.2"
 
 // tlsTransport skips certificate verification for self-signed dev certs.
 var tlsTransport = &http.Transport{
@@ -64,7 +64,7 @@ func sshExec(t *testing.T, ip string, cmd string) string {
 
 	keyPath := os.Getenv("SSH_KEY_PATH")
 	if keyPath == "" {
-		keyPath = os.ExpandEnv("${HOME}/.ssh/hosting-dev")
+		keyPath = os.ExpandEnv("${HOME}/.ssh/id_rsa")
 	}
 
 	args := []string{

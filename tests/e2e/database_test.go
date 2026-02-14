@@ -18,7 +18,7 @@ func TestDatabaseCRUD(t *testing.T) {
 
 	// Step 1: Create a database for the tenant.
 	resp, body := httpPost(t, fmt.Sprintf("%s/tenants/%s/databases", coreAPIURL, tenantID), map[string]interface{}{
-		"name":     "e2e-testdb",
+		"name":     "e2e_testdb",
 		"shard_id": dbShardID,
 	})
 	require.Equal(t, 202, resp.StatusCode, "create database: %s", body)
@@ -47,7 +47,7 @@ func TestDatabaseCRUD(t *testing.T) {
 
 	// Step 4: Create a database user.
 	resp, body = httpPost(t, fmt.Sprintf("%s/databases/%s/users", coreAPIURL, dbID), map[string]interface{}{
-		"username":   "e2e-user",
+		"username":   "e2e_user",
 		"password":   "Str0ngP@ssw0rd!",
 		"privileges": []string{"ALL"},
 	})
@@ -120,7 +120,7 @@ func TestDatabaseUserCreateValidation(t *testing.T) {
 
 	// Create a database first.
 	resp, body := httpPost(t, fmt.Sprintf("%s/tenants/%s/databases", coreAPIURL, tenantID), map[string]interface{}{
-		"name":     "e2e-valdb",
+		"name":     "e2e_valdb",
 		"shard_id": dbShardID,
 	})
 	require.Equal(t, 202, resp.StatusCode, body)

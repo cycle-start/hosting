@@ -52,7 +52,7 @@ test-integration:
 
 # Run e2e tests (requires VMs running)
 test-e2e:
-    go test ./tests/e2e/... -tags e2e -count=1 -timeout 10m -v
+    HOSTING_E2E=1 go test ./tests/e2e/... -count=1 -timeout 10m -v
 
 # Run all tests
 test-all: test test-integration test-e2e

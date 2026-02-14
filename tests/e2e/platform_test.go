@@ -21,7 +21,7 @@ func clusterConfigPath() string {
 	if p := os.Getenv("CLUSTER_CONFIG"); p != "" {
 		return p
 	}
-	return "../../terraform/cluster.yaml"
+	return "../../clusters/vm-generated.yaml"
 }
 
 func TestPlatformE2E(t *testing.T) {
