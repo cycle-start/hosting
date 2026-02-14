@@ -12,8 +12,9 @@ type Shard struct {
 	Role      string          `json:"role" db:"role"`
 	LBBackend string          `json:"lb_backend" db:"lb_backend"`
 	Config    json.RawMessage `json:"config" db:"config"`
-	Status    string          `json:"status" db:"status"`
-	CreatedAt time.Time       `json:"created_at" db:"created_at"`
+	Status        string          `json:"status" db:"status"`
+	StatusMessage *string         `json:"status_message,omitempty" db:"status_message"`
+	CreatedAt     time.Time       `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time       `json:"updated_at" db:"updated_at"`
 }
 

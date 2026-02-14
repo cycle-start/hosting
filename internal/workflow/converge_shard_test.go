@@ -30,6 +30,15 @@ func (s *ConvergeShardWorkflowTestSuite) AfterTest(suiteName, testName string) {
 	s.env.AssertExpectations(s.T())
 }
 
+// matchShardStatus returns a matcher for UpdateResourceStatus on the shards table.
+func matchShardStatus(shardID, status string) interface{} {
+	return mock.MatchedBy(func(params activity.UpdateResourceStatusParams) bool {
+		return params.Table == "shards" &&
+			params.ID == shardID &&
+			params.Status == status
+	})
+}
+
 func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 	shardID := "shard-web-1"
 	tenantShardID := shardID
@@ -52,6 +61,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 	}
 
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusConverging)).Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("ListTenantsByShard", mock.Anything, shardID).Return(tenants, nil)
 
@@ -76,6 +86,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 
 	// ReloadNginx for each node
 	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusActive)).Return(nil)
 
 	s.env.ExecuteWorkflow(ConvergeShardWorkflow, ConvergeShardParams{ShardID: shardID})
 	s.True(s.env.IsWorkflowCompleted())
@@ -99,6 +110,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestDatabaseShard() {
 	}
 
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusConverging)).Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("ListDatabasesByShard", mock.Anything, shardID).Return(databases, nil)
 	s.env.OnActivity("CreateDatabase", mock.Anything, "mydb").Return(nil)
@@ -109,6 +121,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestDatabaseShard() {
 		Password:     "pass",
 		Privileges:   []string{"ALL"},
 	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusActive)).Return(nil)
 
 	s.env.ExecuteWorkflow(ConvergeShardWorkflow, ConvergeShardParams{ShardID: shardID})
 	s.True(s.env.IsWorkflowCompleted())
@@ -132,6 +145,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestValkeyShard() {
 	}
 
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusConverging)).Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("ListValkeyInstancesByShard", mock.Anything, shardID).Return(instances, nil)
 	s.env.OnActivity("CreateValkeyInstance", mock.Anything, activity.CreateValkeyInstanceParams{
@@ -149,6 +163,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestValkeyShard() {
 		Privileges:   []string{"allcommands"},
 		KeyPattern:   "*",
 	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusActive)).Return(nil)
 
 	s.env.ExecuteWorkflow(ConvergeShardWorkflow, ConvergeShardParams{ShardID: shardID})
 	s.True(s.env.IsWorkflowCompleted())
@@ -163,7 +178,9 @@ func (s *ConvergeShardWorkflowTestSuite) TestNoNodes() {
 	}
 
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusConverging)).Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return([]model.Node{}, nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusFailed)).Return(nil)
 
 	s.env.ExecuteWorkflow(ConvergeShardWorkflow, ConvergeShardParams{ShardID: shardID})
 	s.True(s.env.IsWorkflowCompleted())
@@ -186,6 +203,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestSkipsInactiveResources() {
 	}
 
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusConverging)).Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("ListTenantsByShard", mock.Anything, shardID).Return(tenants, nil)
 
@@ -199,6 +217,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestSkipsInactiveResources() {
 
 	s.env.OnActivity("ListWebrootsByTenantID", mock.Anything, "tenant-active").Return([]model.Webroot{}, nil)
 	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusActive)).Return(nil)
 
 	s.env.ExecuteWorkflow(ConvergeShardWorkflow, ConvergeShardParams{ShardID: shardID})
 	s.True(s.env.IsWorkflowCompleted())
@@ -212,6 +231,41 @@ func (s *ConvergeShardWorkflowTestSuite) TestGetShardFails() {
 	s.env.ExecuteWorkflow(ConvergeShardWorkflow, ConvergeShardParams{ShardID: shardID})
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
+}
+
+func (s *ConvergeShardWorkflowTestSuite) TestPartialFailureContinues() {
+	shardID := "shard-db-partial"
+	shard := model.Shard{
+		ID:   shardID,
+		Role: model.ShardRoleDatabase,
+	}
+	nodes := []model.Node{
+		{ID: "node-ok"},
+		{ID: "node-bad"},
+	}
+	databases := []model.Database{
+		{ID: "db-1", Name: "mydb", ShardID: &shardID, Status: model.StatusActive},
+	}
+
+	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusConverging)).Return(nil)
+	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("ListDatabasesByShard", mock.Anything, shardID).Return(databases, nil)
+
+	// CreateDatabase succeeds on node-ok, fails on node-bad
+	s.env.OnActivity("CreateDatabase", mock.Anything, "mydb").Return(nil).Once()
+	s.env.OnActivity("CreateDatabase", mock.Anything, "mydb").Return(fmt.Errorf("node unreachable")).Once()
+
+	// User listing still runs (workflow doesn't stop)
+	s.env.OnActivity("ListDatabaseUsersByDatabaseID", mock.Anything, "db-1").Return([]model.DatabaseUser{}, nil)
+
+	// Should end in failed state with error message
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusFailed)).Return(nil)
+
+	s.env.ExecuteWorkflow(ConvergeShardWorkflow, ConvergeShardParams{ShardID: shardID})
+	s.True(s.env.IsWorkflowCompleted())
+	s.Error(s.env.GetWorkflowError())
+	s.Contains(s.env.GetWorkflowError().Error(), "convergence completed with")
 }
 
 // ---------- Run ----------

@@ -3,8 +3,10 @@ package workflow
 import (
 	"time"
 
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/edvin/hosting/internal/activity"
 	"github.com/edvin/hosting/internal/model"
 )
 
@@ -80,5 +82,49 @@ func executeProvisionTask(ctx workflow.Context, task model.ProvisionTask) error 
 		WorkflowID: task.WorkflowID,
 		TaskQueue:  "hosting-tasks",
 	})
-	return workflow.ExecuteChildWorkflow(childCtx, task.WorkflowName, task.Arg).Get(ctx, nil)
+	childErr := workflow.ExecuteChildWorkflow(childCtx, task.WorkflowName, task.Arg).Get(ctx, nil)
+
+	if task.CallbackURL != "" {
+		fireCallback(ctx, task, childErr)
+	}
+
+	return childErr
+}
+
+// fireCallback sends a callback notification after a provisioning task completes.
+// It is best-effort: callback failures are logged but never block the orchestrator.
+func fireCallback(ctx workflow.Context, task model.ProvisionTask, childErr error) {
+	logger := workflow.GetLogger(ctx)
+
+	payload := model.CallbackPayload{
+		ResourceType: task.ResourceType,
+		ResourceID:   task.ResourceID,
+		Status:       model.StatusActive,
+	}
+	if childErr != nil {
+		payload.Status = model.StatusFailed
+		payload.StatusMessage = childErr.Error()
+	}
+
+	callbackCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: 30 * time.Second,
+		RetryPolicy: &temporal.RetryPolicy{
+			MaximumAttempts:    10,
+			InitialInterval:    5 * time.Second,
+			MaximumInterval:    5 * time.Minute,
+			BackoffCoefficient: 2.0,
+		},
+	})
+
+	err := workflow.ExecuteActivity(callbackCtx, "SendCallback", activity.SendCallbackParams{
+		URL:     task.CallbackURL,
+		Payload: payload,
+	}).Get(ctx, nil)
+	if err != nil {
+		logger.Error("callback failed",
+			"url", task.CallbackURL,
+			"resource_type", task.ResourceType,
+			"resource_id", task.ResourceID,
+			"error", err)
+	}
 }

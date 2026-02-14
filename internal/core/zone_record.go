@@ -38,6 +38,8 @@ func (s *ZoneRecordService) Create(ctx context.Context, record *model.ZoneRecord
 		WorkflowName: "CreateZoneRecordWorkflow",
 		WorkflowID:   workflowID("zone-record", record.Name+"/"+record.Type, record.ID),
 		Arg:          record.ID,
+		ResourceType: "zone-record",
+		ResourceID:   record.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateZoneRecordWorkflow: %w", err)
 	}
@@ -120,6 +122,8 @@ func (s *ZoneRecordService) Update(ctx context.Context, record *model.ZoneRecord
 		WorkflowName: "UpdateZoneRecordWorkflow",
 		WorkflowID:   workflowID("zone-record", record.Name+"/"+record.Type, record.ID),
 		Arg:          record.ID,
+		ResourceType: "zone-record",
+		ResourceID:   record.ID,
 	}); err != nil {
 		return fmt.Errorf("start UpdateZoneRecordWorkflow: %w", err)
 	}
@@ -146,6 +150,8 @@ func (s *ZoneRecordService) Delete(ctx context.Context, id string) error {
 		WorkflowName: "DeleteZoneRecordWorkflow",
 		WorkflowID:   workflowID("zone-record", name, id),
 		Arg:          id,
+		ResourceType: "zone-record",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteZoneRecordWorkflow: %w", err)
 	}
@@ -174,5 +180,7 @@ func (s *ZoneRecordService) Retry(ctx context.Context, id string) error {
 		WorkflowName: "CreateZoneRecordWorkflow",
 		WorkflowID:   workflowID("zone-record", name, id),
 		Arg:          id,
+		ResourceType: "zone-record",
+		ResourceID:   id,
 	})
 }

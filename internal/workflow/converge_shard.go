@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"go.temporal.io/sdk/temporal"
@@ -18,6 +19,10 @@ type ConvergeShardParams struct {
 
 // ConvergeShardWorkflow pushes all existing resources on a shard to every node.
 // This is used after a new node joins a shard, or for manual convergence.
+//
+// The workflow sets the shard to "converging" at start, collects errors from
+// per-node/per-resource operations without stopping, and sets the shard to
+// "active" on full success or "failed" with an error summary on any failure.
 func ConvergeShardWorkflow(ctx workflow.Context, params ConvergeShardParams) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -34,47 +39,71 @@ func ConvergeShardWorkflow(ctx workflow.Context, params ConvergeShardParams) err
 		return fmt.Errorf("get shard: %w", err)
 	}
 
+	// Set shard to converging.
+	setShardStatus(ctx, params.ShardID, model.StatusConverging, nil)
+
 	// List all nodes in the shard.
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", params.ShardID).Get(ctx, &nodes)
 	if err != nil {
+		setShardStatus(ctx, params.ShardID, model.StatusFailed, strPtr(fmt.Sprintf("list nodes: %v", err)))
 		return fmt.Errorf("list nodes: %w", err)
 	}
 
 	if len(nodes) == 0 {
-		return fmt.Errorf("shard %s has no nodes", params.ShardID)
+		msg := fmt.Sprintf("shard %s has no nodes", params.ShardID)
+		setShardStatus(ctx, params.ShardID, model.StatusFailed, &msg)
+		return fmt.Errorf("%s", msg)
 	}
 
+	var errs []string
 	switch shard.Role {
 	case model.ShardRoleWeb:
-		return convergeWebShard(ctx, params.ShardID, nodes)
+		errs = convergeWebShard(ctx, params.ShardID, nodes)
 	case model.ShardRoleDatabase:
-		return convergeDatabaseShard(ctx, params.ShardID, nodes)
+		errs = convergeDatabaseShard(ctx, params.ShardID, nodes)
 	case model.ShardRoleValkey:
-		return convergeValkeyShard(ctx, params.ShardID, nodes)
-	case model.ShardRoleStorage:
-		// Storage nodes (S3/CephFS) are configured at boot via cloud-init; no convergence needed.
-		return nil
-	case model.ShardRoleDBAdmin:
-		// DB admin nodes are configured at boot via cloud-init; no convergence needed.
-		return nil
+		errs = convergeValkeyShard(ctx, params.ShardID, nodes)
 	case model.ShardRoleLB:
-		return convergeLBShard(ctx, shard, nodes)
+		errs = convergeLBShard(ctx, shard, nodes)
 	default:
-		// DNS/email shards don't have convergence yet.
+		// Storage, DBAdmin, DNS, email — no convergence needed.
+		setShardStatus(ctx, params.ShardID, model.StatusActive, nil)
 		return nil
 	}
+
+	if len(errs) > 0 {
+		msg := strings.Join(errs, "; ")
+		if len(msg) > 4000 {
+			msg = msg[:4000]
+		}
+		setShardStatus(ctx, params.ShardID, model.StatusFailed, &msg)
+		return fmt.Errorf("convergence completed with %d errors: %s", len(errs), msg)
+	}
+
+	setShardStatus(ctx, params.ShardID, model.StatusActive, nil)
+	return nil
 }
 
-func convergeLBShard(ctx workflow.Context, shard model.Shard, nodes []model.Node) error {
+// setShardStatus updates the shard's status and status_message via the UpdateResourceStatus activity.
+func setShardStatus(ctx workflow.Context, shardID, status string, msg *string) {
+	_ = workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
+		Table:         "shards",
+		ID:            shardID,
+		Status:        status,
+		StatusMessage: msg,
+	}).Get(ctx, nil)
+}
+
+func convergeLBShard(ctx workflow.Context, shard model.Shard, nodes []model.Node) []string {
 	// Fetch all active FQDN-to-backend mappings for this cluster.
 	var mappings []activity.FQDNMapping
 	err := workflow.ExecuteActivity(ctx, "ListActiveFQDNMappings", shard.ClusterID).Get(ctx, &mappings)
 	if err != nil {
-		return fmt.Errorf("list active fqdn mappings: %w", err)
+		return []string{fmt.Sprintf("list active fqdn mappings: %v", err)}
 	}
 
-	// Set each mapping on every LB node.
+	var errs []string
 	for _, m := range mappings {
 		for _, node := range nodes {
 			nodeCtx := nodeActivityCtx(ctx, node.ID)
@@ -83,22 +112,23 @@ func convergeLBShard(ctx workflow.Context, shard model.Shard, nodes []model.Node
 				LBBackend: m.LBBackend,
 			}).Get(ctx, nil)
 			if err != nil {
-				return fmt.Errorf("set lb map %s on node %s: %w", m.FQDN, node.ID, err)
+				errs = append(errs, fmt.Sprintf("set lb map %s on node %s: %v", m.FQDN, node.ID, err))
 			}
 		}
 	}
 
-	return nil
+	return errs
 }
 
-func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) error {
+func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) []string {
 	// List all tenants on this shard.
 	var tenants []model.Tenant
 	err := workflow.ExecuteActivity(ctx, "ListTenantsByShard", shardID).Get(ctx, &tenants)
 	if err != nil {
-		return fmt.Errorf("list tenants: %w", err)
+		return []string{fmt.Sprintf("list tenants: %v", err)}
 	}
 
+	var errs []string
 	for _, tenant := range tenants {
 		if tenant.Status != model.StatusActive {
 			continue
@@ -114,7 +144,8 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				SSHEnabled:  tenant.SSHEnabled,
 			}).Get(ctx, nil)
 			if err != nil {
-				return fmt.Errorf("create tenant %s on node %s: %w", tenant.ID, node.ID, err)
+				errs = append(errs, fmt.Sprintf("create tenant %s on node %s: %v", tenant.ID, node.ID, err))
+				continue
 			}
 
 			// Sync SSH/SFTP config on the node.
@@ -124,7 +155,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				SFTPEnabled: tenant.SFTPEnabled,
 			}).Get(ctx, nil)
 			if err != nil {
-				return fmt.Errorf("sync ssh config for %s on node %s: %w", tenant.ID, node.ID, err)
+				errs = append(errs, fmt.Sprintf("sync ssh config for %s on node %s: %v", tenant.ID, node.ID, err))
 			}
 		}
 
@@ -132,7 +163,8 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		var webroots []model.Webroot
 		err = workflow.ExecuteActivity(ctx, "ListWebrootsByTenantID", tenant.ID).Get(ctx, &webroots)
 		if err != nil {
-			return fmt.Errorf("list webroots for tenant %s: %w", tenant.ID, err)
+			errs = append(errs, fmt.Sprintf("list webroots for tenant %s: %v", tenant.ID, err))
+			continue
 		}
 
 		for _, webroot := range webroots {
@@ -144,7 +176,8 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 			var fqdns []model.FQDN
 			err = workflow.ExecuteActivity(ctx, "GetFQDNsByWebrootID", webroot.ID).Get(ctx, &fqdns)
 			if err != nil {
-				return fmt.Errorf("get fqdns for webroot %s: %w", webroot.ID, err)
+				errs = append(errs, fmt.Sprintf("get fqdns for webroot %s: %v", webroot.ID, err))
+				continue
 			}
 
 			var fqdnParams []activity.FQDNParam
@@ -173,7 +206,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 					FQDNs:          fqdnParams,
 				}).Get(ctx, nil)
 				if err != nil {
-					return fmt.Errorf("create webroot %s on node %s: %w", webroot.ID, node.ID, err)
+					errs = append(errs, fmt.Sprintf("create webroot %s on node %s: %v", webroot.ID, node.ID, err))
 				}
 			}
 		}
@@ -184,21 +217,22 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err := workflow.ExecuteActivity(nodeCtx, "ReloadNginx").Get(ctx, nil)
 		if err != nil {
-			return fmt.Errorf("reload nginx on node %s: %w", node.ID, err)
+			errs = append(errs, fmt.Sprintf("reload nginx on node %s: %v", node.ID, err))
 		}
 	}
 
-	return nil
+	return errs
 }
 
-func convergeDatabaseShard(ctx workflow.Context, shardID string, nodes []model.Node) error {
+func convergeDatabaseShard(ctx workflow.Context, shardID string, nodes []model.Node) []string {
 	// List all databases on this shard.
 	var databases []model.Database
 	err := workflow.ExecuteActivity(ctx, "ListDatabasesByShard", shardID).Get(ctx, &databases)
 	if err != nil {
-		return fmt.Errorf("list databases: %w", err)
+		return []string{fmt.Sprintf("list databases: %v", err)}
 	}
 
+	var errs []string
 	for _, database := range databases {
 		if database.Status != model.StatusActive {
 			continue
@@ -209,7 +243,7 @@ func convergeDatabaseShard(ctx workflow.Context, shardID string, nodes []model.N
 			nodeCtx := nodeActivityCtx(ctx, node.ID)
 			err = workflow.ExecuteActivity(nodeCtx, "CreateDatabase", database.Name).Get(ctx, nil)
 			if err != nil {
-				return fmt.Errorf("create database %s on node %s: %w", database.ID, node.ID, err)
+				errs = append(errs, fmt.Sprintf("create database %s on node %s: %v", database.ID, node.ID, err))
 			}
 		}
 
@@ -217,7 +251,8 @@ func convergeDatabaseShard(ctx workflow.Context, shardID string, nodes []model.N
 		var users []model.DatabaseUser
 		err = workflow.ExecuteActivity(ctx, "ListDatabaseUsersByDatabaseID", database.ID).Get(ctx, &users)
 		if err != nil {
-			return fmt.Errorf("list users for database %s: %w", database.ID, err)
+			errs = append(errs, fmt.Sprintf("list users for database %s: %v", database.ID, err))
+			continue
 		}
 
 		for _, user := range users {
@@ -235,23 +270,24 @@ func convergeDatabaseShard(ctx workflow.Context, shardID string, nodes []model.N
 					Privileges:   user.Privileges,
 				}).Get(ctx, nil)
 				if err != nil {
-					return fmt.Errorf("create db user %s on node %s: %w", user.ID, node.ID, err)
+					errs = append(errs, fmt.Sprintf("create db user %s on node %s: %v", user.ID, node.ID, err))
 				}
 			}
 		}
 	}
 
-	return nil
+	return errs
 }
 
-func convergeValkeyShard(ctx workflow.Context, shardID string, nodes []model.Node) error {
+func convergeValkeyShard(ctx workflow.Context, shardID string, nodes []model.Node) []string {
 	// List all valkey instances on this shard.
 	var instances []model.ValkeyInstance
 	err := workflow.ExecuteActivity(ctx, "ListValkeyInstancesByShard", shardID).Get(ctx, &instances)
 	if err != nil {
-		return fmt.Errorf("list valkey instances: %w", err)
+		return []string{fmt.Sprintf("list valkey instances: %v", err)}
 	}
 
+	var errs []string
 	for _, instance := range instances {
 		if instance.Status != model.StatusActive {
 			continue
@@ -267,7 +303,7 @@ func convergeValkeyShard(ctx workflow.Context, shardID string, nodes []model.Nod
 				MaxMemoryMB: instance.MaxMemoryMB,
 			}).Get(ctx, nil)
 			if err != nil {
-				return fmt.Errorf("create valkey instance %s on node %s: %w", instance.ID, node.ID, err)
+				errs = append(errs, fmt.Sprintf("create valkey instance %s on node %s: %v", instance.ID, node.ID, err))
 			}
 		}
 
@@ -275,7 +311,8 @@ func convergeValkeyShard(ctx workflow.Context, shardID string, nodes []model.Nod
 		var users []model.ValkeyUser
 		err = workflow.ExecuteActivity(ctx, "ListValkeyUsersByInstanceID", instance.ID).Get(ctx, &users)
 		if err != nil {
-			return fmt.Errorf("list users for valkey instance %s: %w", instance.ID, err)
+			errs = append(errs, fmt.Sprintf("list users for valkey instance %s: %v", instance.ID, err))
+			continue
 		}
 
 		for _, user := range users {
@@ -295,11 +332,13 @@ func convergeValkeyShard(ctx workflow.Context, shardID string, nodes []model.Nod
 					KeyPattern:   user.KeyPattern,
 				}).Get(ctx, nil)
 				if err != nil {
-					return fmt.Errorf("create valkey user %s on node %s: %w", user.ID, node.ID, err)
+					errs = append(errs, fmt.Sprintf("create valkey user %s on node %s: %v", user.ID, node.ID, err))
 				}
 			}
 		}
 	}
 
-	return nil
+	return errs
 }
+
+func strPtr(s string) *string { return &s }

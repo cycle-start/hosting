@@ -37,6 +37,8 @@ func (s *DatabaseUserService) Create(ctx context.Context, user *model.DatabaseUs
 		WorkflowName: "CreateDatabaseUserWorkflow",
 		WorkflowID:   workflowID("database-user", user.Username, user.ID),
 		Arg:          user.ID,
+		ResourceType: "database-user",
+		ResourceID:   user.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateDatabaseUserWorkflow: %w", err)
 	}
@@ -117,6 +119,8 @@ func (s *DatabaseUserService) Update(ctx context.Context, user *model.DatabaseUs
 		WorkflowName: "UpdateDatabaseUserWorkflow",
 		WorkflowID:   workflowID("database-user", user.Username, user.ID),
 		Arg:          user.ID,
+		ResourceType: "database-user",
+		ResourceID:   user.ID,
 	}); err != nil {
 		return fmt.Errorf("start UpdateDatabaseUserWorkflow: %w", err)
 	}
@@ -143,6 +147,8 @@ func (s *DatabaseUserService) Delete(ctx context.Context, id string) error {
 		WorkflowName: "DeleteDatabaseUserWorkflow",
 		WorkflowID:   workflowID("database-user", username, id),
 		Arg:          id,
+		ResourceType: "database-user",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteDatabaseUserWorkflow: %w", err)
 	}
@@ -171,5 +177,7 @@ func (s *DatabaseUserService) Retry(ctx context.Context, id string) error {
 		WorkflowName: "CreateDatabaseUserWorkflow",
 		WorkflowID:   workflowID("database-user", username, id),
 		Arg:          id,
+		ResourceType: "database-user",
+		ResourceID:   id,
 	})
 }

@@ -44,6 +44,8 @@ func (s *CertificateService) Upload(ctx context.Context, cert *model.Certificate
 		WorkflowName: "UploadCustomCertWorkflow",
 		WorkflowID:   workflowID("certificate", fqdnName, cert.ID),
 		Arg:          cert.ID,
+		ResourceType: "certificate",
+		ResourceID:   cert.ID,
 	}); err != nil {
 		return fmt.Errorf("start UploadCustomCertWorkflow: %w", err)
 	}
@@ -128,5 +130,7 @@ func (s *CertificateService) Retry(ctx context.Context, id string) error {
 		WorkflowName: "UploadCustomCertWorkflow",
 		WorkflowID:   workflowID("certificate", fqdnName, id),
 		Arg:          id,
+		ResourceType: "certificate",
+		ResourceID:   id,
 	})
 }

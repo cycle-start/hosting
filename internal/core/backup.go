@@ -33,6 +33,8 @@ func (s *BackupService) Create(ctx context.Context, backup *model.Backup) error 
 		WorkflowName: "CreateBackupWorkflow",
 		WorkflowID:   workflowID("backup-create", backup.Type+"/"+backup.SourceName, backup.ID),
 		Arg:          backup.ID,
+		ResourceType: "backup",
+		ResourceID:   backup.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateBackupWorkflow: %w", err)
 	}
@@ -115,6 +117,8 @@ func (s *BackupService) Delete(ctx context.Context, id string) error {
 		WorkflowName: "DeleteBackupWorkflow",
 		WorkflowID:   workflowID("backup-delete", name, id),
 		Arg:          id,
+		ResourceType: "backup",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteBackupWorkflow: %w", err)
 	}
@@ -136,6 +140,8 @@ func (s *BackupService) Restore(ctx context.Context, id string) error {
 		WorkflowName: "RestoreBackupWorkflow",
 		WorkflowID:   workflowID("backup-restore", backup.Type+"/"+backup.SourceName, id),
 		Arg:          id,
+		ResourceType: "backup",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start RestoreBackupWorkflow: %w", err)
 	}
@@ -164,5 +170,7 @@ func (s *BackupService) Retry(ctx context.Context, id string) error {
 		WorkflowName: "CreateBackupWorkflow",
 		WorkflowID:   workflowID("backup-create", name, id),
 		Arg:          id,
+		ResourceType: "backup",
+		ResourceID:   id,
 	})
 }

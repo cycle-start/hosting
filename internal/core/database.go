@@ -38,6 +38,8 @@ func (s *DatabaseService) Create(ctx context.Context, database *model.Database) 
 		WorkflowName: "CreateDatabaseWorkflow",
 		WorkflowID:   workflowID("database", database.Name, database.ID),
 		Arg:          database.ID,
+		ResourceType: "database",
+		ResourceID:   database.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateDatabaseWorkflow: %w", err)
 	}
@@ -188,6 +190,8 @@ func (s *DatabaseService) Delete(ctx context.Context, id string) error {
 		WorkflowName: "DeleteDatabaseWorkflow",
 		WorkflowID:   workflowID("database", name, id),
 		Arg:          id,
+		ResourceType: "database",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteDatabaseWorkflow: %w", err)
 	}
@@ -217,6 +221,8 @@ func (s *DatabaseService) Migrate(ctx context.Context, id string, targetShardID 
 			DatabaseID:    id,
 			TargetShardID: targetShardID,
 		},
+		ResourceType: "database",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start MigrateDatabaseWorkflow: %w", err)
 	}
@@ -262,5 +268,7 @@ func (s *DatabaseService) Retry(ctx context.Context, id string) error {
 		WorkflowName: "CreateDatabaseWorkflow",
 		WorkflowID:   workflowID("database", name, id),
 		Arg:          id,
+		ResourceType: "database",
+		ResourceID:   id,
 	})
 }

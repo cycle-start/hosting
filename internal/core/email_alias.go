@@ -36,6 +36,8 @@ func (s *EmailAliasService) Create(ctx context.Context, a *model.EmailAlias) err
 		WorkflowName: "CreateEmailAliasWorkflow",
 		WorkflowID:   workflowID("email-alias", a.Address, a.ID),
 		Arg:          a.ID,
+		ResourceType: "email-alias",
+		ResourceID:   a.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateEmailAliasWorkflow: %w", err)
 	}
@@ -114,6 +116,8 @@ func (s *EmailAliasService) Delete(ctx context.Context, id string) error {
 		WorkflowName: "DeleteEmailAliasWorkflow",
 		WorkflowID:   workflowID("email-alias", address, id),
 		Arg:          id,
+		ResourceType: "email-alias",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteEmailAliasWorkflow: %w", err)
 	}
@@ -142,5 +146,7 @@ func (s *EmailAliasService) Retry(ctx context.Context, id string) error {
 		WorkflowName: "CreateEmailAliasWorkflow",
 		WorkflowID:   workflowID("email-alias", address, id),
 		Arg:          id,
+		ResourceType: "email-alias",
+		ResourceID:   id,
 	})
 }

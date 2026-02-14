@@ -93,6 +93,9 @@ func main() {
 	stalwartActivities := activity.NewStalwart(corePool)
 	w.RegisterActivity(stalwartActivities)
 
+	callbackActivities := activity.NewCallback()
+	w.RegisterActivity(callbackActivities)
+
 	// Register workflows
 	w.RegisterWorkflow(workflow.TenantProvisionWorkflow)
 	w.RegisterWorkflow(workflow.CreateTenantWorkflow)

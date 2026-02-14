@@ -36,6 +36,8 @@ func (s *EmailForwardService) Create(ctx context.Context, f *model.EmailForward)
 		WorkflowName: "CreateEmailForwardWorkflow",
 		WorkflowID:   workflowID("email-forward", f.Destination, f.ID),
 		Arg:          f.ID,
+		ResourceType: "email-forward",
+		ResourceID:   f.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateEmailForwardWorkflow: %w", err)
 	}
@@ -114,6 +116,8 @@ func (s *EmailForwardService) Delete(ctx context.Context, id string) error {
 		WorkflowName: "DeleteEmailForwardWorkflow",
 		WorkflowID:   workflowID("email-forward", destination, id),
 		Arg:          id,
+		ResourceType: "email-forward",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteEmailForwardWorkflow: %w", err)
 	}
@@ -142,5 +146,7 @@ func (s *EmailForwardService) Retry(ctx context.Context, id string) error {
 		WorkflowName: "CreateEmailForwardWorkflow",
 		WorkflowID:   workflowID("email-forward", destination, id),
 		Arg:          id,
+		ResourceType: "email-forward",
+		ResourceID:   id,
 	})
 }

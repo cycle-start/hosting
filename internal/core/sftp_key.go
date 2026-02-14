@@ -35,6 +35,8 @@ func (s *SFTPKeyService) Create(ctx context.Context, key *model.SFTPKey) error {
 		WorkflowName: "AddSFTPKeyWorkflow",
 		WorkflowID:   workflowID("sftp-key", key.Name, key.ID),
 		Arg:          key.ID,
+		ResourceType: "sftp-key",
+		ResourceID:   key.ID,
 	}); err != nil {
 		return fmt.Errorf("start AddSFTPKeyWorkflow: %w", err)
 	}
@@ -118,6 +120,8 @@ func (s *SFTPKeyService) Delete(ctx context.Context, id string) error {
 		WorkflowName: "RemoveSFTPKeyWorkflow",
 		WorkflowID:   workflowID("sftp-key", name, id),
 		Arg:          id,
+		ResourceType: "sftp-key",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start RemoveSFTPKeyWorkflow: %w", err)
 	}
@@ -146,5 +150,7 @@ func (s *SFTPKeyService) Retry(ctx context.Context, id string) error {
 		WorkflowName: "AddSFTPKeyWorkflow",
 		WorkflowID:   workflowID("sftp-key", name, id),
 		Arg:          id,
+		ResourceType: "sftp-key",
+		ResourceID:   id,
 	})
 }

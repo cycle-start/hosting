@@ -227,9 +227,9 @@ func (a *CoreDB) GetClusterLBAddresses(ctx context.Context, clusterID string) ([
 func (a *CoreDB) GetShardByID(ctx context.Context, id string) (*model.Shard, error) {
 	var s model.Shard
 	err := a.db.QueryRow(ctx,
-		`SELECT id, cluster_id, name, role, lb_backend, config, status, created_at, updated_at
+		`SELECT id, cluster_id, name, role, lb_backend, config, status, status_message, created_at, updated_at
 		 FROM shards WHERE id = $1`, id,
-	).Scan(&s.ID, &s.ClusterID, &s.Name, &s.Role, &s.LBBackend, &s.Config, &s.Status, &s.CreatedAt, &s.UpdatedAt)
+	).Scan(&s.ID, &s.ClusterID, &s.Name, &s.Role, &s.LBBackend, &s.Config, &s.Status, &s.StatusMessage, &s.CreatedAt, &s.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get shard by id: %w", err)
 	}
@@ -500,9 +500,9 @@ func (a *CoreDB) CountActiveEmailAccountsByFQDN(ctx context.Context, fqdnID stri
 // CreateShard inserts a new shard record.
 func (a *CoreDB) CreateShard(ctx context.Context, s *model.Shard) error {
 	_, err := a.db.Exec(ctx,
-		`INSERT INTO shards (id, cluster_id, name, role, lb_backend, config, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		s.ID, s.ClusterID, s.Name, s.Role, s.LBBackend, s.Config, s.Status, s.CreatedAt, s.UpdatedAt,
+		`INSERT INTO shards (id, cluster_id, name, role, lb_backend, config, status, status_message, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		s.ID, s.ClusterID, s.Name, s.Role, s.LBBackend, s.Config, s.Status, s.StatusMessage, s.CreatedAt, s.UpdatedAt,
 	)
 	return err
 }

@@ -10,6 +10,27 @@ import (
 
 const taskQueue = "hosting-tasks"
 
+// ctxKey is a context key type for callback URL propagation.
+type ctxKey string
+
+const callbackURLKey ctxKey = "callback_url"
+
+// WithCallbackURL attaches a callback URL to the context for propagation
+// to signalProvision without changing any service method signatures.
+func WithCallbackURL(ctx context.Context, url string) context.Context {
+	if url == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, callbackURLKey, url)
+}
+
+func callbackURLFromCtx(ctx context.Context) string {
+	if url, ok := ctx.Value(callbackURLKey).(string); ok {
+		return url
+	}
+	return ""
+}
+
 // workflowID builds a human-readable Temporal workflow ID from a resource type
 // prefix, a human-readable name, and the resource's unique ID.
 // Example: workflowID("database", "mydb", "917090fc-ab8e-4943-bc5d-4fb511551e5d")
@@ -32,7 +53,21 @@ func workflowID(prefix, name, id string) string {
 // When tenantID is empty (e.g. unassigned databases/zones/valkey instances),
 // the task is executed directly as a standalone workflow.
 func signalProvision(ctx context.Context, tc temporalclient.Client, tenantID string, task model.ProvisionTask) error {
+	if url := callbackURLFromCtx(ctx); url != "" {
+		task.CallbackURL = url
+	}
+
 	if tenantID == "" {
+		if task.CallbackURL != "" {
+			// Route through orchestrator so callback fires after child completes.
+			orchID := fmt.Sprintf("standalone-provision-%s", task.WorkflowID)
+			_, err := tc.SignalWithStartWorkflow(ctx, orchID, model.ProvisionSignalName, task,
+				temporalclient.StartWorkflowOptions{
+					ID:        orchID,
+					TaskQueue: taskQueue,
+				}, "TenantProvisionWorkflow")
+			return err
+		}
 		_, err := tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
 			ID:        task.WorkflowID,
 			TaskQueue: taskQueue,

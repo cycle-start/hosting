@@ -65,6 +65,8 @@ func (s *S3AccessKeyService) Create(ctx context.Context, key *model.S3AccessKey)
 		WorkflowName: "CreateS3AccessKeyWorkflow",
 		WorkflowID:   workflowID("s3-access-key", key.AccessKeyID, key.ID),
 		Arg:          key.ID,
+		ResourceType: "s3-access-key",
+		ResourceID:   key.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateS3AccessKeyWorkflow: %w", err)
 	}
@@ -145,6 +147,8 @@ func (s *S3AccessKeyService) Delete(ctx context.Context, id string) error {
 		WorkflowName: "DeleteS3AccessKeyWorkflow",
 		WorkflowID:   workflowID("s3-access-key", accessKeyID, id),
 		Arg:          id,
+		ResourceType: "s3-access-key",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteS3AccessKeyWorkflow: %w", err)
 	}
@@ -173,5 +177,7 @@ func (s *S3AccessKeyService) Retry(ctx context.Context, id string) error {
 		WorkflowName: "CreateS3AccessKeyWorkflow",
 		WorkflowID:   workflowID("s3-access-key", accessKeyID, id),
 		Arg:          id,
+		ResourceType: "s3-access-key",
+		ResourceID:   id,
 	})
 }

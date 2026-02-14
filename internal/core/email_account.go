@@ -36,6 +36,8 @@ func (s *EmailAccountService) Create(ctx context.Context, a *model.EmailAccount)
 		WorkflowName: "CreateEmailAccountWorkflow",
 		WorkflowID:   workflowID("email-account", a.Address, a.ID),
 		Arg:          a.ID,
+		ResourceType: "email-account",
+		ResourceID:   a.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateEmailAccountWorkflow: %w", err)
 	}
@@ -114,6 +116,8 @@ func (s *EmailAccountService) Delete(ctx context.Context, id string) error {
 		WorkflowName: "DeleteEmailAccountWorkflow",
 		WorkflowID:   workflowID("email-account", address, id),
 		Arg:          id,
+		ResourceType: "email-account",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteEmailAccountWorkflow: %w", err)
 	}
@@ -142,5 +146,7 @@ func (s *EmailAccountService) Retry(ctx context.Context, id string) error {
 		WorkflowName: "CreateEmailAccountWorkflow",
 		WorkflowID:   workflowID("email-account", address, id),
 		Arg:          id,
+		ResourceType: "email-account",
+		ResourceID:   id,
 	})
 }

@@ -37,6 +37,8 @@ func (s *FQDNService) Create(ctx context.Context, fqdn *model.FQDN) error {
 		WorkflowName: "BindFQDNWorkflow",
 		WorkflowID:   workflowID("fqdn", fqdn.FQDN, fqdn.ID),
 		Arg:          fqdn.ID,
+		ResourceType: "fqdn",
+		ResourceID:   fqdn.ID,
 	}); err != nil {
 		return fmt.Errorf("start BindFQDNWorkflow: %w", err)
 	}
@@ -117,6 +119,8 @@ func (s *FQDNService) Delete(ctx context.Context, id string) error {
 		WorkflowName: "UnbindFQDNWorkflow",
 		WorkflowID:   workflowID("fqdn", fqdnName, id),
 		Arg:          id,
+		ResourceType: "fqdn",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start UnbindFQDNWorkflow: %w", err)
 	}
@@ -145,5 +149,7 @@ func (s *FQDNService) Retry(ctx context.Context, id string) error {
 		WorkflowName: "CreateFQDNWorkflow",
 		WorkflowID:   workflowID("fqdn", fqdnName, id),
 		Arg:          id,
+		ResourceType: "fqdn",
+		ResourceID:   id,
 	})
 }

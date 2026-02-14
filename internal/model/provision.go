@@ -9,4 +9,7 @@ type ProvisionTask struct {
 	WorkflowName string `json:"workflow_name"`
 	WorkflowID   string `json:"workflow_id"`
 	Arg          any    `json:"arg"`
+	CallbackURL  string `json:"callback_url,omitempty"`
+	ResourceType string `json:"resource_type,omitempty"`
+	ResourceID   string `json:"resource_id,omitempty"`
 }

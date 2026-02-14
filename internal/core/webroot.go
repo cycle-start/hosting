@@ -32,6 +32,8 @@ func (s *WebrootService) Create(ctx context.Context, webroot *model.Webroot) err
 		WorkflowName: "CreateWebrootWorkflow",
 		WorkflowID:   workflowID("webroot", webroot.Name, webroot.ID),
 		Arg:          webroot.ID,
+		ResourceType: "webroot",
+		ResourceID:   webroot.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateWebrootWorkflow: %w", err)
 	}
@@ -108,6 +110,8 @@ func (s *WebrootService) Update(ctx context.Context, webroot *model.Webroot) err
 		WorkflowName: "UpdateWebrootWorkflow",
 		WorkflowID:   workflowID("webroot", webroot.Name, webroot.ID),
 		Arg:          webroot.ID,
+		ResourceType: "webroot",
+		ResourceID:   webroot.ID,
 	}); err != nil {
 		return fmt.Errorf("start UpdateWebrootWorkflow: %w", err)
 	}
@@ -134,6 +138,8 @@ func (s *WebrootService) Delete(ctx context.Context, id string) error {
 		WorkflowName: "DeleteWebrootWorkflow",
 		WorkflowID:   workflowID("webroot", name, id),
 		Arg:          id,
+		ResourceType: "webroot",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteWebrootWorkflow: %w", err)
 	}
@@ -162,5 +168,7 @@ func (s *WebrootService) Retry(ctx context.Context, id string) error {
 		WorkflowName: "CreateWebrootWorkflow",
 		WorkflowID:   workflowID("webroot", name, id),
 		Arg:          id,
+		ResourceType: "webroot",
+		ResourceID:   id,
 	})
 }

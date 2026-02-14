@@ -39,6 +39,8 @@ func (s *TenantService) Create(ctx context.Context, tenant *model.Tenant) error 
 		WorkflowName: "CreateTenantWorkflow",
 		WorkflowID:   fmt.Sprintf("tenant-%s", tenant.ID),
 		Arg:          tenant.ID,
+		ResourceType: "tenant",
+		ResourceID:   tenant.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateTenantWorkflow: %w", err)
 	}
@@ -184,6 +186,8 @@ func (s *TenantService) Update(ctx context.Context, tenant *model.Tenant) error 
 		WorkflowName: "UpdateTenantWorkflow",
 		WorkflowID:   fmt.Sprintf("tenant-%s", tenant.ID),
 		Arg:          tenant.ID,
+		ResourceType: "tenant",
+		ResourceID:   tenant.ID,
 	}); err != nil {
 		return fmt.Errorf("start UpdateTenantWorkflow: %w", err)
 	}
@@ -204,6 +208,8 @@ func (s *TenantService) Delete(ctx context.Context, id string) error {
 		WorkflowName: "DeleteTenantWorkflow",
 		WorkflowID:   fmt.Sprintf("tenant-%s", id),
 		Arg:          id,
+		ResourceType: "tenant",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteTenantWorkflow: %w", err)
 	}
@@ -224,6 +230,8 @@ func (s *TenantService) Suspend(ctx context.Context, id string) error {
 		WorkflowName: "SuspendTenantWorkflow",
 		WorkflowID:   fmt.Sprintf("tenant-%s", id),
 		Arg:          id,
+		ResourceType: "tenant",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start SuspendTenantWorkflow: %w", err)
 	}
@@ -244,6 +252,8 @@ func (s *TenantService) Unsuspend(ctx context.Context, id string) error {
 		WorkflowName: "UnsuspendTenantWorkflow",
 		WorkflowID:   fmt.Sprintf("tenant-%s", id),
 		Arg:          id,
+		ResourceType: "tenant",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start UnsuspendTenantWorkflow: %w", err)
 	}
@@ -269,6 +279,8 @@ func (s *TenantService) Migrate(ctx context.Context, id string, targetShardID st
 			MigrateZones:  migrateZones,
 			MigrateFQDNs:  migrateFQDNs,
 		},
+		ResourceType: "tenant",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start MigrateTenantWorkflow: %w", err)
 	}
@@ -430,6 +442,8 @@ func (s *TenantService) Retry(ctx context.Context, id string) error {
 		WorkflowName: "CreateTenantWorkflow",
 		WorkflowID:   fmt.Sprintf("tenant-%s", id),
 		Arg:          id,
+		ResourceType: "tenant",
+		ResourceID:   id,
 	})
 }
 
@@ -504,6 +518,8 @@ func (s *TenantService) RetryFailed(ctx context.Context, tenantID string) (int, 
 				WorkflowName: spec.workflowName,
 				WorkflowID:   workflowID(spec.workflowPrefix, item.name, item.id),
 				Arg:          item.id,
+				ResourceType: spec.workflowPrefix,
+				ResourceID:   item.id,
 			}); err != nil {
 				return count, fmt.Errorf("start %s for %s: %w", spec.workflowName, item.id, err)
 			}
@@ -526,6 +542,8 @@ func (s *TenantService) RetryFailed(ctx context.Context, tenantID string) (int, 
 			WorkflowName: "CreateTenantWorkflow",
 			WorkflowID:   fmt.Sprintf("tenant-%s", tenantID),
 			Arg:          tenantID,
+			ResourceType: "tenant",
+			ResourceID:   tenantID,
 		}); err != nil {
 			return count, fmt.Errorf("start CreateTenantWorkflow: %w", err)
 		}

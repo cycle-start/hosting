@@ -54,6 +54,8 @@ func (s *ValkeyInstanceService) Create(ctx context.Context, instance *model.Valk
 		WorkflowName: "CreateValkeyInstanceWorkflow",
 		WorkflowID:   workflowID("valkey-instance", instance.Name, instance.ID),
 		Arg:          instance.ID,
+		ResourceType: "valkey-instance",
+		ResourceID:   instance.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateValkeyInstanceWorkflow: %w", err)
 	}
@@ -139,6 +141,8 @@ func (s *ValkeyInstanceService) Delete(ctx context.Context, id string) error {
 		WorkflowName: "DeleteValkeyInstanceWorkflow",
 		WorkflowID:   workflowID("valkey-instance", name, id),
 		Arg:          id,
+		ResourceType: "valkey-instance",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteValkeyInstanceWorkflow: %w", err)
 	}
@@ -168,6 +172,8 @@ func (s *ValkeyInstanceService) Migrate(ctx context.Context, id string, targetSh
 			InstanceID:    id,
 			TargetShardID: targetShardID,
 		},
+		ResourceType: "valkey-instance",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start MigrateValkeyInstanceWorkflow: %w", err)
 	}
@@ -207,5 +213,7 @@ func (s *ValkeyInstanceService) Retry(ctx context.Context, id string) error {
 		WorkflowName: "CreateValkeyInstanceWorkflow",
 		WorkflowID:   workflowID("valkey-instance", name, id),
 		Arg:          id,
+		ResourceType: "valkey-instance",
+		ResourceID:   id,
 	})
 }

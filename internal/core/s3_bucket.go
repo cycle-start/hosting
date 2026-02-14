@@ -38,6 +38,8 @@ func (s *S3BucketService) Create(ctx context.Context, bucket *model.S3Bucket) er
 		WorkflowName: "CreateS3BucketWorkflow",
 		WorkflowID:   workflowID("s3-bucket", bucket.Name, bucket.ID),
 		Arg:          bucket.ID,
+		ResourceType: "s3-bucket",
+		ResourceID:   bucket.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateS3BucketWorkflow: %w", err)
 	}
@@ -162,6 +164,8 @@ func (s *S3BucketService) Update(ctx context.Context, id string, public *bool, q
 		WorkflowName: "UpdateS3BucketWorkflow",
 		WorkflowID:   workflowID("s3-bucket", name, id),
 		Arg:          id,
+		ResourceType: "s3-bucket",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start UpdateS3BucketWorkflow: %w", err)
 	}
@@ -188,6 +192,8 @@ func (s *S3BucketService) Delete(ctx context.Context, id string) error {
 		WorkflowName: "DeleteS3BucketWorkflow",
 		WorkflowID:   workflowID("s3-bucket", name, id),
 		Arg:          id,
+		ResourceType: "s3-bucket",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteS3BucketWorkflow: %w", err)
 	}
@@ -216,5 +222,7 @@ func (s *S3BucketService) Retry(ctx context.Context, id string) error {
 		WorkflowName: "CreateS3BucketWorkflow",
 		WorkflowID:   workflowID("s3-bucket", name, id),
 		Arg:          id,
+		ResourceType: "s3-bucket",
+		ResourceID:   id,
 	})
 }

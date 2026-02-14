@@ -37,6 +37,8 @@ func (s *ValkeyUserService) Create(ctx context.Context, user *model.ValkeyUser) 
 		WorkflowName: "CreateValkeyUserWorkflow",
 		WorkflowID:   workflowID("valkey-user", user.Username, user.ID),
 		Arg:          user.ID,
+		ResourceType: "valkey-user",
+		ResourceID:   user.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateValkeyUserWorkflow: %w", err)
 	}
@@ -117,6 +119,8 @@ func (s *ValkeyUserService) Update(ctx context.Context, user *model.ValkeyUser) 
 		WorkflowName: "UpdateValkeyUserWorkflow",
 		WorkflowID:   workflowID("valkey-user", user.Username, user.ID),
 		Arg:          user.ID,
+		ResourceType: "valkey-user",
+		ResourceID:   user.ID,
 	}); err != nil {
 		return fmt.Errorf("start UpdateValkeyUserWorkflow: %w", err)
 	}
@@ -143,6 +147,8 @@ func (s *ValkeyUserService) Delete(ctx context.Context, id string) error {
 		WorkflowName: "DeleteValkeyUserWorkflow",
 		WorkflowID:   workflowID("valkey-user", username, id),
 		Arg:          id,
+		ResourceType: "valkey-user",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteValkeyUserWorkflow: %w", err)
 	}
@@ -171,5 +177,7 @@ func (s *ValkeyUserService) Retry(ctx context.Context, id string) error {
 		WorkflowName: "CreateValkeyUserWorkflow",
 		WorkflowID:   workflowID("valkey-user", username, id),
 		Arg:          id,
+		ResourceType: "valkey-user",
+		ResourceID:   id,
 	})
 }

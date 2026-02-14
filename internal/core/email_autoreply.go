@@ -56,6 +56,8 @@ func (s *EmailAutoReplyService) Upsert(ctx context.Context, ar *model.EmailAutoR
 		WorkflowName: "UpdateEmailAutoReplyWorkflow",
 		WorkflowID:   workflowID("email-autoreply", ar.Subject, actualID),
 		Arg:          actualID,
+		ResourceType: "email-autoreply",
+		ResourceID:   actualID,
 	}); err != nil {
 		return fmt.Errorf("start UpdateEmailAutoReplyWorkflow: %w", err)
 	}
@@ -101,6 +103,8 @@ func (s *EmailAutoReplyService) Delete(ctx context.Context, accountID string) er
 		WorkflowName: "DeleteEmailAutoReplyWorkflow",
 		WorkflowID:   workflowID("email-autoreply", subject, id),
 		Arg:          id,
+		ResourceType: "email-autoreply",
+		ResourceID:   id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteEmailAutoReplyWorkflow: %w", err)
 	}
@@ -129,5 +133,7 @@ func (s *EmailAutoReplyService) Retry(ctx context.Context, id string) error {
 		WorkflowName: "UpdateEmailAutoReplyWorkflow",
 		WorkflowID:   workflowID("email-autoreply", subject, id),
 		Arg:          id,
+		ResourceType: "email-autoreply",
+		ResourceID:   id,
 	})
 }

@@ -107,8 +107,9 @@ func TestShardService_GetByID_Success(t *testing.T) {
 		*(dest[4].(*string)) = "backend-1"
 		*(dest[5].(*json.RawMessage)) = cfg
 		*(dest[6].(*string)) = model.StatusActive
-		*(dest[7].(*time.Time)) = now
+		*(dest[7].(**string)) = nil
 		*(dest[8].(*time.Time)) = now
+		*(dest[9].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -164,8 +165,9 @@ func TestShardService_ListByCluster_Success(t *testing.T) {
 			*(dest[4].(*string)) = "backend-db"
 			*(dest[5].(*json.RawMessage)) = cfg
 			*(dest[6].(*string)) = model.StatusActive
-			*(dest[7].(*time.Time)) = now
+			*(dest[7].(**string)) = nil
 			*(dest[8].(*time.Time)) = now
+			*(dest[9].(*time.Time)) = now
 			return nil
 		},
 		func(dest ...any) error {
@@ -176,8 +178,9 @@ func TestShardService_ListByCluster_Success(t *testing.T) {
 			*(dest[4].(*string)) = "backend-web"
 			*(dest[5].(*json.RawMessage)) = cfg
 			*(dest[6].(*string)) = model.StatusActive
-			*(dest[7].(*time.Time)) = now
+			*(dest[7].(**string)) = nil
 			*(dest[8].(*time.Time)) = now
+			*(dest[9].(*time.Time)) = now
 			return nil
 		},
 	)

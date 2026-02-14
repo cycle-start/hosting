@@ -88,6 +88,7 @@ func (s *Server) setupRoutes() {
 
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Use(mw.Auth(s.corePool))
+		r.Use(mw.CallbackURL)
 		r.Use(s.auditLogger.Middleware)
 
 		// Dashboard
@@ -149,6 +150,7 @@ func (s *Server) setupRoutes() {
 		r.Put("/shards/{id}", shard.Update)
 		r.Delete("/shards/{id}", shard.Delete)
 		r.Post("/shards/{id}/converge", shard.Converge)
+		r.Post("/shards/{id}/retry", shard.Retry)
 
 		// Nodes
 		node := handler.NewNode(s.services.Node)
