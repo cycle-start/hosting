@@ -30,6 +30,9 @@ frontend http
     use_backend backend-core-api    if { req.hdr(host) -i api.${base_domain} }
     use_backend backend-temporal-ui if { req.hdr(host) -i temporal.${base_domain} }
     use_backend backend-dbadmin    if { req.hdr(host) -i dbadmin.${base_domain} }
+    use_backend backend-grafana    if { req.hdr(host) -i grafana.${base_domain} }
+    use_backend backend-prometheus if { req.hdr(host) -i prometheus.${base_domain} }
+    use_backend backend-loki       if { req.hdr(host) -i loki.${base_domain} }
     # Tenant routing via dynamic map
     use_backend %[req.hdr(host),lower,map(/var/lib/haproxy/maps/fqdn-to-shard.map,shard-default)]
 
@@ -45,6 +48,15 @@ backend backend-temporal-ui
 
 backend backend-dbadmin
     server dbadmin 127.0.0.1:4180
+
+backend backend-grafana
+    server grafana 127.0.0.1:3000
+
+backend backend-prometheus
+    server prometheus 127.0.0.1:9090
+
+backend backend-loki
+    server loki 127.0.0.1:3100
 
 # Default backend (returns 503 for unmapped FQDNs)
 backend shard-default

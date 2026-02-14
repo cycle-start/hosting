@@ -16,6 +16,11 @@ write_files:
       NODE_ID=${node_id}
       SHARD_NAME=${shard_name}
       MYSQL_DSN=root@tcp(127.0.0.1:3306)/
+      REGION_ID=${region_id}
+      CLUSTER_ID=${cluster_id}
+      NODE_ROLE=database
+      SERVICE_NAME=node-agent
+      METRICS_ADDR=:9100
 
 runcmd:
   - systemctl daemon-reload

@@ -27,6 +27,8 @@ adminUi:
 config:
   registryUrl: "localhost:5000"
   oidcIssuerUrl: "http://api.hosting.test"
+  regionId: "dev"
+  clusterId: "vm-cluster-1"
 
 secrets:
   coreDatabaseUrl: "postgres://hosting:hosting@127.0.0.1:5432/hosting_core"

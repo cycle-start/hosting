@@ -13,3 +13,5 @@ data:
   OIDC_ISSUER_URL: {{ .Values.config.oidcIssuerUrl | quote }}
   AUDIT_LOG_RETENTION_DAYS: {{ .Values.config.auditLogRetentionDays | quote }}
   BACKUP_RETENTION_DAYS: {{ .Values.config.backupRetentionDays | quote }}
+  REGION_ID: {{ .Values.config.regionId | quote }}
+  CLUSTER_ID: {{ .Values.config.clusterId | quote }}

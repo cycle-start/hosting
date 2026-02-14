@@ -44,6 +44,8 @@ spec:
           env:
             - name: HTTP_LISTEN_ADDR
               value: ":{{ .Values.coreApi.port }}"
+            - name: SERVICE_NAME
+              value: "core-api"
             {{- if .Values.temporal.tls.enabled }}
             - name: TEMPORAL_TLS_CERT
               value: /tls/temporal/tls.crt

@@ -19,6 +19,11 @@ write_files:
       WEB_STORAGE_DIR=/var/www/storage
       CERT_DIR=/etc/ssl/hosting
       SSH_CONFIG_DIR=/etc/ssh/sshd_config.d
+      REGION_ID=${region_id}
+      CLUSTER_ID=${cluster_id}
+      NODE_ROLE=web
+      SERVICE_NAME=node-agent
+      METRICS_ADDR=:9100
 
 runcmd:
   # Fetch CephFS client keyring and config from storage node.

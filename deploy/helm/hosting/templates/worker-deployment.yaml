@@ -34,8 +34,11 @@ spec:
                 name: {{ include "hosting.fullname" . }}
             - secretRef:
                 name: {{ include "hosting.secretName" . }}
-          {{- if or .Values.temporal.tls.enabled .Values.worker.extraEnv }}
           env:
+            - name: SERVICE_NAME
+              value: "worker"
+            - name: METRICS_ADDR
+              value: ":9200"
             {{- if .Values.temporal.tls.enabled }}
             - name: TEMPORAL_TLS_CERT
               value: /tls/temporal/tls.crt
@@ -47,7 +50,6 @@ spec:
             {{- with .Values.worker.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          {{- end }}
           {{- if .Values.temporal.tls.enabled }}
           volumeMounts:
             - name: temporal-tls

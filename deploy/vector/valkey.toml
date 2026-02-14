@@ -1,0 +1,26 @@
+# Additional Vector sources for Valkey nodes.
+
+[sources.valkey_log]
+type = "file"
+include = ["/var/log/valkey/*.log", "/var/lib/valkey/*.log"]
+read_from = "end"
+
+[transforms.label_valkey]
+type = "remap"
+inputs = ["valkey_log"]
+source = '''
+.service = "valkey"
+.level = "info"
+'''
+
+[sinks.loki_valkey]
+type = "loki"
+inputs = ["label_valkey"]
+endpoint = "http://10.10.10.2:3100"
+encoding.codec = "text"
+
+[sinks.loki_valkey.labels]
+service = "{{ service }}"
+hostname = "{{ host }}"
+level = "{{ level }}"
+job = "valkey"

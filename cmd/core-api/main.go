@@ -10,13 +10,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/rs/zerolog"
 	temporalclient "go.temporal.io/sdk/client"
 
 	"github.com/edvin/hosting/internal/api"
 	"github.com/edvin/hosting/internal/config"
 	"github.com/edvin/hosting/internal/core"
 	"github.com/edvin/hosting/internal/db"
+	"github.com/edvin/hosting/internal/logging"
 )
 
 func main() {
@@ -29,22 +29,18 @@ func main() {
 	migrateDirFlag := flag.String("migrate-dir", "migrations/core", "Migration files directory")
 	flag.Parse()
 
-	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
-
 	cfg, err := config.Load()
 	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to load config")
+		fmt.Fprintf(os.Stderr, "failed to load config: %v\n", err)
+		os.Exit(1)
 	}
 
 	if err := cfg.Validate("core-api"); err != nil {
-		logger.Fatal().Err(err).Msg("invalid config")
+		fmt.Fprintf(os.Stderr, "invalid config: %v\n", err)
+		os.Exit(1)
 	}
 
-	level, err := zerolog.ParseLevel(cfg.LogLevel)
-	if err != nil {
-		logger.Fatal().Str("level", cfg.LogLevel).Msg("invalid log level")
-	}
-	logger = logger.Level(level)
+	logger := logging.NewLogger(cfg)
 
 	if *migrateFlag {
 		logger.Info().Str("dir", *migrateDirFlag).Msg("running database migrations")

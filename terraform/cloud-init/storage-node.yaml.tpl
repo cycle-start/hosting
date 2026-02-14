@@ -163,6 +163,11 @@ write_files:
       NODE_ID=${node_id}
       SHARD_NAME=${shard_name}
       RGW_ENDPOINT=http://localhost:7480
+      REGION_ID=${region_id}
+      CLUSTER_ID=${cluster_id}
+      NODE_ROLE=storage
+      SERVICE_NAME=node-agent
+      METRICS_ADDR=:9100
 
 runcmd:
   - /opt/hosting/setup-ceph.sh

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -14,28 +16,26 @@ import (
 	"github.com/edvin/hosting/internal/activity"
 	"github.com/edvin/hosting/internal/config"
 	"github.com/edvin/hosting/internal/db"
+	"github.com/edvin/hosting/internal/logging"
+	"github.com/edvin/hosting/internal/metrics"
 	"github.com/edvin/hosting/internal/workflow"
 )
 
 const taskQueue = "hosting-tasks"
 
 func main() {
-	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
-
 	cfg, err := config.Load()
 	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to load config")
+		fmt.Fprintf(os.Stderr, "failed to load config: %v\n", err)
+		os.Exit(1)
 	}
 
 	if err := cfg.Validate("worker"); err != nil {
-		logger.Fatal().Err(err).Msg("invalid config")
+		fmt.Fprintf(os.Stderr, "invalid config: %v\n", err)
+		os.Exit(1)
 	}
 
-	level, err := zerolog.ParseLevel(cfg.LogLevel)
-	if err != nil {
-		logger.Fatal().Str("level", cfg.LogLevel).Msg("invalid log level")
-	}
-	logger = logger.Level(level)
+	logger := logging.NewLogger(cfg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -152,6 +152,16 @@ func main() {
 	w.RegisterWorkflow(workflow.DeleteBackupWorkflow)
 	w.RegisterWorkflow(workflow.CleanupAuditLogsWorkflow)
 	w.RegisterWorkflow(workflow.CleanupOldBackupsWorkflow)
+
+	if cfg.MetricsAddr != "" {
+		metricsSrv := metrics.NewServer(cfg.MetricsAddr)
+		go func() {
+			logger.Info().Str("addr", cfg.MetricsAddr).Msg("starting metrics server")
+			if err := metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				logger.Error().Err(err).Msg("metrics server failed")
+			}
+		}()
+	}
 
 	go func() {
 		logger.Info().Str("taskQueue", taskQueue).Msg("starting temporal worker")

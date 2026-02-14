@@ -22,6 +22,9 @@ libvirt network 10.10.10.0/24
   |     |-- admin-ui :3001
   |     |-- Temporal :7233
   |     |-- Temporal UI :8080
+  |     |-- Grafana :3000
+  |     |-- Loki :3100
+  |     |-- Prometheus :9090
   |     |-- PostgreSQL :5432 (core), :5433 (powerdns)
   |     |-- Valkey :6379
   |     '-- Registry :5000
@@ -86,7 +89,7 @@ Note: if WSL2's IP changes, you'll need to update the persistent route.
 Edit `C:\Windows\System32\drivers\etc\hosts` as Administrator:
 
 ```
-10.10.10.2  admin.hosting.test api.hosting.test temporal.hosting.test dbadmin.hosting.test
+10.10.10.2  admin.hosting.test api.hosting.test temporal.hosting.test dbadmin.hosting.test grafana.hosting.test prometheus.hosting.test loki.hosting.test
 ```
 
 Add tenant FQDNs as needed:
@@ -147,6 +150,9 @@ Both HTTP and HTTPS work simultaneously — no forced redirect.
 | `https://api.hosting.test` | Core API | `127.0.0.1:8090` |
 | `https://temporal.hosting.test` | Temporal UI | `127.0.0.1:8080` |
 | `https://dbadmin.hosting.test` | DB Admin (CloudBeaver) | `127.0.0.1:4180` |
+| `https://grafana.hosting.test` | Grafana (logs/metrics) | `127.0.0.1:3000` |
+| `https://prometheus.hosting.test` | Prometheus | `127.0.0.1:9090` |
+| `https://loki.hosting.test` | Loki (log aggregation) | `127.0.0.1:3100` |
 | `https://acme.hosting.test` | Tenant site | web shard VMs |
 
 HTTP (`http://`) also works on all URLs — no forced redirect.

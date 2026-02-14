@@ -11,6 +11,9 @@ systemctl start mysql
 mysql -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY ''; FLUSH PRIVILEGES;"
 systemctl stop mysql
 
+# Vector role-specific config.
+cp /tmp/vector-db.toml /etc/vector/config.d/db.toml
+
 # Cleanup.
 apt-get clean
 rm -rf /var/lib/apt/lists/*

@@ -199,6 +199,16 @@ build {
     destination = "/tmp/00-hosting-base.conf"
   }
 
+  provisioner "file" {
+    source      = "../deploy/vector/base.toml"
+    destination = "/tmp/vector.toml"
+  }
+
+  provisioner "file" {
+    source      = "../deploy/vector/web.toml"
+    destination = "/tmp/vector-web.toml"
+  }
+
   provisioner "shell" {
     execute_command = "sudo sh -c '{{ .Vars }} {{ .Path }}'"
     scripts = [
@@ -230,6 +240,16 @@ build {
   provisioner "file" {
     source      = "files/node-agent.service"
     destination = "/tmp/node-agent.service"
+  }
+
+  provisioner "file" {
+    source      = "../deploy/vector/base.toml"
+    destination = "/tmp/vector.toml"
+  }
+
+  provisioner "file" {
+    source      = "../deploy/vector/db.toml"
+    destination = "/tmp/vector-db.toml"
   }
 
   provisioner "shell" {
@@ -265,6 +285,16 @@ build {
     destination = "/tmp/node-agent.service"
   }
 
+  provisioner "file" {
+    source      = "../deploy/vector/base.toml"
+    destination = "/tmp/vector.toml"
+  }
+
+  provisioner "file" {
+    source      = "../deploy/vector/dns.toml"
+    destination = "/tmp/vector-dns.toml"
+  }
+
   provisioner "shell" {
     execute_command = "sudo sh -c '{{ .Vars }} {{ .Path }}'"
     scripts = [
@@ -298,6 +328,16 @@ build {
     destination = "/tmp/node-agent.service"
   }
 
+  provisioner "file" {
+    source      = "../deploy/vector/base.toml"
+    destination = "/tmp/vector.toml"
+  }
+
+  provisioner "file" {
+    source      = "../deploy/vector/valkey.toml"
+    destination = "/tmp/vector-valkey.toml"
+  }
+
   provisioner "shell" {
     execute_command = "sudo sh -c '{{ .Vars }} {{ .Path }}'"
     scripts = [
@@ -329,6 +369,16 @@ build {
   provisioner "file" {
     source      = "files/node-agent.service"
     destination = "/tmp/node-agent.service"
+  }
+
+  provisioner "file" {
+    source      = "../deploy/vector/base.toml"
+    destination = "/tmp/vector.toml"
+  }
+
+  provisioner "file" {
+    source      = "../deploy/vector/storage.toml"
+    destination = "/tmp/vector-storage.toml"
   }
 
   provisioner "shell" {
@@ -369,6 +419,11 @@ build {
     destination = "/tmp/cloudbeaver.service"
   }
 
+  provisioner "file" {
+    source      = "../deploy/vector/base.toml"
+    destination = "/tmp/vector.toml"
+  }
+
   provisioner "shell" {
     execute_command = "sudo sh -c '{{ .Vars }} {{ .Path }}'"
     scripts = [
@@ -391,6 +446,11 @@ build {
   name = "controlplane"
 
   sources = ["source.qemu.controlplane"]
+
+  provisioner "file" {
+    source      = "../deploy/vector/controlplane.toml"
+    destination = "/tmp/vector-controlplane.toml"
+  }
 
   provisioner "shell" {
     execute_command = "sudo sh -c '{{ .Vars }} {{ .Path }}'"

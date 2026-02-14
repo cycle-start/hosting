@@ -41,6 +41,8 @@ config:
   oidcIssuerUrl: "http://api.hosting.localhost"
   auditLogRetentionDays: "90"
   backupRetentionDays: "30"
+  regionId: ""
+  clusterId: ""
 
 # Secrets — either inline or reference an existing K8s Secret
 secrets:

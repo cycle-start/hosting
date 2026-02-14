@@ -42,6 +42,18 @@ variable "base_domain" {
   default     = "hosting.test"
 }
 
+variable "region_id" {
+  description = "Region identifier for observability labels"
+  type        = string
+  default     = "dev"
+}
+
+variable "cluster_id" {
+  description = "Cluster identifier for observability labels"
+  type        = string
+  default     = "vm-cluster-1"
+}
+
 variable "controlplane_nodes" {
   description = "Control plane node definitions"
   type = list(object({

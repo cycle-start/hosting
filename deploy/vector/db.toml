@@ -1,0 +1,26 @@
+# Additional Vector sources for database nodes.
+
+[sources.mysql_error]
+type = "file"
+include = ["/var/log/mysql/error.log"]
+read_from = "end"
+
+[transforms.label_mysql]
+type = "remap"
+inputs = ["mysql_error"]
+source = '''
+.service = "mysql"
+.level = "error"
+'''
+
+[sinks.loki_db]
+type = "loki"
+inputs = ["label_mysql"]
+endpoint = "http://10.10.10.2:3100"
+encoding.codec = "text"
+
+[sinks.loki_db.labels]
+service = "{{ service }}"
+hostname = "{{ host }}"
+level = "{{ level }}"
+job = "mysql"

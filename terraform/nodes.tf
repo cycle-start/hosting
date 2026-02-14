@@ -111,6 +111,8 @@ resource "libvirt_cloudinit_disk" "web_node" {
     temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
     ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
     storage_node_ip  = var.storage_nodes[0].ip
+    region_id        = var.region_id
+    cluster_id       = var.cluster_id
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.web_nodes[count.index].ip
@@ -140,6 +142,8 @@ resource "libvirt_cloudinit_disk" "db_node" {
     shard_name       = var.db_shard_name
     temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
     ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
+    region_id        = var.region_id
+    cluster_id       = var.cluster_id
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.db_nodes[count.index].ip
@@ -169,6 +173,8 @@ resource "libvirt_cloudinit_disk" "dns_node" {
     shard_name       = var.dns_shard_name
     temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
     ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
+    region_id        = var.region_id
+    cluster_id       = var.cluster_id
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.dns_nodes[count.index].ip
@@ -198,6 +204,8 @@ resource "libvirt_cloudinit_disk" "valkey_node" {
     shard_name       = var.valkey_shard_name
     temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
     ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
+    region_id        = var.region_id
+    cluster_id       = var.cluster_id
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.valkey_nodes[count.index].ip
@@ -230,6 +238,8 @@ resource "libvirt_cloudinit_disk" "storage_node" {
     ip_address         = var.storage_nodes[count.index].ip
     s3_enabled         = true
     filestore_enabled  = true
+    region_id          = var.region_id
+    cluster_id         = var.cluster_id
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.storage_nodes[count.index].ip
@@ -271,6 +281,8 @@ resource "libvirt_cloudinit_disk" "dbadmin_node" {
     shard_name       = var.dbadmin_shard_name
     temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
     ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
+    region_id        = var.region_id
+    cluster_id       = var.cluster_id
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.dbadmin_nodes[count.index].ip

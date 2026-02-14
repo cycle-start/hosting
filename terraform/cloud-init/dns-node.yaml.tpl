@@ -15,6 +15,11 @@ write_files:
       TEMPORAL_ADDRESS=${temporal_address}
       NODE_ID=${node_id}
       SHARD_NAME=${shard_name}
+      REGION_ID=${region_id}
+      CLUSTER_ID=${cluster_id}
+      NODE_ROLE=dns
+      SERVICE_NAME=node-agent
+      METRICS_ADDR=:9100
 
 runcmd:
   - systemctl daemon-reload

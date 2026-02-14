@@ -20,6 +20,9 @@ cp /tmp/00-hosting-base.conf /etc/ssh/sshd_config.d/00-hosting-base.conf
 # Hide other users' processes (applied on every boot via fstab).
 echo "proc /proc proc defaults,hidepid=2 0 0" >> /etc/fstab
 
+# Vector role-specific config.
+cp /tmp/vector-web.toml /etc/vector/config.d/web.toml
+
 # Cleanup.
 apt-get clean
 rm -rf /var/lib/apt/lists/*

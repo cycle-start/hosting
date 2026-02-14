@@ -20,6 +20,19 @@ cp /tmp/node-agent.service /etc/systemd/system/node-agent.service
 systemctl daemon-reload
 systemctl enable node-agent
 
+# Install Vector for log shipping.
+curl -1sLf https://setup.vector.dev | bash
+apt-get install -y vector
+mkdir -p /etc/vector/config.d
+rm -f /etc/vector/vector.yaml
+cp /tmp/vector.toml /etc/vector/vector.toml
+# Point Vector to our config instead of the default vector.yaml.
+cat > /etc/default/vector <<'EOF'
+VECTOR_CONFIG=/etc/vector/vector.toml
+VECTOR_CONFIG_DIR=/etc/vector/config.d
+EOF
+systemctl enable vector
+
 # Cleanup.
 apt-get clean
 rm -rf /var/lib/apt/lists/*

@@ -75,6 +75,11 @@ write_files:
       NODE_ID=${node_id}
       SHARD_NAME=${shard_name}
       CLOUDBEAVER_ENDPOINT=http://localhost:8978
+      REGION_ID=${region_id}
+      CLUSTER_ID=${cluster_id}
+      NODE_ROLE=dbadmin
+      SERVICE_NAME=node-agent
+      METRICS_ADDR=:9100
 
 runcmd:
   - systemctl daemon-reload

@@ -35,6 +35,14 @@ type Config struct {
 	TemporalTLSKey        string // TEMPORAL_TLS_KEY — path to client key
 	TemporalTLSCACert     string // TEMPORAL_TLS_CA_CERT — path to CA cert
 	TemporalTLSServerName string // TEMPORAL_TLS_SERVER_NAME — SNI override
+
+	// Observability context
+	RegionID    string // REGION_ID
+	ClusterID   string // CLUSTER_ID
+	ShardName   string // SHARD_NAME
+	NodeRole    string // NODE_ROLE
+	ServiceName string // SERVICE_NAME
+	MetricsAddr string // METRICS_ADDR — listen addr for /metrics (worker + node-agent)
 }
 
 func Load() (*Config, error) {
@@ -57,6 +65,13 @@ func Load() (*Config, error) {
 		TemporalTLSKey:        getEnv("TEMPORAL_TLS_KEY", ""),
 		TemporalTLSCACert:     getEnv("TEMPORAL_TLS_CA_CERT", ""),
 		TemporalTLSServerName: getEnv("TEMPORAL_TLS_SERVER_NAME", ""),
+
+		RegionID:    getEnv("REGION_ID", ""),
+		ClusterID:   getEnv("CLUSTER_ID", ""),
+		ShardName:   getEnv("SHARD_NAME", ""),
+		NodeRole:    getEnv("NODE_ROLE", ""),
+		ServiceName: getEnv("SERVICE_NAME", ""),
+		MetricsAddr: getEnv("METRICS_ADDR", ""),
 	}
 
 	return cfg, nil

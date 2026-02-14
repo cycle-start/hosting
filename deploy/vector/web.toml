@@ -1,0 +1,42 @@
+# Additional Vector sources for web nodes.
+
+[sources.nginx_access]
+type = "file"
+include = ["/var/log/nginx/access.log"]
+read_from = "end"
+
+[sources.nginx_error]
+type = "file"
+include = ["/var/log/nginx/error.log"]
+read_from = "end"
+
+[transforms.label_nginx_access]
+type = "remap"
+inputs = ["nginx_access"]
+source = '''
+.service = "nginx"
+.level = "info"
+.log_type = "access"
+'''
+
+[transforms.label_nginx_error]
+type = "remap"
+inputs = ["nginx_error"]
+source = '''
+.service = "nginx"
+.level = "error"
+.log_type = "error"
+'''
+
+[sinks.loki_web]
+type = "loki"
+inputs = ["label_nginx_access", "label_nginx_error"]
+endpoint = "http://10.10.10.2:3100"
+encoding.codec = "text"
+
+[sinks.loki_web.labels]
+service = "{{ service }}"
+hostname = "{{ host }}"
+level = "{{ level }}"
+log_type = "{{ log_type }}"
+job = "nginx"

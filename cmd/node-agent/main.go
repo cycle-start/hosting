@@ -1,34 +1,34 @@
 package main
 
 import (
+	"fmt"
+	"net/http"
 	"os"
 
-	"github.com/rs/zerolog"
+	"github.com/prometheus/client_golang/prometheus"
 	temporalclient "go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 
 	"github.com/edvin/hosting/internal/activity"
 	"github.com/edvin/hosting/internal/agent"
 	"github.com/edvin/hosting/internal/config"
+	"github.com/edvin/hosting/internal/logging"
+	"github.com/edvin/hosting/internal/metrics"
 )
 
 func main() {
-	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
-
 	cfg, err := config.Load()
 	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to load config")
+		fmt.Fprintf(os.Stderr, "failed to load config: %v\n", err)
+		os.Exit(1)
 	}
 
 	if err := cfg.Validate("node-agent"); err != nil {
-		logger.Fatal().Err(err).Msg("invalid config")
+		fmt.Fprintf(os.Stderr, "invalid config: %v\n", err)
+		os.Exit(1)
 	}
 
-	level, err := zerolog.ParseLevel(cfg.LogLevel)
-	if err != nil {
-		logger.Fatal().Str("level", cfg.LogLevel).Msg("invalid log level")
-	}
-	logger = logger.Level(level)
+	logger := logging.NewLogger(cfg)
 
 	agentCfg := agent.Config{
 		MySQLDSN:        cfg.MySQLDSN,
@@ -39,7 +39,7 @@ func main() {
 		ValkeyDataDir:   getEnv("VALKEY_DATA_DIR", "/var/lib/valkey"),
 		InitSystem:      getEnv("INIT_SYSTEM", "direct"),
 		SSHConfigDir:    getEnv("SSH_CONFIG_DIR", "/etc/ssh/sshd_config.d"),
-		ShardName:       getEnv("SHARD_NAME", ""),
+		ShardName:       cfg.ShardName,
 	}
 
 	srv := agent.NewServer(logger, agentCfg)
@@ -84,6 +84,23 @@ func main() {
 
 	nodeACMEActs := activity.NewNodeACMEActivity()
 	w.RegisterActivity(nodeACMEActs)
+
+	if cfg.MetricsAddr != "" {
+		infoGauge := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "node_agent_info",
+			Help: "Node agent instance info (always 1)",
+		}, []string{"node_id", "node_role", "shard", "region", "cluster"})
+		prometheus.MustRegister(infoGauge)
+		infoGauge.WithLabelValues(cfg.NodeID, cfg.NodeRole, cfg.ShardName, cfg.RegionID, cfg.ClusterID).Set(1)
+
+		metricsSrv := metrics.NewServer(cfg.MetricsAddr)
+		go func() {
+			logger.Info().Str("addr", cfg.MetricsAddr).Msg("starting metrics server")
+			if err := metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				logger.Error().Err(err).Msg("metrics server failed")
+			}
+		}()
+	}
 
 	logger.Info().
 		Str("nodeID", cfg.NodeID).

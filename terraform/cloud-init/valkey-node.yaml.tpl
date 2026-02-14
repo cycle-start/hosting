@@ -17,6 +17,11 @@ write_files:
       SHARD_NAME=${shard_name}
       VALKEY_CONFIG_DIR=/etc/valkey
       VALKEY_DATA_DIR=/var/lib/valkey
+      REGION_ID=${region_id}
+      CLUSTER_ID=${cluster_id}
+      NODE_ROLE=valkey
+      SERVICE_NAME=node-agent
+      METRICS_ADDR=:9100
 
 runcmd:
   - systemctl daemon-reload

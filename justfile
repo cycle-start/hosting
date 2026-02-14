@@ -189,6 +189,12 @@ vm-deploy:
     kubectl --context hosting create configmap haproxy-config \
       --from-file=haproxy.cfg=docker/haproxy/haproxy.cfg \
       --from-literal=fqdn-to-shard.map=""
+    # Create Grafana dashboards ConfigMap
+    kubectl --context hosting delete configmap grafana-dashboards --ignore-not-found
+    kubectl --context hosting create configmap grafana-dashboards \
+      --from-file=api-overview.json=docker/grafana/provisioning/dashboards/api-overview.json \
+      --from-file=infrastructure.json=docker/grafana/provisioning/dashboards/infrastructure.json \
+      --from-file=log-explorer.json=docker/grafana/provisioning/dashboards/log-explorer.json
     # Install/upgrade Helm chart
     helm --kube-context hosting upgrade --install hosting \
       deploy/helm/hosting -f deploy/helm/hosting/values-dev.yaml
@@ -262,3 +268,17 @@ forward-stop:
 # Check forwarding status
 forward-status:
     ./scripts/wsl-forward.sh status
+
+# --- Monitoring ---
+
+# Open Grafana UI
+vm-grafana:
+    @echo "http://grafana.hosting.test (admin/admin)"
+
+# Open Prometheus UI
+vm-prometheus:
+    @echo "http://prometheus.hosting.test"
+
+# Bootstrap Vector on all running VMs (Phase A — no Packer rebuild needed)
+vm-bootstrap-vector:
+    bash scripts/bootstrap-vector.sh
