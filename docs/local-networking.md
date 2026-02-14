@@ -169,6 +169,21 @@ HTTP (`http://`) also works on all URLs — no forced redirect.
 
 Control plane hostnames are configured via k8s Ingress resources in `deploy/k3s/ingress.yaml`. Tenant routing is via the HAProxy FQDN map on the LB VM. The domain is controlled by the `base_domain` Terraform variable (default: `hosting.test`).
 
+### Authentication
+
+Most control plane services are open (no auth) since they're only accessible within the libvirt dev network.
+
+| Service | Auth | Notes |
+|---------|------|-------|
+| Admin UI | None | Open access |
+| Core API | API key | `X-API-Key` header required |
+| Grafana | admin / admin | Anonymous users get read-only Viewer role (dashboards only). Log in as `admin`/`admin` for full access including Explore (log queries). |
+| Prometheus | None | Open access |
+| Loki | None | API-only (no UI). Browse logs via Grafana → Explore → Loki. |
+| Temporal UI | None | Open access |
+| Traefik | None | Dashboard at `/dashboard/` |
+| CloudBeaver | OIDC | Authenticates via core-api as OIDC provider |
+
 ## Adding and reaching tenant sites
 
 1. Create a tenant (via admin UI or API)
