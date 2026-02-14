@@ -177,6 +177,7 @@ func TestDatabaseUserCreate_InvalidSlugUsername(t *testing.T) {
 		{"spaces", "my user"},
 		{"special chars", "user@name"},
 		{"starts with digit", "1user"},
+		{"hyphens", "my-user"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

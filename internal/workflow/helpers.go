@@ -28,8 +28,9 @@ func setResourceFailed(ctx workflow.Context, table string, id string, err error)
 // context will be picked up by the node-agent worker running on that node.
 func nodeActivityCtx(ctx workflow.Context, nodeID string) workflow.Context {
 	return workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-		TaskQueue:           "node-" + nodeID,
-		StartToCloseTimeout: 2 * time.Minute,
+		TaskQueue:              "node-" + nodeID,
+		StartToCloseTimeout:    2 * time.Minute,
+		ScheduleToCloseTimeout: 10 * time.Minute,
 		RetryPolicy: &temporal.RetryPolicy{
 			MaximumAttempts:    5,
 			InitialInterval:    5 * time.Second,

@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"fmt"
 	"time"
 
 	"go.temporal.io/sdk/temporal"
@@ -44,6 +45,11 @@ func CreateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	if err != nil {
 		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
+	}
+	if domainID == 0 {
+		zoneErr := fmt.Errorf("zone %q not found in DNS", zctx.ZoneName)
+		_ = setResourceFailed(ctx, "zone_records", recordID, zoneErr)
+		return zoneErr
 	}
 
 	// Write the record to PowerDNS DB.
@@ -102,6 +108,11 @@ func UpdateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	if err != nil {
 		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
+	}
+	if domainID == 0 {
+		zoneErr := fmt.Errorf("zone %q not found in DNS", zctx.ZoneName)
+		_ = setResourceFailed(ctx, "zone_records", recordID, zoneErr)
+		return zoneErr
 	}
 
 	// Update the record in PowerDNS DB.
@@ -162,15 +173,19 @@ func DeleteZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 		return err
 	}
 
-	// Delete the record from PowerDNS DB.
-	err = workflow.ExecuteActivity(ctx, "DeleteDNSRecord", activity.DeleteDNSRecordParams{
-		DomainID: domainID,
-		Name:     zctx.Record.Name,
-		Type:     zctx.Record.Type,
-	}).Get(ctx, nil)
-	if err != nil {
-		_ = setResourceFailed(ctx, "zone_records", recordID, err)
-		return err
+	// Only delete from PowerDNS if the zone exists there (domainID > 0).
+	// This makes delete idempotent — if the zone was already removed from
+	// PowerDNS (or never created), we skip straight to marking it deleted.
+	if domainID > 0 {
+		err = workflow.ExecuteActivity(ctx, "DeleteDNSRecord", activity.DeleteDNSRecordParams{
+			DomainID: domainID,
+			Name:     zctx.Record.Name,
+			Type:     zctx.Record.Type,
+		}).Get(ctx, nil)
+		if err != nil {
+			_ = setResourceFailed(ctx, "zone_records", recordID, err)
+			return err
+		}
 	}
 
 	// Set status to deleted.

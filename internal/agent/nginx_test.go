@@ -256,11 +256,18 @@ func TestGenerateConfig_StaticRuntime(t *testing.T) {
 
 func TestGenerateConfig_WithSSL(t *testing.T) {
 	tmpDir := t.TempDir()
+	certDir := filepath.Join(tmpDir, "certs")
 	cfg := Config{
 		NginxConfigDir: tmpDir,
-		CertDir:        "/etc/ssl/hosting",
+		CertDir:        certDir,
 	}
 	mgr := NewNginxManager(zerolog.Nop(), cfg)
+
+	// Create actual certificate files on disk so SSL is enabled.
+	fqdnCertDir := filepath.Join(certDir, "secure.example.com")
+	require.NoError(t, os.MkdirAll(fqdnCertDir, 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(fqdnCertDir, "fullchain.pem"), []byte("cert"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(fqdnCertDir, "privkey.pem"), []byte("key"), 0600))
 
 	webroot := &runtime.WebrootInfo{
 		TenantName: "tenant1",
@@ -277,8 +284,8 @@ func TestGenerateConfig_WithSSL(t *testing.T) {
 	// Verify SSL directives.
 	assert.Contains(t, config, "listen 443 ssl")
 	assert.Contains(t, config, "listen [::]:443 ssl")
-	assert.Contains(t, config, "ssl_certificate     /etc/ssl/hosting/secure.example.com/fullchain.pem")
-	assert.Contains(t, config, "ssl_certificate_key /etc/ssl/hosting/secure.example.com/privkey.pem")
+	assert.Contains(t, config, "ssl_certificate     "+filepath.Join(certDir, "secure.example.com/fullchain.pem"))
+	assert.Contains(t, config, "ssl_certificate_key "+filepath.Join(certDir, "secure.example.com/privkey.pem"))
 	assert.Contains(t, config, "ssl_protocols       TLSv1.2 TLSv1.3")
 	assert.Contains(t, config, "ssl_ciphers         HIGH:!aNULL:!MD5")
 	assert.Contains(t, config, "ssl_prefer_server_ciphers on")
@@ -306,6 +313,74 @@ func TestGenerateConfig_WithSSL(t *testing.T) {
 		}
 	}
 	assert.True(t, foundRedirectBlock, "redirect server block should listen on port 80")
+}
+
+func TestGenerateConfig_WithSSL_CertsMissing_FallbackToHTTP(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := Config{
+		NginxConfigDir: tmpDir,
+		CertDir:        filepath.Join(tmpDir, "certs"), // No cert files created on disk.
+	}
+	mgr := NewNginxManager(zerolog.Nop(), cfg)
+
+	webroot := &runtime.WebrootInfo{
+		TenantName: "tenant1",
+		Name:       "pendingssl",
+		Runtime:    "static",
+	}
+	fqdns := []*FQDNInfo{
+		{FQDN: "pending.example.com", SSLEnabled: true},
+	}
+
+	config, err := mgr.GenerateConfig(webroot, fqdns)
+	require.NoError(t, err)
+
+	// SSL should NOT be enabled because cert files don't exist on disk.
+	assert.NotContains(t, config, "listen 443 ssl")
+	assert.NotContains(t, config, "ssl_certificate")
+	assert.NotContains(t, config, "ssl_certificate_key")
+	assert.NotContains(t, config, "return 301 https://")
+
+	// Should fall back to plain HTTP.
+	assert.Contains(t, config, "listen 80")
+	assert.Contains(t, config, "listen [::]:80")
+	assert.Contains(t, config, "server_name pending.example.com")
+}
+
+func TestGenerateConfig_WithSSL_PartialCerts_FallbackToHTTP(t *testing.T) {
+	tmpDir := t.TempDir()
+	certDir := filepath.Join(tmpDir, "certs")
+	cfg := Config{
+		NginxConfigDir: tmpDir,
+		CertDir:        certDir,
+	}
+	mgr := NewNginxManager(zerolog.Nop(), cfg)
+
+	// Only create the fullchain.pem — missing privkey.pem.
+	fqdnCertDir := filepath.Join(certDir, "partial.example.com")
+	require.NoError(t, os.MkdirAll(fqdnCertDir, 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(fqdnCertDir, "fullchain.pem"), []byte("cert"), 0600))
+
+	webroot := &runtime.WebrootInfo{
+		TenantName: "tenant1",
+		Name:       "partialssl",
+		Runtime:    "static",
+	}
+	fqdns := []*FQDNInfo{
+		{FQDN: "partial.example.com", SSLEnabled: true},
+	}
+
+	config, err := mgr.GenerateConfig(webroot, fqdns)
+	require.NoError(t, err)
+
+	// SSL should NOT be enabled because privkey.pem is missing.
+	assert.NotContains(t, config, "listen 443 ssl")
+	assert.NotContains(t, config, "ssl_certificate")
+	assert.NotContains(t, config, "ssl_certificate_key")
+
+	// Should fall back to plain HTTP.
+	assert.Contains(t, config, "listen 80")
+	assert.Contains(t, config, "listen [::]:80")
 }
 
 func TestGenerateConfig_WithSSL_NoHTTP(t *testing.T) {
@@ -357,11 +432,18 @@ func TestGenerateConfig_MultipleFQDNs(t *testing.T) {
 
 func TestGenerateConfig_MultipleFQDNs_SSLFromFirst(t *testing.T) {
 	tmpDir := t.TempDir()
+	certDir := filepath.Join(tmpDir, "certs")
 	cfg := Config{
 		NginxConfigDir: tmpDir,
-		CertDir:        "/etc/ssl/hosting",
+		CertDir:        certDir,
 	}
 	mgr := NewNginxManager(zerolog.Nop(), cfg)
+
+	// Create cert files for the SSL-enabled FQDN.
+	fqdnCertDir := filepath.Join(certDir, "www.example.com")
+	require.NoError(t, os.MkdirAll(fqdnCertDir, 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(fqdnCertDir, "fullchain.pem"), []byte("cert"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(fqdnCertDir, "privkey.pem"), []byte("key"), 0600))
 
 	webroot := &runtime.WebrootInfo{
 		TenantName: "tenant1",
@@ -378,8 +460,8 @@ func TestGenerateConfig_MultipleFQDNs_SSLFromFirst(t *testing.T) {
 	require.NoError(t, err)
 
 	// SSL cert should come from the first ssl-enabled FQDN.
-	assert.Contains(t, config, "ssl_certificate     /etc/ssl/hosting/www.example.com/fullchain.pem")
-	assert.Contains(t, config, "ssl_certificate_key /etc/ssl/hosting/www.example.com/privkey.pem")
+	assert.Contains(t, config, "ssl_certificate     "+filepath.Join(certDir, "www.example.com/fullchain.pem"))
+	assert.Contains(t, config, "ssl_certificate_key "+filepath.Join(certDir, "www.example.com/privkey.pem"))
 	assert.Contains(t, config, "listen 443 ssl")
 }
 

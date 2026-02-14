@@ -93,3 +93,31 @@ func TestSlugValidation_Invalid(t *testing.T) {
 		})
 	}
 }
+
+func TestMySQLNameValidation_Valid(t *testing.T) {
+	validNames := []string{"mydb", "test123", "a", "my_database", "db_01", "z0"}
+	for _, name := range validNames {
+		t.Run(name, func(t *testing.T) {
+			assert.True(t, mysqlNameRegex.MatchString(name), "expected mysql_name %q to be valid", name)
+		})
+	}
+}
+
+func TestMySQLNameValidation_Invalid(t *testing.T) {
+	invalidNames := []string{
+		"my-database",   // hyphens not allowed
+		"My_DB",         // uppercase not allowed
+		"test@123",      // special character
+		"",              // empty
+		strings.Repeat("a", 64), // too long (max 63 chars)
+		"1starts_digit", // must start with lowercase letter
+		"_leading",      // must start with lowercase letter
+		"-leading",      // must start with lowercase letter
+		"has-hyphen",    // hyphens not allowed
+	}
+	for _, name := range invalidNames {
+		t.Run(name, func(t *testing.T) {
+			assert.False(t, mysqlNameRegex.MatchString(name), "expected mysql_name %q to be invalid", name)
+		})
+	}
+}

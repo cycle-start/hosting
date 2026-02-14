@@ -244,6 +244,25 @@ func (s *DeleteZoneWorkflowTestSuite) TestDeleteRecordsByDomainFails_SetsStatusF
 	s.Error(s.env.GetWorkflowError())
 }
 
+func (s *DeleteZoneWorkflowTestSuite) TestZoneNotInPowerDNS_SkipsDeletionAndSucceeds() {
+	zoneID := "test-zone-5"
+	zone := model.Zone{ID: zoneID, BrandID: "test-brand", Name: "example.com"}
+
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
+		Table: "zones", ID: zoneID, Status: model.StatusDeleting,
+	}).Return(nil)
+	s.env.OnActivity("GetZoneByID", mock.Anything, zoneID).Return(&zone, nil)
+	// GetDNSZoneIDByName returns 0 — zone does not exist in PowerDNS.
+	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(0, nil)
+	// DeleteDNSRecordsByDomain and DeleteDNSZone should NOT be called.
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
+		Table: "zones", ID: zoneID, Status: model.StatusDeleted,
+	}).Return(nil)
+	s.env.ExecuteWorkflow(DeleteZoneWorkflow, zoneID)
+	s.True(s.env.IsWorkflowCompleted())
+	s.NoError(s.env.GetWorkflowError())
+}
+
 // ---------- Run all suites ----------
 
 func TestCreateZoneWorkflow(t *testing.T) {

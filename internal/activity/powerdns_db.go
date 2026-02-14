@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -24,12 +25,21 @@ type WriteDNSZoneParams struct {
 }
 
 // WriteDNSZone inserts a new zone into the PowerDNS domains table and returns its ID.
+// This is idempotent: if the zone already exists (conflict on name), it returns the existing ID.
 func (a *PowerDNSDB) WriteDNSZone(ctx context.Context, params WriteDNSZoneParams) (int, error) {
 	var id int
 	err := a.db.QueryRow(ctx,
-		`INSERT INTO domains (name, type) VALUES ($1, $2) RETURNING id`,
+		`INSERT INTO domains (name, type) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING RETURNING id`,
 		params.Name, params.Type,
 	).Scan(&id)
+	if err == pgx.ErrNoRows {
+		// Zone already exists — look up the existing ID.
+		err = a.db.QueryRow(ctx, `SELECT id FROM domains WHERE name = $1`, params.Name).Scan(&id)
+		if err != nil {
+			return 0, fmt.Errorf("write dns zone: lookup existing: %w", err)
+		}
+		return id, nil
+	}
 	if err != nil {
 		return 0, fmt.Errorf("write dns zone: %w", err)
 	}
@@ -55,9 +65,19 @@ type WriteDNSRecordParams struct {
 	Priority *int
 }
 
-// WriteDNSRecord inserts a new record into the PowerDNS records table.
+// WriteDNSRecord inserts a record into the PowerDNS records table.
+// This is idempotent: it first deletes any existing record matching
+// (domain_id, name, type, content), then inserts the new one.
 func (a *PowerDNSDB) WriteDNSRecord(ctx context.Context, params WriteDNSRecordParams) error {
 	_, err := a.db.Exec(ctx,
+		`DELETE FROM records WHERE domain_id = $1 AND name = $2 AND type = $3 AND content = $4`,
+		params.DomainID, params.Name, params.Type, params.Content,
+	)
+	if err != nil {
+		return fmt.Errorf("write dns record: delete existing: %w", err)
+	}
+
+	_, err = a.db.Exec(ctx,
 		`INSERT INTO records (domain_id, name, type, content, ttl, prio) VALUES ($1, $2, $3, $4, $5, $6)`,
 		params.DomainID, params.Name, params.Type, params.Content, params.TTL, params.Priority,
 	)
@@ -118,9 +138,13 @@ func (a *PowerDNSDB) DeleteDNSRecordsByDomain(ctx context.Context, domainID int)
 }
 
 // GetDNSZoneIDByName looks up a PowerDNS domain ID by its name.
+// Returns 0 if the zone does not exist in PowerDNS (no error).
 func (a *PowerDNSDB) GetDNSZoneIDByName(ctx context.Context, name string) (int, error) {
 	var id int
 	err := a.db.QueryRow(ctx, `SELECT id FROM domains WHERE name = $1`, name).Scan(&id)
+	if err == pgx.ErrNoRows {
+		return 0, nil
+	}
 	if err != nil {
 		return 0, fmt.Errorf("get dns zone id by name: %w", err)
 	}

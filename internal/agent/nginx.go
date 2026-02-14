@@ -190,11 +190,25 @@ func (m *NginxManager) GenerateConfig(webroot *runtime.WebrootInfo, fqdns []*FQD
 		proxyPort = computeNodePort(tenantName, webrootName)
 	}
 
-	// Build SSL paths.
+	// Build SSL paths, but only enable SSL if the certificate files actually
+	// exist on disk. Certificates may not be provisioned yet when the webroot
+	// is first created — in that case we fall back to plain HTTP and the
+	// config will be regenerated once the certificate is installed.
 	var sslCertPath, sslKeyPath string
 	if hasSSL && sslFQDN != "" {
 		sslCertPath = filepath.Join(m.certDir, sslFQDN, "fullchain.pem")
 		sslKeyPath = filepath.Join(m.certDir, sslFQDN, "privkey.pem")
+
+		if !fileExists(sslCertPath) || !fileExists(sslKeyPath) {
+			m.logger.Warn().
+				Str("fqdn", sslFQDN).
+				Str("cert_path", sslCertPath).
+				Str("key_path", sslKeyPath).
+				Msg("SSL certificate files not found on disk, falling back to HTTP-only config")
+			hasSSL = false
+			sslCertPath = ""
+			sslKeyPath = ""
+		}
 	}
 
 	data := nginxTemplateData{
@@ -326,6 +340,12 @@ func (m *NginxManager) InstallCertificate(ctx context.Context, cert *Certificate
 	}
 
 	return nil
+}
+
+// fileExists returns true if the given path exists and is a regular file.
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
 
 // computeNodePort derives a deterministic port from the tenant and webroot name.

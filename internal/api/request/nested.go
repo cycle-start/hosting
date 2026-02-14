@@ -52,13 +52,13 @@ type CreateEmailAutoReplyNested struct {
 }
 
 type CreateDatabaseNested struct {
-	Name    string                     `json:"name" validate:"required,slug"`
+	Name    string                     `json:"name" validate:"required,mysql_name"`
 	ShardID string                     `json:"shard_id" validate:"required"`
 	Users   []CreateDatabaseUserNested `json:"users" validate:"omitempty,dive"`
 }
 
 type CreateDatabaseUserNested struct {
-	Username   string   `json:"username" validate:"required,slug"`
+	Username   string   `json:"username" validate:"required,mysql_name"`
 	Password   string   `json:"password" validate:"required,min=8"`
 	Privileges []string `json:"privileges" validate:"required,min=1"`
 }

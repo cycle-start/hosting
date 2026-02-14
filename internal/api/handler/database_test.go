@@ -127,6 +127,7 @@ func TestDatabaseCreate_InvalidSlugName(t *testing.T) {
 		{"spaces", "my database"},
 		{"special chars", "my@db"},
 		{"starts with digit", "1database"},
+		{"hyphens", "my-database"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

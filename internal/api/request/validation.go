@@ -12,10 +12,14 @@ import (
 var validate = validator.New()
 
 var nameRegex = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,62}$`)
+var mysqlNameRegex = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
 
 func init() {
 	validate.RegisterValidation("slug", func(fl validator.FieldLevel) bool {
 		return nameRegex.MatchString(fl.Field().String())
+	})
+	validate.RegisterValidation("mysql_name", func(fl validator.FieldLevel) bool {
+		return mysqlNameRegex.MatchString(fl.Field().String())
 	})
 }
 

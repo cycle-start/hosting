@@ -2,16 +2,46 @@ package activity
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 
 	"github.com/rs/zerolog"
+	"go.temporal.io/sdk/temporal"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/edvin/hosting/internal/agent"
 	"github.com/edvin/hosting/internal/agent/runtime"
 )
+
+// grpcStatusError is the interface implemented by gRPC status errors.
+// Used with errors.As to extract gRPC status from wrapped errors.
+type grpcStatusError interface {
+	GRPCStatus() *status.Status
+}
+
+// asNonRetryable checks whether err (or any error in its chain) is a gRPC
+// status error with codes.InvalidArgument. If so it wraps the error as a
+// Temporal non-retryable application error so that the activity is not
+// retried — validation failures are deterministic and will never succeed
+// on retry. All other errors are returned unchanged.
+func asNonRetryable(err error) error {
+	if err == nil {
+		return nil
+	}
+	var se grpcStatusError
+	if errors.As(err, &se) && se.GRPCStatus().Code() == codes.InvalidArgument {
+		return temporal.NewNonRetryableApplicationError(
+			se.GRPCStatus().Message(),
+			"InvalidArgument",
+			err,
+		)
+	}
+	return err
+}
 
 // NodeLocal contains activities that execute locally on the node using manager
 // structs directly. This replaces the gRPC-based NodeGRPC and NodeGRPCDynamic
@@ -60,43 +90,43 @@ func NewNodeLocal(
 // CreateTenant creates a tenant locally on this node.
 func (a *NodeLocal) CreateTenant(ctx context.Context, params CreateTenantParams) error {
 	a.logger.Info().Str("tenant", params.ID).Msg("CreateTenant")
-	return a.tenant.Create(ctx, &agent.TenantInfo{
+	return asNonRetryable(a.tenant.Create(ctx, &agent.TenantInfo{
 		ID:          params.ID,
 		Name:        params.ID,
 		UID:         int32(params.UID),
 		SFTPEnabled: params.SFTPEnabled,
 		SSHEnabled:  params.SSHEnabled,
-	})
+	}))
 }
 
 // UpdateTenant updates a tenant locally on this node.
 func (a *NodeLocal) UpdateTenant(ctx context.Context, params UpdateTenantParams) error {
 	a.logger.Info().Str("tenant", params.ID).Msg("UpdateTenant")
-	return a.tenant.Update(ctx, &agent.TenantInfo{
+	return asNonRetryable(a.tenant.Update(ctx, &agent.TenantInfo{
 		ID:          params.ID,
 		Name:        params.ID,
 		UID:         int32(params.UID),
 		SFTPEnabled: params.SFTPEnabled,
 		SSHEnabled:  params.SSHEnabled,
-	})
+	}))
 }
 
 // SuspendTenant suspends a tenant locally on this node.
 func (a *NodeLocal) SuspendTenant(ctx context.Context, name string) error {
 	a.logger.Info().Str("tenant", name).Msg("SuspendTenant")
-	return a.tenant.Suspend(ctx, name)
+	return asNonRetryable(a.tenant.Suspend(ctx, name))
 }
 
 // UnsuspendTenant unsuspends a tenant locally on this node.
 func (a *NodeLocal) UnsuspendTenant(ctx context.Context, name string) error {
 	a.logger.Info().Str("tenant", name).Msg("UnsuspendTenant")
-	return a.tenant.Unsuspend(ctx, name)
+	return asNonRetryable(a.tenant.Unsuspend(ctx, name))
 }
 
 // DeleteTenant deletes a tenant locally on this node.
 func (a *NodeLocal) DeleteTenant(ctx context.Context, name string) error {
 	a.logger.Info().Str("tenant", name).Msg("DeleteTenant")
-	return a.tenant.Delete(ctx, name)
+	return asNonRetryable(a.tenant.Delete(ctx, name))
 }
 
 // --------------------------------------------------------------------------
@@ -128,7 +158,7 @@ func (a *NodeLocal) CreateWebroot(ctx context.Context, params CreateWebrootParam
 
 	// Create webroot directories.
 	if err := a.webroot.Create(ctx, info); err != nil {
-		return fmt.Errorf("create webroot: %w", err)
+		return asNonRetryable(fmt.Errorf("create webroot: %w", err))
 	}
 
 	// Configure and start runtime.
@@ -137,24 +167,24 @@ func (a *NodeLocal) CreateWebroot(ctx context.Context, params CreateWebrootParam
 		return fmt.Errorf("unsupported runtime: %s", info.Runtime)
 	}
 	if err := rt.Configure(ctx, info); err != nil {
-		return fmt.Errorf("configure runtime: %w", err)
+		return asNonRetryable(fmt.Errorf("configure runtime: %w", err))
 	}
 	if err := rt.Start(ctx, info); err != nil {
-		return fmt.Errorf("start runtime: %w", err)
+		return asNonRetryable(fmt.Errorf("start runtime: %w", err))
 	}
 
 	// Generate and write nginx config.
 	nginxConfig, err := a.nginx.GenerateConfig(info, fqdns)
 	if err != nil {
-		return fmt.Errorf("generate nginx config: %w", err)
+		return asNonRetryable(fmt.Errorf("generate nginx config: %w", err))
 	}
 	if err := a.nginx.WriteConfig(info.TenantName, info.Name, nginxConfig); err != nil {
-		return fmt.Errorf("write nginx config: %w", err)
+		return asNonRetryable(fmt.Errorf("write nginx config: %w", err))
 	}
 
 	// Reload nginx.
 	if err := a.nginx.Reload(ctx); err != nil {
-		return fmt.Errorf("reload nginx: %w", err)
+		return asNonRetryable(fmt.Errorf("reload nginx: %w", err))
 	}
 
 	return nil
@@ -185,7 +215,7 @@ func (a *NodeLocal) UpdateWebroot(ctx context.Context, params UpdateWebrootParam
 
 	// Update webroot directories.
 	if err := a.webroot.Update(ctx, info); err != nil {
-		return fmt.Errorf("update webroot: %w", err)
+		return asNonRetryable(fmt.Errorf("update webroot: %w", err))
 	}
 
 	// Reconfigure and reload runtime.
@@ -194,24 +224,24 @@ func (a *NodeLocal) UpdateWebroot(ctx context.Context, params UpdateWebrootParam
 		return fmt.Errorf("unsupported runtime: %s", info.Runtime)
 	}
 	if err := rt.Configure(ctx, info); err != nil {
-		return fmt.Errorf("configure runtime: %w", err)
+		return asNonRetryable(fmt.Errorf("configure runtime: %w", err))
 	}
 	if err := rt.Reload(ctx, info); err != nil {
-		return fmt.Errorf("reload runtime: %w", err)
+		return asNonRetryable(fmt.Errorf("reload runtime: %w", err))
 	}
 
 	// Regenerate and write nginx config.
 	nginxConfig, err := a.nginx.GenerateConfig(info, fqdns)
 	if err != nil {
-		return fmt.Errorf("generate nginx config: %w", err)
+		return asNonRetryable(fmt.Errorf("generate nginx config: %w", err))
 	}
 	if err := a.nginx.WriteConfig(info.TenantName, info.Name, nginxConfig); err != nil {
-		return fmt.Errorf("write nginx config: %w", err)
+		return asNonRetryable(fmt.Errorf("write nginx config: %w", err))
 	}
 
 	// Reload nginx.
 	if err := a.nginx.Reload(ctx); err != nil {
-		return fmt.Errorf("reload nginx: %w", err)
+		return asNonRetryable(fmt.Errorf("reload nginx: %w", err))
 	}
 
 	return nil
@@ -223,12 +253,12 @@ func (a *NodeLocal) DeleteWebroot(ctx context.Context, tenantName, webrootName s
 
 	// Remove nginx config.
 	if err := a.nginx.RemoveConfig(tenantName, webrootName); err != nil {
-		return fmt.Errorf("remove nginx config: %w", err)
+		return asNonRetryable(fmt.Errorf("remove nginx config: %w", err))
 	}
 
 	// Reload nginx.
 	if err := a.nginx.Reload(ctx); err != nil {
-		return fmt.Errorf("reload nginx: %w", err)
+		return asNonRetryable(fmt.Errorf("reload nginx: %w", err))
 	}
 
 	// Remove runtimes (try all, only one will match).
@@ -239,7 +269,7 @@ func (a *NodeLocal) DeleteWebroot(ctx context.Context, tenantName, webrootName s
 
 	// Remove webroot directories.
 	if err := a.webroot.Delete(ctx, tenantName, webrootName); err != nil {
-		return fmt.Errorf("delete webroot: %w", err)
+		return asNonRetryable(fmt.Errorf("delete webroot: %w", err))
 	}
 
 	return nil
@@ -268,10 +298,10 @@ func (a *NodeLocal) ConfigureRuntime(ctx context.Context, params ConfigureRuntim
 		return fmt.Errorf("unsupported runtime: %s", info.Runtime)
 	}
 	if err := rt.Configure(ctx, info); err != nil {
-		return fmt.Errorf("configure runtime: %w", err)
+		return asNonRetryable(fmt.Errorf("configure runtime: %w", err))
 	}
 	if err := rt.Start(ctx, info); err != nil {
-		return fmt.Errorf("start runtime: %w", err)
+		return asNonRetryable(fmt.Errorf("start runtime: %w", err))
 	}
 	return nil
 }
@@ -279,7 +309,7 @@ func (a *NodeLocal) ConfigureRuntime(ctx context.Context, params ConfigureRuntim
 // ReloadNginx tests and reloads the nginx configuration.
 func (a *NodeLocal) ReloadNginx(ctx context.Context) error {
 	a.logger.Info().Msg("ReloadNginx")
-	return a.nginx.Reload(ctx)
+	return asNonRetryable(a.nginx.Reload(ctx))
 }
 
 // --------------------------------------------------------------------------
@@ -289,31 +319,31 @@ func (a *NodeLocal) ReloadNginx(ctx context.Context) error {
 // CreateDatabase creates a MySQL database locally on this node.
 func (a *NodeLocal) CreateDatabase(ctx context.Context, name string) error {
 	a.logger.Info().Str("database", name).Msg("CreateDatabase")
-	return a.database.CreateDatabase(ctx, name)
+	return asNonRetryable(a.database.CreateDatabase(ctx, name))
 }
 
 // DeleteDatabase drops a MySQL database locally on this node.
 func (a *NodeLocal) DeleteDatabase(ctx context.Context, name string) error {
 	a.logger.Info().Str("database", name).Msg("DeleteDatabase")
-	return a.database.DeleteDatabase(ctx, name)
+	return asNonRetryable(a.database.DeleteDatabase(ctx, name))
 }
 
 // CreateDatabaseUser creates a MySQL user locally on this node.
 func (a *NodeLocal) CreateDatabaseUser(ctx context.Context, params CreateDatabaseUserParams) error {
 	a.logger.Info().Str("username", params.Username).Msg("CreateDatabaseUser")
-	return a.database.CreateUser(ctx, params.DatabaseName, params.Username, params.Password, params.Privileges)
+	return asNonRetryable(a.database.CreateUser(ctx, params.DatabaseName, params.Username, params.Password, params.Privileges))
 }
 
 // UpdateDatabaseUser updates a MySQL user locally on this node.
 func (a *NodeLocal) UpdateDatabaseUser(ctx context.Context, params UpdateDatabaseUserParams) error {
 	a.logger.Info().Str("username", params.Username).Msg("UpdateDatabaseUser")
-	return a.database.UpdateUser(ctx, params.DatabaseName, params.Username, params.Password, params.Privileges)
+	return asNonRetryable(a.database.UpdateUser(ctx, params.DatabaseName, params.Username, params.Password, params.Privileges))
 }
 
 // DeleteDatabaseUser drops a MySQL user locally on this node.
 func (a *NodeLocal) DeleteDatabaseUser(ctx context.Context, dbName, username string) error {
 	a.logger.Info().Str("username", username).Msg("DeleteDatabaseUser")
-	return a.database.DeleteUser(ctx, dbName, username)
+	return asNonRetryable(a.database.DeleteUser(ctx, dbName, username))
 }
 
 // --------------------------------------------------------------------------
@@ -323,31 +353,31 @@ func (a *NodeLocal) DeleteDatabaseUser(ctx context.Context, dbName, username str
 // CreateValkeyInstance creates a Valkey instance locally on this node.
 func (a *NodeLocal) CreateValkeyInstance(ctx context.Context, params CreateValkeyInstanceParams) error {
 	a.logger.Info().Str("instance", params.Name).Msg("CreateValkeyInstance")
-	return a.valkey.CreateInstance(ctx, params.Name, params.Port, params.Password, params.MaxMemoryMB)
+	return asNonRetryable(a.valkey.CreateInstance(ctx, params.Name, params.Port, params.Password, params.MaxMemoryMB))
 }
 
 // DeleteValkeyInstance deletes a Valkey instance locally on this node.
 func (a *NodeLocal) DeleteValkeyInstance(ctx context.Context, params DeleteValkeyInstanceParams) error {
 	a.logger.Info().Str("instance", params.Name).Msg("DeleteValkeyInstance")
-	return a.valkey.DeleteInstance(ctx, params.Name, params.Port)
+	return asNonRetryable(a.valkey.DeleteInstance(ctx, params.Name, params.Port))
 }
 
 // CreateValkeyUser creates a Valkey ACL user locally on this node.
 func (a *NodeLocal) CreateValkeyUser(ctx context.Context, params CreateValkeyUserParams) error {
 	a.logger.Info().Str("username", params.Username).Msg("CreateValkeyUser")
-	return a.valkey.CreateUser(ctx, params.InstanceName, params.Port, params.Username, params.Password, params.Privileges, params.KeyPattern)
+	return asNonRetryable(a.valkey.CreateUser(ctx, params.InstanceName, params.Port, params.Username, params.Password, params.Privileges, params.KeyPattern))
 }
 
 // UpdateValkeyUser updates a Valkey ACL user locally on this node.
 func (a *NodeLocal) UpdateValkeyUser(ctx context.Context, params UpdateValkeyUserParams) error {
 	a.logger.Info().Str("username", params.Username).Msg("UpdateValkeyUser")
-	return a.valkey.UpdateUser(ctx, params.InstanceName, params.Port, params.Username, params.Password, params.Privileges, params.KeyPattern)
+	return asNonRetryable(a.valkey.UpdateUser(ctx, params.InstanceName, params.Port, params.Username, params.Password, params.Privileges, params.KeyPattern))
 }
 
 // DeleteValkeyUser deletes a Valkey ACL user locally on this node.
 func (a *NodeLocal) DeleteValkeyUser(ctx context.Context, params DeleteValkeyUserParams) error {
 	a.logger.Info().Str("username", params.Username).Msg("DeleteValkeyUser")
-	return a.valkey.DeleteUser(ctx, params.InstanceName, params.Port, params.Username)
+	return asNonRetryable(a.valkey.DeleteUser(ctx, params.InstanceName, params.Port, params.Username))
 }
 
 // --------------------------------------------------------------------------
@@ -357,25 +387,25 @@ func (a *NodeLocal) DeleteValkeyUser(ctx context.Context, params DeleteValkeyUse
 // DumpMySQLDatabase runs mysqldump and compresses the output to a gzipped file.
 func (a *NodeLocal) DumpMySQLDatabase(ctx context.Context, params DumpMySQLDatabaseParams) error {
 	a.logger.Info().Str("database", params.DatabaseName).Str("path", params.DumpPath).Msg("DumpMySQLDatabase")
-	return a.database.DumpDatabase(ctx, params.DatabaseName, params.DumpPath)
+	return asNonRetryable(a.database.DumpDatabase(ctx, params.DatabaseName, params.DumpPath))
 }
 
 // ImportMySQLDatabase imports a gzipped SQL dump into a MySQL database.
 func (a *NodeLocal) ImportMySQLDatabase(ctx context.Context, params ImportMySQLDatabaseParams) error {
 	a.logger.Info().Str("database", params.DatabaseName).Str("path", params.DumpPath).Msg("ImportMySQLDatabase")
-	return a.database.ImportDatabase(ctx, params.DatabaseName, params.DumpPath)
+	return asNonRetryable(a.database.ImportDatabase(ctx, params.DatabaseName, params.DumpPath))
 }
 
 // DumpValkeyData triggers a Valkey BGSAVE and copies the RDB file to the dump path.
 func (a *NodeLocal) DumpValkeyData(ctx context.Context, params DumpValkeyDataParams) error {
 	a.logger.Info().Str("instance", params.Name).Int("port", params.Port).Str("path", params.DumpPath).Msg("DumpValkeyData")
-	return a.valkey.DumpData(ctx, params.Name, params.Port, params.Password, params.DumpPath)
+	return asNonRetryable(a.valkey.DumpData(ctx, params.Name, params.Port, params.Password, params.DumpPath))
 }
 
 // ImportValkeyData stops the instance, replaces the RDB file, and restarts.
 func (a *NodeLocal) ImportValkeyData(ctx context.Context, params ImportValkeyDataParams) error {
 	a.logger.Info().Str("instance", params.Name).Int("port", params.Port).Str("path", params.DumpPath).Msg("ImportValkeyData")
-	return a.valkey.ImportData(ctx, params.Name, params.Port, params.DumpPath)
+	return asNonRetryable(a.valkey.ImportData(ctx, params.Name, params.Port, params.DumpPath))
 }
 
 // CleanupMigrateFile removes a temporary migration file from the local filesystem.
@@ -419,17 +449,17 @@ func (a *NodeLocal) SyncSFTPKeys(ctx context.Context, params SyncSFTPKeysParams)
 // SyncSSHConfig writes per-tenant sshd config and reloads sshd.
 func (a *NodeLocal) SyncSSHConfig(ctx context.Context, params SyncSSHConfigParams) error {
 	a.logger.Info().Str("tenant", params.TenantName).Bool("ssh", params.SSHEnabled).Bool("sftp", params.SFTPEnabled).Msg("SyncSSHConfig")
-	return a.ssh.SyncConfig(ctx, &agent.TenantInfo{
+	return asNonRetryable(a.ssh.SyncConfig(ctx, &agent.TenantInfo{
 		Name:        params.TenantName,
 		SSHEnabled:  params.SSHEnabled,
 		SFTPEnabled: params.SFTPEnabled,
-	})
+	}))
 }
 
 // RemoveSSHConfig removes per-tenant sshd config and reloads sshd.
 func (a *NodeLocal) RemoveSSHConfig(ctx context.Context, name string) error {
 	a.logger.Info().Str("tenant", name).Msg("RemoveSSHConfig")
-	return a.ssh.RemoveConfig(ctx, name)
+	return asNonRetryable(a.ssh.RemoveConfig(ctx, name))
 }
 
 // --------------------------------------------------------------------------
@@ -439,12 +469,12 @@ func (a *NodeLocal) RemoveSSHConfig(ctx context.Context, name string) error {
 // InstallCertificate writes SSL certificate files to disk locally on this node.
 func (a *NodeLocal) InstallCertificate(ctx context.Context, params InstallCertificateParams) error {
 	a.logger.Info().Str("fqdn", params.FQDN).Msg("InstallCertificate")
-	return a.nginx.InstallCertificate(ctx, &agent.CertificateInfo{
+	return asNonRetryable(a.nginx.InstallCertificate(ctx, &agent.CertificateInfo{
 		FQDN:     params.FQDN,
 		CertPEM:  params.CertPEM,
 		KeyPEM:   params.KeyPEM,
 		ChainPEM: params.ChainPEM,
-	})
+	}))
 }
 
 // --------------------------------------------------------------------------
@@ -546,29 +576,29 @@ func (a *NodeLocal) DeleteBackupFile(ctx context.Context, storagePath string) er
 // CreateS3Bucket creates an S3 bucket via RGW on this node.
 func (a *NodeLocal) CreateS3Bucket(ctx context.Context, params CreateS3BucketParams) error {
 	a.logger.Info().Str("tenant", params.TenantID).Str("bucket", params.Name).Msg("CreateS3Bucket")
-	return a.s3.CreateBucket(ctx, params.TenantID, params.Name, params.QuotaBytes)
+	return asNonRetryable(a.s3.CreateBucket(ctx, params.TenantID, params.Name, params.QuotaBytes))
 }
 
 // DeleteS3Bucket deletes an S3 bucket via RGW on this node.
 func (a *NodeLocal) DeleteS3Bucket(ctx context.Context, params DeleteS3BucketParams) error {
 	a.logger.Info().Str("tenant", params.TenantID).Str("bucket", params.Name).Msg("DeleteS3Bucket")
-	return a.s3.DeleteBucket(ctx, params.TenantID, params.Name)
+	return asNonRetryable(a.s3.DeleteBucket(ctx, params.TenantID, params.Name))
 }
 
 // CreateS3AccessKey creates an S3 access key via RGW on this node.
 func (a *NodeLocal) CreateS3AccessKey(ctx context.Context, params CreateS3AccessKeyParams) error {
 	a.logger.Info().Str("tenant", params.TenantID).Str("access_key", params.AccessKeyID).Msg("CreateS3AccessKey")
-	return a.s3.CreateAccessKey(ctx, params.TenantID, params.AccessKeyID, params.SecretAccessKey)
+	return asNonRetryable(a.s3.CreateAccessKey(ctx, params.TenantID, params.AccessKeyID, params.SecretAccessKey))
 }
 
 // DeleteS3AccessKey deletes an S3 access key via RGW on this node.
 func (a *NodeLocal) DeleteS3AccessKey(ctx context.Context, params DeleteS3AccessKeyParams) error {
 	a.logger.Info().Str("tenant", params.TenantID).Str("access_key", params.AccessKeyID).Msg("DeleteS3AccessKey")
-	return a.s3.DeleteAccessKey(ctx, params.TenantID, params.AccessKeyID)
+	return asNonRetryable(a.s3.DeleteAccessKey(ctx, params.TenantID, params.AccessKeyID))
 }
 
 // UpdateS3BucketPolicy sets or removes a public-read policy on an S3 bucket.
 func (a *NodeLocal) UpdateS3BucketPolicy(ctx context.Context, params UpdateS3BucketPolicyParams) error {
 	a.logger.Info().Str("tenant", params.TenantID).Str("bucket", params.Name).Bool("public", params.Public).Msg("UpdateS3BucketPolicy")
-	return a.s3.SetBucketPolicy(ctx, params.TenantID, params.Name, params.Public)
+	return asNonRetryable(a.s3.SetBucketPolicy(ctx, params.TenantID, params.Name, params.Public))
 }

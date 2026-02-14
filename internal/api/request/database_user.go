@@ -1,7 +1,7 @@
 package request
 
 type CreateDatabaseUser struct {
-	Username   string   `json:"username" validate:"required,slug"`
+	Username   string   `json:"username" validate:"required,mysql_name"`
 	Password   string   `json:"password" validate:"required,min=8"`
 	Privileges []string `json:"privileges" validate:"required,min=1"`
 }

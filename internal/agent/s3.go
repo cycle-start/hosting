@@ -193,6 +193,8 @@ func (m *S3Manager) DeleteBucket(ctx context.Context, tenantID, name string) err
 }
 
 // CreateAccessKey creates an S3 access key for the RGW user.
+// This operation is idempotent: if the key already exists on retry, it is
+// treated as success.
 func (m *S3Manager) CreateAccessKey(ctx context.Context, tenantID, accessKey, secretKey string) error {
 	m.logger.Info().Str("tenant", tenantID).Str("access_key", accessKey).Msg("creating S3 access key")
 
@@ -207,6 +209,14 @@ func (m *S3Manager) CreateAccessKey(ctx context.Context, tenantID, accessKey, se
 		"--key-type=s3",
 	)
 	if err != nil {
+		errMsg := err.Error()
+		// On retry the key may already exist — treat as success.
+		if strings.Contains(errMsg, "KeyExists") ||
+			strings.Contains(errMsg, "key already exists") ||
+			strings.Contains(errMsg, "already exists") {
+			m.logger.Info().Str("tenant", tenantID).Str("access_key", accessKey).Msg("access key already exists, treating as success")
+			return nil
+		}
 		return fmt.Errorf("create access key for %s: %w", tenantID, err)
 	}
 
@@ -214,6 +224,8 @@ func (m *S3Manager) CreateAccessKey(ctx context.Context, tenantID, accessKey, se
 }
 
 // DeleteAccessKey removes an S3 access key from the RGW user.
+// This operation is idempotent: if the key has already been deleted, it is
+// treated as success.
 func (m *S3Manager) DeleteAccessKey(ctx context.Context, tenantID, accessKey string) error {
 	m.logger.Info().Str("tenant", tenantID).Str("access_key", accessKey).Msg("deleting S3 access key")
 
@@ -222,6 +234,16 @@ func (m *S3Manager) DeleteAccessKey(ctx context.Context, tenantID, accessKey str
 		"--access-key="+accessKey,
 	)
 	if err != nil {
+		errMsg := err.Error()
+		// On retry the key (or user) may already be gone — treat as success.
+		if strings.Contains(errMsg, "NoSuchKey") ||
+			strings.Contains(errMsg, "key does not exist") ||
+			strings.Contains(errMsg, "InvalidAccessKeyId") ||
+			strings.Contains(errMsg, "NoSuchUser") ||
+			strings.Contains(errMsg, "could not find user") {
+			m.logger.Info().Str("tenant", tenantID).Str("access_key", accessKey).Msg("access key already removed, treating as success")
+			return nil
+		}
 		return fmt.Errorf("delete access key %s: %w", accessKey, err)
 	}
 

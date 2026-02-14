@@ -226,7 +226,7 @@ func TestDatabaseService_ListByShard_Success(t *testing.T) {
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
 			*(dest[1].(**string)) = &tenantID
-			*(dest[2].(*string)) = "db-alpha"
+			*(dest[2].(*string)) = "db_alpha"
 			*(dest[3].(**string)) = &shardID
 			*(dest[4].(**string)) = &nodeID
 			*(dest[5].(*string)) = model.StatusActive
@@ -239,7 +239,7 @@ func TestDatabaseService_ListByShard_Success(t *testing.T) {
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id2
 			*(dest[1].(**string)) = &tenantID
-			*(dest[2].(*string)) = "db-beta"
+			*(dest[2].(*string)) = "db_beta"
 			*(dest[3].(**string)) = &shardID
 			*(dest[4].(**string)) = &nodeID
 			*(dest[5].(*string)) = model.StatusPending
@@ -256,8 +256,8 @@ func TestDatabaseService_ListByShard_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, hasMore)
 	require.Len(t, result, 2)
-	assert.Equal(t, "db-alpha", result[0].Name)
-	assert.Equal(t, "db-beta", result[1].Name)
+	assert.Equal(t, "db_alpha", result[0].Name)
+	assert.Equal(t, "db_beta", result[1].Name)
 	assert.Equal(t, &shardID, result[0].ShardID)
 	assert.Equal(t, &shardID, result[1].ShardID)
 	db.AssertExpectations(t)

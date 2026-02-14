@@ -58,6 +58,18 @@ else
 fi
 VECENV_EOF
 
+  # On the controlplane, Vector needs to read /var/log/pods (owned by root:root, mode 750)
+  # and the CRI log files within (owned by root:root, mode 640).
+  # Add the vector user to the root group so it has group-read access.
+  if [ "$role" = "controlplane" ]; then
+    ssh $SSH_OPTS ubuntu@"$ip" bash -s <<'GROUP_EOF'
+if ! id -nG vector | grep -qw root; then
+  echo "Adding vector user to root group for /var/log/pods access..."
+  sudo usermod -aG root vector
+fi
+GROUP_EOF
+  fi
+
   # Copy base config.
   if [ "$role" = "controlplane" ]; then
     scp $SSH_OPTS "$VECTOR_DIR/controlplane.toml" ubuntu@"$ip":/tmp/vector.toml

@@ -135,7 +135,7 @@ func DeleteZoneWorkflow(ctx workflow.Context, zoneID string) error {
 		return err
 	}
 
-	// Get the PowerDNS domain ID.
+	// Get the PowerDNS domain ID. Returns 0 if the zone doesn't exist in PowerDNS.
 	var domainID int
 	err = workflow.ExecuteActivity(ctx, "GetDNSZoneIDByName", zone.Name).Get(ctx, &domainID)
 	if err != nil {
@@ -143,18 +143,23 @@ func DeleteZoneWorkflow(ctx workflow.Context, zoneID string) error {
 		return err
 	}
 
-	// Delete all records for this domain.
-	err = workflow.ExecuteActivity(ctx, "DeleteDNSRecordsByDomain", domainID).Get(ctx, nil)
-	if err != nil {
-		_ = setResourceFailed(ctx, "zones", zoneID, err)
-		return err
-	}
+	// Only delete from PowerDNS if the zone exists there (domainID > 0).
+	// This makes delete idempotent — if the zone was already removed from
+	// PowerDNS (or never created), we skip straight to marking it deleted.
+	if domainID > 0 {
+		// Delete all records for this domain.
+		err = workflow.ExecuteActivity(ctx, "DeleteDNSRecordsByDomain", domainID).Get(ctx, nil)
+		if err != nil {
+			_ = setResourceFailed(ctx, "zones", zoneID, err)
+			return err
+		}
 
-	// Delete the zone from PowerDNS DB.
-	err = workflow.ExecuteActivity(ctx, "DeleteDNSZone", zone.Name).Get(ctx, nil)
-	if err != nil {
-		_ = setResourceFailed(ctx, "zones", zoneID, err)
-		return err
+		// Delete the zone from PowerDNS DB.
+		err = workflow.ExecuteActivity(ctx, "DeleteDNSZone", zone.Name).Get(ctx, nil)
+		if err != nil {
+			_ = setResourceFailed(ctx, "zones", zoneID, err)
+			return err
+		}
 	}
 
 	// Set status to deleted.
