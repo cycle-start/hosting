@@ -98,12 +98,14 @@ Edit `C:\Windows\System32\drivers\etc\hosts` as Administrator:
 # Control plane services (Traefik on controlplane VM)
 10.10.10.2  admin.hosting.test api.hosting.test temporal.hosting.test grafana.hosting.test prometheus.hosting.test loki.hosting.test traefik.hosting.test
 
-# DB Admin (runs on its own VM, not via Traefik)
+# DB Admin (CloudBeaver — runs on its own VM, port 4180)
 10.10.10.60  dbadmin.hosting.test
 
-# Tenant sites (HAProxy on LB VM)
+# Tenant sites (HAProxy on LB VM) — add seeded + new tenant FQDNs here
 10.10.10.70  acme.hosting.test www.acme.hosting.test
 ```
+
+The seed file (`seeds/dev-tenants.yaml`) creates two tenant FQDNs: `acme.hosting.test` and `www.acme.hosting.test`. These must point to the LB VM (`10.10.10.70`), **not** the controlplane. When adding new tenant FQDNs, always add them to the `10.10.10.70` line.
 
 ## SSL/TLS (optional)
 
