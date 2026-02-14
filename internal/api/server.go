@@ -94,6 +94,7 @@ func (s *Server) setupRoutes() {
 		// Initialize handlers
 		dashboard := handler.NewDashboard(s.services.Dashboard)
 		audit := handler.NewAudit(s.corePool)
+		logs := handler.NewLogs(s.cfg.LokiURL)
 		platformCfg := handler.NewPlatformConfig(s.services.PlatformConfig)
 		brand := handler.NewBrand(s.services.Brand)
 		region := handler.NewRegion(s.services.Region)
@@ -133,6 +134,12 @@ func (s *Server) setupRoutes() {
 
 			// Audit logs
 			r.Get("/audit-logs", audit.List)
+
+			// Logs (Loki proxy)
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("audit_logs", "read"))
+				r.Get("/logs", logs.Query)
+			})
 
 			// Platform config
 			r.Get("/platform/config", platformCfg.Get)

@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { Breadcrumb } from '@/components/shared/breadcrumb'
 import { CopyButton } from '@/components/shared/copy-button'
+import { LogViewer } from '@/components/shared/log-viewer'
 import { formatDate } from '@/lib/utils'
 import { rules, validateField } from '@/lib/validation'
 import {
@@ -148,6 +149,9 @@ export function WebrootDetailPage() {
             onRowClick={(f) => navigate({ to: '/tenants/$id/fqdns/$fqdnId', params: { id: tenantId, fqdnId: f.id } })} />
         )}
       </div>
+
+      {/* Logs */}
+      <LogViewer query={`{app=~"core-api|worker|node-agent"} |= "${webrootId}"`} title="Logs" />
 
       {/* Edit Webroot */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

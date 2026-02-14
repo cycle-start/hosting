@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Pause, Play, Trash2, Plus, RotateCcw, Loader2, FolderOpen, Database as DatabaseIcon, Globe, Boxes, HardDrive, Key, Archive, AlertCircle } from 'lucide-react'
+import { Pause, Play, Trash2, Plus, RotateCcw, Loader2, FolderOpen, Database as DatabaseIcon, Globe, Boxes, HardDrive, Key, Archive, AlertCircle, ScrollText } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -39,9 +39,10 @@ import { ValkeyInstanceFields } from '@/components/forms/valkey-instance-fields'
 import { S3BucketFields } from '@/components/forms/s3-bucket-fields'
 import { SFTPKeyFields } from '@/components/forms/sftp-key-fields'
 import { ZoneFields } from '@/components/forms/zone-fields'
+import { LogViewer } from '@/components/shared/log-viewer'
 
 const defaultTab = 'webroots'
-const validTabs = ['webroots', 'databases', 'zones', 'valkey', 's3', 'sftp', 'backups']
+const validTabs = ['webroots', 'databases', 'zones', 'valkey', 's3', 'sftp', 'backups', 'logs']
 
 function getTabFromHash() {
   const hash = window.location.hash.slice(1)
@@ -681,6 +682,7 @@ export function TenantDetailPage() {
           <TabsTrigger value="s3">S3 Buckets ({s3Data?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="sftp">SFTP Keys ({sftpData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="backups">Backups ({backupsData?.items?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="logs"><ScrollText className="mr-1.5 h-4 w-4" /> Logs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="webroots">
@@ -777,6 +779,10 @@ export function TenantDetailPage() {
           ) : (
             <DataTable columns={backupColumns} data={backupsData?.items ?? []} loading={backupsLoading} emptyMessage="No backups" />
           )}
+        </TabsContent>
+
+        <TabsContent value="logs">
+          <LogViewer query={`{app=~"core-api|worker|node-agent"} |= "${id}"`} />
         </TabsContent>
       </Tabs>
 

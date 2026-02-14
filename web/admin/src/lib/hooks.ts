@@ -10,6 +10,7 @@ import type {
   PlatformConfig, ListParams, AuditListParams, TenantResourceSummary,
   CreateTenantRequest,
   FQDNFormData, DatabaseUserFormData, ValkeyUserFormData,
+  LogQueryResponse,
 } from './types'
 
 function buildQuery(params?: Record<string, unknown>): string {
@@ -955,6 +956,16 @@ export function useRetryBackup() {
   return useMutation({
     mutationFn: (id: string) => api.post(`/backups/${id}/retry`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['backups'] }),
+  })
+}
+
+// Logs
+export function useLogs(query: string, range: string = '1h', enabled = true) {
+  return useQuery({
+    queryKey: ['logs', query, range],
+    queryFn: () => api.get<LogQueryResponse>(`/logs?query=${encodeURIComponent(query)}&start=${range}&limit=500`),
+    enabled,
+    refetchInterval: 10000,
   })
 }
 

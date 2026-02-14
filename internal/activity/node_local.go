@@ -306,6 +306,16 @@ func (a *NodeLocal) ConfigureRuntime(ctx context.Context, params ConfigureRuntim
 	return nil
 }
 
+// CleanOrphanedConfigs removes nginx config files that are not in the expected set.
+func (a *NodeLocal) CleanOrphanedConfigs(ctx context.Context, input CleanOrphanedConfigsInput) (CleanOrphanedConfigsResult, error) {
+	a.logger.Info().Int("expected_count", len(input.ExpectedConfigs)).Msg("CleanOrphanedConfigs")
+	removed, err := a.nginx.CleanOrphanedConfigs(input.ExpectedConfigs)
+	if err != nil {
+		return CleanOrphanedConfigsResult{}, asNonRetryable(fmt.Errorf("clean orphaned configs: %w", err))
+	}
+	return CleanOrphanedConfigsResult{Removed: removed}, nil
+}
+
 // ReloadNginx tests and reloads the nginx configuration.
 func (a *NodeLocal) ReloadNginx(ctx context.Context) error {
 	a.logger.Info().Msg("ReloadNginx")

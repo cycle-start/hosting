@@ -1,15 +1,19 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/edvin/hosting/internal/hostctl"
 )
 
 func main() {
+	loadEnvFile(".env")
+
 	if len(os.Args) < 2 {
 		printUsage()
 		os.Exit(1)
@@ -74,6 +78,32 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", os.Args[1])
 		printUsage()
 		os.Exit(1)
+	}
+}
+
+// loadEnvFile reads a .env file and sets any variables not already in the environment.
+func loadEnvFile(path string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return // missing .env is fine
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, val, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		val = strings.TrimSpace(val)
+		if os.Getenv(key) == "" {
+			os.Setenv(key, val)
+		}
 	}
 }
 

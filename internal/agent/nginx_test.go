@@ -698,3 +698,132 @@ func TestInstallCertificate_NoChain(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "cert-only", string(fullchain))
 }
+
+func TestCleanOrphanedConfigs_RemovesOrphaned(t *testing.T) {
+	mgr := newTestNginxManager(t)
+	sitesDir := filepath.Join(mgr.configDir, "sites-enabled")
+	require.NoError(t, os.MkdirAll(sitesDir, 0755))
+
+	// Create some config files: two expected, one orphaned.
+	require.NoError(t, os.WriteFile(filepath.Join(sitesDir, "tenant1_main.conf"), []byte("conf1"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(sitesDir, "tenant1_blog.conf"), []byte("conf2"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(sitesDir, "tenant2_old.conf"), []byte("orphaned"), 0644))
+
+	expected := map[string]bool{
+		"tenant1_main.conf": true,
+		"tenant1_blog.conf": true,
+	}
+
+	removed, err := mgr.CleanOrphanedConfigs(expected)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"tenant2_old.conf"}, removed)
+
+	// Verify expected files still exist.
+	assert.True(t, fileExists(filepath.Join(sitesDir, "tenant1_main.conf")))
+	assert.True(t, fileExists(filepath.Join(sitesDir, "tenant1_blog.conf")))
+
+	// Verify orphaned file was removed.
+	assert.False(t, fileExists(filepath.Join(sitesDir, "tenant2_old.conf")))
+}
+
+func TestCleanOrphanedConfigs_SkipsNonWebrootFiles(t *testing.T) {
+	mgr := newTestNginxManager(t)
+	sitesDir := filepath.Join(mgr.configDir, "sites-enabled")
+	require.NoError(t, os.MkdirAll(sitesDir, 0755))
+
+	// Create non-webroot config files (no underscore in the base name).
+	require.NoError(t, os.WriteFile(filepath.Join(sitesDir, "default.conf"), []byte("default"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(sitesDir, "custom.conf"), []byte("custom"), 0644))
+	// Also a non-.conf file.
+	require.NoError(t, os.WriteFile(filepath.Join(sitesDir, "readme.txt"), []byte("readme"), 0644))
+
+	// No expected configs (empty set).
+	removed, err := mgr.CleanOrphanedConfigs(map[string]bool{})
+	require.NoError(t, err)
+
+	// Nothing should be removed because none of the files match the webroot pattern.
+	assert.Empty(t, removed)
+
+	// Verify files still exist.
+	assert.True(t, fileExists(filepath.Join(sitesDir, "default.conf")))
+	assert.True(t, fileExists(filepath.Join(sitesDir, "custom.conf")))
+	assert.True(t, fileExists(filepath.Join(sitesDir, "readme.txt")))
+}
+
+func TestCleanOrphanedConfigs_KeepsAllExpected(t *testing.T) {
+	mgr := newTestNginxManager(t)
+	sitesDir := filepath.Join(mgr.configDir, "sites-enabled")
+	require.NoError(t, os.MkdirAll(sitesDir, 0755))
+
+	// Create only expected files.
+	require.NoError(t, os.WriteFile(filepath.Join(sitesDir, "t1_site.conf"), []byte("c1"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(sitesDir, "t2_site.conf"), []byte("c2"), 0644))
+
+	expected := map[string]bool{
+		"t1_site.conf": true,
+		"t2_site.conf": true,
+	}
+
+	removed, err := mgr.CleanOrphanedConfigs(expected)
+	require.NoError(t, err)
+
+	assert.Empty(t, removed)
+
+	// All files still present.
+	assert.True(t, fileExists(filepath.Join(sitesDir, "t1_site.conf")))
+	assert.True(t, fileExists(filepath.Join(sitesDir, "t2_site.conf")))
+}
+
+func TestCleanOrphanedConfigs_EmptyDirectory(t *testing.T) {
+	mgr := newTestNginxManager(t)
+	sitesDir := filepath.Join(mgr.configDir, "sites-enabled")
+	require.NoError(t, os.MkdirAll(sitesDir, 0755))
+
+	removed, err := mgr.CleanOrphanedConfigs(map[string]bool{})
+	require.NoError(t, err)
+	assert.Empty(t, removed)
+}
+
+func TestCleanOrphanedConfigs_MissingDirectory(t *testing.T) {
+	// sites-enabled directory doesn't exist at all.
+	mgr := newTestNginxManager(t)
+
+	removed, err := mgr.CleanOrphanedConfigs(map[string]bool{})
+	require.NoError(t, err)
+	assert.Nil(t, removed)
+}
+
+func TestCleanOrphanedConfigs_MixedFiles(t *testing.T) {
+	mgr := newTestNginxManager(t)
+	sitesDir := filepath.Join(mgr.configDir, "sites-enabled")
+	require.NoError(t, os.MkdirAll(sitesDir, 0755))
+
+	// Mix of expected, orphaned, non-webroot, and non-conf files.
+	require.NoError(t, os.WriteFile(filepath.Join(sitesDir, "tenant1_main.conf"), []byte("expected"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(sitesDir, "tenant2_old.conf"), []byte("orphaned1"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(sitesDir, "tenant3_stale.conf"), []byte("orphaned2"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(sitesDir, "default.conf"), []byte("system"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(sitesDir, "notes.txt"), []byte("ignore"), 0644))
+
+	expected := map[string]bool{
+		"tenant1_main.conf": true,
+	}
+
+	removed, err := mgr.CleanOrphanedConfigs(expected)
+	require.NoError(t, err)
+
+	// Should have removed exactly the two orphaned webroot configs.
+	assert.Len(t, removed, 2)
+	assert.Contains(t, removed, "tenant2_old.conf")
+	assert.Contains(t, removed, "tenant3_stale.conf")
+
+	// Expected and non-webroot files remain.
+	assert.True(t, fileExists(filepath.Join(sitesDir, "tenant1_main.conf")))
+	assert.True(t, fileExists(filepath.Join(sitesDir, "default.conf")))
+	assert.True(t, fileExists(filepath.Join(sitesDir, "notes.txt")))
+
+	// Orphaned files removed.
+	assert.False(t, fileExists(filepath.Join(sitesDir, "tenant2_old.conf")))
+	assert.False(t, fileExists(filepath.Join(sitesDir, "tenant3_stale.conf")))
+}

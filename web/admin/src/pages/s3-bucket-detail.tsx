@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Trash2, Key, Copy, Check } from 'lucide-react'
+import { Plus, Trash2, Key, Copy, Check, ScrollText } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,7 @@ import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { Breadcrumb } from '@/components/shared/breadcrumb'
+import { LogViewer } from '@/components/shared/log-viewer'
 import { CopyButton } from '@/components/shared/copy-button'
 import { formatDate } from '@/lib/utils'
 import {
@@ -196,6 +197,9 @@ export function S3BucketDetailPage() {
       </Dialog>
 
       {/* Delete Access Key */}
+      {/* Logs */}
+      <LogViewer query={`{app=~"core-api|worker|node-agent"} |= "${bucketId}"`} title="Logs" />
+
       <ConfirmDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)} title="Delete Access Key"
         description={`Delete access key "${deleteTarget?.access_key_id}"? Any applications using this key will lose access.`}
         confirmLabel="Delete" variant="destructive" loading={deleteMut.isPending}

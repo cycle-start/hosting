@@ -15,3 +15,4 @@ data:
   BACKUP_RETENTION_DAYS: {{ .Values.config.backupRetentionDays | quote }}
   REGION_ID: {{ .Values.config.regionId | quote }}
   CLUSTER_ID: {{ .Values.config.clusterId | quote }}
+  LOKI_URL: {{ .Values.config.lokiUrl | quote }}

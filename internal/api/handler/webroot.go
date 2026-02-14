@@ -80,13 +80,13 @@ func (h *Webroot) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !checkTenantBrand(w, r, h.services.Tenant, tenantID) {
-		return
-	}
-
 	var req request.CreateWebroot
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !checkTenantBrand(w, r, h.services.Tenant, tenantID) {
 		return
 	}
 

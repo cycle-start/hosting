@@ -222,6 +222,16 @@ type DeleteS3AccessKeyParams struct {
 	AccessKeyID string
 }
 
+// CleanOrphanedConfigsInput holds parameters for cleaning orphaned nginx configs.
+type CleanOrphanedConfigsInput struct {
+	ExpectedConfigs map[string]bool `json:"expected_configs"`
+}
+
+// CleanOrphanedConfigsResult holds the result of cleaning orphaned nginx configs.
+type CleanOrphanedConfigsResult struct {
+	Removed []string `json:"removed"`
+}
+
 // BackupResult holds the result of a backup operation.
 type BackupResult struct {
 	StoragePath string

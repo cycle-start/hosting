@@ -376,6 +376,18 @@ export interface TenantResourceSummary {
   failed: number
 }
 
+// --- Log types ---
+
+export interface LogEntry {
+  timestamp: string
+  line: string
+  labels: Record<string, string>
+}
+
+export interface LogQueryResponse {
+  entries: LogEntry[]
+}
+
 export interface ListParams {
   limit?: number
   cursor?: string

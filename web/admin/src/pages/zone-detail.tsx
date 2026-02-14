@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, ScrollText } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,7 @@ import { DataTable } from '@/components/shared/data-table'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { CopyButton } from '@/components/shared/copy-button'
+import { LogViewer } from '@/components/shared/log-viewer'
 import { formatDate, truncateID } from '@/lib/utils'
 import { useZone, useZoneRecords, useCreateZoneRecord, useDeleteZoneRecord } from '@/lib/hooks'
 import type { ZoneRecord } from '@/lib/types'
@@ -155,6 +156,9 @@ export function ZoneDetailPage() {
         searchPlaceholder="Search records..."
         emptyMessage="No DNS records"
       />
+
+      {/* Logs */}
+      <LogViewer query={`{app=~"core-api|worker|node-agent"} |= "${id}"`} title="Logs" />
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>

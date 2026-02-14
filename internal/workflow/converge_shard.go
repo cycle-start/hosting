@@ -121,6 +121,8 @@ func convergeLBShard(ctx workflow.Context, shard model.Shard, nodes []model.Node
 }
 
 func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) []string {
+	logger := workflow.GetLogger(ctx)
+
 	// List all tenants on this shard.
 	var tenants []model.Tenant
 	err := workflow.ExecuteActivity(ctx, "ListTenantsByShard", shardID).Get(ctx, &tenants)
@@ -128,7 +130,86 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		return []string{fmt.Sprintf("list tenants: %v", err)}
 	}
 
+	// Build the expected nginx config set from all active webroots across all
+	// active tenants. This is used to clean orphaned configs before and after
+	// creating webroots, preventing stale configs from blocking nginx reloads.
+	expectedConfigs := make(map[string]bool)
+	// We also collect webroot data upfront to avoid fetching it twice.
+	type webrootEntry struct {
+		tenant  model.Tenant
+		webroot model.Webroot
+		fqdns   []activity.FQDNParam
+	}
+	var webrootEntries []webrootEntry
+
 	var errs []string
+	for _, tenant := range tenants {
+		if tenant.Status != model.StatusActive {
+			continue
+		}
+
+		// List webroots for this tenant.
+		var webroots []model.Webroot
+		err = workflow.ExecuteActivity(ctx, "ListWebrootsByTenantID", tenant.ID).Get(ctx, &webroots)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("list webroots for tenant %s: %v", tenant.ID, err))
+			continue
+		}
+
+		for _, webroot := range webroots {
+			if webroot.Status != model.StatusActive {
+				continue
+			}
+
+			// Register this webroot's config as expected.
+			confName := fmt.Sprintf("%s_%s.conf", tenant.ID, webroot.Name)
+			expectedConfigs[confName] = true
+
+			// Get FQDNs for this webroot.
+			var fqdns []model.FQDN
+			err = workflow.ExecuteActivity(ctx, "GetFQDNsByWebrootID", webroot.ID).Get(ctx, &fqdns)
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("get fqdns for webroot %s: %v", webroot.ID, err))
+				continue
+			}
+
+			var fqdnParams []activity.FQDNParam
+			for _, f := range fqdns {
+				if f.Status != model.StatusActive {
+					continue
+				}
+				fqdnParams = append(fqdnParams, activity.FQDNParam{
+					FQDN:       f.FQDN,
+					WebrootID:  f.WebrootID,
+					SSLEnabled: f.SSLEnabled,
+				})
+			}
+
+			webrootEntries = append(webrootEntries, webrootEntry{
+				tenant:  tenant,
+				webroot: webroot,
+				fqdns:   fqdnParams,
+			})
+		}
+	}
+
+	// Clean orphaned nginx configs on each node BEFORE creating webroots.
+	// This prevents stale configs from causing nginx -t failures that block
+	// all new webroot provisioning.
+	for _, node := range nodes {
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		var result activity.CleanOrphanedConfigsResult
+		err = workflow.ExecuteActivity(nodeCtx, "CleanOrphanedConfigs", activity.CleanOrphanedConfigsInput{
+			ExpectedConfigs: expectedConfigs,
+		}).Get(ctx, &result)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("clean orphaned configs on node %s: %v", node.ID, err))
+		} else if len(result.Removed) > 0 {
+			logger.Warn("removed orphaned nginx configs", "node", node.ID, "removed", result.Removed)
+		}
+	}
+
+	// Create tenants and webroots on each node.
 	for _, tenant := range tenants {
 		if tenant.Status != model.StatusActive {
 			continue
@@ -158,56 +239,24 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				errs = append(errs, fmt.Sprintf("sync ssh config for %s on node %s: %v", tenant.ID, node.ID, err))
 			}
 		}
+	}
 
-		// List webroots for this tenant.
-		var webroots []model.Webroot
-		err = workflow.ExecuteActivity(ctx, "ListWebrootsByTenantID", tenant.ID).Get(ctx, &webroots)
-		if err != nil {
-			errs = append(errs, fmt.Sprintf("list webroots for tenant %s: %v", tenant.ID, err))
-			continue
-		}
-
-		for _, webroot := range webroots {
-			if webroot.Status != model.StatusActive {
-				continue
-			}
-
-			// Get FQDNs for this webroot.
-			var fqdns []model.FQDN
-			err = workflow.ExecuteActivity(ctx, "GetFQDNsByWebrootID", webroot.ID).Get(ctx, &fqdns)
+	// Create webroots on each node.
+	for _, entry := range webrootEntries {
+		for _, node := range nodes {
+			nodeCtx := nodeActivityCtx(ctx, node.ID)
+			err = workflow.ExecuteActivity(nodeCtx, "CreateWebroot", activity.CreateWebrootParams{
+				ID:             entry.webroot.ID,
+				TenantName:     entry.tenant.ID,
+				Name:           entry.webroot.Name,
+				Runtime:        entry.webroot.Runtime,
+				RuntimeVersion: entry.webroot.RuntimeVersion,
+				RuntimeConfig:  string(entry.webroot.RuntimeConfig),
+				PublicFolder:   entry.webroot.PublicFolder,
+				FQDNs:          entry.fqdns,
+			}).Get(ctx, nil)
 			if err != nil {
-				errs = append(errs, fmt.Sprintf("get fqdns for webroot %s: %v", webroot.ID, err))
-				continue
-			}
-
-			var fqdnParams []activity.FQDNParam
-			for _, f := range fqdns {
-				if f.Status != model.StatusActive {
-					continue
-				}
-				fqdnParams = append(fqdnParams, activity.FQDNParam{
-					FQDN:       f.FQDN,
-					WebrootID:  f.WebrootID,
-					SSLEnabled: f.SSLEnabled,
-				})
-			}
-
-			// Create webroot on each node.
-			for _, node := range nodes {
-				nodeCtx := nodeActivityCtx(ctx, node.ID)
-				err = workflow.ExecuteActivity(nodeCtx, "CreateWebroot", activity.CreateWebrootParams{
-					ID:             webroot.ID,
-					TenantName:     tenant.ID,
-					Name:           webroot.Name,
-					Runtime:        webroot.Runtime,
-					RuntimeVersion: webroot.RuntimeVersion,
-					RuntimeConfig:  string(webroot.RuntimeConfig),
-					PublicFolder:   webroot.PublicFolder,
-					FQDNs:          fqdnParams,
-				}).Get(ctx, nil)
-				if err != nil {
-					errs = append(errs, fmt.Sprintf("create webroot %s on node %s: %v", webroot.ID, node.ID, err))
-				}
+				errs = append(errs, fmt.Sprintf("create webroot %s on node %s: %v", entry.webroot.ID, node.ID, err))
 			}
 		}
 	}

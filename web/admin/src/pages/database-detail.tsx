@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Trash2, Pencil, Users, ExternalLink } from 'lucide-react'
+import { Plus, Trash2, Pencil, Users, ExternalLink, ScrollText } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +14,7 @@ import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { Breadcrumb } from '@/components/shared/breadcrumb'
+import { LogViewer } from '@/components/shared/log-viewer'
 import { CopyButton } from '@/components/shared/copy-button'
 import { formatDate } from '@/lib/utils'
 import { rules, validateField } from '@/lib/validation'
@@ -186,6 +187,9 @@ export function DatabaseDetailPage() {
           <DataTable columns={columns} data={usersData?.items ?? []} loading={usersLoading} searchColumn="username" searchPlaceholder="Search users..." />
         )}
       </div>
+
+      {/* Logs */}
+      <LogViewer query={`{app=~"core-api|worker|node-agent"} |= "${databaseId}"`} title="Logs" />
 
       {/* Create User */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

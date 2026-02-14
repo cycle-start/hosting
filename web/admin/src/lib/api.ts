@@ -44,8 +44,10 @@ class ApiClient {
 
     if (res.status === 401) {
       this.setApiKey(null)
-      window.location.href = '/login'
-      throw new Error('Unauthorized')
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
+      throw new Error('Invalid API key')
     }
 
     if (res.status === 204) {

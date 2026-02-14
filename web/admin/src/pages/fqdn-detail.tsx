@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Trash2, Shield, Mail } from 'lucide-react'
+import { Plus, Trash2, Shield, Mail, ScrollText } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,7 @@ import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { Breadcrumb } from '@/components/shared/breadcrumb'
+import { LogViewer } from '@/components/shared/log-viewer'
 import { CopyButton } from '@/components/shared/copy-button'
 import { formatDate } from '@/lib/utils'
 import { rules, validateField } from '@/lib/validation'
@@ -25,7 +26,7 @@ import {
 } from '@/lib/hooks'
 import type { Certificate, EmailAccount } from '@/lib/types'
 
-const fqdnTabs = ['certificates', 'email']
+const fqdnTabs = ['certificates', 'email', 'logs']
 function getFQDNTabFromHash() {
   const hash = window.location.hash.slice(1)
   return fqdnTabs.includes(hash) ? hash : 'certificates'
@@ -153,6 +154,7 @@ export function FQDNDetailPage() {
         <TabsList>
           <TabsTrigger value="certificates">Certificates ({certsData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="email">Email Accounts ({emailsData?.items?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="logs"><ScrollText className="mr-1.5 h-4 w-4" /> Logs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="certificates">
@@ -180,6 +182,10 @@ export function FQDNDetailPage() {
             <DataTable columns={emailColumns} data={emailsData?.items ?? []} loading={emailsLoading} searchColumn="address" searchPlaceholder="Search accounts..."
               onRowClick={(a) => navigate({ to: '/tenants/$id/email-accounts/$accountId', params: { id: tenantId, accountId: a.id } })} />
           )}
+        </TabsContent>
+
+        <TabsContent value="logs">
+          <LogViewer query={`{app=~"core-api|worker|node-agent"} |= "${fqdnId}"`} />
         </TabsContent>
       </Tabs>
 

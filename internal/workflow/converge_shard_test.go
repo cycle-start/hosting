@@ -65,7 +65,16 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("ListTenantsByShard", mock.Anything, shardID).Return(tenants, nil)
 
-	// CreateTenant for each node
+	// Webroot and FQDN listing (now happens before CleanOrphanedConfigs).
+	s.env.OnActivity("ListWebrootsByTenantID", mock.Anything, "tenant-1").Return(webroots, nil)
+	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, "wr-1").Return(fqdns, nil)
+
+	// CleanOrphanedConfigs on each node before creating webroots.
+	s.env.OnActivity("CleanOrphanedConfigs", mock.Anything, activity.CleanOrphanedConfigsInput{
+		ExpectedConfigs: map[string]bool{"tenant-1_main.conf": true},
+	}).Return(activity.CleanOrphanedConfigsResult{}, nil)
+
+	// CreateTenant for each node.
 	s.env.OnActivity("CreateTenant", mock.Anything, activity.CreateTenantParams{
 		ID: "tenant-1", UID: 1000, SFTPEnabled: true,
 	}).Return(nil)
@@ -73,10 +82,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 		TenantName: "tenant-1", SFTPEnabled: true,
 	}).Return(nil)
 
-	s.env.OnActivity("ListWebrootsByTenantID", mock.Anything, "tenant-1").Return(webroots, nil)
-	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, "wr-1").Return(fqdns, nil)
-
-	// CreateWebroot for each node
+	// CreateWebroot for each node.
 	s.env.OnActivity("CreateWebroot", mock.Anything, activity.CreateWebrootParams{
 		ID: "wr-1", TenantName: "tenant-1", Name: "main",
 		Runtime: "php", RuntimeVersion: "8.5", RuntimeConfig: "{}",
@@ -84,7 +90,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 		FQDNs:        []activity.FQDNParam{{FQDN: "example.com", WebrootID: "wr-1", SSLEnabled: true}},
 	}).Return(nil)
 
-	// ReloadNginx for each node
+	// ReloadNginx for each node.
 	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusActive)).Return(nil)
 
@@ -207,6 +213,14 @@ func (s *ConvergeShardWorkflowTestSuite) TestSkipsInactiveResources() {
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("ListTenantsByShard", mock.Anything, shardID).Return(tenants, nil)
 
+	// Webroot listing for active tenant (no webroots).
+	s.env.OnActivity("ListWebrootsByTenantID", mock.Anything, "tenant-active").Return([]model.Webroot{}, nil)
+
+	// CleanOrphanedConfigs with empty expected set (no active webroots).
+	s.env.OnActivity("CleanOrphanedConfigs", mock.Anything, activity.CleanOrphanedConfigsInput{
+		ExpectedConfigs: map[string]bool{},
+	}).Return(activity.CleanOrphanedConfigsResult{}, nil)
+
 	// Only the active tenant gets CreateTenant.
 	s.env.OnActivity("CreateTenant", mock.Anything, activity.CreateTenantParams{
 		ID: "tenant-active", UID: 1000,
@@ -215,7 +229,6 @@ func (s *ConvergeShardWorkflowTestSuite) TestSkipsInactiveResources() {
 		TenantName: "tenant-active",
 	}).Return(nil)
 
-	s.env.OnActivity("ListWebrootsByTenantID", mock.Anything, "tenant-active").Return([]model.Webroot{}, nil)
 	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusActive)).Return(nil)
 

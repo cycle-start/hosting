@@ -254,13 +254,13 @@ func (h *Zone) ReassignTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !h.checkZoneBrandAccess(w, r, id) {
-		return
-	}
-
 	var req request.ReassignZoneTenant
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !h.checkZoneBrandAccess(w, r, id) {
 		return
 	}
 

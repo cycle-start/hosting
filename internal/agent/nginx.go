@@ -342,6 +342,61 @@ func (m *NginxManager) InstallCertificate(ctx context.Context, cert *Certificate
 	return nil
 }
 
+// CleanOrphanedConfigs removes nginx config files from sites-enabled that are not
+// in the expected set. expectedConfigs is a set of config filenames (e.g. "tenantID_webrootName.conf").
+// Returns the list of removed filenames. Does NOT reload nginx (caller handles that).
+func (m *NginxManager) CleanOrphanedConfigs(expectedConfigs map[string]bool) ([]string, error) {
+	sitesDir := filepath.Join(m.configDir, "sites-enabled")
+
+	entries, err := os.ReadDir(sitesDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read sites-enabled dir: %w", err)
+	}
+
+	var removed []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		name := entry.Name()
+
+		// Only consider .conf files.
+		if !strings.HasSuffix(name, ".conf") {
+			continue
+		}
+
+		// Skip non-webroot configs (files without underscores, like "default.conf").
+		// Webroot configs always have the pattern {tenantID}_{webrootName}.conf.
+		baseName := strings.TrimSuffix(name, ".conf")
+		if !strings.Contains(baseName, "_") {
+			continue
+		}
+
+		// Skip expected configs.
+		if expectedConfigs[name] {
+			continue
+		}
+
+		// Remove orphaned config.
+		confPath := filepath.Join(sitesDir, name)
+		m.logger.Warn().
+			Str("path", confPath).
+			Str("filename", name).
+			Msg("removing orphaned nginx config")
+
+		if err := os.Remove(confPath); err != nil {
+			return removed, fmt.Errorf("remove orphaned config %s: %w", confPath, err)
+		}
+		removed = append(removed, name)
+	}
+
+	return removed, nil
+}
+
 // fileExists returns true if the given path exists and is a regular file.
 func fileExists(path string) bool {
 	info, err := os.Stat(path)

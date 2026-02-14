@@ -55,6 +55,7 @@ config:
   backupRetentionDays: "30"
   regionId: ""
   clusterId: ""
+  lokiUrl: "http://127.0.0.1:3100"
 
 # Secrets — either inline or reference an existing K8s Secret
 secrets:

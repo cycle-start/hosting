@@ -43,6 +43,8 @@ type Config struct {
 	NodeRole    string // NODE_ROLE
 	ServiceName string // SERVICE_NAME
 	MetricsAddr string // METRICS_ADDR — listen addr for /metrics (worker + node-agent)
+
+	LokiURL string // LOKI_URL — Loki query endpoint (default: http://127.0.0.1:3100)
 }
 
 func Load() (*Config, error) {
@@ -72,6 +74,8 @@ func Load() (*Config, error) {
 		NodeRole:    getEnv("NODE_ROLE", ""),
 		ServiceName: getEnv("SERVICE_NAME", ""),
 		MetricsAddr: getEnv("METRICS_ADDR", ""),
+
+		LokiURL: getEnv("LOKI_URL", "http://127.0.0.1:3100"),
 	}
 
 	return cfg, nil
