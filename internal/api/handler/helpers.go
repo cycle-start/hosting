@@ -5,15 +5,33 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"net/http"
 	"time"
 
 	"golang.org/x/crypto/ssh"
 
+	mw "github.com/edvin/hosting/internal/api/middleware"
 	"github.com/edvin/hosting/internal/api/request"
+	"github.com/edvin/hosting/internal/api/response"
 	"github.com/edvin/hosting/internal/core"
 	"github.com/edvin/hosting/internal/model"
 	"github.com/edvin/hosting/internal/platform"
 )
+
+// checkTenantBrand verifies that the caller has brand access to the given tenant.
+// Returns false and writes an error response if access is denied.
+func checkTenantBrand(w http.ResponseWriter, r *http.Request, tenantSvc *core.TenantService, tenantID string) bool {
+	tenant, err := tenantSvc.GetByID(r.Context(), tenantID)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return false
+	}
+	if !mw.HasBrandAccess(mw.GetIdentity(r.Context()), tenant.BrandID) {
+		response.WriteError(w, http.StatusForbidden, "no access to this brand")
+		return false
+	}
+	return true
+}
 
 // parseSSHKey parses an SSH public key and returns its SHA256 fingerprint.
 func parseSSHKey(publicKey string) (string, error) {

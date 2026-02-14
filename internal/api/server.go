@@ -91,251 +91,445 @@ func (s *Server) setupRoutes() {
 		r.Use(mw.CallbackURL)
 		r.Use(s.auditLogger.Middleware)
 
-		// Dashboard
+		// Initialize handlers
 		dashboard := handler.NewDashboard(s.services.Dashboard)
-		r.Get("/dashboard/stats", dashboard.Stats)
-
-		// Audit logs
 		audit := handler.NewAudit(s.corePool)
-		r.Get("/audit-logs", audit.List)
-
-		// Platform config
 		platformCfg := handler.NewPlatformConfig(s.services.PlatformConfig)
-		r.Get("/platform/config", platformCfg.Get)
-		r.Put("/platform/config", platformCfg.Update)
-
-		// Brands
 		brand := handler.NewBrand(s.services.Brand)
-		r.Get("/brands", brand.List)
-		r.Post("/brands", brand.Create)
-		r.Get("/brands/{id}", brand.Get)
-		r.Put("/brands/{id}", brand.Update)
-		r.Delete("/brands/{id}", brand.Delete)
-		r.Get("/brands/{id}/clusters", brand.ListClusters)
-		r.Put("/brands/{id}/clusters", brand.SetClusters)
-
-		// Regions
 		region := handler.NewRegion(s.services.Region)
-		r.Get("/regions", region.List)
-		r.Post("/regions", region.Create)
-		r.Get("/regions/{id}", region.Get)
-		r.Put("/regions/{id}", region.Update)
-		r.Delete("/regions/{id}", region.Delete)
-
-		// Region runtimes
-		r.Get("/regions/{id}/runtimes", region.ListRuntimes)
-		r.Post("/regions/{id}/runtimes", region.AddRuntime)
-		r.Delete("/regions/{id}/runtimes", region.RemoveRuntime)
-
-		// Clusters
 		cluster := handler.NewCluster(s.services.Cluster)
-		r.Get("/regions/{regionID}/clusters", cluster.ListByRegion)
-		r.Post("/regions/{regionID}/clusters", cluster.Create)
-		r.Get("/clusters/{id}", cluster.Get)
-		r.Put("/clusters/{id}", cluster.Update)
-		r.Delete("/clusters/{id}", cluster.Delete)
-
-		// Cluster LB addresses
 		clusterLBAddress := handler.NewClusterLBAddressHandler(s.services.ClusterLBAddress)
-		r.Get("/clusters/{clusterID}/lb-addresses", clusterLBAddress.List)
-		r.Post("/clusters/{clusterID}/lb-addresses", clusterLBAddress.Create)
-		r.Get("/lb-addresses/{id}", clusterLBAddress.Get)
-		r.Delete("/lb-addresses/{id}", clusterLBAddress.Delete)
-
-		// Shards
 		shard := handler.NewShard(s.services.Shard)
-		r.Get("/clusters/{clusterID}/shards", shard.ListByCluster)
-		r.Post("/clusters/{clusterID}/shards", shard.Create)
-		r.Get("/shards/{id}", shard.Get)
-		r.Put("/shards/{id}", shard.Update)
-		r.Delete("/shards/{id}", shard.Delete)
-		r.Post("/shards/{id}/converge", shard.Converge)
-		r.Post("/shards/{id}/retry", shard.Retry)
-
-		// Nodes
 		node := handler.NewNode(s.services.Node)
-		r.Get("/clusters/{clusterID}/nodes", node.ListByCluster)
-		r.Post("/clusters/{clusterID}/nodes", node.Create)
-		r.Get("/nodes/{id}", node.Get)
-		r.Put("/nodes/{id}", node.Update)
-		r.Delete("/nodes/{id}", node.Delete)
+		tenant := handler.NewTenant(s.services)
+		oidcLogin := handler.NewOIDCLogin(s.services.OIDC)
+		oidcClient := handler.NewOIDCClient(s.services.OIDC)
+		webroot := handler.NewWebroot(s.services)
+		fqdn := handler.NewFQDN(s.services)
+		cert := handler.NewCertificate(s.services.Certificate)
+		zone := handler.NewZone(s.services)
+		zoneRecord := handler.NewZoneRecord(s.services.ZoneRecord)
+		database := handler.NewDatabase(s.services.Database, s.services.DatabaseUser, s.services.Tenant)
+		dbUser := handler.NewDatabaseUser(s.services.DatabaseUser)
+		valkeyInstance := handler.NewValkeyInstance(s.services.ValkeyInstance, s.services.ValkeyUser, s.services.Tenant)
+		valkeyUser := handler.NewValkeyUser(s.services.ValkeyUser)
+		s3Bucket := handler.NewS3Bucket(s.services.S3Bucket, s.services.S3AccessKey, s.services.Tenant)
+		s3AccessKey := handler.NewS3AccessKey(s.services.S3AccessKey)
+		sftpKey := handler.NewSFTPKey(s.services.SFTPKey, s.services.Tenant)
+		emailAccount := handler.NewEmailAccount(s.services)
+		emailAlias := handler.NewEmailAlias(s.services.EmailAlias)
+		emailForward := handler.NewEmailForward(s.services.EmailForward)
+		emailAutoReply := handler.NewEmailAutoReply(s.services.EmailAutoReply)
+		backup := handler.NewBackup(s.services.Backup, s.services.Webroot, s.services.Database, s.services.Tenant)
+		search := handler.NewSearch(s.services.Search)
+		apiKey := handler.NewAPIKey(s.services.APIKey)
+
+		// Platform-admin-only endpoints (require brands: ["*"])
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequirePlatformAdmin())
+
+			// Dashboard
+			r.Get("/dashboard/stats", dashboard.Stats)
+
+			// Audit logs
+			r.Get("/audit-logs", audit.List)
+
+			// Platform config
+			r.Get("/platform/config", platformCfg.Get)
+			r.Put("/platform/config", platformCfg.Update)
+
+			// Search
+			r.Get("/search", search.Search)
+
+			// OIDC clients (admin)
+			r.Post("/oidc/clients", oidcClient.Create)
+
+			// API keys
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("api_keys", "read"))
+				r.Get("/api-keys", apiKey.List)
+				r.Get("/api-keys/{id}", apiKey.Get)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("api_keys", "write"))
+				r.Post("/api-keys", apiKey.Create)
+				r.Put("/api-keys/{id}", apiKey.Update)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("api_keys", "delete"))
+				r.Delete("/api-keys/{id}", apiKey.Revoke)
+			})
+
+			// Regions
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("regions", "read"))
+				r.Get("/regions", region.List)
+				r.Get("/regions/{id}", region.Get)
+				r.Get("/regions/{id}/runtimes", region.ListRuntimes)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("regions", "write"))
+				r.Post("/regions", region.Create)
+				r.Put("/regions/{id}", region.Update)
+				r.Post("/regions/{id}/runtimes", region.AddRuntime)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("regions", "delete"))
+				r.Delete("/regions/{id}", region.Delete)
+				r.Delete("/regions/{id}/runtimes", region.RemoveRuntime)
+			})
+
+			// Clusters
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("clusters", "read"))
+				r.Get("/regions/{regionID}/clusters", cluster.ListByRegion)
+				r.Get("/clusters/{id}", cluster.Get)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("clusters", "write"))
+				r.Post("/regions/{regionID}/clusters", cluster.Create)
+				r.Put("/clusters/{id}", cluster.Update)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("clusters", "delete"))
+				r.Delete("/clusters/{id}", cluster.Delete)
+			})
+
+			// Cluster LB addresses
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("clusters", "read"))
+				r.Get("/clusters/{clusterID}/lb-addresses", clusterLBAddress.List)
+				r.Get("/lb-addresses/{id}", clusterLBAddress.Get)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("clusters", "write"))
+				r.Post("/clusters/{clusterID}/lb-addresses", clusterLBAddress.Create)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("clusters", "delete"))
+				r.Delete("/lb-addresses/{id}", clusterLBAddress.Delete)
+			})
+
+			// Shards
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("shards", "read"))
+				r.Get("/clusters/{clusterID}/shards", shard.ListByCluster)
+				r.Get("/shards/{id}", shard.Get)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("shards", "write"))
+				r.Post("/clusters/{clusterID}/shards", shard.Create)
+				r.Put("/shards/{id}", shard.Update)
+				r.Post("/shards/{id}/converge", shard.Converge)
+				r.Post("/shards/{id}/retry", shard.Retry)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("shards", "delete"))
+				r.Delete("/shards/{id}", shard.Delete)
+			})
+
+			// Nodes
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("nodes", "read"))
+				r.Get("/clusters/{clusterID}/nodes", node.ListByCluster)
+				r.Get("/nodes/{id}", node.Get)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("nodes", "write"))
+				r.Post("/clusters/{clusterID}/nodes", node.Create)
+				r.Put("/nodes/{id}", node.Update)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("nodes", "delete"))
+				r.Delete("/nodes/{id}", node.Delete)
+			})
+		})
+
+		// Brand-scoped endpoints — scope middleware per resource group
+		// Brands
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("brands", "read"))
+			r.Get("/brands", brand.List)
+			r.Get("/brands/{id}", brand.Get)
+			r.Get("/brands/{id}/clusters", brand.ListClusters)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("brands", "write"))
+			r.Post("/brands", brand.Create)
+			r.Put("/brands/{id}", brand.Update)
+			r.Put("/brands/{id}/clusters", brand.SetClusters)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("brands", "delete"))
+			r.Delete("/brands/{id}", brand.Delete)
+		})
 
 		// Tenants
-		tenant := handler.NewTenant(s.services)
-		r.Get("/tenants", tenant.List)
-		r.Post("/tenants", tenant.Create)
-		r.Get("/tenants/{id}", tenant.Get)
-		r.Put("/tenants/{id}", tenant.Update)
-		r.Delete("/tenants/{id}", tenant.Delete)
-		r.Post("/tenants/{id}/suspend", tenant.Suspend)
-		r.Post("/tenants/{id}/unsuspend", tenant.Unsuspend)
-		r.Post("/tenants/{id}/migrate", tenant.Migrate)
-		r.Get("/tenants/{id}/resource-summary", tenant.ResourceSummary)
-		r.Post("/tenants/{id}/retry", tenant.Retry)
-		r.Post("/tenants/{id}/retry-failed", tenant.RetryFailed)
-
-		// OIDC login sessions
-		oidcLogin := handler.NewOIDCLogin(s.services.OIDC)
-		r.Post("/tenants/{id}/login-sessions", oidcLogin.CreateLoginSession)
-
-		// OIDC clients (admin)
-		oidcClient := handler.NewOIDCClient(s.services.OIDC)
-		r.Post("/oidc/clients", oidcClient.Create)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("tenants", "read"))
+			r.Get("/tenants", tenant.List)
+			r.Get("/tenants/{id}", tenant.Get)
+			r.Get("/tenants/{id}/resource-summary", tenant.ResourceSummary)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("tenants", "write"))
+			r.Post("/tenants", tenant.Create)
+			r.Put("/tenants/{id}", tenant.Update)
+			r.Post("/tenants/{id}/suspend", tenant.Suspend)
+			r.Post("/tenants/{id}/unsuspend", tenant.Unsuspend)
+			r.Post("/tenants/{id}/migrate", tenant.Migrate)
+			r.Post("/tenants/{id}/retry", tenant.Retry)
+			r.Post("/tenants/{id}/retry-failed", tenant.RetryFailed)
+			r.Post("/tenants/{id}/login-sessions", oidcLogin.CreateLoginSession)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("tenants", "delete"))
+			r.Delete("/tenants/{id}", tenant.Delete)
+		})
 
 		// Webroots
-		webroot := handler.NewWebroot(s.services)
-		r.Get("/tenants/{tenantID}/webroots", webroot.ListByTenant)
-		r.Post("/tenants/{tenantID}/webroots", webroot.Create)
-		r.Get("/webroots/{id}", webroot.Get)
-		r.Put("/webroots/{id}", webroot.Update)
-		r.Delete("/webroots/{id}", webroot.Delete)
-		r.Post("/webroots/{id}/retry", webroot.Retry)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("webroots", "read"))
+			r.Get("/tenants/{tenantID}/webroots", webroot.ListByTenant)
+			r.Get("/webroots/{id}", webroot.Get)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("webroots", "write"))
+			r.Post("/tenants/{tenantID}/webroots", webroot.Create)
+			r.Put("/webroots/{id}", webroot.Update)
+			r.Post("/webroots/{id}/retry", webroot.Retry)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("webroots", "delete"))
+			r.Delete("/webroots/{id}", webroot.Delete)
+		})
 
 		// FQDNs
-		fqdn := handler.NewFQDN(s.services)
-		r.Get("/webroots/{webrootID}/fqdns", fqdn.ListByWebroot)
-		r.Post("/webroots/{webrootID}/fqdns", fqdn.Create)
-		r.Get("/fqdns/{id}", fqdn.Get)
-		r.Delete("/fqdns/{id}", fqdn.Delete)
-		r.Post("/fqdns/{id}/retry", fqdn.Retry)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("fqdns", "read"))
+			r.Get("/webroots/{webrootID}/fqdns", fqdn.ListByWebroot)
+			r.Get("/fqdns/{id}", fqdn.Get)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("fqdns", "write"))
+			r.Post("/webroots/{webrootID}/fqdns", fqdn.Create)
+			r.Post("/fqdns/{id}/retry", fqdn.Retry)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("fqdns", "delete"))
+			r.Delete("/fqdns/{id}", fqdn.Delete)
+		})
 
 		// Certificates
-		cert := handler.NewCertificate(s.services.Certificate)
-		r.Get("/fqdns/{fqdnID}/certificates", cert.ListByFQDN)
-		r.Post("/fqdns/{fqdnID}/certificates", cert.Upload)
-		r.Post("/certificates/{id}/retry", cert.Retry)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("certificates", "read"))
+			r.Get("/fqdns/{fqdnID}/certificates", cert.ListByFQDN)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("certificates", "write"))
+			r.Post("/fqdns/{fqdnID}/certificates", cert.Upload)
+			r.Post("/certificates/{id}/retry", cert.Retry)
+		})
 
 		// Zones
-		zone := handler.NewZone(s.services)
-		r.Get("/zones", zone.List)
-		r.Post("/zones", zone.Create)
-		r.Get("/zones/{id}", zone.Get)
-		r.Put("/zones/{id}", zone.Update)
-		r.Delete("/zones/{id}", zone.Delete)
-		r.Put("/zones/{id}/tenant", zone.ReassignTenant)
-		r.Post("/zones/{id}/retry", zone.Retry)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("zones", "read"))
+			r.Get("/zones", zone.List)
+			r.Get("/zones/{id}", zone.Get)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("zones", "write"))
+			r.Post("/zones", zone.Create)
+			r.Put("/zones/{id}", zone.Update)
+			r.Put("/zones/{id}/tenant", zone.ReassignTenant)
+			r.Post("/zones/{id}/retry", zone.Retry)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("zones", "delete"))
+			r.Delete("/zones/{id}", zone.Delete)
+		})
 
 		// Zone records
-		zoneRecord := handler.NewZoneRecord(s.services.ZoneRecord)
-		r.Get("/zones/{zoneID}/records", zoneRecord.ListByZone)
-		r.Post("/zones/{zoneID}/records", zoneRecord.Create)
-		r.Get("/zone-records/{id}", zoneRecord.Get)
-		r.Put("/zone-records/{id}", zoneRecord.Update)
-		r.Delete("/zone-records/{id}", zoneRecord.Delete)
-		r.Post("/zone-records/{id}/retry", zoneRecord.Retry)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("zone_records", "read"))
+			r.Get("/zones/{zoneID}/records", zoneRecord.ListByZone)
+			r.Get("/zone-records/{id}", zoneRecord.Get)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("zone_records", "write"))
+			r.Post("/zones/{zoneID}/records", zoneRecord.Create)
+			r.Put("/zone-records/{id}", zoneRecord.Update)
+			r.Post("/zone-records/{id}/retry", zoneRecord.Retry)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("zone_records", "delete"))
+			r.Delete("/zone-records/{id}", zoneRecord.Delete)
+		})
 
 		// Databases
-		database := handler.NewDatabase(s.services.Database, s.services.DatabaseUser)
-		r.Get("/tenants/{tenantID}/databases", database.ListByTenant)
-		r.Post("/tenants/{tenantID}/databases", database.Create)
-		r.Get("/databases/{id}", database.Get)
-		r.Delete("/databases/{id}", database.Delete)
-		r.Post("/databases/{id}/migrate", database.Migrate)
-		r.Put("/databases/{id}/tenant", database.ReassignTenant)
-		r.Post("/databases/{id}/retry", database.Retry)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("databases", "read"))
+			r.Get("/tenants/{tenantID}/databases", database.ListByTenant)
+			r.Get("/databases/{id}", database.Get)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("databases", "write"))
+			r.Post("/tenants/{tenantID}/databases", database.Create)
+			r.Post("/databases/{id}/migrate", database.Migrate)
+			r.Put("/databases/{id}/tenant", database.ReassignTenant)
+			r.Post("/databases/{id}/retry", database.Retry)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("databases", "delete"))
+			r.Delete("/databases/{id}", database.Delete)
+		})
 
 		// Database users
-		dbUser := handler.NewDatabaseUser(s.services.DatabaseUser)
-		r.Get("/databases/{databaseID}/users", dbUser.ListByDatabase)
-		r.Post("/databases/{databaseID}/users", dbUser.Create)
-		r.Get("/database-users/{id}", dbUser.Get)
-		r.Put("/database-users/{id}", dbUser.Update)
-		r.Delete("/database-users/{id}", dbUser.Delete)
-		r.Post("/database-users/{id}/retry", dbUser.Retry)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("database_users", "read"))
+			r.Get("/databases/{databaseID}/users", dbUser.ListByDatabase)
+			r.Get("/database-users/{id}", dbUser.Get)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("database_users", "write"))
+			r.Post("/databases/{databaseID}/users", dbUser.Create)
+			r.Put("/database-users/{id}", dbUser.Update)
+			r.Post("/database-users/{id}/retry", dbUser.Retry)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("database_users", "delete"))
+			r.Delete("/database-users/{id}", dbUser.Delete)
+		})
 
 		// Valkey instances
-		valkeyInstance := handler.NewValkeyInstance(s.services.ValkeyInstance, s.services.ValkeyUser)
-		r.Get("/tenants/{tenantID}/valkey-instances", valkeyInstance.ListByTenant)
-		r.Post("/tenants/{tenantID}/valkey-instances", valkeyInstance.Create)
-		r.Get("/valkey-instances/{id}", valkeyInstance.Get)
-		r.Delete("/valkey-instances/{id}", valkeyInstance.Delete)
-		r.Post("/valkey-instances/{id}/migrate", valkeyInstance.Migrate)
-		r.Put("/valkey-instances/{id}/tenant", valkeyInstance.ReassignTenant)
-		r.Post("/valkey-instances/{id}/retry", valkeyInstance.Retry)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("valkey", "read"))
+			r.Get("/tenants/{tenantID}/valkey-instances", valkeyInstance.ListByTenant)
+			r.Get("/valkey-instances/{id}", valkeyInstance.Get)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("valkey", "write"))
+			r.Post("/tenants/{tenantID}/valkey-instances", valkeyInstance.Create)
+			r.Post("/valkey-instances/{id}/migrate", valkeyInstance.Migrate)
+			r.Put("/valkey-instances/{id}/tenant", valkeyInstance.ReassignTenant)
+			r.Post("/valkey-instances/{id}/retry", valkeyInstance.Retry)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("valkey", "delete"))
+			r.Delete("/valkey-instances/{id}", valkeyInstance.Delete)
+		})
 
 		// Valkey users
-		valkeyUser := handler.NewValkeyUser(s.services.ValkeyUser)
-		r.Get("/valkey-instances/{instanceID}/users", valkeyUser.ListByInstance)
-		r.Post("/valkey-instances/{instanceID}/users", valkeyUser.Create)
-		r.Get("/valkey-users/{id}", valkeyUser.Get)
-		r.Put("/valkey-users/{id}", valkeyUser.Update)
-		r.Delete("/valkey-users/{id}", valkeyUser.Delete)
-		r.Post("/valkey-users/{id}/retry", valkeyUser.Retry)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("valkey", "read"))
+			r.Get("/valkey-instances/{instanceID}/users", valkeyUser.ListByInstance)
+			r.Get("/valkey-users/{id}", valkeyUser.Get)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("valkey", "write"))
+			r.Post("/valkey-instances/{instanceID}/users", valkeyUser.Create)
+			r.Put("/valkey-users/{id}", valkeyUser.Update)
+			r.Post("/valkey-users/{id}/retry", valkeyUser.Retry)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("valkey", "delete"))
+			r.Delete("/valkey-users/{id}", valkeyUser.Delete)
+		})
 
 		// S3 buckets
-		s3Bucket := handler.NewS3Bucket(s.services.S3Bucket, s.services.S3AccessKey)
-		r.Get("/tenants/{tenantID}/s3-buckets", s3Bucket.ListByTenant)
-		r.Post("/tenants/{tenantID}/s3-buckets", s3Bucket.Create)
-		r.Get("/s3-buckets/{id}", s3Bucket.Get)
-		r.Put("/s3-buckets/{id}", s3Bucket.Update)
-		r.Delete("/s3-buckets/{id}", s3Bucket.Delete)
-		r.Post("/s3-buckets/{id}/retry", s3Bucket.Retry)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("s3", "read"))
+			r.Get("/tenants/{tenantID}/s3-buckets", s3Bucket.ListByTenant)
+			r.Get("/s3-buckets/{id}", s3Bucket.Get)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("s3", "write"))
+			r.Post("/tenants/{tenantID}/s3-buckets", s3Bucket.Create)
+			r.Put("/s3-buckets/{id}", s3Bucket.Update)
+			r.Post("/s3-buckets/{id}/retry", s3Bucket.Retry)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("s3", "delete"))
+			r.Delete("/s3-buckets/{id}", s3Bucket.Delete)
+		})
 
 		// S3 access keys
-		s3AccessKey := handler.NewS3AccessKey(s.services.S3AccessKey)
-		r.Get("/s3-buckets/{bucketID}/access-keys", s3AccessKey.ListByBucket)
-		r.Post("/s3-buckets/{bucketID}/access-keys", s3AccessKey.Create)
-		r.Delete("/s3-access-keys/{id}", s3AccessKey.Delete)
-		r.Post("/s3-access-keys/{id}/retry", s3AccessKey.Retry)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("s3", "read"))
+			r.Get("/s3-buckets/{bucketID}/access-keys", s3AccessKey.ListByBucket)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("s3", "write"))
+			r.Post("/s3-buckets/{bucketID}/access-keys", s3AccessKey.Create)
+			r.Post("/s3-access-keys/{id}/retry", s3AccessKey.Retry)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("s3", "delete"))
+			r.Delete("/s3-access-keys/{id}", s3AccessKey.Delete)
+		})
 
 		// SFTP keys
-		sftpKey := handler.NewSFTPKey(s.services.SFTPKey)
-		r.Get("/tenants/{tenantID}/sftp-keys", sftpKey.ListByTenant)
-		r.Post("/tenants/{tenantID}/sftp-keys", sftpKey.Create)
-		r.Get("/sftp-keys/{id}", sftpKey.Get)
-		r.Delete("/sftp-keys/{id}", sftpKey.Delete)
-		r.Post("/sftp-keys/{id}/retry", sftpKey.Retry)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("sftp_keys", "read"))
+			r.Get("/tenants/{tenantID}/sftp-keys", sftpKey.ListByTenant)
+			r.Get("/sftp-keys/{id}", sftpKey.Get)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("sftp_keys", "write"))
+			r.Post("/tenants/{tenantID}/sftp-keys", sftpKey.Create)
+			r.Post("/sftp-keys/{id}/retry", sftpKey.Retry)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("sftp_keys", "delete"))
+			r.Delete("/sftp-keys/{id}", sftpKey.Delete)
+		})
 
 		// Email accounts
-		emailAccount := handler.NewEmailAccount(s.services)
-		r.Get("/fqdns/{fqdnID}/email-accounts", emailAccount.ListByFQDN)
-		r.Post("/fqdns/{fqdnID}/email-accounts", emailAccount.Create)
-		r.Get("/email-accounts/{id}", emailAccount.Get)
-		r.Delete("/email-accounts/{id}", emailAccount.Delete)
-		r.Post("/email-accounts/{id}/retry", emailAccount.Retry)
-
-		// Email aliases
-		emailAlias := handler.NewEmailAlias(s.services.EmailAlias)
-		r.Get("/email-accounts/{id}/aliases", emailAlias.ListByAccount)
-		r.Post("/email-accounts/{id}/aliases", emailAlias.Create)
-		r.Get("/email-aliases/{aliasID}", emailAlias.Get)
-		r.Delete("/email-aliases/{aliasID}", emailAlias.Delete)
-		r.Post("/email-aliases/{aliasID}/retry", emailAlias.Retry)
-
-		// Email forwards
-		emailForward := handler.NewEmailForward(s.services.EmailForward)
-		r.Get("/email-accounts/{id}/forwards", emailForward.ListByAccount)
-		r.Post("/email-accounts/{id}/forwards", emailForward.Create)
-		r.Get("/email-forwards/{forwardID}", emailForward.Get)
-		r.Delete("/email-forwards/{forwardID}", emailForward.Delete)
-		r.Post("/email-forwards/{forwardID}/retry", emailForward.Retry)
-
-		// Email auto-reply
-		emailAutoReply := handler.NewEmailAutoReply(s.services.EmailAutoReply)
-		r.Get("/email-accounts/{id}/autoreply", emailAutoReply.Get)
-		r.Put("/email-accounts/{id}/autoreply", emailAutoReply.Put)
-		r.Delete("/email-accounts/{id}/autoreply", emailAutoReply.Delete)
-		r.Post("/email-autoreplies/{id}/retry", emailAutoReply.Retry)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("email", "read"))
+			r.Get("/fqdns/{fqdnID}/email-accounts", emailAccount.ListByFQDN)
+			r.Get("/email-accounts/{id}", emailAccount.Get)
+			r.Get("/email-accounts/{id}/aliases", emailAlias.ListByAccount)
+			r.Get("/email-aliases/{aliasID}", emailAlias.Get)
+			r.Get("/email-accounts/{id}/forwards", emailForward.ListByAccount)
+			r.Get("/email-forwards/{forwardID}", emailForward.Get)
+			r.Get("/email-accounts/{id}/autoreply", emailAutoReply.Get)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("email", "write"))
+			r.Post("/fqdns/{fqdnID}/email-accounts", emailAccount.Create)
+			r.Post("/email-accounts/{id}/retry", emailAccount.Retry)
+			r.Post("/email-accounts/{id}/aliases", emailAlias.Create)
+			r.Post("/email-aliases/{aliasID}/retry", emailAlias.Retry)
+			r.Post("/email-accounts/{id}/forwards", emailForward.Create)
+			r.Post("/email-forwards/{forwardID}/retry", emailForward.Retry)
+			r.Put("/email-accounts/{id}/autoreply", emailAutoReply.Put)
+			r.Post("/email-autoreplies/{id}/retry", emailAutoReply.Retry)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("email", "delete"))
+			r.Delete("/email-accounts/{id}", emailAccount.Delete)
+			r.Delete("/email-aliases/{aliasID}", emailAlias.Delete)
+			r.Delete("/email-forwards/{forwardID}", emailForward.Delete)
+			r.Delete("/email-accounts/{id}/autoreply", emailAutoReply.Delete)
+		})
 
 		// Backups
-		backup := handler.NewBackup(s.services.Backup, s.services.Webroot, s.services.Database)
-		r.Get("/tenants/{tenantID}/backups", backup.ListByTenant)
-		r.Post("/tenants/{tenantID}/backups", backup.Create)
-		r.Get("/backups/{id}", backup.Get)
-		r.Delete("/backups/{id}", backup.Delete)
-		r.Post("/backups/{id}/restore", backup.Restore)
-		r.Post("/backups/{id}/retry", backup.Retry)
-
-		// Search
-		search := handler.NewSearch(s.services.Search)
-		r.Get("/search", search.Search)
-
-		// API keys
-		apiKey := handler.NewAPIKey(s.services.APIKey)
-		r.Get("/api-keys", apiKey.List)
-		r.Post("/api-keys", apiKey.Create)
-		r.Get("/api-keys/{id}", apiKey.Get)
-		r.Delete("/api-keys/{id}", apiKey.Revoke)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("backups", "read"))
+			r.Get("/tenants/{tenantID}/backups", backup.ListByTenant)
+			r.Get("/backups/{id}", backup.Get)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("backups", "write"))
+			r.Post("/tenants/{tenantID}/backups", backup.Create)
+			r.Post("/backups/{id}/restore", backup.Restore)
+			r.Post("/backups/{id}/retry", backup.Retry)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("backups", "delete"))
+			r.Delete("/backups/{id}", backup.Delete)
+		})
 	})
 }
 

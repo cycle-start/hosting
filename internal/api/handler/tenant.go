@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	mw "github.com/edvin/hosting/internal/api/middleware"
 	"github.com/edvin/hosting/internal/api/request"
 	"github.com/edvin/hosting/internal/api/response"
 	"github.com/edvin/hosting/internal/core"
@@ -21,6 +22,20 @@ type Tenant struct {
 
 func NewTenant(services *core.Services) *Tenant {
 	return &Tenant{svc: services.Tenant, services: services}
+}
+
+// checkTenantBrandAccess fetches a tenant and verifies brand access for the caller.
+func (h *Tenant) checkTenantBrandAccess(w http.ResponseWriter, r *http.Request, id string) bool {
+	tenant, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return false
+	}
+	if !mw.HasBrandAccess(mw.GetIdentity(r.Context()), tenant.BrandID) {
+		response.WriteError(w, http.StatusForbidden, "no access to this brand")
+		return false
+	}
+	return true
 }
 
 // List godoc
@@ -41,6 +56,7 @@ func NewTenant(services *core.Services) *Tenant {
 //	@Router			/tenants [get]
 func (h *Tenant) List(w http.ResponseWriter, r *http.Request) {
 	params := request.ParseListParams(r, "created_at")
+	params.BrandIDs = mw.BrandIDs(r.Context())
 
 	tenants, hasMore, err := h.svc.List(r.Context(), params)
 	if err != nil {
@@ -70,6 +86,11 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 	var req request.CreateTenant
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !mw.HasBrandAccess(mw.GetIdentity(r.Context()), req.BrandID) {
+		response.WriteError(w, http.StatusForbidden, "no access to this brand")
 		return
 	}
 
@@ -327,6 +348,11 @@ func (h *Tenant) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !mw.HasBrandAccess(mw.GetIdentity(r.Context()), tenant.BrandID) {
+		response.WriteError(w, http.StatusForbidden, "no access to this brand")
+		return
+	}
+
 	response.WriteJSON(w, http.StatusOK, tenant)
 }
 
@@ -359,6 +385,11 @@ func (h *Tenant) Update(w http.ResponseWriter, r *http.Request) {
 	tenant, err := h.svc.GetByID(r.Context(), id)
 	if err != nil {
 		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	if !mw.HasBrandAccess(mw.GetIdentity(r.Context()), tenant.BrandID) {
+		response.WriteError(w, http.StatusForbidden, "no access to this brand")
 		return
 	}
 
@@ -395,6 +426,10 @@ func (h *Tenant) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !h.checkTenantBrandAccess(w, r, id) {
+		return
+	}
+
 	if err := h.svc.Delete(r.Context(), id); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -418,6 +453,10 @@ func (h *Tenant) Suspend(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !h.checkTenantBrandAccess(w, r, id) {
 		return
 	}
 
@@ -447,6 +486,10 @@ func (h *Tenant) Unsuspend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !h.checkTenantBrandAccess(w, r, id) {
+		return
+	}
+
 	if err := h.svc.Unsuspend(r.Context(), id); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -470,6 +513,10 @@ func (h *Tenant) ResourceSummary(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !h.checkTenantBrandAccess(w, r, id) {
 		return
 	}
 
@@ -498,6 +545,10 @@ func (h *Tenant) Migrate(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !h.checkTenantBrandAccess(w, r, id) {
 		return
 	}
 
@@ -532,6 +583,9 @@ func (h *Tenant) Retry(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if !h.checkTenantBrandAccess(w, r, id) {
+		return
+	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -554,6 +608,9 @@ func (h *Tenant) RetryFailed(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if !h.checkTenantBrandAccess(w, r, id) {
 		return
 	}
 	count, err := h.svc.RetryFailed(r.Context(), id)

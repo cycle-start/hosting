@@ -128,7 +128,7 @@ func createAPIKey(args []string) {
 	defer pool.Close()
 
 	svc := core.NewAPIKeyService(pool)
-	key, rawKey, err := svc.Create(ctx, *name, nil)
+	key, rawKey, err := svc.Create(ctx, *name, nil, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: failed to create API key: %v\n", err)
 		os.Exit(1)

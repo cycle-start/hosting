@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/edvin/hosting/internal/core"
 	"github.com/stretchr/testify/assert"
@@ -12,7 +13,7 @@ import (
 )
 
 func newValkeyInstanceHandler() *ValkeyInstance {
-	return &ValkeyInstance{svc: nil, userSvc: nil}
+	return &ValkeyInstance{svc: nil, userSvc: nil, tenantSvc: nil}
 }
 
 // --- Create with nested ---
@@ -102,7 +103,26 @@ func TestValkeyInstanceMigrate_Success(t *testing.T) {
 	db := &handlerMockDB{}
 	tc := &temporalmocks.Client{}
 	svc := core.NewValkeyInstanceService(db, tc)
-	h := &ValkeyInstance{svc: svc, userSvc: nil}
+	h := &ValkeyInstance{svc: svc, userSvc: nil, tenantSvc: nil}
+
+	// GetByID call from brand check (return instance with nil TenantID to skip brand check)
+	now := time.Now()
+	getRow := &handlerMockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = validID
+		*(dest[1].(**string)) = nil // nil TenantID — skips brand check
+		*(dest[2].(*string)) = "my-valkey"
+		*(dest[3].(**string)) = nil
+		*(dest[4].(*int)) = 0
+		*(dest[5].(*int)) = 64
+		*(dest[6].(*string)) = ""
+		*(dest[7].(*string)) = "active"
+		*(dest[8].(**string)) = nil
+		*(dest[9].(*time.Time)) = now
+		*(dest[10].(*time.Time)) = now
+		*(dest[11].(**string)) = nil
+		return nil
+	}}
+	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(getRow).Once()
 
 	updateRow := &handlerMockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "my-valkey"

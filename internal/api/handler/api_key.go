@@ -26,7 +26,7 @@ func NewAPIKey(svc *core.APIKeyService) *APIKey {
 // Create godoc
 //
 //	@Summary		Create an API key
-//	@Description	Generates a new API key with the given name and scopes. The response includes the full key value (prefixed with "hst_") exactly once — it cannot be retrieved again. Store it securely. Synchronous (201).
+//	@Description	Generates a new API key with the given name, scopes, and brand access. The response includes the full key value (prefixed with "hst_") exactly once — it cannot be retrieved again. Store it securely. Synchronous (201).
 //	@Tags			API Keys
 //	@Security		ApiKeyAuth
 //	@Param			body body request.CreateAPIKey true "API key details"
@@ -41,19 +41,19 @@ func (h *APIKey) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, rawKey, err := h.svc.Create(r.Context(), req.Name, req.Scopes)
+	key, rawKey, err := h.svc.Create(r.Context(), req.Name, req.Scopes, req.Brands)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	// Build the response with the raw key included (shown only once).
 	resp := map[string]any{
 		"id":         key.ID,
 		"name":       key.Name,
 		"key":        rawKey,
 		"key_prefix": key.KeyPrefix,
 		"scopes":     key.Scopes,
+		"brands":     key.Brands,
 		"created_at": key.CreatedAt,
 	}
 	response.WriteJSON(w, http.StatusCreated, resp)
@@ -62,7 +62,7 @@ func (h *APIKey) Create(w http.ResponseWriter, r *http.Request) {
 // List godoc
 //
 //	@Summary		List API keys
-//	@Description	Returns a paginated list of API keys. Each entry contains key metadata (name, prefix, scopes, created/revoked timestamps) but never the full key value.
+//	@Description	Returns a paginated list of API keys. Each entry contains key metadata (name, prefix, scopes, brands, created/revoked timestamps) but never the full key value.
 //	@Tags			API Keys
 //	@Security		ApiKeyAuth
 //	@Param			limit query int false "Page size" default(50)
@@ -89,7 +89,7 @@ func (h *APIKey) List(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get an API key
-//	@Description	Returns API key metadata by ID, including name, prefix, scopes, and timestamps. The full key value is never returned.
+//	@Description	Returns API key metadata by ID, including name, prefix, scopes, brands, and timestamps. The full key value is never returned.
 //	@Tags			API Keys
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "API key ID"
@@ -105,6 +105,41 @@ func (h *APIKey) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	key, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, key)
+}
+
+// Update godoc
+//
+//	@Summary		Update an API key
+//	@Description	Updates the name, scopes, and brand access of an API key.
+//	@Tags			API Keys
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "API key ID"
+//	@Param			body body request.UpdateAPIKey true "Updated API key details"
+//	@Success		200 {object} model.APIKey
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		404 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/api-keys/{id} [put]
+func (h *APIKey) Update(w http.ResponseWriter, r *http.Request) {
+	id, err := request.RequireID(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	var req request.UpdateAPIKey
+	if err := request.Decode(r, &req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	key, err := h.svc.Update(r.Context(), id, req.Name, req.Scopes, req.Brands)
 	if err != nil {
 		response.WriteError(w, http.StatusNotFound, err.Error())
 		return

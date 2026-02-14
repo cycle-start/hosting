@@ -14,12 +14,13 @@ import (
 )
 
 type Database struct {
-	svc     *core.DatabaseService
-	userSvc *core.DatabaseUserService
+	svc       *core.DatabaseService
+	userSvc   *core.DatabaseUserService
+	tenantSvc *core.TenantService
 }
 
-func NewDatabase(svc *core.DatabaseService, userSvc *core.DatabaseUserService) *Database {
-	return &Database{svc: svc, userSvc: userSvc}
+func NewDatabase(svc *core.DatabaseService, userSvc *core.DatabaseUserService, tenantSvc *core.TenantService) *Database {
+	return &Database{svc: svc, userSvc: userSvc, tenantSvc: tenantSvc}
 }
 
 // ListByTenant godoc
@@ -43,6 +44,10 @@ func (h *Database) ListByTenant(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := request.RequireID(chi.URLParam(r, "tenantID"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !checkTenantBrand(w, r, h.tenantSvc, tenantID) {
 		return
 	}
 
@@ -83,6 +88,10 @@ func (h *Database) Create(w http.ResponseWriter, r *http.Request) {
 	var req request.CreateDatabase
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !checkTenantBrand(w, r, h.tenantSvc, tenantID) {
 		return
 	}
 
@@ -149,6 +158,12 @@ func (h *Database) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if database.TenantID != nil {
+		if !checkTenantBrand(w, r, h.tenantSvc, *database.TenantID) {
+			return
+		}
+	}
+
 	response.WriteJSON(w, http.StatusOK, database)
 }
 
@@ -168,6 +183,17 @@ func (h *Database) Delete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
 		return
+	}
+
+	database, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if database.TenantID != nil {
+		if !checkTenantBrand(w, r, h.tenantSvc, *database.TenantID) {
+			return
+		}
 	}
 
 	if err := h.svc.Delete(r.Context(), id); err != nil {
@@ -203,6 +229,17 @@ func (h *Database) Migrate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	database, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if database.TenantID != nil {
+		if !checkTenantBrand(w, r, h.tenantSvc, *database.TenantID) {
+			return
+		}
+	}
+
 	if err := h.svc.Migrate(r.Context(), id, req.TargetShardID); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -236,12 +273,23 @@ func (h *Database) ReassignTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	database, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if database.TenantID != nil {
+		if !checkTenantBrand(w, r, h.tenantSvc, *database.TenantID) {
+			return
+		}
+	}
+
 	if err := h.svc.ReassignTenant(r.Context(), id, req.TenantID); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	database, err := h.svc.GetByID(r.Context(), id)
+	database, err = h.svc.GetByID(r.Context(), id)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -266,6 +314,16 @@ func (h *Database) Retry(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
 		return
+	}
+	database, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if database.TenantID != nil {
+		if !checkTenantBrand(w, r, h.tenantSvc, *database.TenantID) {
+			return
+		}
 	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
+import { useNavigate } from '@tanstack/react-router'
 import { Plus, Trash2, KeyRound, Copy, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -12,15 +13,32 @@ import { ResourceHeader } from '@/components/shared/resource-header'
 import { DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
+import { ScopePicker } from '@/components/shared/scope-picker'
+import { BrandPicker } from '@/components/shared/brand-picker'
 import { formatDate } from '@/lib/utils'
 import { useAPIKeys, useCreateAPIKey, useRevokeAPIKey } from '@/lib/hooks'
 import type { APIKey } from '@/lib/types'
 
+function formatScopes(scopes: string[]): string {
+  if (!scopes || scopes.length === 0) return 'none'
+  if (scopes.includes('*:*')) return 'full access'
+  return `${scopes.length} scope${scopes.length !== 1 ? 's' : ''}`
+}
+
+function formatBrands(brands: string[]): string {
+  if (!brands || brands.length === 0) return 'none'
+  if (brands.includes('*')) return 'all brands'
+  return `${brands.length} brand${brands.length !== 1 ? 's' : ''}`
+}
+
 export function APIKeysPage() {
+  const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
   const [revokeTarget, setRevokeTarget] = useState<APIKey | null>(null)
   const [createdKey, setCreatedKey] = useState('')
   const [formName, setFormName] = useState('')
+  const [formScopes, setFormScopes] = useState<string[]>(['*:*'])
+  const [formBrands, setFormBrands] = useState<string[]>(['*'])
   const [copied, setCopied] = useState(false)
 
   const { data, isLoading } = useAPIKeys()
@@ -39,7 +57,12 @@ export function APIKeysPage() {
     {
       accessorKey: 'scopes',
       header: 'Scopes',
-      cell: ({ row }) => (row.original.scopes ?? []).join(', ') || 'all',
+      cell: ({ row }) => <span className="text-sm">{formatScopes(row.original.scopes)}</span>,
+    },
+    {
+      accessorKey: 'brands',
+      header: 'Brands',
+      cell: ({ row }) => <span className="text-sm">{formatBrands(row.original.brands)}</span>,
     },
     {
       accessorKey: 'created_at',
@@ -65,9 +88,11 @@ export function APIKeysPage() {
 
   const handleCreate = async () => {
     try {
-      const result = await createMutation.mutateAsync({ name: formName, scopes: [] })
+      const result = await createMutation.mutateAsync({ name: formName, scopes: formScopes, brands: formBrands })
       setCreatedKey(result.key)
       setFormName('')
+      setFormScopes(['*:*'])
+      setFormBrands(['*'])
       toast.success('API key created')
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Failed to create API key')
@@ -95,6 +120,8 @@ export function APIKeysPage() {
     setCreateOpen(false)
     setCreatedKey('')
     setFormName('')
+    setFormScopes(['*:*'])
+    setFormBrands(['*'])
   }
 
   return (
@@ -117,11 +144,18 @@ export function APIKeysPage() {
           action={{ label: 'Create API Key', onClick: () => setCreateOpen(true) }}
         />
       ) : (
-        <DataTable columns={columns} data={keys} loading={isLoading} searchColumn="name" searchPlaceholder="Search keys..." />
+        <DataTable
+          columns={columns}
+          data={keys}
+          loading={isLoading}
+          searchColumn="name"
+          searchPlaceholder="Search keys..."
+          onRowClick={(row) => navigate({ to: '/api-keys/$id', params: { id: row.id } })}
+        />
       )}
 
       <Dialog open={createOpen} onOpenChange={handleCloseCreate}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{createdKey ? 'API Key Created' : 'Create API Key'}</DialogTitle>
             {createdKey && (
@@ -145,15 +179,25 @@ export function APIKeysPage() {
             </div>
           ) : (
             <>
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div className="space-y-2">
                   <Label>Name</Label>
                   <Input placeholder="e.g. admin-key" value={formName} onChange={(e) => setFormName(e.target.value)} />
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Scopes</Label>
+                  <ScopePicker value={formScopes} onChange={setFormScopes} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Brand Access</Label>
+                  <BrandPicker value={formBrands} onChange={setFormBrands} />
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={handleCloseCreate}>Cancel</Button>
-                <Button onClick={handleCreate} disabled={createMutation.isPending || !formName}>
+                <Button onClick={handleCreate} disabled={createMutation.isPending || !formName || formScopes.length === 0 || formBrands.length === 0}>
                   {createMutation.isPending ? 'Creating...' : 'Create'}
                 </Button>
               </DialogFooter>

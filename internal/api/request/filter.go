@@ -4,12 +4,13 @@ import "net/http"
 
 // ListParams holds pagination, search, filter, and sort parameters.
 type ListParams struct {
-	Limit  int
-	Cursor string
-	Search string
-	Status string
-	Sort   string
-	Order  string // "asc" or "desc"
+	Limit    int
+	Cursor   string
+	Search   string
+	Status   string
+	Sort     string
+	Order    string // "asc" or "desc"
+	BrandIDs []string // populated from auth context, not query params
 }
 
 // ParseListParams extracts list parameters from the query string.

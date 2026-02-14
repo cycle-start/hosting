@@ -14,12 +14,13 @@ import (
 )
 
 type S3Bucket struct {
-	svc    *core.S3BucketService
-	keySvc *core.S3AccessKeyService
+	svc       *core.S3BucketService
+	keySvc    *core.S3AccessKeyService
+	tenantSvc *core.TenantService
 }
 
-func NewS3Bucket(svc *core.S3BucketService, keySvc *core.S3AccessKeyService) *S3Bucket {
-	return &S3Bucket{svc: svc, keySvc: keySvc}
+func NewS3Bucket(svc *core.S3BucketService, keySvc *core.S3AccessKeyService, tenantSvc *core.TenantService) *S3Bucket {
+	return &S3Bucket{svc: svc, keySvc: keySvc, tenantSvc: tenantSvc}
 }
 
 // ListByTenant godoc
@@ -43,6 +44,10 @@ func (h *S3Bucket) ListByTenant(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := request.RequireID(chi.URLParam(r, "tenantID"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !checkTenantBrand(w, r, h.tenantSvc, tenantID) {
 		return
 	}
 
@@ -83,6 +88,10 @@ func (h *S3Bucket) Create(w http.ResponseWriter, r *http.Request) {
 	var req request.CreateS3Bucket
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !checkTenantBrand(w, r, h.tenantSvc, tenantID) {
 		return
 	}
 
@@ -136,6 +145,12 @@ func (h *S3Bucket) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if bucket.TenantID != nil {
+		if !checkTenantBrand(w, r, h.tenantSvc, *bucket.TenantID) {
+			return
+		}
+	}
+
 	response.WriteJSON(w, http.StatusOK, bucket)
 }
 
@@ -164,12 +179,23 @@ func (h *S3Bucket) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	bucket, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if bucket.TenantID != nil {
+		if !checkTenantBrand(w, r, h.tenantSvc, *bucket.TenantID) {
+			return
+		}
+	}
+
 	if err := h.svc.Update(r.Context(), id, req.Public, req.QuotaBytes); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	bucket, err := h.svc.GetByID(r.Context(), id)
+	bucket, err = h.svc.GetByID(r.Context(), id)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -196,6 +222,17 @@ func (h *S3Bucket) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	bucket, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if bucket.TenantID != nil {
+		if !checkTenantBrand(w, r, h.tenantSvc, *bucket.TenantID) {
+			return
+		}
+	}
+
 	if err := h.svc.Delete(r.Context(), id); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -220,6 +257,16 @@ func (h *S3Bucket) Retry(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
 		return
+	}
+	bucket, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if bucket.TenantID != nil {
+		if !checkTenantBrand(w, r, h.tenantSvc, *bucket.TenantID) {
+			return
+		}
 	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())

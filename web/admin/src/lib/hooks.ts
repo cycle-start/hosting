@@ -811,12 +811,32 @@ export function useAPIKeys(params?: ListParams) {
   })
 }
 
+export function useAPIKey(id: string) {
+  return useQuery({
+    queryKey: ['api-key', id],
+    queryFn: () => api.get<APIKey>(`/api-keys/${id}`),
+    enabled: !!id,
+  })
+}
+
 export function useCreateAPIKey() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { name: string; scopes: string[] }) =>
+    mutationFn: (data: { name: string; scopes: string[]; brands: string[] }) =>
       api.post<APIKeyCreateResponse>('/api-keys', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['api-keys'] }),
+  })
+}
+
+export function useUpdateAPIKey() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string; name: string; scopes: string[]; brands: string[] }) =>
+      api.put<APIKey>(`/api-keys/${id}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['api-keys'] })
+      qc.invalidateQueries({ queryKey: ['api-key'] })
+    },
   })
 }
 

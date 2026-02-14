@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/edvin/hosting/internal/core"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +15,7 @@ import (
 )
 
 func newDatabaseHandler() *Database {
-	return &Database{svc: nil, userSvc: nil}
+	return &Database{svc: nil, userSvc: nil, tenantSvc: nil}
 }
 
 // --- ListByTenant ---
@@ -321,7 +322,24 @@ func TestDatabaseMigrate_Success(t *testing.T) {
 	db := &handlerMockDB{}
 	tc := &temporalmocks.Client{}
 	svc := core.NewDatabaseService(db, tc)
-	h := &Database{svc: svc, userSvc: nil}
+	h := &Database{svc: svc, userSvc: nil, tenantSvc: nil}
+
+	// GetByID call from brand check (return database with nil TenantID to skip brand check)
+	now := time.Now()
+	getRow := &handlerMockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = validID
+		*(dest[1].(**string)) = nil // nil TenantID — skips brand check
+		*(dest[2].(*string)) = "mydb"
+		*(dest[3].(**string)) = nil
+		*(dest[4].(**string)) = nil
+		*(dest[5].(*string)) = "active"
+		*(dest[6].(**string)) = nil
+		*(dest[7].(*time.Time)) = now
+		*(dest[8].(*time.Time)) = now
+		*(dest[9].(**string)) = nil
+		return nil
+	}}
+	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(getRow).Once()
 
 	updateRow := &handlerMockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "mydb"

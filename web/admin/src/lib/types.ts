@@ -309,6 +309,7 @@ export interface APIKey {
   name: string
   key_prefix?: string
   scopes: string[]
+  brands: string[]
   created_at: string
   revoked_at?: string | null
 }

@@ -9,7 +9,7 @@ import (
 )
 
 func newS3BucketHandler() *S3Bucket {
-	return &S3Bucket{svc: nil, keySvc: nil}
+	return &S3Bucket{svc: nil, keySvc: nil, tenantSvc: nil}
 }
 
 // --- ListByTenant ---

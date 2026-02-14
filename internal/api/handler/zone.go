@@ -4,8 +4,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/edvin/hosting/internal/api/response"
+	mw "github.com/edvin/hosting/internal/api/middleware"
 	"github.com/edvin/hosting/internal/api/request"
+	"github.com/edvin/hosting/internal/api/response"
 	"github.com/edvin/hosting/internal/core"
 	"github.com/edvin/hosting/internal/model"
 	"github.com/edvin/hosting/internal/platform"
@@ -19,6 +20,19 @@ type Zone struct {
 
 func NewZone(services *core.Services) *Zone {
 	return &Zone{svc: services.Zone, services: services}
+}
+
+func (h *Zone) checkZoneBrandAccess(w http.ResponseWriter, r *http.Request, id string) bool {
+	zone, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return false
+	}
+	if !mw.HasBrandAccess(mw.GetIdentity(r.Context()), zone.BrandID) {
+		response.WriteError(w, http.StatusForbidden, "no access to this brand")
+		return false
+	}
+	return true
 }
 
 // List godoc
@@ -39,6 +53,7 @@ func NewZone(services *core.Services) *Zone {
 //	@Router			/zones [get]
 func (h *Zone) List(w http.ResponseWriter, r *http.Request) {
 	params := request.ParseListParams(r, "created_at")
+	params.BrandIDs = mw.BrandIDs(r.Context())
 
 	zones, hasMore, err := h.svc.List(r.Context(), params)
 	if err != nil {
@@ -86,6 +101,11 @@ func (h *Zone) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !mw.HasBrandAccess(mw.GetIdentity(r.Context()), brandID) {
+		response.WriteError(w, http.StatusForbidden, "no access to this brand")
+		return
+	}
+
 	now := time.Now()
 	zone := &model.Zone{
 		ID:        platform.NewID(),
@@ -130,6 +150,11 @@ func (h *Zone) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !mw.HasBrandAccess(mw.GetIdentity(r.Context()), zone.BrandID) {
+		response.WriteError(w, http.StatusForbidden, "no access to this brand")
+		return
+	}
+
 	response.WriteJSON(w, http.StatusOK, zone)
 }
 
@@ -165,6 +190,11 @@ func (h *Zone) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !mw.HasBrandAccess(mw.GetIdentity(r.Context()), zone.BrandID) {
+		response.WriteError(w, http.StatusForbidden, "no access to this brand")
+		return
+	}
+
 	zone.TenantID = req.TenantID
 
 	if err := h.svc.Update(r.Context(), zone); err != nil {
@@ -193,6 +223,10 @@ func (h *Zone) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !h.checkZoneBrandAccess(w, r, id) {
+		return
+	}
+
 	if err := h.svc.Delete(r.Context(), id); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -217,6 +251,10 @@ func (h *Zone) ReassignTenant(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !h.checkZoneBrandAccess(w, r, id) {
 		return
 	}
 
@@ -255,6 +293,9 @@ func (h *Zone) Retry(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if !h.checkZoneBrandAccess(w, r, id) {
 		return
 	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {

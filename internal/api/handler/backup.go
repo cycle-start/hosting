@@ -13,13 +13,14 @@ import (
 )
 
 type Backup struct {
-	svc     *core.BackupService
-	webroot *core.WebrootService
-	db      *core.DatabaseService
+	svc       *core.BackupService
+	webroot   *core.WebrootService
+	db        *core.DatabaseService
+	tenantSvc *core.TenantService
 }
 
-func NewBackup(svc *core.BackupService, webroot *core.WebrootService, db *core.DatabaseService) *Backup {
-	return &Backup{svc: svc, webroot: webroot, db: db}
+func NewBackup(svc *core.BackupService, webroot *core.WebrootService, db *core.DatabaseService, tenantSvc *core.TenantService) *Backup {
+	return &Backup{svc: svc, webroot: webroot, db: db, tenantSvc: tenantSvc}
 }
 
 // ListByTenant godoc
@@ -39,6 +40,10 @@ func (h *Backup) ListByTenant(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := request.RequireID(chi.URLParam(r, "tenantID"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !checkTenantBrand(w, r, h.tenantSvc, tenantID) {
 		return
 	}
 
@@ -80,6 +85,10 @@ func (h *Backup) Create(w http.ResponseWriter, r *http.Request) {
 	var req request.CreateBackup
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !checkTenantBrand(w, r, h.tenantSvc, tenantID) {
 		return
 	}
 
@@ -146,6 +155,10 @@ func (h *Backup) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !checkTenantBrand(w, r, h.tenantSvc, backup.TenantID) {
+		return
+	}
+
 	response.WriteJSON(w, http.StatusOK, backup)
 }
 
@@ -164,6 +177,15 @@ func (h *Backup) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	backup, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if !checkTenantBrand(w, r, h.tenantSvc, backup.TenantID) {
 		return
 	}
 
@@ -193,6 +215,15 @@ func (h *Backup) Restore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	backup, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if !checkTenantBrand(w, r, h.tenantSvc, backup.TenantID) {
+		return
+	}
+
 	if err := h.svc.Restore(r.Context(), id); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -216,6 +247,14 @@ func (h *Backup) Retry(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	backup, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if !checkTenantBrand(w, r, h.tenantSvc, backup.TenantID) {
 		return
 	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {

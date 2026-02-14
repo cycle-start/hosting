@@ -4,7 +4,8 @@ CREATE TABLE api_keys (
     name TEXT NOT NULL,
     key_hash TEXT NOT NULL UNIQUE,
     key_prefix TEXT NOT NULL DEFAULT '',
-    scopes TEXT[] NOT NULL DEFAULT '{}',
+    scopes TEXT[] NOT NULL DEFAULT '{"*:*"}',
+    brands TEXT[] NOT NULL DEFAULT '{"*"}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     revoked_at TIMESTAMPTZ
 );

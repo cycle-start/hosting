@@ -14,12 +14,13 @@ import (
 )
 
 type ValkeyInstance struct {
-	svc     *core.ValkeyInstanceService
-	userSvc *core.ValkeyUserService
+	svc       *core.ValkeyInstanceService
+	userSvc   *core.ValkeyUserService
+	tenantSvc *core.TenantService
 }
 
-func NewValkeyInstance(svc *core.ValkeyInstanceService, userSvc *core.ValkeyUserService) *ValkeyInstance {
-	return &ValkeyInstance{svc: svc, userSvc: userSvc}
+func NewValkeyInstance(svc *core.ValkeyInstanceService, userSvc *core.ValkeyUserService, tenantSvc *core.TenantService) *ValkeyInstance {
+	return &ValkeyInstance{svc: svc, userSvc: userSvc, tenantSvc: tenantSvc}
 }
 
 // ListByTenant godoc
@@ -39,6 +40,10 @@ func (h *ValkeyInstance) ListByTenant(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := request.RequireID(chi.URLParam(r, "tenantID"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !checkTenantBrand(w, r, h.tenantSvc, tenantID) {
 		return
 	}
 
@@ -82,6 +87,10 @@ func (h *ValkeyInstance) Create(w http.ResponseWriter, r *http.Request) {
 	var req request.CreateValkeyInstance
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !checkTenantBrand(w, r, h.tenantSvc, tenantID) {
 		return
 	}
 
@@ -161,6 +170,12 @@ func (h *ValkeyInstance) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if instance.TenantID != nil {
+		if !checkTenantBrand(w, r, h.tenantSvc, *instance.TenantID) {
+			return
+		}
+	}
+
 	instance.Password = ""
 	response.WriteJSON(w, http.StatusOK, instance)
 }
@@ -181,6 +196,17 @@ func (h *ValkeyInstance) Delete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
 		return
+	}
+
+	instance, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if instance.TenantID != nil {
+		if !checkTenantBrand(w, r, h.tenantSvc, *instance.TenantID) {
+			return
+		}
 	}
 
 	if err := h.svc.Delete(r.Context(), id); err != nil {
@@ -216,6 +242,17 @@ func (h *ValkeyInstance) Migrate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	instance, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if instance.TenantID != nil {
+		if !checkTenantBrand(w, r, h.tenantSvc, *instance.TenantID) {
+			return
+		}
+	}
+
 	if err := h.svc.Migrate(r.Context(), id, req.TargetShardID); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -249,12 +286,23 @@ func (h *ValkeyInstance) ReassignTenant(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	instance, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if instance.TenantID != nil {
+		if !checkTenantBrand(w, r, h.tenantSvc, *instance.TenantID) {
+			return
+		}
+	}
+
 	if err := h.svc.ReassignTenant(r.Context(), id, req.TenantID); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	instance, err := h.svc.GetByID(r.Context(), id)
+	instance, err = h.svc.GetByID(r.Context(), id)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -280,6 +328,16 @@ func (h *ValkeyInstance) Retry(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
 		return
+	}
+	instance, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if instance.TenantID != nil {
+		if !checkTenantBrand(w, r, h.tenantSvc, *instance.TenantID) {
+			return
+		}
 	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())

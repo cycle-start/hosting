@@ -87,6 +87,11 @@ func (s *TenantService) List(ctx context.Context, params request.ListParams) ([]
 		args = append(args, params.Cursor)
 		argIdx++
 	}
+	if len(params.BrandIDs) > 0 {
+		query += fmt.Sprintf(` AND t.brand_id = ANY($%d)`, argIdx)
+		args = append(args, params.BrandIDs)
+		argIdx++
+	}
 
 	sortCol := "t.created_at"
 	switch params.Sort {

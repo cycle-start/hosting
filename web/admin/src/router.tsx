@@ -24,6 +24,7 @@ import { S3BucketsPage } from './pages/s3-buckets'
 import { S3BucketDetailPage } from './pages/s3-bucket-detail'
 import { PlatformConfigPage } from './pages/platform-config'
 import { APIKeysPage } from './pages/api-keys'
+import { APIKeyDetailPage } from './pages/api-key-detail'
 import { AuditLogPage } from './pages/audit-log'
 
 const rootRoute = createRootRoute({
@@ -179,6 +180,12 @@ const apiKeysRoute = createRoute({
   component: APIKeysPage,
 })
 
+const apiKeyDetailRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/api-keys/$id',
+  component: APIKeyDetailPage,
+})
+
 const auditLogRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/audit-log',
@@ -210,6 +217,7 @@ const routeTree = rootRoute.addChildren([
     s3BucketsRoute,
     platformConfigRoute,
     apiKeysRoute,
+    apiKeyDetailRoute,
     auditLogRoute,
   ]),
 ])

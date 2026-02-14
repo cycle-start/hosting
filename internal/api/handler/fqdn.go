@@ -41,6 +41,15 @@ func (h *FQDN) ListByWebroot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	webroot, err := h.services.Webroot.GetByID(r.Context(), webrootID)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if !checkTenantBrand(w, r, h.services.Tenant, webroot.TenantID) {
+		return
+	}
+
 	pg := request.ParsePagination(r)
 
 	fqdns, hasMore, err := h.svc.ListByWebroot(r.Context(), webrootID, pg.Limit, pg.Cursor)
@@ -78,6 +87,15 @@ func (h *FQDN) Create(w http.ResponseWriter, r *http.Request) {
 	var req request.CreateFQDN
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	webroot, err := h.services.Webroot.GetByID(r.Context(), webrootID)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if !checkTenantBrand(w, r, h.services.Tenant, webroot.TenantID) {
 		return
 	}
 

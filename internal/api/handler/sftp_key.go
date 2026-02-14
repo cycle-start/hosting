@@ -14,12 +14,13 @@ import (
 
 // SFTPKey handles SFTP key management endpoints.
 type SFTPKey struct {
-	svc *core.SFTPKeyService
+	svc       *core.SFTPKeyService
+	tenantSvc *core.TenantService
 }
 
 // NewSFTPKey creates a new SFTPKey handler.
-func NewSFTPKey(svc *core.SFTPKeyService) *SFTPKey {
-	return &SFTPKey{svc: svc}
+func NewSFTPKey(svc *core.SFTPKeyService, tenantSvc *core.TenantService) *SFTPKey {
+	return &SFTPKey{svc: svc, tenantSvc: tenantSvc}
 }
 
 // ListByTenant godoc
@@ -39,6 +40,10 @@ func (h *SFTPKey) ListByTenant(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := request.RequireID(chi.URLParam(r, "tenantID"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !checkTenantBrand(w, r, h.tenantSvc, tenantID) {
 		return
 	}
 
@@ -89,6 +94,10 @@ func (h *SFTPKey) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !checkTenantBrand(w, r, h.tenantSvc, tenantID) {
+		return
+	}
+
 	now := time.Now()
 	key := &model.SFTPKey{
 		ID:          platform.NewID(),
@@ -133,6 +142,10 @@ func (h *SFTPKey) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !checkTenantBrand(w, r, h.tenantSvc, key.TenantID) {
+		return
+	}
+
 	response.WriteJSON(w, http.StatusOK, key)
 }
 
@@ -151,6 +164,15 @@ func (h *SFTPKey) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	key, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if !checkTenantBrand(w, r, h.tenantSvc, key.TenantID) {
 		return
 	}
 
@@ -177,6 +199,14 @@ func (h *SFTPKey) Retry(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	key, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if !checkTenantBrand(w, r, h.tenantSvc, key.TenantID) {
 		return
 	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {

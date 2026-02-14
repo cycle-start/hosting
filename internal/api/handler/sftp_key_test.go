@@ -11,7 +11,7 @@ import (
 )
 
 func newSFTPKeyHandler() *SFTPKey {
-	return NewSFTPKey(nil)
+	return NewSFTPKey(nil, nil)
 }
 
 // --- ListByTenant ---

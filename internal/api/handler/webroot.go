@@ -42,6 +42,10 @@ func (h *Webroot) ListByTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !checkTenantBrand(w, r, h.services.Tenant, tenantID) {
+		return
+	}
+
 	pg := request.ParsePagination(r)
 
 	webroots, hasMore, err := h.svc.ListByTenant(r.Context(), tenantID, pg.Limit, pg.Cursor)
@@ -73,6 +77,10 @@ func (h *Webroot) Create(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := request.RequireID(chi.URLParam(r, "tenantID"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !checkTenantBrand(w, r, h.services.Tenant, tenantID) {
 		return
 	}
 
@@ -138,6 +146,10 @@ func (h *Webroot) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !checkTenantBrand(w, r, h.services.Tenant, webroot.TenantID) {
+		return
+	}
+
 	response.WriteJSON(w, http.StatusOK, webroot)
 }
 
@@ -170,6 +182,10 @@ func (h *Webroot) Update(w http.ResponseWriter, r *http.Request) {
 	webroot, err := h.svc.GetByID(r.Context(), id)
 	if err != nil {
 		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	if !checkTenantBrand(w, r, h.services.Tenant, webroot.TenantID) {
 		return
 	}
 
@@ -212,6 +228,15 @@ func (h *Webroot) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	webroot, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if !checkTenantBrand(w, r, h.services.Tenant, webroot.TenantID) {
+		return
+	}
+
 	if err := h.svc.Delete(r.Context(), id); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -235,6 +260,14 @@ func (h *Webroot) Retry(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	webroot, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if !checkTenantBrand(w, r, h.services.Tenant, webroot.TenantID) {
 		return
 	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {

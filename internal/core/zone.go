@@ -94,6 +94,11 @@ func (s *ZoneService) List(ctx context.Context, params request.ListParams) ([]mo
 		args = append(args, params.Cursor)
 		argIdx++
 	}
+	if len(params.BrandIDs) > 0 {
+		query += fmt.Sprintf(` AND z.brand_id = ANY($%d)`, argIdx)
+		args = append(args, params.BrandIDs)
+		argIdx++
+	}
 
 	sortCol := "z.created_at"
 	switch params.Sort {
