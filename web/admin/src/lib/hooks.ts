@@ -5,7 +5,7 @@ import type {
   Zone, ZoneRecord, Database, DatabaseUser,
   ValkeyInstance, ValkeyUser, EmailAccount, EmailAlias, EmailForward, EmailAutoReply,
   S3Bucket, S3AccessKey,
-  SFTPKey, Backup, Brand,
+  SSHKey, Backup, Brand,
   APIKey, APIKeyCreateResponse, AuditLogEntry, DashboardStats,
   PlatformConfig, ListParams, AuditListParams, TenantResourceSummary,
   CreateTenantRequest,
@@ -744,29 +744,29 @@ export function useDeleteS3AccessKey() {
   })
 }
 
-// SFTP Keys
-export function useSFTPKeys(tenantId: string) {
+// SSH Keys
+export function useSSHKeys(tenantId: string) {
   return useQuery({
-    queryKey: ['sftp-keys', tenantId],
-    queryFn: () => api.get<PaginatedResponse<SFTPKey>>(listPath(`/tenants/${tenantId}/sftp-keys`)),
+    queryKey: ['ssh-keys', tenantId],
+    queryFn: () => api.get<PaginatedResponse<SSHKey>>(listPath(`/tenants/${tenantId}/ssh-keys`)),
     enabled: !!tenantId,
   })
 }
 
-export function useCreateSFTPKey() {
+export function useCreateSSHKey() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: { tenant_id: string; name: string; public_key: string }) =>
-      api.post<SFTPKey>(`/tenants/${data.tenant_id}/sftp-keys`, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sftp-keys'] }),
+      api.post<SSHKey>(`/tenants/${data.tenant_id}/ssh-keys`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ssh-keys'] }),
   })
 }
 
-export function useDeleteSFTPKey() {
+export function useDeleteSSHKey() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => api.delete(`/sftp-keys/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sftp-keys'] }),
+    mutationFn: (id: string) => api.delete(`/ssh-keys/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ssh-keys'] }),
   })
 }
 
@@ -897,7 +897,7 @@ export function useRetryTenantFailed() {
       qc.invalidateQueries({ queryKey: ['zones'] })
       qc.invalidateQueries({ queryKey: ['valkey-instances'] })
       qc.invalidateQueries({ queryKey: ['s3-buckets'] })
-      qc.invalidateQueries({ queryKey: ['sftp-keys'] })
+      qc.invalidateQueries({ queryKey: ['ssh-keys'] })
       qc.invalidateQueries({ queryKey: ['backups'] })
     },
   })
@@ -935,11 +935,11 @@ export function useRetryS3Bucket() {
   })
 }
 
-export function useRetrySFTPKey() {
+export function useRetrySSHKey() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => api.post(`/sftp-keys/${id}/retry`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sftp-keys'] }),
+    mutationFn: (id: string) => api.post(`/ssh-keys/${id}/retry`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ssh-keys'] }),
   })
 }
 

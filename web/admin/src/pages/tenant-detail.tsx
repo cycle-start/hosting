@@ -21,23 +21,23 @@ import { cn, formatDate } from '@/lib/utils'
 import {
   useTenant, useTenantResourceSummary, useWebroots, useDatabases, useValkeyInstances,
   useS3Buckets,
-  useSFTPKeys, useBackups, useZones, useSuspendTenant, useUnsuspendTenant,
+  useSSHKeys, useBackups, useZones, useSuspendTenant, useUnsuspendTenant,
   useDeleteTenant, useCreateWebroot, useDeleteWebroot,
   useCreateDatabase, useDeleteDatabase,
   useCreateValkeyInstance, useDeleteValkeyInstance,
   useCreateS3Bucket, useDeleteS3Bucket,
-  useCreateSFTPKey, useDeleteSFTPKey,
+  useCreateSSHKey, useDeleteSSHKey,
   useCreateBackup, useDeleteBackup, useRestoreBackup,
   useCreateZone, useDeleteZone,
   useRetryTenantFailed, useRetryWebroot, useRetryDatabase,
-  useRetryValkeyInstance, useRetryS3Bucket, useRetrySFTPKey, useRetryZone, useRetryBackup,
+  useRetryValkeyInstance, useRetryS3Bucket, useRetrySSHKey, useRetryZone, useRetryBackup,
 } from '@/lib/hooks'
-import type { Webroot, Database, ValkeyInstance, S3Bucket, SFTPKey, Backup, Zone, WebrootFormData, DatabaseFormData, ValkeyInstanceFormData, S3BucketFormData, SFTPKeyFormData, ZoneFormData } from '@/lib/types'
+import type { Webroot, Database, ValkeyInstance, S3Bucket, SSHKey, Backup, Zone, WebrootFormData, DatabaseFormData, ValkeyInstanceFormData, S3BucketFormData, SSHKeyFormData, ZoneFormData } from '@/lib/types'
 import { WebrootFields } from '@/components/forms/webroot-fields'
 import { DatabaseFields } from '@/components/forms/database-fields'
 import { ValkeyInstanceFields } from '@/components/forms/valkey-instance-fields'
 import { S3BucketFields } from '@/components/forms/s3-bucket-fields'
-import { SFTPKeyFields } from '@/components/forms/sftp-key-fields'
+import { SSHKeyFields } from '@/components/forms/ssh-key-fields'
 import { ZoneFields } from '@/components/forms/zone-fields'
 import { LogViewer } from '@/components/shared/log-viewer'
 
@@ -69,7 +69,7 @@ export function TenantDetailPage() {
   const [deleteDb, setDeleteDb] = useState<Database | null>(null)
   const [deleteValkey, setDeleteValkey] = useState<ValkeyInstance | null>(null)
   const [deleteS3, setDeleteS3] = useState<S3Bucket | null>(null)
-  const [deleteSftp, setDeleteSftp] = useState<SFTPKey | null>(null)
+  const [deleteSftp, setDeleteSftp] = useState<SSHKey | null>(null)
   const [deleteBackupTarget, setDeleteBackupTarget] = useState<Backup | null>(null)
   const [restoreBackupTarget, setRestoreBackupTarget] = useState<Backup | null>(null)
   const [deleteZoneTarget, setDeleteZoneTarget] = useState<Zone | null>(null)
@@ -79,14 +79,14 @@ export function TenantDetailPage() {
   const defaultDatabase: DatabaseFormData = { name: '', shard_id: '' }
   const defaultValkey: ValkeyInstanceFormData = { name: '', shard_id: '', max_memory_mb: 64 }
   const defaultS3: S3BucketFormData = { name: '', shard_id: '' }
-  const defaultSftp: SFTPKeyFormData = { name: '', public_key: '' }
+  const defaultSftp: SSHKeyFormData = { name: '', public_key: '' }
   const defaultZone: ZoneFormData = { name: '' }
 
   const [wrForm, setWrForm] = useState<WebrootFormData>(defaultWebroot)
   const [dbForm, setDbForm] = useState<DatabaseFormData>(defaultDatabase)
   const [vkForm, setVkForm] = useState<ValkeyInstanceFormData>(defaultValkey)
   const [s3Form, setS3Form] = useState<S3BucketFormData>(defaultS3)
-  const [sftpForm, setSftpForm] = useState<SFTPKeyFormData>(defaultSftp)
+  const [sftpForm, setSftpForm] = useState<SSHKeyFormData>(defaultSftp)
   const [znForm, setZnForm] = useState<ZoneFormData>(defaultZone)
   const [bkType, setBkType] = useState('web')
   const [bkSource, setBkSource] = useState('')
@@ -102,7 +102,7 @@ export function TenantDetailPage() {
         case 'database': setCreateDbOpen(true); break
         case 'valkey': setCreateValkeyOpen(true); break
         case 's3_bucket': setCreateS3Open(true); break
-        case 'sftp_key': setCreateSftpOpen(true); break
+        case 'ssh_key': setCreateSftpOpen(true); break
         case 'zone': setCreateZoneOpen(true); break
       }
       // Clean up the URL
@@ -116,7 +116,7 @@ export function TenantDetailPage() {
   const { data: databasesData, isLoading: databasesLoading } = useDatabases(id)
   const { data: valkeyData, isLoading: valkeyLoading } = useValkeyInstances(id)
   const { data: s3Data, isLoading: s3Loading } = useS3Buckets(id)
-  const { data: sftpData, isLoading: sftpLoading } = useSFTPKeys(id)
+  const { data: sftpData, isLoading: sftpLoading } = useSSHKeys(id)
   const { data: backupsData, isLoading: backupsLoading } = useBackups(id)
   const { data: zonesData, isLoading: zonesLoading } = useZones()
 
@@ -131,8 +131,8 @@ export function TenantDetailPage() {
   const deleteValkeyMut = useDeleteValkeyInstance()
   const createS3Mut = useCreateS3Bucket()
   const deleteS3Mut = useDeleteS3Bucket()
-  const createSftpMut = useCreateSFTPKey()
-  const deleteSftpMut = useDeleteSFTPKey()
+  const createSftpMut = useCreateSSHKey()
+  const deleteSftpMut = useDeleteSSHKey()
   const createBackupMut = useCreateBackup()
   const deleteBackupMut = useDeleteBackup()
   const restoreBackupMut = useRestoreBackup()
@@ -143,7 +143,7 @@ export function TenantDetailPage() {
   const retryDbMut = useRetryDatabase()
   const retryValkeyMut = useRetryValkeyInstance()
   const retryS3Mut = useRetryS3Bucket()
-  const retrySftpMut = useRetrySFTPKey()
+  const retrySftpMut = useRetrySSHKey()
   const retryZoneMut = useRetryZone()
   const retryBackupMut = useRetryBackup()
 
@@ -239,7 +239,7 @@ export function TenantDetailPage() {
     if (!sftpForm.name || !sftpForm.public_key) return
     try {
       await createSftpMut.mutateAsync({ tenant_id: id, name: sftpForm.name, public_key: sftpForm.public_key })
-      toast.success('SFTP key created'); setCreateSftpOpen(false); resetForm()
+      toast.success('SSH key created'); setCreateSftpOpen(false); resetForm()
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }
 
@@ -503,7 +503,7 @@ export function TenantDetailPage() {
     },
   ]
 
-  const sftpColumns: ColumnDef<SFTPKey>[] = [
+  const sftpColumns: ColumnDef<SSHKey>[] = [
     { accessorKey: 'name', header: 'Name', cell: ({ row }) => <span className="font-medium">{row.original.name}</span> },
     { accessorKey: 'fingerprint', header: 'Fingerprint', cell: ({ row }) => <code className="text-xs">{row.original.fingerprint}</code> },
     {
@@ -535,7 +535,7 @@ export function TenantDetailPage() {
       cell: ({ row }) => (
         <div className="flex gap-1">
           {row.original.status === 'failed' && (
-            <Button variant="ghost" size="icon" title="Retry" onClick={(e) => { e.stopPropagation(); retrySftpMut.mutate(row.original.id, { onSuccess: () => toast.success('Retrying SFTP key'), onError: (e) => toast.error(e.message) }) }}>
+            <Button variant="ghost" size="icon" title="Retry" onClick={(e) => { e.stopPropagation(); retrySftpMut.mutate(row.original.id, { onSuccess: () => toast.success('Retrying SSH key'), onError: (e) => toast.error(e.message) }) }}>
               <RotateCcw className="h-4 w-4" />
             </Button>
           )}
@@ -680,7 +680,7 @@ export function TenantDetailPage() {
           <TabsTrigger value="zones">Zones ({tenantZones.length})</TabsTrigger>
           <TabsTrigger value="valkey">Valkey ({valkeyData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="s3">S3 Buckets ({s3Data?.items?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="sftp">SFTP Keys ({sftpData?.items?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="sftp">SSH Keys ({sftpData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="backups">Backups ({backupsData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="logs"><ScrollText className="mr-1.5 h-4 w-4" /> Logs</TabsTrigger>
         </TabsList>
@@ -758,13 +758,13 @@ export function TenantDetailPage() {
         <TabsContent value="sftp">
           <div className="mb-4 flex justify-end">
             <Button size="sm" onClick={() => { resetForm(); setCreateSftpOpen(true) }}>
-              <Plus className="mr-2 h-4 w-4" /> Add SFTP Key
+              <Plus className="mr-2 h-4 w-4" /> Add SSH Key
             </Button>
           </div>
           {!sftpLoading && (sftpData?.items?.length ?? 0) === 0 ? (
-            <EmptyState icon={Key} title="No SFTP keys" description="Add an SSH public key for SFTP access." action={{ label: 'Add Key', onClick: () => { resetForm(); setCreateSftpOpen(true) } }} />
+            <EmptyState icon={Key} title="No SSH keys" description="Add an SSH public key for access." action={{ label: 'Add Key', onClick: () => { resetForm(); setCreateSftpOpen(true) } }} />
           ) : (
-            <DataTable columns={sftpColumns} data={sftpData?.items ?? []} loading={sftpLoading} emptyMessage="No SFTP keys" />
+            <DataTable columns={sftpColumns} data={sftpData?.items ?? []} loading={sftpLoading} emptyMessage="No SSH keys" />
           )}
         </TabsContent>
 
@@ -815,11 +815,11 @@ export function TenantDetailPage() {
         confirmLabel="Delete" variant="destructive" loading={deleteS3Mut.isPending}
         onConfirm={async () => { try { await deleteS3Mut.mutateAsync(deleteS3!.id); toast.success('S3 bucket deleted'); setDeleteS3(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
 
-      {/* Delete SFTP Key */}
-      <ConfirmDialog open={!!deleteSftp} onOpenChange={(o) => !o && setDeleteSftp(null)} title="Delete SFTP Key"
-        description={`Delete SFTP key "${deleteSftp?.name}"?`}
+      {/* Delete SSH Key */}
+      <ConfirmDialog open={!!deleteSftp} onOpenChange={(o) => !o && setDeleteSftp(null)} title="Delete SSH Key"
+        description={`Delete SSH key "${deleteSftp?.name}"?`}
         confirmLabel="Delete" variant="destructive" loading={deleteSftpMut.isPending}
-        onConfirm={async () => { try { await deleteSftpMut.mutateAsync(deleteSftp!.id); toast.success('SFTP key deleted'); setDeleteSftp(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
+        onConfirm={async () => { try { await deleteSftpMut.mutateAsync(deleteSftp!.id); toast.success('SSH key deleted'); setDeleteSftp(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
 
       {/* Delete Backup */}
       <ConfirmDialog open={!!deleteBackupTarget} onOpenChange={(o) => !o && setDeleteBackupTarget(null)} title="Delete Backup"
@@ -895,11 +895,11 @@ export function TenantDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Create SFTP Key Dialog */}
+      {/* Create SSH Key Dialog */}
       <Dialog open={createSftpOpen} onOpenChange={setCreateSftpOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add SFTP Key</DialogTitle></DialogHeader>
-          <SFTPKeyFields value={sftpForm} onChange={setSftpForm} />
+          <DialogHeader><DialogTitle>Add SSH Key</DialogTitle></DialogHeader>
+          <SSHKeyFields value={sftpForm} onChange={setSftpForm} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateSftpOpen(false)}>Cancel</Button>
             <Button onClick={handleCreateSftp} disabled={createSftpMut.isPending || !sftpForm.name || !sftpForm.public_key}>

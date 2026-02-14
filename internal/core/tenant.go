@@ -329,7 +329,7 @@ func (s *TenantService) ResourceSummary(ctx context.Context, tenantID string) (*
 		UNION ALL
 		SELECT 'valkey_users', vu.status, count(*) FROM valkey_users vu JOIN valkey_instances vi ON vi.id = vu.valkey_instance_id WHERE vi.tenant_id = $1 AND vu.status != 'deleted' GROUP BY vu.status
 		UNION ALL
-		SELECT 'sftp_keys', status, count(*) FROM sftp_keys WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status
+		SELECT 'ssh_keys', status, count(*) FROM ssh_keys WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status
 		UNION ALL
 		SELECT 'backups', status, count(*) FROM backups WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status`
 
@@ -370,7 +370,7 @@ func (s *TenantService) ResourceSummary(ctx context.Context, tenantID string) (*
 		ZoneRecords:      counts["zone_records"],
 		ValkeyInstances:  counts["valkey_instances"],
 		ValkeyUsers:      counts["valkey_users"],
-		SFTPKeys:         counts["sftp_keys"],
+		SSHKeys:          counts["ssh_keys"],
 		Backups:          counts["backups"],
 	}
 
@@ -393,7 +393,7 @@ func (s *TenantService) ResourceSummary(ctx context.Context, tenantID string) (*
 	ensureMap(&summary.ZoneRecords)
 	ensureMap(&summary.ValkeyInstances)
 	ensureMap(&summary.ValkeyUsers)
-	ensureMap(&summary.SFTPKeys)
+	ensureMap(&summary.SSHKeys)
 	ensureMap(&summary.Backups)
 
 	// Compute aggregates.
@@ -403,7 +403,7 @@ func (s *TenantService) ResourceSummary(ctx context.Context, tenantID string) (*
 		summary.Databases, summary.DatabaseUsers,
 		summary.Zones, summary.ZoneRecords,
 		summary.ValkeyInstances, summary.ValkeyUsers,
-		summary.SFTPKeys, summary.Backups,
+		summary.SSHKeys, summary.Backups,
 	} {
 		for status, count := range m {
 			summary.Total += count
@@ -483,7 +483,7 @@ func (s *TenantService) RetryFailed(ctx context.Context, tenantID string) (int, 
 		{`SELECT al.id, al.address FROM email_aliases al JOIN email_accounts ea ON ea.id = al.email_account_id JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND al.status = 'failed'`, "email_aliases", "CreateEmailAliasWorkflow", "email-alias"},
 		{`SELECT ef.id, ef.destination FROM email_forwards ef JOIN email_accounts ea ON ea.id = ef.email_account_id JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND ef.status = 'failed'`, "email_forwards", "CreateEmailForwardWorkflow", "email-forward"},
 		{`SELECT ar.id, ar.subject FROM email_autoreplies ar JOIN email_accounts ea ON ea.id = ar.email_account_id JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND ar.status = 'failed'`, "email_autoreplies", "UpdateEmailAutoReplyWorkflow", "email-autoreply"},
-		{"SELECT id, name FROM sftp_keys WHERE tenant_id = $1 AND status = 'failed'", "sftp_keys", "AddSFTPKeyWorkflow", "sftp-key"},
+		{"SELECT id, name FROM ssh_keys WHERE tenant_id = $1 AND status = 'failed'", "ssh_keys", "AddSSHKeyWorkflow", "ssh-key"},
 		{"SELECT id, name FROM s3_buckets WHERE tenant_id = $1 AND status = 'failed'", "s3_buckets", "CreateS3BucketWorkflow", "s3-bucket"},
 		{`SELECT k.id, k.access_key_id FROM s3_access_keys k JOIN s3_buckets b ON b.id = k.s3_bucket_id WHERE b.tenant_id = $1 AND k.status = 'failed'`, "s3_access_keys", "CreateS3AccessKeyWorkflow", "s3-access-key"},
 		{"SELECT id, type || '/' || source_name FROM backups WHERE tenant_id = $1 AND status = 'failed'", "backups", "CreateBackupWorkflow", "backup-create"},

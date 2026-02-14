@@ -2,11 +2,10 @@
 
 ## Current Status Summary
 
-**Build:** Compiles clean, `go vet` passes, all test packages pass.
-**Infrastructure:** Docker Compose for control plane (core-db, powerdns-db, temporal, temporal-ui, platform-valkey, mysql, powerdns, ceph, haproxy, local registry, stalwart, prometheus, grafana, loki, promtail, core-api, worker). Nodes run on VMs provisioned by Terraform/libvirt.
-**Migrations:** All core + PowerDNS DB migrations applied.
-**CLI:** `hostctl cluster apply` bootstraps a full cluster; `hostctl seed` populates tenant data; `hostctl converge-shard` triggers manual shard convergence.
-**E2E tests:** Full pipeline: health check, cluster bootstrap, tenant seeding, shared storage verification, web traffic through HAProxy.
+**Build:** Go 1.26, compiles clean, `go vet` passes, all test packages pass.
+**Infrastructure:** k3s control plane (core-api, worker, admin-ui, MCP server, Temporal, PostgreSQL, Loki, Grafana, Prometheus, Alloy). Nodes run on VMs provisioned by Terraform/libvirt with Packer golden images.
+**Dev Environment:** 9 VMs (controlplane + 2 web + 1 db + 1 dns + 1 valkey + 1 storage + 1 dbadmin + 1 lb) on libvirt, accessible at `*.hosting.test`.
+**CLI:** `hostctl cluster apply` bootstraps infrastructure; `hostctl seed` populates tenant data; `hostctl converge-shard` triggers convergence. Auto-loads `.env` for API key.
 
 ---
 
@@ -14,116 +13,179 @@
 
 ### Core API (REST)
 
-Full CRUD REST API at `localhost:8090/api/v1`:
+Full CRUD REST API at `api.hosting.test/api/v1` with OpenAPI docs at `/docs`.
 
-| Resource         | Endpoints                                        | Async |
-|------------------|--------------------------------------------------|-------|
-| Platform Config  | GET/PUT `/platform/config`                       | No    |
-| Regions          | CRUD `/regions`, runtimes sub-resource            | No    |
-| Clusters         | CRUD `/regions/{id}/clusters`                    | No    |
-| Cluster LB Addrs | CRUD `/clusters/{id}/lb-addresses`               | No    |
-| Shards           | CRUD `/clusters/{id}/shards`, converge            | Yes   |
-| Nodes            | CRUD `/clusters/{id}/nodes`                      | No    |
-| Tenants          | CRUD + suspend/unsuspend/migrate `/tenants`       | Yes   |
-| Webroots         | CRUD `/tenants/{id}/webroots`                    | Yes   |
-| FQDNs            | Create/delete `/webroots/{id}/fqdns`             | Yes   |
-| Certificates     | List/upload `/fqdns/{id}/certificates`           | Yes   |
-| Zones            | CRUD `/zones`                                    | Yes   |
-| Zone Records     | CRUD `/zones/{id}/records`                       | Yes   |
-| Databases        | CRUD + reassign `/tenants/{id}/databases`        | Yes   |
-| Database Users   | CRUD `/databases/{id}/users`                     | Yes   |
-| Valkey Instances | CRUD + reassign `/tenants/{id}/valkey-instances` | Yes   |
-| Valkey Users     | CRUD `/valkey-instances/{id}/users`              | Yes   |
-| Email Accounts   | CRUD `/fqdns/{id}/email-accounts`                | Yes   |
+**Authentication & Authorization:**
+- API key auth (`X-API-Key` header) with fine-grained scopes (`resource:action` format)
+- Brand-based access control (keys authorized for specific brands or `*` for platform admin)
+- All mutations audit-logged with sanitized request bodies (passwords/keys redacted)
 
-Infrastructure resources (regions, clusters, shards, nodes) use synchronous CRUD.
-Tenant-level resources are async: API returns 202, Temporal workflow handles provisioning.
+| Resource | Endpoints | Async | Notes |
+|---|---|---|---|
+| Dashboard | GET `/dashboard/stats` | No | Platform-wide resource counts |
+| Search | GET `/search` | No | Cross-resource substring search |
+| Audit Logs | GET `/audit-logs` | No | Mutation history with API key tracking |
+| Platform Config | GET/PUT `/platform/config` | No | Base domain, NS servers, OIDC issuer |
+| API Keys | CRUD `/api-keys` | No | Scopes, brand access; key shown once |
+| Brands | CRUD `/brands`, cluster mappings | No | Multi-brand isolation boundary |
+| Regions | CRUD `/regions`, runtimes sub-resource | No | |
+| Clusters | CRUD `/regions/{id}/clusters` | No | |
+| Cluster LB Addrs | CRUD `/clusters/{id}/lb-addresses` | No | |
+| Shards | CRUD `/clusters/{id}/shards`, converge, retry | Yes | Roles: web, database, dns, email, valkey, s3 |
+| Nodes | CRUD `/clusters/{id}/nodes` | No | UUID-based Temporal task queue routing |
+| Tenants | CRUD, suspend/unsuspend/migrate/retry `/tenants` | Yes | Resource summary, login sessions, retry-failed |
+| Webroots | CRUD `/tenants/{id}/webroots`, retry | Yes | PHP/Node/Python/Ruby/Static runtimes |
+| FQDNs | CRUD `/webroots/{id}/fqdns`, retry | Yes | Auto-DNS + auto-LB-map + optional LE cert |
+| Certificates | List/upload `/fqdns/{id}/certificates`, retry | Yes | PEM upload, LE provisioning |
+| SSH Keys | CRUD `/tenants/{id}/ssh-keys`, retry | Yes | SSH public keys for SFTP/SSH access |
+| Zones | CRUD `/zones`, tenant reassign, retry | Yes | Brand-scoped DNS zones |
+| Zone Records | CRUD `/zones/{id}/records`, retry | Yes | A/AAAA/CNAME/MX/TXT/NS/etc. |
+| Databases | CRUD `/tenants/{id}/databases`, migrate, retry | Yes | MySQL; charset, collation |
+| Database Users | CRUD `/databases/{id}/users`, retry | Yes | Privileges (all/read-only) |
+| Valkey Instances | CRUD `/tenants/{id}/valkey-instances`, migrate, retry | Yes | Managed Redis; eviction, max memory |
+| Valkey Users | CRUD `/valkey-instances/{id}/users`, retry | Yes | ACL-based access |
+| S3 Buckets | CRUD `/tenants/{id}/s3-buckets`, retry | Yes | Ceph RGW; public/private, quotas |
+| S3 Access Keys | CRUD `/s3-buckets/{id}/access-keys`, retry | Yes | 20-char ID, 40-char secret; shown once |
+| Email Accounts | CRUD `/fqdns/{id}/email-accounts`, retry | Yes | Stalwart SMTP/IMAP/JMAP |
+| Email Aliases | CRUD `/email-accounts/{id}/aliases`, retry | Yes | |
+| Email Forwards | CRUD `/email-accounts/{id}/forwards`, retry | Yes | External forwarding with keep-copy |
+| Email Auto-Replies | GET/PUT/DELETE `/email-accounts/{id}/autoreply`, retry | Yes | Vacation/out-of-office |
+| Backups | CRUD `/tenants/{id}/backups`, restore, retry | Yes | Web (tar.gz) and MySQL (.sql.gz) |
+| Logs | GET `/logs` | No | Loki proxy for platform log querying |
+
+**OIDC Provider:**
+- Discovery (`.well-known/openid-configuration`), JWKS, authorize, token endpoints
+- Client management for external auth integrations (e.g., CloudBeaver)
+- Tenant login sessions for authorization code flow
+
+**MCP Server:**
+- Dynamic tool generation from OpenAPI spec, grouped by domain (infrastructure, tenants, web, databases, dns, email, storage, platform)
+- Available at `mcp.hosting.test`
+
+**Response patterns:**
+- List endpoints: `{items: [...], next_cursor, has_more}` with search/sort/status filtering
+- Async operations: 202 Accepted, Temporal workflow handles provisioning
+- Status progression: `pending -> provisioning -> active` (or `failed` with `status_message`)
+- All async resources support `POST /{resource}/{id}/retry` to re-trigger failed provisioning
 
 ### Temporal Workflows
 
-**Resource lifecycle:**
-- Tenant: create, update, suspend, unsuspend, delete, migrate
+**Resource lifecycle (all with retry support):**
+- Tenant: create, update, suspend, unsuspend, delete, migrate (cross-shard)
 - Webroot: create, update, delete
 - FQDN: bind (auto-DNS + auto-LB-map + optional LE cert), unbind
-- Zone: create (SOA + NS records), delete
+- Zone: create (brand-aware SOA + NS records), delete
 - Zone Record: create, update, delete
-- Database: create, delete
+- Database: create, delete, migrate (dump/restore across shards)
 - Database User: create, update, delete
-- Valkey Instance: create, delete
+- Valkey Instance: create, delete, migrate (RDB dump/import)
 - Valkey User: create, update, delete
-- Certificate: provision LE (stub ACME), upload custom, renew (stub), cleanup (stub)
-- Email Account: create, delete (schema-only, Stalwart integration stubbed)
+- S3 Bucket: create, update (policy/quota), delete
+- S3 Access Key: create, delete
+- Certificate: provision LE (HTTP-01 ACME), upload custom, cron renewal, cron cleanup
+- Email Account: create (auto-creates MX/SPF DNS records), delete (cleanup domain if last account)
+- Email Alias: create, delete (via Stalwart JMAP)
+- Email Forward: create, delete (Sieve script generation)
+- Email Auto-Reply: update, delete (vacation via JMAP)
+- SSH Key: add, remove (syncs authorized_keys across all shard nodes)
+- Backup: create, restore, delete; cron cleanup of old backups
 
-**Infrastructure lifecycle:**
-- ConvergeShardWorkflow: pushes all existing resources (tenants, webroots, databases, valkey instances + their users) to every node in a shard via Temporal task queue routing, role-aware (web/database/valkey)
+**Infrastructure workflows:**
+- `ConvergeShardWorkflow`: role-aware (web/database/valkey/LB), cleans orphaned nginx configs before provisioning, collects errors without stopping
+- `TenantProvisionWorkflow`: long-running orchestrator, processes provision signals sequentially as child workflows, uses ContinueAsNew after 1000 iterations
+- `UpdateServiceHostnamesWorkflow`: auto-generates DNS records for tenant services
+- Audit log cleanup cron
 
-Nodes are provisioned externally via Terraform/libvirt. The `hostctl cluster apply` CLI registers them with the platform and triggers shard convergence.
-
-Status progression: `pending -> provisioning -> active` (or `failed`/`deleted`).
+**Provisioning callbacks:** optional webhook notifications on task completion with configurable retry.
 
 ### Node Agent (Temporal Worker)
 
-Runs on each VM node, connecting to Temporal via a node-specific task queue:
+Runs on each VM node, connecting to Temporal via `node-{uuid}` task queue:
 
-- **TenantManager:** Linux user accounts (useradd/userdel/usermod), directory structure, SFTP setup
-- **WebrootManager:** Webroot directories under tenant home
-- **NginxManager:** Per-webroot nginx server blocks from templates (PHP/Node/Python/Ruby/Static), SSL cert installation, config test + reload
-- **DatabaseManager:** MySQL CREATE/DROP DATABASE, CREATE/DROP USER, GRANT
-- **ValkeyManager:** Valkey instance lifecycle (config + systemd template units), ACL user management via valkey-cli
-- **Runtime managers:** PHP-FPM pool configs + systemctl reload, Node.js proxy, Python (gunicorn), Ruby (puma), Static
+- **TenantManager:** Linux user accounts, directory structure, UID management
+- **WebrootManager:** Webroot directories, storage paths
+- **NginxManager:** Per-webroot server blocks from templates, SSL cert installation, config test + reload, orphaned config cleanup
+- **SSHManager:** SSH/SFTP configuration, authorized_keys sync across all shard nodes
+- **DatabaseManager:** MySQL CREATE/DROP DATABASE/USER, GRANT, dump/import for migrations
+- **ValkeyManager:** Instance lifecycle (config + systemd units), ACL user management, RDB dump/import
+- **S3Manager:** Ceph RGW bucket/user management via `radosgw-admin`, tenant-scoped naming (`{tenantID}--{bucketName}`)
+- **Runtime managers:** PHP-FPM (socket activation), Node.js, Python (gunicorn), Ruby (puma), Static
 
 ### DNS (PowerDNS)
 
-- PowerDNS DB stores domains/records tables
-- Workflows auto-create A/AAAA records when binding FQDNs (if zone exists)
+- Separate PowerDNS PostgreSQL database for zone/record storage
+- Brand-aware NS records (each brand defines its own NS hostnames and hostmaster)
+- Auto-created A/AAAA records when binding FQDNs (if zone exists)
+- Auto-created MX/SPF records when creating email accounts
 - Platform-managed vs user-managed record tracking
-- SOA + NS records auto-created on zone creation from platform config
 
 ### Load Balancing (HAProxy)
 
-- Runtime map file (`fqdn-to-shard.map`) updated via HAProxy Runtime API (TCP socket) without reload
-- `SetLBMapEntry`/`DeleteLBMapEntry` activities update mappings when FQDNs are bound/unbound
+- LB VM at 10.10.10.70 with HAProxy
+- Runtime map file (`fqdn-to-shard.map`) updated via HAProxy Runtime API (no reload for FQDN changes)
 - Consistent hashing on Host header within shard backends
-- HAProxy runs in Docker Compose, Runtime API exposed on port 9999
+- Convergence pushes all active FQDN mappings to LB nodes
+
+### Email (Stalwart)
+
+- Full Stalwart integration: SMTP, IMAP, JMAP
+- Account, alias, forward, auto-reply management via JMAP API
+- Domain auto-creation (idempotent), cleanup when last account removed
+- Auto-generated MX and SPF DNS records per FQDN
+- Sieve script generation for forwards
+- Vacation auto-reply with optional date ranges
+
+### S3 Object Storage (Ceph RGW)
+
+- Single-node Ceph cluster per S3 shard (mon + mgr + osd + rgw)
+- OSD on dedicated raw disk with LVM + BlueStore
+- Bucket policies (public/private read access), quotas
+- Access keys: 20-char ID, 40-char secret (shown once on creation)
+- RGW admin credentials auto-generated during cloud-init
 
 ### Admin UI
 
-- Go reverse-proxy binary (`cmd/admin-ui`) serves the built React SPA and proxies `/api/` requests to core-api
-- Configurable via environment variables: `LISTEN_ADDR`, `CORE_API_URL`, `STATIC_DIR`
-- SPA fallback to `index.html` for client-side routing, aggressive caching for `/assets/`
-- Multi-stage Dockerfile (`docker/admin-ui.Dockerfile`): Node build for SPA, Go build for binary, minimal final image
-- Docker Compose service on port 3001, depends on core-api
-- Dev workflow: `just dev-admin` runs Vite dev server with proxy; `just build-admin` produces production build
+React SPA (TypeScript, Vite, Tailwind, shadcn/ui) served by Go binary on port 3001:
+
+- **25 pages:** Dashboard, tenants, webroots, databases, zones, valkey, S3 buckets, FQDNs, email accounts, brands, API keys, audit log, platform config, login
+- **Detail pages** with tabs for sub-resources, status badges, retry buttons, status messages for failed resources
+- **Log viewer:** real-time log streaming from Loki with time range selection, service filtering, pause/resume, expandable JSON entries, Grafana deep link
+- **Forms:** inline creation of nested resources (databases, webroots, zones, email, S3 in tenant creation)
+- **Auth:** API key login with error feedback, localStorage persistence
+
+### Observability
+
+- **Prometheus:** 15s scrape interval, targets: core-api, worker, HAProxy, Temporal, node exporters on all VMs
+- **Grafana:** 3 dashboards (API overview, infrastructure, log explorer), Prometheus + Loki datasources
+- **Loki:** TSDB store with 5 GB PVC
+- **Alloy:** DaemonSet tailing all k3s pod logs, extracting `app` label from `app.kubernetes.io/component`, shipping to Loki
+- **Log proxy:** core-api `/logs` endpoint proxies LogQL queries to Loki for admin UI consumption
+- **Metrics endpoint:** `/metrics` on core-api (request count/latency/status codes)
 
 ### CLI Tooling (`hostctl`)
 
-- `hostctl cluster apply -f <yaml>`: bootstraps full cluster from declarative YAML (region, cluster, LB addresses, shards, nodes, converge)
-- `hostctl seed -f <yaml>`: seeds tenant data (zones, tenants, webroots, FQDNs, databases, valkey instances, email accounts)
+- `hostctl cluster apply -f <yaml>`: bootstraps region, cluster, LB addresses, shards, nodes; triggers convergence
+- `hostctl seed -f <yaml>`: seeds brands, zones, tenants with webroots/FQDNs/databases/valkey/S3/email; waits for each resource to reach active
 - `hostctl converge-shard <shard-id>`: triggers manual shard convergence
+- Auto-loads `.env` file for `HOSTING_API_KEY`
 
-### Unit Tests
+### Infrastructure
 
-Full coverage across all packages:
-- Workflow tests (mock activities, verify state transitions)
-- Handler tests (HTTP request/response, validation, chi routing)
-- Activity tests (mock DB calls, mock TCP listener for LB)
-- Agent tests (mock exec commands, template rendering)
-- Runtime manager tests
-- Request validation, response formatting, config loading, model helpers
+- **VM provisioning:** Terraform + libvirt with Packer golden images (9 roles: web, db, dns, valkey, storage, s3, dbadmin, lb, controlplane)
+- **k3s control plane:** Helm chart deploys core-api, worker, admin-ui, MCP server; k3s manifests for Temporal, PostgreSQL, Loki, Grafana, Prometheus, Alloy, Traefik ingress
+- **Image delivery:** `docker build` -> `docker save` -> SSH pipe -> `k3s ctr images import`
+- **Networking:** `*.hosting.test` domain via Traefik ingress, WSL2 -> libvirt routing via `just forward`
+
+### Tests
+
+- **Unit tests:** workflows (mock activities, state transitions), handlers (HTTP req/res, validation), activities (mock DB/TCP), agent managers (mock exec), runtime managers, request/response/config/model packages
+- **E2E tests:** tenant lifecycle, webroot, database, DNS, S3, backup, platform config (require `HOSTING_E2E=1` and running cluster)
 
 ---
 
 ## What's Missing
 
-### Priority 1: Email (v2)
-
-Email accounts have schema + API + workflow stubs, but no real backend:
-- Stalwart integration (SMTP/IMAP/JMAP)
-- Email aliases, forwards, auto-reply
-- Domain-level email configuration
-- Spam filtering policy management
-
-### Priority 2: MySQL Replication Management
+### Priority 1: MySQL Replication Management
 
 DB shards use replication pairs, but there's no automation for:
 - Setting up replication between nodes in a shard
@@ -131,39 +193,32 @@ DB shards use replication pairs, but there's no automation for:
 - Handling failover (ProxySQL VIP switching)
 - Promoting a replica to primary
 
-### Priority 3: CephFS Integration
+### Priority 2: CephFS Integration
 
 Web nodes need CephFS mounted at `/var/www/storage` for shared tenant files:
-- Ceph client configuration distribution (ceph.conf, keyring)
+- Ceph client configuration distribution
 - Mount management in node-agent
 - Health monitoring of Ceph mounts
 
-### Priority 4: SSL/ACME
+### Priority 3: Agent-Side Reconciliation
 
-Let's Encrypt certificate provisioning is stubbed:
-- Need real ACME challenge implementation (HTTP-01 or DNS-01)
-- Certificate storage workflow works but uses placeholder PEM data
-- Renewal and cleanup cron workflows are stubs
-
-### Priority 5: Extended E2E Tests
-
-`tests/e2e/` has a basic pipeline (health, bootstrap, seed, shared storage, web traffic). Still needed:
-- Full lifecycle API integration tests (CRUD + workflow completion)
-- Database shard e2e (MySQL create/drop/replication)
-- Valkey shard e2e
-- DNS record propagation e2e
-
-### Priority 6: Monitoring & Observability
-
-Prometheus/Grafana/Loki are in docker-compose but not wired up:
-- Node health reporting back to core
-- Tenant resource usage metrics
-- Service health checks (nginx, PHP-FPM, MySQL, CephFS)
-- Alerting on failures
-
-### Priority 7: Agent-Side Reconciliation
-
-ConvergeShardWorkflow handles Temporal-driven convergence, but the agent itself has no:
+The agent has no autonomous self-healing:
 - Startup self-check (query core DB, converge local state)
 - Periodic drift detection
-- Health status reporting
+- Health status reporting back to core
+
+### Priority 4: Extended E2E Tests
+
+Current E2E coverage is partial. Still needed:
+- Valkey shard e2e
+- Email account e2e (Stalwart integration)
+- Cross-shard migration e2e
+- DNS record propagation verification
+
+### Priority 5: Alerting
+
+Prometheus and Grafana are deployed but no alerts configured:
+- Node health degradation
+- Workflow failure rates
+- Resource provisioning timeouts
+- Disk/memory/CPU thresholds

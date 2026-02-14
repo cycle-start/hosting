@@ -8,7 +8,7 @@ const SCOPE_GROUPS = [
   },
   {
     label: 'Hosting',
-    resources: ['tenants', 'webroots', 'fqdns', 'certificates', 'sftp_keys', 'backups'],
+    resources: ['tenants', 'webroots', 'fqdns', 'certificates', 'ssh_keys', 'backups'],
   },
   {
     label: 'Databases',

@@ -116,7 +116,7 @@ func (s *Server) setupRoutes() {
 		valkeyUser := handler.NewValkeyUser(s.services.ValkeyUser)
 		s3Bucket := handler.NewS3Bucket(s.services.S3Bucket, s.services.S3AccessKey, s.services.Tenant)
 		s3AccessKey := handler.NewS3AccessKey(s.services.S3AccessKey)
-		sftpKey := handler.NewSFTPKey(s.services.SFTPKey, s.services.Tenant)
+		sshKey := handler.NewSSHKey(s.services.SSHKey, s.services.Tenant)
 		emailAccount := handler.NewEmailAccount(s.services)
 		emailAlias := handler.NewEmailAlias(s.services.EmailAlias)
 		emailForward := handler.NewEmailForward(s.services.EmailForward)
@@ -475,20 +475,20 @@ func (s *Server) setupRoutes() {
 			r.Delete("/s3-access-keys/{id}", s3AccessKey.Delete)
 		})
 
-		// SFTP keys
+		// SSH keys
 		r.Group(func(r chi.Router) {
-			r.Use(mw.RequireScope("sftp_keys", "read"))
-			r.Get("/tenants/{tenantID}/sftp-keys", sftpKey.ListByTenant)
-			r.Get("/sftp-keys/{id}", sftpKey.Get)
+			r.Use(mw.RequireScope("ssh_keys", "read"))
+			r.Get("/tenants/{tenantID}/ssh-keys", sshKey.ListByTenant)
+			r.Get("/ssh-keys/{id}", sshKey.Get)
 		})
 		r.Group(func(r chi.Router) {
-			r.Use(mw.RequireScope("sftp_keys", "write"))
-			r.Post("/tenants/{tenantID}/sftp-keys", sftpKey.Create)
-			r.Post("/sftp-keys/{id}/retry", sftpKey.Retry)
+			r.Use(mw.RequireScope("ssh_keys", "write"))
+			r.Post("/tenants/{tenantID}/ssh-keys", sshKey.Create)
+			r.Post("/ssh-keys/{id}/retry", sshKey.Retry)
 		})
 		r.Group(func(r chi.Router) {
-			r.Use(mw.RequireScope("sftp_keys", "delete"))
-			r.Delete("/sftp-keys/{id}", sftpKey.Delete)
+			r.Use(mw.RequireScope("ssh_keys", "delete"))
+			r.Delete("/ssh-keys/{id}", sshKey.Delete)
 		})
 
 		// Email accounts

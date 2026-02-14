@@ -12,28 +12,28 @@ import (
 	"github.com/edvin/hosting/internal/model"
 )
 
-// ---------- AddSFTPKeyWorkflow ----------
+// ---------- AddSSHKeyWorkflow ----------
 
-type AddSFTPKeyWorkflowTestSuite struct {
+type AddSSHKeyWorkflowTestSuite struct {
 	suite.Suite
 	testsuite.WorkflowTestSuite
 	env *testsuite.TestWorkflowEnvironment
 }
 
-func (s *AddSFTPKeyWorkflowTestSuite) SetupTest() {
+func (s *AddSSHKeyWorkflowTestSuite) SetupTest() {
 	s.env = s.NewTestWorkflowEnvironment()
 	registerActivities(s.env)
 }
 
-func (s *AddSFTPKeyWorkflowTestSuite) AfterTest(suiteName, testName string) {
+func (s *AddSSHKeyWorkflowTestSuite) AfterTest(suiteName, testName string) {
 	s.env.AssertExpectations(s.T())
 }
 
-func (s *AddSFTPKeyWorkflowTestSuite) TestSuccess() {
+func (s *AddSSHKeyWorkflowTestSuite) TestSuccess() {
 	keyID := "test-key-1"
 	tenantID := "test-tenant-1"
 	shardID := "test-shard-1"
-	key := model.SFTPKey{
+	key := model.SSHKey{
 		ID:        keyID,
 		TenantID:  tenantID,
 		Name:      "my-key",
@@ -48,37 +48,37 @@ func (s *AddSFTPKeyWorkflowTestSuite) TestSuccess() {
 	nodes := []model.Node{{ID: "node-1"}}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "sftp_keys", ID: keyID, Status: model.StatusProvisioning,
+		Table: "ssh_keys", ID: keyID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetSFTPKeyByID", mock.Anything, keyID).Return(&key, nil)
+	s.env.OnActivity("GetSSHKeyByID", mock.Anything, keyID).Return(&key, nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetSFTPKeysByTenant", mock.Anything, tenantID).Return([]model.SFTPKey{}, nil)
+	s.env.OnActivity("GetSSHKeysByTenant", mock.Anything, tenantID).Return([]model.SSHKey{}, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("SyncSFTPKeys", mock.Anything, activity.SyncSFTPKeysParams{
+	s.env.OnActivity("SyncSSHKeys", mock.Anything, activity.SyncSSHKeysParams{
 		TenantName: tenantID,
 		PublicKeys: []string{"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5 test@test"},
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "sftp_keys", ID: keyID, Status: model.StatusActive,
+		Table: "ssh_keys", ID: keyID, Status: model.StatusActive,
 	}).Return(nil)
 
-	s.env.ExecuteWorkflow(AddSFTPKeyWorkflow, keyID)
+	s.env.ExecuteWorkflow(AddSSHKeyWorkflow, keyID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
 }
 
-func (s *AddSFTPKeyWorkflowTestSuite) TestWithExistingActiveKeys() {
+func (s *AddSSHKeyWorkflowTestSuite) TestWithExistingActiveKeys() {
 	keyID := "test-key-2"
 	tenantID := "test-tenant-1"
 	shardID := "test-shard-1"
-	key := model.SFTPKey{
+	key := model.SSHKey{
 		ID:        keyID,
 		TenantID:  tenantID,
 		Name:      "second-key",
 		PublicKey: "ssh-rsa AAAAB3... second@test",
 		Status:    model.StatusPending,
 	}
-	existingKey := model.SFTPKey{
+	existingKey := model.SSHKey{
 		ID:        "existing-key-1",
 		TenantID:  tenantID,
 		PublicKey: "ssh-ed25519 AAAAC3... first@test",
@@ -92,43 +92,43 @@ func (s *AddSFTPKeyWorkflowTestSuite) TestWithExistingActiveKeys() {
 	nodes := []model.Node{{ID: "node-1"}}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "sftp_keys", ID: keyID, Status: model.StatusProvisioning,
+		Table: "ssh_keys", ID: keyID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetSFTPKeyByID", mock.Anything, keyID).Return(&key, nil)
+	s.env.OnActivity("GetSSHKeyByID", mock.Anything, keyID).Return(&key, nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetSFTPKeysByTenant", mock.Anything, tenantID).Return([]model.SFTPKey{existingKey}, nil)
+	s.env.OnActivity("GetSSHKeysByTenant", mock.Anything, tenantID).Return([]model.SSHKey{existingKey}, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("SyncSFTPKeys", mock.Anything, activity.SyncSFTPKeysParams{
+	s.env.OnActivity("SyncSSHKeys", mock.Anything, activity.SyncSSHKeysParams{
 		TenantName: tenantID,
 		PublicKeys: []string{"ssh-ed25519 AAAAC3... first@test", "ssh-rsa AAAAB3... second@test"},
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "sftp_keys", ID: keyID, Status: model.StatusActive,
+		Table: "ssh_keys", ID: keyID, Status: model.StatusActive,
 	}).Return(nil)
 
-	s.env.ExecuteWorkflow(AddSFTPKeyWorkflow, keyID)
+	s.env.ExecuteWorkflow(AddSSHKeyWorkflow, keyID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
 }
 
-func (s *AddSFTPKeyWorkflowTestSuite) TestGetKeyFails_SetsStatusFailed() {
+func (s *AddSSHKeyWorkflowTestSuite) TestGetKeyFails_SetsStatusFailed() {
 	keyID := "test-key-3"
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "sftp_keys", ID: keyID, Status: model.StatusProvisioning,
+		Table: "ssh_keys", ID: keyID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetSFTPKeyByID", mock.Anything, keyID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("sftp_keys", keyID)).Return(nil)
+	s.env.OnActivity("GetSSHKeyByID", mock.Anything, keyID).Return(nil, fmt.Errorf("not found"))
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("ssh_keys", keyID)).Return(nil)
 
-	s.env.ExecuteWorkflow(AddSFTPKeyWorkflow, keyID)
+	s.env.ExecuteWorkflow(AddSSHKeyWorkflow, keyID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
 }
 
-func (s *AddSFTPKeyWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
+func (s *AddSSHKeyWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 	keyID := "test-key-4"
 	tenantID := "test-tenant-1"
-	key := model.SFTPKey{
+	key := model.SSHKey{
 		ID:       keyID,
 		TenantID: tenantID,
 	}
@@ -139,21 +139,21 @@ func (s *AddSFTPKeyWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "sftp_keys", ID: keyID, Status: model.StatusProvisioning,
+		Table: "ssh_keys", ID: keyID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetSFTPKeyByID", mock.Anything, keyID).Return(&key, nil)
+	s.env.OnActivity("GetSSHKeyByID", mock.Anything, keyID).Return(&key, nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("sftp_keys", keyID)).Return(nil)
-	s.env.ExecuteWorkflow(AddSFTPKeyWorkflow, keyID)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("ssh_keys", keyID)).Return(nil)
+	s.env.ExecuteWorkflow(AddSSHKeyWorkflow, keyID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
 }
 
-func (s *AddSFTPKeyWorkflowTestSuite) TestSyncFails_SetsStatusFailed() {
+func (s *AddSSHKeyWorkflowTestSuite) TestSyncFails_SetsStatusFailed() {
 	keyID := "test-key-5"
 	tenantID := "test-tenant-1"
 	shardID := "test-shard-1"
-	key := model.SFTPKey{
+	key := model.SSHKey{
 		ID:        keyID,
 		TenantID:  tenantID,
 		PublicKey: "ssh-ed25519 AAAAC3...",
@@ -166,54 +166,54 @@ func (s *AddSFTPKeyWorkflowTestSuite) TestSyncFails_SetsStatusFailed() {
 	nodes := []model.Node{{ID: "node-1"}}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "sftp_keys", ID: keyID, Status: model.StatusProvisioning,
+		Table: "ssh_keys", ID: keyID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetSFTPKeyByID", mock.Anything, keyID).Return(&key, nil)
+	s.env.OnActivity("GetSSHKeyByID", mock.Anything, keyID).Return(&key, nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetSFTPKeysByTenant", mock.Anything, tenantID).Return([]model.SFTPKey{}, nil)
+	s.env.OnActivity("GetSSHKeysByTenant", mock.Anything, tenantID).Return([]model.SSHKey{}, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("SyncSFTPKeys", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("sftp_keys", keyID)).Return(nil)
+	s.env.OnActivity("SyncSSHKeys", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("ssh_keys", keyID)).Return(nil)
 
-	s.env.ExecuteWorkflow(AddSFTPKeyWorkflow, keyID)
+	s.env.ExecuteWorkflow(AddSSHKeyWorkflow, keyID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
 }
 
-func (s *AddSFTPKeyWorkflowTestSuite) TestSetProvisioningFails() {
+func (s *AddSSHKeyWorkflowTestSuite) TestSetProvisioningFails() {
 	keyID := "test-key-6"
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "sftp_keys", ID: keyID, Status: model.StatusProvisioning,
+		Table: "ssh_keys", ID: keyID, Status: model.StatusProvisioning,
 	}).Return(fmt.Errorf("db error"))
 
-	s.env.ExecuteWorkflow(AddSFTPKeyWorkflow, keyID)
+	s.env.ExecuteWorkflow(AddSSHKeyWorkflow, keyID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
 }
 
-// ---------- RemoveSFTPKeyWorkflow ----------
+// ---------- RemoveSSHKeyWorkflow ----------
 
-type RemoveSFTPKeyWorkflowTestSuite struct {
+type RemoveSSHKeyWorkflowTestSuite struct {
 	suite.Suite
 	testsuite.WorkflowTestSuite
 	env *testsuite.TestWorkflowEnvironment
 }
 
-func (s *RemoveSFTPKeyWorkflowTestSuite) SetupTest() {
+func (s *RemoveSSHKeyWorkflowTestSuite) SetupTest() {
 	s.env = s.NewTestWorkflowEnvironment()
 	registerActivities(s.env)
 }
 
-func (s *RemoveSFTPKeyWorkflowTestSuite) AfterTest(suiteName, testName string) {
+func (s *RemoveSSHKeyWorkflowTestSuite) AfterTest(suiteName, testName string) {
 	s.env.AssertExpectations(s.T())
 }
 
-func (s *RemoveSFTPKeyWorkflowTestSuite) TestSuccess() {
+func (s *RemoveSSHKeyWorkflowTestSuite) TestSuccess() {
 	keyID := "test-key-1"
 	tenantID := "test-tenant-1"
 	shardID := "test-shard-1"
-	key := model.SFTPKey{
+	key := model.SSHKey{
 		ID:        keyID,
 		TenantID:  tenantID,
 		PublicKey: "ssh-ed25519 AAAAC3...",
@@ -226,34 +226,34 @@ func (s *RemoveSFTPKeyWorkflowTestSuite) TestSuccess() {
 	}
 	nodes := []model.Node{{ID: "node-1"}}
 
-	s.env.OnActivity("GetSFTPKeyByID", mock.Anything, keyID).Return(&key, nil)
+	s.env.OnActivity("GetSSHKeyByID", mock.Anything, keyID).Return(&key, nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "sftp_keys", ID: keyID, Status: model.StatusDeleted,
+		Table: "ssh_keys", ID: keyID, Status: model.StatusDeleted,
 	}).Return(nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetSFTPKeysByTenant", mock.Anything, tenantID).Return([]model.SFTPKey{}, nil)
+	s.env.OnActivity("GetSSHKeysByTenant", mock.Anything, tenantID).Return([]model.SSHKey{}, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("SyncSFTPKeys", mock.Anything, activity.SyncSFTPKeysParams{
+	s.env.OnActivity("SyncSSHKeys", mock.Anything, activity.SyncSSHKeysParams{
 		TenantName: tenantID,
 		PublicKeys: []string{},
 	}).Return(nil)
 
-	s.env.ExecuteWorkflow(RemoveSFTPKeyWorkflow, keyID)
+	s.env.ExecuteWorkflow(RemoveSSHKeyWorkflow, keyID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
 }
 
-func (s *RemoveSFTPKeyWorkflowTestSuite) TestWithRemainingKeys() {
+func (s *RemoveSSHKeyWorkflowTestSuite) TestWithRemainingKeys() {
 	keyID := "test-key-1"
 	tenantID := "test-tenant-1"
 	shardID := "test-shard-1"
-	key := model.SFTPKey{
+	key := model.SSHKey{
 		ID:        keyID,
 		TenantID:  tenantID,
 		PublicKey: "ssh-ed25519 AAAAC3...",
 		Status:    model.StatusDeleting,
 	}
-	remainingKey := model.SFTPKey{
+	remainingKey := model.SSHKey{
 		ID:        "other-key",
 		TenantID:  tenantID,
 		PublicKey: "ssh-rsa AAAAB3... other@test",
@@ -266,38 +266,38 @@ func (s *RemoveSFTPKeyWorkflowTestSuite) TestWithRemainingKeys() {
 	}
 	nodes := []model.Node{{ID: "node-1"}}
 
-	s.env.OnActivity("GetSFTPKeyByID", mock.Anything, keyID).Return(&key, nil)
+	s.env.OnActivity("GetSSHKeyByID", mock.Anything, keyID).Return(&key, nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "sftp_keys", ID: keyID, Status: model.StatusDeleted,
+		Table: "ssh_keys", ID: keyID, Status: model.StatusDeleted,
 	}).Return(nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetSFTPKeysByTenant", mock.Anything, tenantID).Return([]model.SFTPKey{remainingKey}, nil)
+	s.env.OnActivity("GetSSHKeysByTenant", mock.Anything, tenantID).Return([]model.SSHKey{remainingKey}, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("SyncSFTPKeys", mock.Anything, activity.SyncSFTPKeysParams{
+	s.env.OnActivity("SyncSSHKeys", mock.Anything, activity.SyncSSHKeysParams{
 		TenantName: tenantID,
 		PublicKeys: []string{"ssh-rsa AAAAB3... other@test"},
 	}).Return(nil)
 
-	s.env.ExecuteWorkflow(RemoveSFTPKeyWorkflow, keyID)
+	s.env.ExecuteWorkflow(RemoveSSHKeyWorkflow, keyID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
 }
 
-func (s *RemoveSFTPKeyWorkflowTestSuite) TestGetKeyFails_SetsStatusFailed() {
+func (s *RemoveSSHKeyWorkflowTestSuite) TestGetKeyFails_SetsStatusFailed() {
 	keyID := "test-key-2"
 
-	s.env.OnActivity("GetSFTPKeyByID", mock.Anything, keyID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("sftp_keys", keyID)).Return(nil)
+	s.env.OnActivity("GetSSHKeyByID", mock.Anything, keyID).Return(nil, fmt.Errorf("not found"))
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("ssh_keys", keyID)).Return(nil)
 
-	s.env.ExecuteWorkflow(RemoveSFTPKeyWorkflow, keyID)
+	s.env.ExecuteWorkflow(RemoveSSHKeyWorkflow, keyID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
 }
 
-func (s *RemoveSFTPKeyWorkflowTestSuite) TestNoShard() {
+func (s *RemoveSSHKeyWorkflowTestSuite) TestNoShard() {
 	keyID := "test-key-3"
 	tenantID := "test-tenant-1"
-	key := model.SFTPKey{
+	key := model.SSHKey{
 		ID:       keyID,
 		TenantID: tenantID,
 		Status:   model.StatusDeleting,
@@ -308,22 +308,22 @@ func (s *RemoveSFTPKeyWorkflowTestSuite) TestNoShard() {
 		// ShardID is nil
 	}
 
-	s.env.OnActivity("GetSFTPKeyByID", mock.Anything, keyID).Return(&key, nil)
+	s.env.OnActivity("GetSSHKeyByID", mock.Anything, keyID).Return(&key, nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "sftp_keys", ID: keyID, Status: model.StatusDeleted,
+		Table: "ssh_keys", ID: keyID, Status: model.StatusDeleted,
 	}).Return(nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 
-	s.env.ExecuteWorkflow(RemoveSFTPKeyWorkflow, keyID)
+	s.env.ExecuteWorkflow(RemoveSSHKeyWorkflow, keyID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
 }
 
-func (s *RemoveSFTPKeyWorkflowTestSuite) TestSyncFails() {
+func (s *RemoveSSHKeyWorkflowTestSuite) TestSyncFails() {
 	keyID := "test-key-4"
 	tenantID := "test-tenant-1"
 	shardID := "test-shard-1"
-	key := model.SFTPKey{
+	key := model.SSHKey{
 		ID:       keyID,
 		TenantID: tenantID,
 		Status:   model.StatusDeleting,
@@ -335,26 +335,26 @@ func (s *RemoveSFTPKeyWorkflowTestSuite) TestSyncFails() {
 	}
 	nodes := []model.Node{{ID: "node-1"}}
 
-	s.env.OnActivity("GetSFTPKeyByID", mock.Anything, keyID).Return(&key, nil)
+	s.env.OnActivity("GetSSHKeyByID", mock.Anything, keyID).Return(&key, nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "sftp_keys", ID: keyID, Status: model.StatusDeleted,
+		Table: "ssh_keys", ID: keyID, Status: model.StatusDeleted,
 	}).Return(nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("GetSFTPKeysByTenant", mock.Anything, tenantID).Return([]model.SFTPKey{}, nil)
+	s.env.OnActivity("GetSSHKeysByTenant", mock.Anything, tenantID).Return([]model.SSHKey{}, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("SyncSFTPKeys", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
+	s.env.OnActivity("SyncSSHKeys", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
 
-	s.env.ExecuteWorkflow(RemoveSFTPKeyWorkflow, keyID)
+	s.env.ExecuteWorkflow(RemoveSSHKeyWorkflow, keyID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
 }
 
 // ---------- Run all suites ----------
 
-func TestAddSFTPKeyWorkflow(t *testing.T) {
-	suite.Run(t, new(AddSFTPKeyWorkflowTestSuite))
+func TestAddSSHKeyWorkflow(t *testing.T) {
+	suite.Run(t, new(AddSSHKeyWorkflowTestSuite))
 }
 
-func TestRemoveSFTPKeyWorkflow(t *testing.T) {
-	suite.Run(t, new(RemoveSFTPKeyWorkflowTestSuite))
+func TestRemoveSSHKeyWorkflow(t *testing.T) {
+	suite.Run(t, new(RemoveSSHKeyWorkflowTestSuite))
 }

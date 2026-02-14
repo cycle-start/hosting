@@ -84,7 +84,7 @@ type CreateS3BucketNested struct {
 	QuotaBytes *int64 `json:"quota_bytes"`
 }
 
-type CreateSFTPKeyNested struct {
+type CreateSSHKeyNested struct {
 	Name      string `json:"name" validate:"required,min=1,max=255"`
 	PublicKey string `json:"public_key" validate:"required"`
 }

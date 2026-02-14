@@ -130,8 +130,8 @@ type SyncSSHConfigParams struct {
 	SFTPEnabled bool
 }
 
-// SyncSFTPKeysParams holds parameters for syncing SFTP authorized keys on a node.
-type SyncSFTPKeysParams struct {
+// SyncSSHKeysParams holds parameters for syncing SSH authorized keys on a node.
+type SyncSSHKeysParams struct {
 	TenantName string
 	PublicKeys []string
 }

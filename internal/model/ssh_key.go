@@ -2,8 +2,8 @@ package model
 
 import "time"
 
-// SFTPKey represents an SSH public key used for SFTP access to a tenant's storage.
-type SFTPKey struct {
+// SSHKey represents an SSH public key used for SFTP access to a tenant's storage.
+type SSHKey struct {
 	ID          string    `json:"id"`
 	TenantID    string    `json:"tenant_id"`
 	Name        string    `json:"name"`

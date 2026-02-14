@@ -250,7 +250,7 @@ export interface EmailAutoReply {
   updated_at: string
 }
 
-export interface SFTPKey {
+export interface SSHKey {
   id: string
   tenant_id: string
   name: string
@@ -368,7 +368,7 @@ export interface TenantResourceSummary {
   valkey_users: Record<string, number>
   s3_buckets: Record<string, number>
   s3_access_keys: Record<string, number>
-  sftp_keys: Record<string, number>
+  ssh_keys: Record<string, number>
   backups: Record<string, number>
   total: number
   pending: number
@@ -440,7 +440,7 @@ export interface S3BucketFormData {
   name: string; shard_id: string; public?: boolean; quota_bytes?: number
 }
 
-export interface SFTPKeyFormData { name: string; public_key: string }
+export interface SSHKeyFormData { name: string; public_key: string }
 
 export interface CreateTenantRequest {
   brand_id: string
@@ -453,5 +453,5 @@ export interface CreateTenantRequest {
   databases?: DatabaseFormData[]
   valkey_instances?: ValkeyInstanceFormData[]
   s3_buckets?: S3BucketFormData[]
-  sftp_keys?: SFTPKeyFormData[]
+  ssh_keys?: SSHKeyFormData[]
 }

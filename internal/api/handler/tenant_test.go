@@ -445,11 +445,11 @@ func TestTenantCreate_WithNestedValkeyInstances_ValidationPasses(t *testing.T) {
 	assert.NotEqual(t, http.StatusBadRequest, rec.Code)
 }
 
-func TestTenantCreate_WithNestedSFTPKeys_ValidationPasses(t *testing.T) {
+func TestTenantCreate_WithNestedSSHKeys_ValidationPasses(t *testing.T) {
 	h := newTenantHandler()
 	rec := httptest.NewRecorder()
 	body := validTenantBody()
-	body["sftp_keys"] = []map[string]any{
+	body["ssh_keys"] = []map[string]any{
 		{
 			"name":       "my-key",
 			"public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGKCwmDZb5JjFMYnbPPM6MvxMCEjMltcGacM4AiSuKiP test@localhost",
@@ -473,7 +473,7 @@ func TestTenantCreate_WithEmptyNestedArrays_ValidationPasses(t *testing.T) {
 	body["webroots"] = []map[string]any{}
 	body["databases"] = []map[string]any{}
 	body["valkey_instances"] = []map[string]any{}
-	body["sftp_keys"] = []map[string]any{}
+	body["ssh_keys"] = []map[string]any{}
 	r := newRequest(http.MethodPost, "/tenants", body)
 
 	func() {
@@ -591,11 +591,11 @@ func TestTenantCreate_WithInvalidNestedValkeyUser_ValidationFails(t *testing.T) 
 	assert.Contains(t, errBody["error"], "validation error")
 }
 
-func TestTenantCreate_WithInvalidNestedSFTPKey_ValidationFails(t *testing.T) {
+func TestTenantCreate_WithInvalidNestedSSHKey_ValidationFails(t *testing.T) {
 	h := newTenantHandler()
 	rec := httptest.NewRecorder()
 	body := validTenantBody()
-	body["sftp_keys"] = []map[string]any{
+	body["ssh_keys"] = []map[string]any{
 		{
 			"name": "my-key",
 			// missing public_key
@@ -728,7 +728,7 @@ func TestTenantCreate_FullNested_ValidationPasses(t *testing.T) {
 			},
 		},
 	}
-	body["sftp_keys"] = []map[string]any{
+	body["ssh_keys"] = []map[string]any{
 		{
 			"name":       "deploy-key",
 			"public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGKCwmDZb5JjFMYnbPPM6MvxMCEjMltcGacM4AiSuKiP test@localhost",

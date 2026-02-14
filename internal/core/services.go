@@ -29,7 +29,7 @@ type Services struct {
 	ValkeyUser       *ValkeyUserService
 	S3Bucket         *S3BucketService
 	S3AccessKey      *S3AccessKeyService
-	SFTPKey          *SFTPKeyService
+	SSHKey           *SSHKeyService
 	Backup           *BackupService
 	APIKey           *APIKeyService
 	OIDC             *OIDCService
@@ -62,7 +62,7 @@ func NewServices(db DB, tc temporalclient.Client, oidcIssuerURL string) *Service
 		ValkeyUser:       NewValkeyUserService(db, tc),
 		S3Bucket:         NewS3BucketService(db, tc),
 		S3AccessKey:      NewS3AccessKeyService(db, tc),
-		SFTPKey:          NewSFTPKeyService(db, tc),
+		SSHKey:           NewSSHKeyService(db, tc),
 		Backup:           NewBackupService(db, tc),
 		APIKey:           NewAPIKeyService(db),
 		OIDC:             NewOIDCService(db, oidcIssuerURL),

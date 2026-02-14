@@ -712,37 +712,37 @@ func (a *CoreDB) GetExpiredCerts(ctx context.Context, daysAfterExpiry int) ([]mo
 	return certs, rows.Err()
 }
 
-// GetSFTPKeyByID retrieves an SFTP key by its ID.
-func (a *CoreDB) GetSFTPKeyByID(ctx context.Context, id string) (*model.SFTPKey, error) {
-	var k model.SFTPKey
+// GetSSHKeyByID retrieves an SSH key by its ID.
+func (a *CoreDB) GetSSHKeyByID(ctx context.Context, id string) (*model.SSHKey, error) {
+	var k model.SSHKey
 	err := a.db.QueryRow(ctx,
 		`SELECT id, tenant_id, name, public_key, fingerprint, status, status_message, created_at, updated_at
-		 FROM sftp_keys WHERE id = $1`, id,
+		 FROM ssh_keys WHERE id = $1`, id,
 	).Scan(&k.ID, &k.TenantID, &k.Name, &k.PublicKey, &k.Fingerprint,
 		&k.Status, &k.StatusMessage, &k.CreatedAt, &k.UpdatedAt)
 	if err != nil {
-		return nil, fmt.Errorf("get sftp key by id: %w", err)
+		return nil, fmt.Errorf("get SSH key by id: %w", err)
 	}
 	return &k, nil
 }
 
-// GetSFTPKeysByTenant retrieves all active SFTP keys for a tenant.
-func (a *CoreDB) GetSFTPKeysByTenant(ctx context.Context, tenantID string) ([]model.SFTPKey, error) {
+// GetSSHKeysByTenant retrieves all active SSH keys for a tenant.
+func (a *CoreDB) GetSSHKeysByTenant(ctx context.Context, tenantID string) ([]model.SSHKey, error) {
 	rows, err := a.db.Query(ctx,
 		`SELECT id, tenant_id, name, public_key, fingerprint, status, status_message, created_at, updated_at
-		 FROM sftp_keys WHERE tenant_id = $1 AND status = $2`, tenantID, model.StatusActive,
+		 FROM ssh_keys WHERE tenant_id = $1 AND status = $2`, tenantID, model.StatusActive,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("get sftp keys by tenant: %w", err)
+		return nil, fmt.Errorf("get SSH keys by tenant: %w", err)
 	}
 	defer rows.Close()
 
-	var keys []model.SFTPKey
+	var keys []model.SSHKey
 	for rows.Next() {
-		var k model.SFTPKey
+		var k model.SSHKey
 		if err := rows.Scan(&k.ID, &k.TenantID, &k.Name, &k.PublicKey, &k.Fingerprint,
 			&k.Status, &k.StatusMessage, &k.CreatedAt, &k.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan sftp key row: %w", err)
+			return nil, fmt.Errorf("scan SSH key row: %w", err)
 		}
 		keys = append(keys, k)
 	}

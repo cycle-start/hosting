@@ -10,16 +10,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newSFTPKeyHandler() *SFTPKey {
-	return NewSFTPKey(nil, nil)
+func newSSHKeyHandler() *SSHKey {
+	return NewSSHKey(nil, nil)
 }
 
 // --- ListByTenant ---
 
-func TestSFTPKeyListByTenant_EmptyID(t *testing.T) {
-	h := newSFTPKeyHandler()
+func TestSSHKeyListByTenant_EmptyID(t *testing.T) {
+	h := newSSHKeyHandler()
 	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodGet, "/tenants//sftp-keys", nil)
+	r := newRequest(http.MethodGet, "/tenants//ssh-keys", nil)
 	r = withChiURLParam(r, "tenantID", "")
 
 	h.ListByTenant(rec, r)
@@ -32,10 +32,10 @@ func TestSFTPKeyListByTenant_EmptyID(t *testing.T) {
 
 // --- Create ---
 
-func TestSFTPKeyCreate_EmptyTenantID(t *testing.T) {
-	h := newSFTPKeyHandler()
+func TestSSHKeyCreate_EmptyTenantID(t *testing.T) {
+	h := newSSHKeyHandler()
 	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/tenants//sftp-keys", map[string]any{
+	r := newRequest(http.MethodPost, "/tenants//ssh-keys", map[string]any{
 		"name":       "my-key",
 		"public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC...",
 	})
@@ -48,10 +48,10 @@ func TestSFTPKeyCreate_EmptyTenantID(t *testing.T) {
 	assert.Contains(t, body["error"], "missing required ID")
 }
 
-func TestSFTPKeyCreate_InvalidJSON(t *testing.T) {
-	h := newSFTPKeyHandler()
+func TestSSHKeyCreate_InvalidJSON(t *testing.T) {
+	h := newSSHKeyHandler()
 	rec := httptest.NewRecorder()
-	r := newRequestRaw(http.MethodPost, "/tenants/"+validID+"/sftp-keys", "{bad json")
+	r := newRequestRaw(http.MethodPost, "/tenants/"+validID+"/ssh-keys", "{bad json")
 	r = withChiURLParam(r, "tenantID", validID)
 
 	h.Create(rec, r)
@@ -61,10 +61,10 @@ func TestSFTPKeyCreate_InvalidJSON(t *testing.T) {
 	assert.Contains(t, body["error"], "invalid JSON")
 }
 
-func TestSFTPKeyCreate_EmptyBody(t *testing.T) {
-	h := newSFTPKeyHandler()
+func TestSSHKeyCreate_EmptyBody(t *testing.T) {
+	h := newSSHKeyHandler()
 	rec := httptest.NewRecorder()
-	r := newRequestRaw(http.MethodPost, "/tenants/"+validID+"/sftp-keys", "")
+	r := newRequestRaw(http.MethodPost, "/tenants/"+validID+"/ssh-keys", "")
 	r = withChiURLParam(r, "tenantID", validID)
 
 	h.Create(rec, r)
@@ -72,10 +72,10 @@ func TestSFTPKeyCreate_EmptyBody(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
-func TestSFTPKeyCreate_MissingRequiredFields(t *testing.T) {
-	h := newSFTPKeyHandler()
+func TestSSHKeyCreate_MissingRequiredFields(t *testing.T) {
+	h := newSSHKeyHandler()
 	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/tenants/"+validID+"/sftp-keys", map[string]any{})
+	r := newRequest(http.MethodPost, "/tenants/"+validID+"/ssh-keys", map[string]any{})
 	r = withChiURLParam(r, "tenantID", validID)
 
 	h.Create(rec, r)
@@ -85,10 +85,10 @@ func TestSFTPKeyCreate_MissingRequiredFields(t *testing.T) {
 	assert.Contains(t, body["error"], "validation error")
 }
 
-func TestSFTPKeyCreate_MissingName(t *testing.T) {
-	h := newSFTPKeyHandler()
+func TestSSHKeyCreate_MissingName(t *testing.T) {
+	h := newSSHKeyHandler()
 	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/tenants/"+validID+"/sftp-keys", map[string]any{
+	r := newRequest(http.MethodPost, "/tenants/"+validID+"/ssh-keys", map[string]any{
 		"public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC...",
 	})
 	r = withChiURLParam(r, "tenantID", validID)
@@ -100,10 +100,10 @@ func TestSFTPKeyCreate_MissingName(t *testing.T) {
 	assert.Contains(t, body["error"], "validation error")
 }
 
-func TestSFTPKeyCreate_MissingPublicKey(t *testing.T) {
-	h := newSFTPKeyHandler()
+func TestSSHKeyCreate_MissingPublicKey(t *testing.T) {
+	h := newSSHKeyHandler()
 	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/tenants/"+validID+"/sftp-keys", map[string]any{
+	r := newRequest(http.MethodPost, "/tenants/"+validID+"/ssh-keys", map[string]any{
 		"name": "my-key",
 	})
 	r = withChiURLParam(r, "tenantID", validID)
@@ -115,10 +115,10 @@ func TestSFTPKeyCreate_MissingPublicKey(t *testing.T) {
 	assert.Contains(t, body["error"], "validation error")
 }
 
-func TestSFTPKeyCreate_InvalidPublicKey(t *testing.T) {
-	h := newSFTPKeyHandler()
+func TestSSHKeyCreate_InvalidPublicKey(t *testing.T) {
+	h := newSSHKeyHandler()
 	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/tenants/"+validID+"/sftp-keys", map[string]any{
+	r := newRequest(http.MethodPost, "/tenants/"+validID+"/ssh-keys", map[string]any{
 		"name":       "my-key",
 		"public_key": "not-a-valid-ssh-key",
 	})
@@ -133,10 +133,10 @@ func TestSFTPKeyCreate_InvalidPublicKey(t *testing.T) {
 
 // --- Get ---
 
-func TestSFTPKeyGet_EmptyID(t *testing.T) {
-	h := newSFTPKeyHandler()
+func TestSSHKeyGet_EmptyID(t *testing.T) {
+	h := newSSHKeyHandler()
 	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodGet, "/sftp-keys/", nil)
+	r := newRequest(http.MethodGet, "/ssh-keys/", nil)
 	r = withChiURLParam(r, "id", "")
 
 	h.Get(rec, r)
@@ -148,10 +148,10 @@ func TestSFTPKeyGet_EmptyID(t *testing.T) {
 
 // --- Delete ---
 
-func TestSFTPKeyDelete_EmptyID(t *testing.T) {
-	h := newSFTPKeyHandler()
+func TestSSHKeyDelete_EmptyID(t *testing.T) {
+	h := newSSHKeyHandler()
 	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodDelete, "/sftp-keys/", nil)
+	r := newRequest(http.MethodDelete, "/ssh-keys/", nil)
 	r = withChiURLParam(r, "id", "")
 
 	h.Delete(rec, r)
@@ -163,10 +163,10 @@ func TestSFTPKeyDelete_EmptyID(t *testing.T) {
 
 // --- Error response format ---
 
-func TestSFTPKeyCreate_ErrorResponseFormat(t *testing.T) {
-	h := newSFTPKeyHandler()
+func TestSSHKeyCreate_ErrorResponseFormat(t *testing.T) {
+	h := newSSHKeyHandler()
 	rec := httptest.NewRecorder()
-	r := newRequestRaw(http.MethodPost, "/tenants/"+validID+"/sftp-keys", "{bad")
+	r := newRequestRaw(http.MethodPost, "/tenants/"+validID+"/ssh-keys", "{bad")
 	r = withChiURLParam(r, "tenantID", validID)
 
 	h.Create(rec, r)

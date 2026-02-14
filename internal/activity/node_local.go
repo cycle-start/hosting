@@ -425,12 +425,12 @@ func (a *NodeLocal) CleanupMigrateFile(ctx context.Context, path string) error {
 }
 
 // --------------------------------------------------------------------------
-// SFTP
+// SSH Keys (authorized_keys)
 // --------------------------------------------------------------------------
 
-// SyncSFTPKeys writes all public keys to the tenant's authorized_keys file.
-func (a *NodeLocal) SyncSFTPKeys(ctx context.Context, params SyncSFTPKeysParams) error {
-	a.logger.Info().Str("tenant", params.TenantName).Int("key_count", len(params.PublicKeys)).Msg("SyncSFTPKeys")
+// SyncSSHKeys writes all public keys to the tenant's authorized_keys file.
+func (a *NodeLocal) SyncSSHKeys(ctx context.Context, params SyncSSHKeysParams) error {
+	a.logger.Info().Str("tenant", params.TenantName).Int("key_count", len(params.PublicKeys)).Msg("SyncSSHKeys")
 
 	// authorized_keys lives in the tenant's home dir on CephFS.
 	sshDir := filepath.Join(a.tenant.WebStorageDir(), params.TenantName, "home", ".ssh")

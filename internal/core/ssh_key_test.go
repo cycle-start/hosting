@@ -14,10 +14,10 @@ import (
 	temporalmocks "go.temporal.io/sdk/mocks"
 )
 
-func TestNewSFTPKeyService(t *testing.T) {
+func TestNewSSHKeyService(t *testing.T) {
 	db := &mockDB{}
 	tc := &temporalmocks.Client{}
-	svc := NewSFTPKeyService(db, tc)
+	svc := NewSSHKeyService(db, tc)
 
 	require.NotNil(t, svc)
 	assert.Equal(t, db, svc.db)
@@ -26,14 +26,14 @@ func TestNewSFTPKeyService(t *testing.T) {
 
 // ---------- Create ----------
 
-func TestSFTPKeyService_Create_Success(t *testing.T) {
+func TestSSHKeyService_Create_Success(t *testing.T) {
 	db := &mockDB{}
 	tc := &temporalmocks.Client{}
-	svc := NewSFTPKeyService(db, tc)
+	svc := NewSSHKeyService(db, tc)
 	ctx := context.Background()
 
 	now := time.Now()
-	key := &model.SFTPKey{
+	key := &model.SSHKey{
 		ID:          "test-key-1",
 		TenantID:    "test-tenant-1",
 		Name:        "my-key",
@@ -57,46 +57,46 @@ func TestSFTPKeyService_Create_Success(t *testing.T) {
 	tc.AssertExpectations(t)
 }
 
-func TestSFTPKeyService_Create_InsertError(t *testing.T) {
+func TestSSHKeyService_Create_InsertError(t *testing.T) {
 	db := &mockDB{}
 	tc := &temporalmocks.Client{}
-	svc := NewSFTPKeyService(db, tc)
+	svc := NewSSHKeyService(db, tc)
 	ctx := context.Background()
 
-	key := &model.SFTPKey{ID: "test-key-1", TenantID: "test-tenant-1"}
+	key := &model.SSHKey{ID: "test-key-1", TenantID: "test-tenant-1"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
 
 	err := svc.Create(ctx, key)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "insert sftp key")
+	assert.Contains(t, err.Error(), "insert SSH key")
 	db.AssertExpectations(t)
 }
 
-func TestSFTPKeyService_Create_WorkflowError(t *testing.T) {
+func TestSSHKeyService_Create_WorkflowError(t *testing.T) {
 	db := &mockDB{}
 	tc := &temporalmocks.Client{}
-	svc := NewSFTPKeyService(db, tc)
+	svc := NewSSHKeyService(db, tc)
 	ctx := context.Background()
 
-	key := &model.SFTPKey{ID: "test-key-1", TenantID: "test-tenant-1"}
+	key := &model.SSHKey{ID: "test-key-1", TenantID: "test-tenant-1"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Create(ctx, key)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start AddSFTPKeyWorkflow")
+	assert.Contains(t, err.Error(), "start AddSSHKeyWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }
 
 // ---------- GetByID ----------
 
-func TestSFTPKeyService_GetByID_Success(t *testing.T) {
+func TestSSHKeyService_GetByID_Success(t *testing.T) {
 	db := &mockDB{}
 	tc := &temporalmocks.Client{}
-	svc := NewSFTPKeyService(db, tc)
+	svc := NewSSHKeyService(db, tc)
 	ctx := context.Background()
 
 	keyID := "test-key-1"
@@ -128,10 +128,10 @@ func TestSFTPKeyService_GetByID_Success(t *testing.T) {
 	db.AssertExpectations(t)
 }
 
-func TestSFTPKeyService_GetByID_NotFound(t *testing.T) {
+func TestSSHKeyService_GetByID_NotFound(t *testing.T) {
 	db := &mockDB{}
 	tc := &temporalmocks.Client{}
-	svc := NewSFTPKeyService(db, tc)
+	svc := NewSSHKeyService(db, tc)
 	ctx := context.Background()
 
 	row := &mockRow{scanFunc: func(dest ...any) error {
@@ -142,16 +142,16 @@ func TestSFTPKeyService_GetByID_NotFound(t *testing.T) {
 	result, err := svc.GetByID(ctx, "nonexistent-key")
 	require.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "get sftp key")
+	assert.Contains(t, err.Error(), "get SSH key")
 	db.AssertExpectations(t)
 }
 
 // ---------- ListByTenant ----------
 
-func TestSFTPKeyService_ListByTenant_Success(t *testing.T) {
+func TestSSHKeyService_ListByTenant_Success(t *testing.T) {
 	db := &mockDB{}
 	tc := &temporalmocks.Client{}
-	svc := NewSFTPKeyService(db, tc)
+	svc := NewSSHKeyService(db, tc)
 	ctx := context.Background()
 
 	tenantID := "test-tenant-1"
@@ -183,10 +183,10 @@ func TestSFTPKeyService_ListByTenant_Success(t *testing.T) {
 	db.AssertExpectations(t)
 }
 
-func TestSFTPKeyService_ListByTenant_Empty(t *testing.T) {
+func TestSSHKeyService_ListByTenant_Empty(t *testing.T) {
 	db := &mockDB{}
 	tc := &temporalmocks.Client{}
-	svc := NewSFTPKeyService(db, tc)
+	svc := NewSSHKeyService(db, tc)
 	ctx := context.Background()
 
 	rows := newEmptyMockRows()
@@ -199,10 +199,10 @@ func TestSFTPKeyService_ListByTenant_Empty(t *testing.T) {
 	db.AssertExpectations(t)
 }
 
-func TestSFTPKeyService_ListByTenant_QueryError(t *testing.T) {
+func TestSSHKeyService_ListByTenant_QueryError(t *testing.T) {
 	db := &mockDB{}
 	tc := &temporalmocks.Client{}
-	svc := NewSFTPKeyService(db, tc)
+	svc := NewSSHKeyService(db, tc)
 	ctx := context.Background()
 
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("db error"))
@@ -210,14 +210,14 @@ func TestSFTPKeyService_ListByTenant_QueryError(t *testing.T) {
 	result, _, err := svc.ListByTenant(ctx, "test-tenant-1", 50, "")
 	require.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "list sftp keys")
+	assert.Contains(t, err.Error(), "list SSH keys")
 	db.AssertExpectations(t)
 }
 
-func TestSFTPKeyService_ListByTenant_WithCursor(t *testing.T) {
+func TestSSHKeyService_ListByTenant_WithCursor(t *testing.T) {
 	db := &mockDB{}
 	tc := &temporalmocks.Client{}
-	svc := NewSFTPKeyService(db, tc)
+	svc := NewSSHKeyService(db, tc)
 	ctx := context.Background()
 
 	rows := newEmptyMockRows()
@@ -232,10 +232,10 @@ func TestSFTPKeyService_ListByTenant_WithCursor(t *testing.T) {
 
 // ---------- Delete ----------
 
-func TestSFTPKeyService_Delete_Success(t *testing.T) {
+func TestSSHKeyService_Delete_Success(t *testing.T) {
 	db := &mockDB{}
 	tc := &temporalmocks.Client{}
-	svc := NewSFTPKeyService(db, tc)
+	svc := NewSSHKeyService(db, tc)
 	ctx := context.Background()
 
 	updateRow := &mockRow{scanFunc: func(dest ...any) error {
@@ -261,10 +261,10 @@ func TestSFTPKeyService_Delete_Success(t *testing.T) {
 	tc.AssertExpectations(t)
 }
 
-func TestSFTPKeyService_Delete_ExecError(t *testing.T) {
+func TestSSHKeyService_Delete_ExecError(t *testing.T) {
 	db := &mockDB{}
 	tc := &temporalmocks.Client{}
-	svc := NewSFTPKeyService(db, tc)
+	svc := NewSSHKeyService(db, tc)
 	ctx := context.Background()
 
 	errorRow := &mockRow{scanFunc: func(dest ...any) error {
@@ -274,14 +274,14 @@ func TestSFTPKeyService_Delete_ExecError(t *testing.T) {
 
 	err := svc.Delete(ctx, "test-key-1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "set sftp key")
+	assert.Contains(t, err.Error(), "set SSH key")
 	db.AssertExpectations(t)
 }
 
-func TestSFTPKeyService_Delete_WorkflowError(t *testing.T) {
+func TestSSHKeyService_Delete_WorkflowError(t *testing.T) {
 	db := &mockDB{}
 	tc := &temporalmocks.Client{}
-	svc := NewSFTPKeyService(db, tc)
+	svc := NewSSHKeyService(db, tc)
 	ctx := context.Background()
 
 	updateRow := &mockRow{scanFunc: func(dest ...any) error {
@@ -299,7 +299,7 @@ func TestSFTPKeyService_Delete_WorkflowError(t *testing.T) {
 
 	err := svc.Delete(ctx, "test-key-1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start RemoveSFTPKeyWorkflow")
+	assert.Contains(t, err.Error(), "start RemoveSSHKeyWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }

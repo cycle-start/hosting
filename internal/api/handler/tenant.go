@@ -74,7 +74,7 @@ func (h *Tenant) List(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create a tenant
-//	@Description	Creates a new tenant with a generated short ID and UID. Supports nested creation of zones, webroots, databases, valkey instances, S3 buckets, and SFTP keys in one request. Validates that the target cluster is in the brand's allowed cluster list. Async — returns 202 and triggers Temporal provisioning workflows for each resource.
+//	@Description	Creates a new tenant with a generated short ID and UID. Supports nested creation of zones, webroots, databases, valkey instances, S3 buckets, and SSH keys in one request. Validates that the target cluster is in the brand's allowed cluster list. Async — returns 202 and triggers Temporal provisioning workflows for each resource.
 //	@Tags			Tenants
 //	@Security		ApiKeyAuth
 //	@Param			body body request.CreateTenant true "Tenant details"
@@ -297,15 +297,15 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Nested SFTP key creation
-	for _, kr := range req.SFTPKeys {
+	// Nested SSH key creation
+	for _, kr := range req.SSHKeys {
 		fingerprint, err := parseSSHKey(kr.PublicKey)
 		if err != nil {
-			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create sftp key %s: invalid SSH public key: %s", kr.Name, err.Error()))
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create SSH key %s: invalid SSH public key: %s", kr.Name, err.Error()))
 			return
 		}
 		now2 := time.Now()
-		key := &model.SFTPKey{
+		key := &model.SSHKey{
 			ID:          platform.NewID(),
 			TenantID:    tenant.ID,
 			Name:        kr.Name,
@@ -315,8 +315,8 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 			CreatedAt:   now2,
 			UpdatedAt:   now2,
 		}
-		if err := h.services.SFTPKey.Create(r.Context(), key); err != nil {
-			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create sftp key %s: %s", kr.Name, err.Error()))
+		if err := h.services.SSHKey.Create(r.Context(), key); err != nil {
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create SSH key %s: %s", kr.Name, err.Error()))
 			return
 		}
 	}

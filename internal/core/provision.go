@@ -188,11 +188,11 @@ func resolveTenantIDFromValkeyUser(ctx context.Context, db DB, userID string) (s
 	return *tenantID, nil
 }
 
-func resolveTenantIDFromSFTPKey(ctx context.Context, db DB, keyID string) (string, error) {
+func resolveTenantIDFromSSHKey(ctx context.Context, db DB, keyID string) (string, error) {
 	var tenantID string
-	err := db.QueryRow(ctx, "SELECT tenant_id FROM sftp_keys WHERE id = $1", keyID).Scan(&tenantID)
+	err := db.QueryRow(ctx, "SELECT tenant_id FROM ssh_keys WHERE id = $1", keyID).Scan(&tenantID)
 	if err != nil {
-		return "", fmt.Errorf("resolve tenant from sftp key %s: %w", keyID, err)
+		return "", fmt.Errorf("resolve tenant from SSH key %s: %w", keyID, err)
 	}
 	return tenantID, nil
 }

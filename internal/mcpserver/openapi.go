@@ -343,7 +343,7 @@ func singularize(s string) string {
 		"lb_addresses":     "lb_address",
 		"audit_logs":       "audit_log",
 		"api_keys":         "api_key",
-		"sftp_keys":        "sftp_key",
+		"ssh_keys":         "ssh_key",
 		"access_keys":      "access_key",
 		"s3_buckets":       "s3_bucket",
 		"s3_access_keys":   "s3_access_key",

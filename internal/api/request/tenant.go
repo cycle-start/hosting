@@ -13,7 +13,7 @@ type CreateTenant struct {
 	Databases       []CreateDatabaseNested       `json:"databases" validate:"omitempty,dive"`
 	ValkeyInstances []CreateValkeyInstanceNested `json:"valkey_instances" validate:"omitempty,dive"`
 	S3Buckets       []CreateS3BucketNested       `json:"s3_buckets" validate:"omitempty,dive"`
-	SFTPKeys        []CreateSFTPKeyNested        `json:"sftp_keys" validate:"omitempty,dive"`
+	SSHKeys         []CreateSSHKeyNested         `json:"ssh_keys" validate:"omitempty,dive"`
 }
 
 type UpdateTenant struct {

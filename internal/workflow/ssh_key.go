@@ -11,8 +11,8 @@ import (
 	"github.com/edvin/hosting/internal/model"
 )
 
-// AddSFTPKeyWorkflow provisions an SFTP key by syncing authorized_keys on all shard nodes.
-func AddSFTPKeyWorkflow(ctx workflow.Context, keyID string) error {
+// AddSSHKeyWorkflow provisions an SSH key by syncing authorized_keys on all shard nodes.
+func AddSSHKeyWorkflow(ctx workflow.Context, keyID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
@@ -23,7 +23,7 @@ func AddSFTPKeyWorkflow(ctx workflow.Context, keyID string) error {
 
 	// Set key status to provisioning.
 	err := workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
-		Table:  "sftp_keys",
+		Table:  "ssh_keys",
 		ID:     keyID,
 		Status: model.StatusProvisioning,
 	}).Get(ctx, nil)
@@ -32,10 +32,10 @@ func AddSFTPKeyWorkflow(ctx workflow.Context, keyID string) error {
 	}
 
 	// Get the key by ID.
-	var key model.SFTPKey
-	err = workflow.ExecuteActivity(ctx, "GetSFTPKeyByID", keyID).Get(ctx, &key)
+	var key model.SSHKey
+	err = workflow.ExecuteActivity(ctx, "GetSSHKeyByID", keyID).Get(ctx, &key)
 	if err != nil {
-		_ = setResourceFailed(ctx, "sftp_keys", keyID, err)
+		_ = setResourceFailed(ctx, "ssh_keys", keyID, err)
 		return err
 	}
 
@@ -43,21 +43,21 @@ func AddSFTPKeyWorkflow(ctx workflow.Context, keyID string) error {
 	var tenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", key.TenantID).Get(ctx, &tenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "sftp_keys", keyID, err)
+		_ = setResourceFailed(ctx, "ssh_keys", keyID, err)
 		return err
 	}
 
 	if tenant.ShardID == nil {
 		noShardErr := fmt.Errorf("tenant %s has no shard assigned", key.TenantID)
-		_ = setResourceFailed(ctx, "sftp_keys", keyID, noShardErr)
+		_ = setResourceFailed(ctx, "ssh_keys", keyID, noShardErr)
 		return noShardErr
 	}
 
-	// Get all active SFTP keys for the tenant.
-	var activeKeys []model.SFTPKey
-	err = workflow.ExecuteActivity(ctx, "GetSFTPKeysByTenant", key.TenantID).Get(ctx, &activeKeys)
+	// Get all active SSH keys for the tenant.
+	var activeKeys []model.SSHKey
+	err = workflow.ExecuteActivity(ctx, "GetSSHKeysByTenant", key.TenantID).Get(ctx, &activeKeys)
 	if err != nil {
-		_ = setResourceFailed(ctx, "sftp_keys", keyID, err)
+		_ = setResourceFailed(ctx, "ssh_keys", keyID, err)
 		return err
 	}
 
@@ -73,33 +73,33 @@ func AddSFTPKeyWorkflow(ctx workflow.Context, keyID string) error {
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "sftp_keys", keyID, err)
+		_ = setResourceFailed(ctx, "ssh_keys", keyID, err)
 		return err
 	}
 
 	// Sync authorized_keys on each node.
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "SyncSFTPKeys", activity.SyncSFTPKeysParams{
+		err = workflow.ExecuteActivity(nodeCtx, "SyncSSHKeys", activity.SyncSSHKeysParams{
 			TenantName: tenant.ID,
 			PublicKeys: publicKeys,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "sftp_keys", keyID, err)
+			_ = setResourceFailed(ctx, "ssh_keys", keyID, err)
 			return err
 		}
 	}
 
 	// Set key status to active.
 	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
-		Table:  "sftp_keys",
+		Table:  "ssh_keys",
 		ID:     keyID,
 		Status: model.StatusActive,
 	}).Get(ctx, nil)
 }
 
-// RemoveSFTPKeyWorkflow removes an SFTP key by syncing authorized_keys on all shard nodes.
-func RemoveSFTPKeyWorkflow(ctx workflow.Context, keyID string) error {
+// RemoveSSHKeyWorkflow removes an SSH key by syncing authorized_keys on all shard nodes.
+func RemoveSSHKeyWorkflow(ctx workflow.Context, keyID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
@@ -109,21 +109,21 @@ func RemoveSFTPKeyWorkflow(ctx workflow.Context, keyID string) error {
 	ctx = workflow.WithActivityOptions(ctx, ao)
 
 	// Get the key by ID (before deletion, it's in deleting status).
-	var key model.SFTPKey
-	err := workflow.ExecuteActivity(ctx, "GetSFTPKeyByID", keyID).Get(ctx, &key)
+	var key model.SSHKey
+	err := workflow.ExecuteActivity(ctx, "GetSSHKeyByID", keyID).Get(ctx, &key)
 	if err != nil {
-		_ = setResourceFailed(ctx, "sftp_keys", keyID, err)
+		_ = setResourceFailed(ctx, "ssh_keys", keyID, err)
 		return err
 	}
 
 	// Set key status to deleted.
 	err = workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
-		Table:  "sftp_keys",
+		Table:  "ssh_keys",
 		ID:     keyID,
 		Status: model.StatusDeleted,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "sftp_keys", keyID, err)
+		_ = setResourceFailed(ctx, "ssh_keys", keyID, err)
 		return err
 	}
 
@@ -138,9 +138,9 @@ func RemoveSFTPKeyWorkflow(ctx workflow.Context, keyID string) error {
 		return fmt.Errorf("tenant %s has no shard assigned", key.TenantID)
 	}
 
-	// Get remaining active SFTP keys (deleted key won't be included).
-	var remainingKeys []model.SFTPKey
-	err = workflow.ExecuteActivity(ctx, "GetSFTPKeysByTenant", key.TenantID).Get(ctx, &remainingKeys)
+	// Get remaining active SSH keys (deleted key won't be included).
+	var remainingKeys []model.SSHKey
+	err = workflow.ExecuteActivity(ctx, "GetSSHKeysByTenant", key.TenantID).Get(ctx, &remainingKeys)
 	if err != nil {
 		return err
 	}
@@ -161,7 +161,7 @@ func RemoveSFTPKeyWorkflow(ctx workflow.Context, keyID string) error {
 	// Sync authorized_keys on each node.
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "SyncSFTPKeys", activity.SyncSFTPKeysParams{
+		err = workflow.ExecuteActivity(nodeCtx, "SyncSSHKeys", activity.SyncSSHKeysParams{
 			TenantName: tenant.ID,
 			PublicKeys: publicKeys,
 		}).Get(ctx, nil)

@@ -16,11 +16,11 @@ import { WebrootFields } from '@/components/forms/webroot-fields'
 import { DatabaseFields } from '@/components/forms/database-fields'
 import { ValkeyInstanceFields } from '@/components/forms/valkey-instance-fields'
 import { S3BucketFields } from '@/components/forms/s3-bucket-fields'
-import { SFTPKeyFields } from '@/components/forms/sftp-key-fields'
+import { SSHKeyFields } from '@/components/forms/ssh-key-fields'
 import { useCreateTenant, useBrands } from '@/lib/hooks'
 import type {
   CreateTenantRequest, ZoneFormData, WebrootFormData,
-  DatabaseFormData, ValkeyInstanceFormData, S3BucketFormData, SFTPKeyFormData,
+  DatabaseFormData, ValkeyInstanceFormData, S3BucketFormData, SSHKeyFormData,
 } from '@/lib/types'
 
 export function CreateTenantPage() {
@@ -39,7 +39,7 @@ export function CreateTenantPage() {
   const [databases, setDatabases] = useState<DatabaseFormData[]>([])
   const [valkeyInstances, setValkeyInstances] = useState<ValkeyInstanceFormData[]>([])
   const [s3Buckets, setS3Buckets] = useState<S3BucketFormData[]>([])
-  const [sftpKeys, setSftpKeys] = useState<SFTPKeyFormData[]>([])
+  const [sshKeys, setSSHKeys] = useState<SSHKeyFormData[]>([])
 
   const handleSubmit = async () => {
     const payload: CreateTenantRequest = {
@@ -54,7 +54,7 @@ export function CreateTenantPage() {
     if (databases.length > 0) payload.databases = databases
     if (valkeyInstances.length > 0) payload.valkey_instances = valkeyInstances
     if (s3Buckets.length > 0) payload.s3_buckets = s3Buckets
-    if (sftpKeys.length > 0) payload.sftp_keys = sftpKeys
+    if (sshKeys.length > 0) payload.ssh_keys = sshKeys
 
     try {
       const tenant = await createMutation.mutateAsync(payload)
@@ -144,12 +144,12 @@ export function CreateTenantPage() {
         renderItem={(item, _, onChange) => <S3BucketFields value={item} onChange={onChange} clusterId={clusterId} />}
       />
 
-      <ArraySection<SFTPKeyFormData>
-        title="SFTP Keys"
-        items={sftpKeys}
-        onChange={setSftpKeys}
+      <ArraySection<SSHKeyFormData>
+        title="SSH Keys"
+        items={sshKeys}
+        onChange={setSSHKeys}
         defaultItem={() => ({ name: '', public_key: '' })}
-        renderItem={(item, _, onChange) => <SFTPKeyFields value={item} onChange={onChange} />}
+        renderItem={(item, _, onChange) => <SSHKeyFields value={item} onChange={onChange} />}
       />
 
       <div className="flex justify-end gap-2 pt-4">

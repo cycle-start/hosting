@@ -26,7 +26,7 @@ API keys have two authorization dimensions:
 | Category | Resources |
 |----------|-----------|
 | Infrastructure | `brands`, `regions`, `clusters`, `shards`, `nodes` |
-| Hosting | `tenants`, `webroots`, `fqdns`, `certificates`, `sftp_keys`, `backups` |
+| Hosting | `tenants`, `webroots`, `fqdns`, `certificates`, `ssh_keys`, `backups` |
 | Databases | `databases`, `database_users` |
 | DNS | `zones`, `zone_records` |
 | Email | `email` |
@@ -72,7 +72,7 @@ Resources trace to a brand through their ownership chain:
 | Tenant | `brand_id` (direct) |
 | Zone | `brand_id` (direct) |
 | Database, Valkey, S3 Bucket | `brand_id` (direct, nullable `tenant_id`) |
-| Webroot, FQDN, Certificate, SFTP Key, Backup | via tenant → `brand_id` |
+| Webroot, FQDN, Certificate, SSH Key, Backup | via tenant → `brand_id` |
 | Zone Record | via zone → `brand_id` |
 | Database User | via database → `brand_id` |
 | Email Account/Alias/Forward/AutoReply | via FQDN → webroot → tenant → `brand_id` |

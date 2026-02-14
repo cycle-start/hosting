@@ -138,9 +138,9 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                   <HardDrive className="mr-2 h-4 w-4" />
                   Create S3 Bucket
                 </CommandItem>
-                <CommandItem onSelect={() => handleSelect(`/tenants/${tenantId}?create=sftp_key`)}>
+                <CommandItem onSelect={() => handleSelect(`/tenants/${tenantId}?create=ssh_key`)}>
                   <Key className="mr-2 h-4 w-4" />
-                  Add SFTP Key
+                  Add SSH Key
                 </CommandItem>
                 <CommandItem onSelect={() => handleSelect(`/tenants/${tenantId}?create=zone`)}>
                   <Globe className="mr-2 h-4 w-4" />

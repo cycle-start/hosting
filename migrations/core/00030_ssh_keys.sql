@@ -1,5 +1,5 @@
 -- +goose Up
-CREATE TABLE sftp_keys (
+CREATE TABLE ssh_keys (
     id TEXT PRIMARY KEY,
     tenant_id TEXT NOT NULL REFERENCES tenants(id),
     name TEXT NOT NULL,
@@ -10,8 +10,8 @@ CREATE TABLE sftp_keys (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_sftp_keys_tenant_id ON sftp_keys(tenant_id);
-CREATE UNIQUE INDEX idx_sftp_keys_tenant_fingerprint ON sftp_keys(tenant_id, fingerprint) WHERE status != 'deleted';
+CREATE INDEX idx_ssh_keys_tenant_id ON ssh_keys(tenant_id);
+CREATE UNIQUE INDEX idx_ssh_keys_tenant_fingerprint ON ssh_keys(tenant_id, fingerprint) WHERE status != 'deleted';
 
 -- +goose Down
-DROP TABLE sftp_keys;
+DROP TABLE ssh_keys;

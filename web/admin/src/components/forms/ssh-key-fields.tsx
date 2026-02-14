@@ -1,11 +1,11 @@
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import type { SFTPKeyFormData } from '@/lib/types'
+import type { SSHKeyFormData } from '@/lib/types'
 
-interface Props { value: SFTPKeyFormData; onChange: (v: SFTPKeyFormData) => void }
+interface Props { value: SSHKeyFormData; onChange: (v: SSHKeyFormData) => void }
 
-export function SFTPKeyFields({ value, onChange }: Props) {
+export function SSHKeyFields({ value, onChange }: Props) {
   return (
     <div className="space-y-3">
       <div className="space-y-2">
