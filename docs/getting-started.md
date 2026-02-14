@@ -56,7 +56,7 @@ route add 10.10.10.0 mask 255.255.255.0 <WSL2_IP>
 **In `C:\Windows\System32\drivers\etc\hosts` (as Administrator):**
 
 ```
-10.10.10.2  admin.hosting.test api.hosting.test temporal.hosting.test dbadmin.hosting.test
+10.10.10.2  admin.hosting.test api.hosting.test mcp.hosting.test temporal.hosting.test dbadmin.hosting.test
 ```
 
 After this, all services are accessible from the Windows browser. See [Local Networking](local-networking.md) for details.
