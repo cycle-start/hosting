@@ -24,6 +24,7 @@ func NewCluster(svc *core.ClusterService) *Cluster {
 // ListByRegion godoc
 //
 //	@Summary		List clusters in a region
+//	@Description	Returns a paginated list of clusters belonging to a region. Clusters are groups of shards and nodes (e.g. "prod-1").
 //	@Tags			Clusters
 //	@Security		ApiKeyAuth
 //	@Param			regionID	path		string	true	"Region ID"
@@ -58,6 +59,7 @@ func (h *Cluster) ListByRegion(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create a cluster
+//	@Description	Synchronously creates a cluster in a region with optional config and a spec defining shard topology. Returns 201 on success.
 //	@Tags			Clusters
 //	@Security		ApiKeyAuth
 //	@Param			regionID	path		string					true	"Region ID"
@@ -111,6 +113,7 @@ func (h *Cluster) Create(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get a cluster
+//	@Description	Returns cluster details including its spec and config.
 //	@Tags			Clusters
 //	@Security		ApiKeyAuth
 //	@Param			id	path		string	true	"Cluster ID"
@@ -137,6 +140,7 @@ func (h *Cluster) Get(w http.ResponseWriter, r *http.Request) {
 // Update godoc
 //
 //	@Summary		Update a cluster
+//	@Description	Synchronously performs a partial update of a cluster's name, status, config, or spec. Only provided fields are changed.
 //	@Tags			Clusters
 //	@Security		ApiKeyAuth
 //	@Param			id		path		string					true	"Cluster ID"
@@ -189,6 +193,7 @@ func (h *Cluster) Update(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete a cluster
+//	@Description	Synchronously deletes a cluster. The cluster must have no shards before it can be deleted.
 //	@Tags			Clusters
 //	@Security		ApiKeyAuth
 //	@Param			id	path	string	true	"Cluster ID"

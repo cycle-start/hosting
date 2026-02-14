@@ -25,6 +25,7 @@ func NewWebroot(services *core.Services) *Webroot {
 // ListByTenant godoc
 //
 //	@Summary		List webroots for a tenant
+//	@Description	Returns a paginated list of webroots belonging to the specified tenant.
 //	@Tags			Webroots
 //	@Security		ApiKeyAuth
 //	@Param			tenantID path string true "Tenant ID"
@@ -59,6 +60,7 @@ func (h *Webroot) ListByTenant(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create a webroot
+//	@Description	Creates a webroot (website document root) for a tenant. Requires name, runtime (php/node/python/ruby/static), and runtime version. Supports nested FQDN creation. Async — returns 202 and triggers a Temporal workflow to configure the web server.
 //	@Tags			Webroots
 //	@Security		ApiKeyAuth
 //	@Param			tenantID path string true "Tenant ID"
@@ -115,6 +117,7 @@ func (h *Webroot) Create(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get a webroot
+//	@Description	Returns a single webroot by ID, including runtime configuration details.
 //	@Tags			Webroots
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Webroot ID"
@@ -141,6 +144,7 @@ func (h *Webroot) Get(w http.ResponseWriter, r *http.Request) {
 // Update godoc
 //
 //	@Summary		Update a webroot
+//	@Description	Partial update of a webroot — supports changing runtime, version, runtime config, or public folder. Async — returns 202 and triggers re-convergence of the web server configuration.
 //	@Tags			Webroots
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Webroot ID"
@@ -193,6 +197,7 @@ func (h *Webroot) Update(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete a webroot
+//	@Description	Deletes a webroot and cascades deletion to all associated FQDNs. Async — returns 202 and triggers a Temporal workflow.
 //	@Tags			Webroots
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Webroot ID"
@@ -218,6 +223,7 @@ func (h *Webroot) Delete(w http.ResponseWriter, r *http.Request) {
 // Retry godoc
 //
 //	@Summary		Retry a failed webroot
+//	@Description	Re-triggers the provisioning workflow for a webroot in failed state. Async — returns 202 and starts a new Temporal workflow.
 //	@Tags			Webroots
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Webroot ID"

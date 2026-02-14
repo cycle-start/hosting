@@ -23,6 +23,7 @@ func NewValkeyUser(svc *core.ValkeyUserService) *ValkeyUser {
 // ListByInstance godoc
 //
 //	@Summary		List Valkey users
+//	@Description	Returns a paginated list of Valkey ACL users for an instance. Passwords are redacted in list responses.
 //	@Tags			Valkey Users
 //	@Security		ApiKeyAuth
 //	@Param			instanceID	path		string	true	"Valkey instance ID"
@@ -60,6 +61,7 @@ func (h *ValkeyUser) ListByInstance(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create a Valkey user
+//	@Description	Asynchronously creates a Valkey ACL user with username, password, privileges, and key pattern. Key pattern defaults to "~*" (all keys). Triggers a Temporal workflow and returns 202 immediately.
 //	@Tags			Valkey Users
 //	@Security		ApiKeyAuth
 //	@Param			instanceID	path		string						true	"Valkey instance ID"
@@ -111,6 +113,7 @@ func (h *ValkeyUser) Create(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get a Valkey user
+//	@Description	Returns the details of a single Valkey user by ID. The password is redacted.
 //	@Tags			Valkey Users
 //	@Security		ApiKeyAuth
 //	@Param			id	path		string	true	"Valkey user ID"
@@ -138,6 +141,7 @@ func (h *ValkeyUser) Get(w http.ResponseWriter, r *http.Request) {
 // Update godoc
 //
 //	@Summary		Update a Valkey user
+//	@Description	Asynchronously updates a Valkey user's password, privileges, or key pattern. Triggers a Temporal workflow and returns 202 immediately.
 //	@Tags			Valkey Users
 //	@Security		ApiKeyAuth
 //	@Param			id		path		string						true	"Valkey user ID"
@@ -188,6 +192,7 @@ func (h *ValkeyUser) Update(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete a Valkey user
+//	@Description	Asynchronously removes a Valkey ACL user from the instance. Triggers a Temporal workflow and returns 202 immediately.
 //	@Tags			Valkey Users
 //	@Security		ApiKeyAuth
 //	@Param			id	path	string	true	"Valkey user ID"
@@ -213,6 +218,7 @@ func (h *ValkeyUser) Delete(w http.ResponseWriter, r *http.Request) {
 // Retry godoc
 //
 //	@Summary		Retry a failed Valkey user
+//	@Description	Re-triggers the provisioning workflow for a Valkey user that previously failed. Returns 202 immediately.
 //	@Tags			Valkey Users
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Valkey user ID"

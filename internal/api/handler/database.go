@@ -25,6 +25,7 @@ func NewDatabase(svc *core.DatabaseService, userSvc *core.DatabaseUserService) *
 // ListByTenant godoc
 //
 //	@Summary		List databases for a tenant
+//	@Description	Returns a paginated list of databases belonging to the specified tenant. Supports filtering by search term and status, and sorting by any column.
 //	@Tags			Databases
 //	@Security		ApiKeyAuth
 //	@Param			tenantID	path		string	true	"Tenant ID"
@@ -63,6 +64,7 @@ func (h *Database) ListByTenant(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create a database
+//	@Description	Creates a MySQL database on the specified shard for a tenant. Accepts optional nested user objects to create database users in the same request. Returns 202 and triggers a Temporal workflow to provision the database on the shard's primary MySQL node.
 //	@Tags			Databases
 //	@Security		ApiKeyAuth
 //	@Param			tenantID	path		string					true	"Tenant ID"
@@ -126,6 +128,7 @@ func (h *Database) Create(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get a database
+//	@Description	Returns the details of a single database, including its shard name.
 //	@Tags			Databases
 //	@Security		ApiKeyAuth
 //	@Param			id	path		string	true	"Database ID"
@@ -152,6 +155,7 @@ func (h *Database) Get(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete a database
+//	@Description	Drops the MySQL database. Returns 202 and triggers a Temporal workflow. Cascades to all associated database users, which are also deleted.
 //	@Tags			Databases
 //	@Security		ApiKeyAuth
 //	@Param			id	path	string	true	"Database ID"
@@ -177,6 +181,7 @@ func (h *Database) Delete(w http.ResponseWriter, r *http.Request) {
 // Migrate godoc
 //
 //	@Summary		Migrate a database to a different shard
+//	@Description	Moves a database to a different database shard via mysqldump/restore. Returns 202 and triggers a multi-step Temporal workflow that dumps the source, restores to the target shard, and updates the shard assignment.
 //	@Tags			Databases
 //	@Security		ApiKeyAuth
 //	@Param			id		path	string					true	"Database ID"
@@ -209,6 +214,7 @@ func (h *Database) Migrate(w http.ResponseWriter, r *http.Request) {
 // ReassignTenant godoc
 //
 //	@Summary		Reassign database to a different tenant
+//	@Description	Changes the tenant ownership of a database without moving any data. This is a synchronous operation. Pass null tenant_id to detach the database from its current tenant.
 //	@Tags			Databases
 //	@Security		ApiKeyAuth
 //	@Param			id		path		string							true	"Database ID"
@@ -247,6 +253,7 @@ func (h *Database) ReassignTenant(w http.ResponseWriter, r *http.Request) {
 // Retry godoc
 //
 //	@Summary		Retry a failed database
+//	@Description	Re-triggers the provisioning workflow for a database that is in a failed state. Returns 202 and starts a new Temporal workflow.
 //	@Tags			Databases
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Database ID"

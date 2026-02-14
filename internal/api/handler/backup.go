@@ -25,6 +25,7 @@ func NewBackup(svc *core.BackupService, webroot *core.WebrootService, db *core.D
 // ListByTenant godoc
 //
 //	@Summary		List backups for a tenant
+//	@Description	Returns a paginated list of backups belonging to the specified tenant, including metadata such as type, source, status, size, and timestamps.
 //	@Tags			Backups
 //	@Security		ApiKeyAuth
 //	@Param			tenantID path string true "Tenant ID"
@@ -59,6 +60,7 @@ func (h *Backup) ListByTenant(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create a backup
+//	@Description	Initiates a backup of a webroot (files) or database (mysqldump). Requires specifying the type ("web" or "database") and source_id. Triggers a Temporal workflow that runs the backup on the appropriate node. Async (202).
 //	@Tags			Backups
 //	@Security		ApiKeyAuth
 //	@Param			tenantID path string true "Tenant ID"
@@ -123,6 +125,7 @@ func (h *Backup) Create(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get a backup
+//	@Description	Returns backup details by ID, including type, source, status, size, and timestamps.
 //	@Tags			Backups
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Backup ID"
@@ -149,6 +152,7 @@ func (h *Backup) Get(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete a backup
+//	@Description	Deletes the backup archive from storage. Triggers an async workflow to remove the backup data. Async (202).
 //	@Tags			Backups
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Backup ID"
@@ -174,6 +178,7 @@ func (h *Backup) Delete(w http.ResponseWriter, r *http.Request) {
 // Restore godoc
 //
 //	@Summary		Restore a backup
+//	@Description	Restores a backup to its original source. For databases, this replaces the current data with the backup contents. For webroots, this overwrites the files. Triggers a Temporal workflow on the appropriate node. Async (202).
 //	@Tags			Backups
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Backup ID"
@@ -199,6 +204,7 @@ func (h *Backup) Restore(w http.ResponseWriter, r *http.Request) {
 // Retry godoc
 //
 //	@Summary		Retry a failed backup
+//	@Description	Re-triggers the backup workflow for a backup that previously failed. Only applicable to backups in a failed state. Async (202).
 //	@Tags			Backups
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Backup ID"

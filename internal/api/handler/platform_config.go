@@ -19,6 +19,7 @@ func NewPlatformConfig(svc *core.PlatformConfigService) *PlatformConfig {
 // Get godoc
 //
 //	@Summary		Get all platform configuration
+//	@Description	Returns all platform configuration key-value pairs. These are global settings such as default runtime versions and other platform-wide defaults. Synchronous.
 //	@Tags			Platform Config
 //	@Security		ApiKeyAuth
 //	@Success		200	{object}	map[string]string
@@ -37,6 +38,7 @@ func (h *PlatformConfig) Get(w http.ResponseWriter, r *http.Request) {
 // Update godoc
 //
 //	@Summary		Update platform configuration
+//	@Description	Sets one or more platform configuration key-value pairs. Creates the key if it does not exist, updates it otherwise. Returns the full configuration after applying changes. Synchronous.
 //	@Tags			Platform Config
 //	@Security		ApiKeyAuth
 //	@Param			body	body		map[string]string	true	"Config key-value pairs"

@@ -23,8 +23,9 @@ func NewRegion(svc *core.RegionService) *Region {
 
 // List godoc
 //
-//	@Summary	List regions
-//	@Tags		Regions
+//	@Summary		List regions
+//	@Description	Returns a paginated list of regions. Regions are geographic areas (e.g. "osl-1") that contain clusters.
+//	@Tags			Regions
 //	@Security	ApiKeyAuth
 //	@Param		limit	query	int		false	"Page size"	default(50)
 //	@Param		cursor	query	string	false	"Pagination cursor"
@@ -49,8 +50,9 @@ func (h *Region) List(w http.ResponseWriter, r *http.Request) {
 
 // Create godoc
 //
-//	@Summary	Create a region
-//	@Tags		Regions
+//	@Summary		Create a region
+//	@Description	Synchronously creates a region with a slug ID and optional JSON config. Returns 201 on success.
+//	@Tags			Regions
 //	@Security	ApiKeyAuth
 //	@Param		body	body		request.CreateRegion	true	"Region"
 //	@Success	201		{object}	model.Region
@@ -88,8 +90,9 @@ func (h *Region) Create(w http.ResponseWriter, r *http.Request) {
 
 // Get godoc
 //
-//	@Summary	Get a region
-//	@Tags		Regions
+//	@Summary		Get a region
+//	@Description	Returns the details of a single region by ID.
+//	@Tags			Regions
 //	@Security	ApiKeyAuth
 //	@Param		id	path		string	true	"Region ID"
 //	@Success	200	{object}	model.Region
@@ -114,8 +117,9 @@ func (h *Region) Get(w http.ResponseWriter, r *http.Request) {
 
 // Update godoc
 //
-//	@Summary	Update a region
-//	@Tags		Regions
+//	@Summary		Update a region
+//	@Description	Synchronously performs a partial update of a region's name or config. Only provided fields are changed.
+//	@Tags			Regions
 //	@Security	ApiKeyAuth
 //	@Param		id		path		string				true	"Region ID"
 //	@Param		body	body		request.UpdateRegion	true	"Region"
@@ -160,8 +164,9 @@ func (h *Region) Update(w http.ResponseWriter, r *http.Request) {
 
 // Delete godoc
 //
-//	@Summary	Delete a region
-//	@Tags		Regions
+//	@Summary		Delete a region
+//	@Description	Synchronously deletes a region. The region must have no clusters before it can be deleted.
+//	@Tags			Regions
 //	@Security	ApiKeyAuth
 //	@Param		id	path	string	true	"Region ID"
 //	@Success	204
@@ -185,8 +190,9 @@ func (h *Region) Delete(w http.ResponseWriter, r *http.Request) {
 
 // ListRuntimes godoc
 //
-//	@Summary	List runtimes for a region
-//	@Tags		Regions
+//	@Summary		List runtimes for a region
+//	@Description	Returns a paginated list of runtimes available in a region (e.g. php 8.5, node 22).
+//	@Tags			Regions
 //	@Security	ApiKeyAuth
 //	@Param		id		path	string	true	"Region ID"
 //	@Param		limit	query	int		false	"Page size"	default(50)
@@ -219,8 +225,9 @@ func (h *Region) ListRuntimes(w http.ResponseWriter, r *http.Request) {
 
 // AddRuntime godoc
 //
-//	@Summary	Add a runtime to a region
-//	@Tags		Regions
+//	@Summary		Add a runtime to a region
+//	@Description	Synchronously registers a runtime and version as available in a region. Returns 201 on success.
+//	@Tags			Regions
 //	@Security	ApiKeyAuth
 //	@Param		id		path		string					true	"Region ID"
 //	@Param		body	body		request.AddRegionRuntime	true	"Runtime"
@@ -258,8 +265,9 @@ func (h *Region) AddRuntime(w http.ResponseWriter, r *http.Request) {
 
 // RemoveRuntime godoc
 //
-//	@Summary	Remove a runtime from a region
-//	@Tags		Regions
+//	@Summary		Remove a runtime from a region
+//	@Description	Synchronously removes a runtime and version from a region's available runtimes.
+//	@Tags			Regions
 //	@Security	ApiKeyAuth
 //	@Param		id		path	string						true	"Region ID"
 //	@Param		body	body	request.RemoveRegionRuntime	true	"Runtime"

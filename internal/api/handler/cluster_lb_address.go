@@ -25,6 +25,7 @@ func NewClusterLBAddressHandler(service *core.ClusterLBAddressService) *ClusterL
 // List godoc
 //
 //	@Summary		List cluster load balancer addresses
+//	@Description	Returns a paginated list of load balancer IP addresses for a cluster. These are the public IPs that DNS records point to.
 //	@Tags			Cluster LB Addresses
 //	@Security		ApiKeyAuth
 //	@Param			clusterID	path		string	true	"Cluster ID"
@@ -59,6 +60,7 @@ func (h *ClusterLBAddressHandler) List(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create a cluster load balancer address
+//	@Description	Synchronously registers a load balancer IP address for a cluster. Address family (IPv4/IPv6) is auto-detected from the address. Returns 201 on success.
 //	@Tags			Cluster LB Addresses
 //	@Security		ApiKeyAuth
 //	@Param			clusterID	path		string							true	"Cluster ID"
@@ -89,6 +91,7 @@ func (h *ClusterLBAddressHandler) Create(w http.ResponseWriter, r *http.Request)
 // Get godoc
 //
 //	@Summary		Get a cluster load balancer address
+//	@Description	Returns the details of a single load balancer address by ID.
 //	@Tags			Cluster LB Addresses
 //	@Security		ApiKeyAuth
 //	@Param			id	path		string	true	"LB Address ID"
@@ -113,6 +116,7 @@ func (h *ClusterLBAddressHandler) Get(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete a cluster load balancer address
+//	@Description	Synchronously removes a load balancer address from a cluster.
 //	@Tags			Cluster LB Addresses
 //	@Security		ApiKeyAuth
 //	@Param			id	path	string	true	"LB Address ID"

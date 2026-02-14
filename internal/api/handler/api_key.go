@@ -26,6 +26,7 @@ func NewAPIKey(svc *core.APIKeyService) *APIKey {
 // Create godoc
 //
 //	@Summary		Create an API key
+//	@Description	Generates a new API key with the given name and scopes. The response includes the full key value (prefixed with "hst_") exactly once — it cannot be retrieved again. Store it securely. Synchronous (201).
 //	@Tags			API Keys
 //	@Security		ApiKeyAuth
 //	@Param			body body request.CreateAPIKey true "API key details"
@@ -61,6 +62,7 @@ func (h *APIKey) Create(w http.ResponseWriter, r *http.Request) {
 // List godoc
 //
 //	@Summary		List API keys
+//	@Description	Returns a paginated list of API keys. Each entry contains key metadata (name, prefix, scopes, created/revoked timestamps) but never the full key value.
 //	@Tags			API Keys
 //	@Security		ApiKeyAuth
 //	@Param			limit query int false "Page size" default(50)
@@ -87,6 +89,7 @@ func (h *APIKey) List(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get an API key
+//	@Description	Returns API key metadata by ID, including name, prefix, scopes, and timestamps. The full key value is never returned.
 //	@Tags			API Keys
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "API key ID"
@@ -113,6 +116,7 @@ func (h *APIKey) Get(w http.ResponseWriter, r *http.Request) {
 // Revoke godoc
 //
 //	@Summary		Revoke an API key
+//	@Description	Soft-deletes an API key by setting its revoked_at timestamp. The key immediately stops authenticating. This action is irreversible. Synchronous (204).
 //	@Tags			API Keys
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "API key ID"

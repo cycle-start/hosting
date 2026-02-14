@@ -1,0 +1,134 @@
+# MCP Server Configuration
+#
+# Defines how OpenAPI endpoints map to MCP tool groups,
+# default hints by HTTP method, and per-tool overrides.
+
+# Core API URL for proxying tool calls
+api_url: "http://localhost:8080"
+
+# Swagger spec location (fetched at startup if not overridden by --spec flag)
+spec_path: "/docs/openapi.json"
+
+# Default MCP annotations derived from HTTP method
+defaults:
+  GET:
+    readonly: true
+    destructive: false
+  POST:
+    readonly: false
+    destructive: false
+  PUT:
+    readonly: false
+    destructive: false
+    idempotent: true
+  DELETE:
+    readonly: false
+    destructive: true
+
+# Map OpenAPI tags to MCP server groups.
+# Each group becomes a separate MCP endpoint at /mcp/{group}.
+groups:
+  infrastructure:
+    description: "Manage brands, regions, clusters, shards, nodes, and load balancer addresses"
+    tags:
+      - "Brands"
+      - "Regions"
+      - "Clusters"
+      - "Cluster LB Addresses"
+      - "Shards"
+      - "Nodes"
+
+  tenants:
+    description: "Manage tenants, webroots, and backups"
+    tags:
+      - "Tenants"
+      - "Webroots"
+      - "Backups"
+
+  web:
+    description: "Manage FQDNs, SSL certificates, and SFTP keys"
+    tags:
+      - "FQDNs"
+      - "Certificates"
+      - "SFTP Keys"
+
+  databases:
+    description: "Manage MySQL databases and database users"
+    tags:
+      - "Databases"
+      - "Database Users"
+
+  dns:
+    description: "Manage DNS zones and zone records"
+    tags:
+      - "Zones"
+      - "Zone Records"
+
+  email:
+    description: "Manage email accounts, aliases, forwards, and autoreplies"
+    tags:
+      - "Email Accounts"
+      - "Email Aliases"
+      - "Email Forwards"
+      - "Email Auto-Replies"
+
+  storage:
+    description: "Manage S3 buckets, access keys, Valkey instances, and Valkey users"
+    tags:
+      - "S3 Buckets"
+      - "S3 Access Keys"
+      - "Valkey Instances"
+      - "Valkey Users"
+
+  platform:
+    description: "Dashboard, search, platform config, API keys, and audit logs"
+    tags:
+      - "Dashboard"
+      - "Search"
+      - "Platform Config"
+      - "API Keys"
+      - "Audit Logs"
+
+# Per-tool overrides keyed by auto-derived tool name.
+# Use this to fix names, improve descriptions, or adjust hints.
+overrides:
+  create_tenant:
+    description: "Create a tenant with optional nested resources (zones, webroots, databases, valkey instances, S3 buckets, SFTP keys) in one request. Async."
+
+  retry_failed_tenant:
+    name: "retry_all_failed_resources"
+    description: "Re-trigger provisioning for all failed child resources of a tenant. Returns the count of resources being retried."
+
+  converge_shard:
+    description: "Trigger convergence — reconciles all nodes in the shard to match desired state. Applies web server configs, databases, DNS zones, and other service configurations."
+    destructive: false
+
+  migrate_tenant:
+    description: "Move a tenant to a different web shard. Optionally migrate associated zones and FQDNs. Multi-step async workflow."
+
+  migrate_database:
+    description: "Move a MySQL database to a different shard via dump/restore. Multi-step async workflow."
+
+  migrate_valkey_instance:
+    description: "Move a Valkey instance to a different shard via data migration. Async workflow."
+
+  create_s3_access_key:
+    description: "Generate an S3 access key pair for a bucket. The secret is returned only once in the response — store it securely."
+
+  create_api_key:
+    description: "Generate a new API key. The full key (prefixed hst_) is returned only once — it cannot be retrieved again."
+
+  revoke_api_key:
+    name: "revoke_api_key"
+    description: "Permanently revoke an API key. The key immediately stops authenticating. Irreversible."
+
+  restore_backup:
+    description: "Restore a backup to its original source. For databases this replaces current data; for webroots this overwrites files. Async."
+
+  get_dashboard_stats:
+    name: "get_dashboard_stats"
+    description: "Returns aggregate platform statistics: region/cluster/shard/node/tenant counts, per-shard tenant distribution, and status breakdowns."
+
+  search:
+    name: "search"
+    description: "Search across all resource types by substring match on names and IDs. Returns matching resources grouped by type."

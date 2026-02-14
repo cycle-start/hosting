@@ -36,6 +36,7 @@ func NewAudit(pool *pgxpool.Pool) *Audit {
 // List godoc
 //
 //	@Summary		List audit logs
+//	@Description	Returns a paginated list of audit log entries. Supports filtering by resource_type, HTTP method (action), and date range (date_from/date_to). Each entry includes the acting API key, HTTP method, path, resource affected, status code, request body, and timestamp.
 //	@Tags			Audit Logs
 //	@Security		ApiKeyAuth
 //	@Param			cursor			query		string	false	"Pagination cursor"

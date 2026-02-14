@@ -25,6 +25,7 @@ func NewSFTPKey(svc *core.SFTPKeyService) *SFTPKey {
 // ListByTenant godoc
 //
 //	@Summary		List SFTP keys for a tenant
+//	@Description	Returns a paginated list of SFTP public keys associated with the specified tenant.
 //	@Tags			SFTP Keys
 //	@Security		ApiKeyAuth
 //	@Param			tenantID path string true "Tenant ID"
@@ -59,6 +60,7 @@ func (h *SFTPKey) ListByTenant(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create an SFTP key
+//	@Description	Adds an SSH public key for SFTP access to a tenant's files. The key fingerprint is computed server-side. Async — returns 202 and triggers a workflow to deploy the key to all nodes in the shard.
 //	@Tags			SFTP Keys
 //	@Security		ApiKeyAuth
 //	@Param			tenantID path string true "Tenant ID"
@@ -110,6 +112,7 @@ func (h *SFTPKey) Create(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get an SFTP key
+//	@Description	Returns a single SFTP key by ID, including its public key and computed fingerprint.
 //	@Tags			SFTP Keys
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "SFTP key ID"
@@ -136,6 +139,7 @@ func (h *SFTPKey) Get(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete an SFTP key
+//	@Description	Removes an SFTP key from all nodes in the tenant's shard. Async — returns 202 and triggers a Temporal workflow.
 //	@Tags			SFTP Keys
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "SFTP key ID"
@@ -161,6 +165,7 @@ func (h *SFTPKey) Delete(w http.ResponseWriter, r *http.Request) {
 // Retry godoc
 //
 //	@Summary		Retry a failed SFTP key
+//	@Description	Re-triggers the deployment workflow for an SFTP key in failed state. Async — returns 202 and starts a new Temporal workflow.
 //	@Tags			SFTP Keys
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "SFTP key ID"

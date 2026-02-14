@@ -23,6 +23,7 @@ func NewS3AccessKey(svc *core.S3AccessKeyService) *S3AccessKey {
 // ListByBucket godoc
 //
 //	@Summary		List access keys for an S3 bucket
+//	@Description	Returns a paginated list of access keys for a bucket. Secret access keys are redacted in list responses.
 //	@Tags			S3 Access Keys
 //	@Security		ApiKeyAuth
 //	@Param			bucketID	path		string	true	"S3 bucket ID"
@@ -60,6 +61,7 @@ func (h *S3AccessKey) ListByBucket(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create an S3 access key
+//	@Description	Asynchronously generates an S3 access key pair (access key ID + secret) for a bucket. The secret is only returned once in the creation response. Permissions default to read-write. Triggers a Temporal workflow and returns 201.
 //	@Tags			S3 Access Keys
 //	@Security		ApiKeyAuth
 //	@Param			bucketID	path		string						true	"S3 bucket ID"
@@ -108,6 +110,7 @@ func (h *S3AccessKey) Create(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete an S3 access key
+//	@Description	Asynchronously revokes an S3 access key. Triggers a Temporal workflow and returns 202 immediately.
 //	@Tags			S3 Access Keys
 //	@Security		ApiKeyAuth
 //	@Param			id	path	string	true	"S3 access key ID"
@@ -133,6 +136,7 @@ func (h *S3AccessKey) Delete(w http.ResponseWriter, r *http.Request) {
 // Retry godoc
 //
 //	@Summary		Retry a failed S3 access key
+//	@Description	Re-triggers the provisioning workflow for an access key that previously failed. Returns 202 immediately.
 //	@Tags			S3 Access Keys
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "S3 access key ID"

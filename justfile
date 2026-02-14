@@ -181,8 +181,9 @@ vm-deploy:
     docker build -t hosting-core-api:latest -f docker/core-api.Dockerfile .
     docker build -t hosting-worker:latest -f docker/worker.Dockerfile .
     docker build -t hosting-admin-ui:latest -f docker/admin-ui.Dockerfile .
+    docker build -t hosting-mcp-server:latest -f docker/mcp-server.Dockerfile .
     # Import into k3s containerd
-    docker save hosting-core-api:latest hosting-worker:latest hosting-admin-ui:latest | \
+    docker save hosting-core-api:latest hosting-worker:latest hosting-admin-ui:latest hosting-mcp-server:latest | \
       ssh -o StrictHostKeyChecking=no ubuntu@{{cp}} "sudo k3s ctr images import -"
     # Apply infra manifests (includes Traefik config and Ingress)
     kubectl --context hosting apply -f deploy/k3s/

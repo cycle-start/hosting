@@ -5,6 +5,7 @@
 /worker
 /node-agent
 /hostctl
+/mcp-server
 *.exe
 
 # Local cluster state

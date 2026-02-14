@@ -25,6 +25,7 @@ func NewS3Bucket(svc *core.S3BucketService, keySvc *core.S3AccessKeyService) *S3
 // ListByTenant godoc
 //
 //	@Summary		List S3 buckets for a tenant
+//	@Description	Returns a paginated list of S3 buckets for a tenant. Supports search, status filtering, and sorting.
 //	@Tags			S3 Buckets
 //	@Security		ApiKeyAuth
 //	@Param			tenantID	path		string	true	"Tenant ID"
@@ -63,6 +64,7 @@ func (h *S3Bucket) ListByTenant(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create an S3 bucket
+//	@Description	Asynchronously creates an S3 bucket on a storage shard via Ceph RADOS Gateway. Bucket names must be unique per tenant. Optionally set public access and quota. Triggers a Temporal workflow and returns 202 immediately.
 //	@Tags			S3 Buckets
 //	@Security		ApiKeyAuth
 //	@Param			tenantID	path		string					true	"Tenant ID"
@@ -113,6 +115,7 @@ func (h *S3Bucket) Create(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get an S3 bucket
+//	@Description	Returns the details of a single S3 bucket by ID.
 //	@Tags			S3 Buckets
 //	@Security		ApiKeyAuth
 //	@Param			id	path		string	true	"S3 bucket ID"
@@ -139,6 +142,7 @@ func (h *S3Bucket) Get(w http.ResponseWriter, r *http.Request) {
 // Update godoc
 //
 //	@Summary		Update an S3 bucket
+//	@Description	Asynchronously updates a bucket's public access flag and/or quota. Triggers a Temporal workflow and returns 202 immediately.
 //	@Tags			S3 Buckets
 //	@Security		ApiKeyAuth
 //	@Param			id		path		string					true	"S3 bucket ID"
@@ -177,6 +181,7 @@ func (h *S3Bucket) Update(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete an S3 bucket
+//	@Description	Asynchronously deletes an S3 bucket and all its objects. Triggers a Temporal workflow and returns 202 immediately.
 //	@Tags			S3 Buckets
 //	@Security		ApiKeyAuth
 //	@Param			id	path	string	true	"S3 bucket ID"
@@ -202,6 +207,7 @@ func (h *S3Bucket) Delete(w http.ResponseWriter, r *http.Request) {
 // Retry godoc
 //
 //	@Summary		Retry a failed S3 bucket
+//	@Description	Re-triggers the provisioning workflow for a bucket that previously failed. Returns 202 immediately.
 //	@Tags			S3 Buckets
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "S3 bucket ID"

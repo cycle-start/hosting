@@ -23,6 +23,7 @@ func NewEmailAutoReply(svc *core.EmailAutoReplyService) *EmailAutoReply {
 // Get godoc
 //
 //	@Summary		Get email auto-reply settings
+//	@Description	Returns the current autoreply configuration for the specified email account. Returns 404 if no autoreply is configured.
 //	@Tags			Email Auto-Reply
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Email account ID"
@@ -49,6 +50,7 @@ func (h *EmailAutoReply) Get(w http.ResponseWriter, r *http.Request) {
 // Put godoc
 //
 //	@Summary		Update email auto-reply settings
+//	@Description	Asynchronously creates or replaces the autoreply (out-of-office) message for an email account. Supports optional start/end dates for time-limited autoreplies and an enabled flag. Triggers a Temporal workflow to configure in Stalwart. Returns 202 Accepted.
 //	@Tags			Email Auto-Reply
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Email account ID"
@@ -95,6 +97,7 @@ func (h *EmailAutoReply) Put(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete email auto-reply settings
+//	@Description	Asynchronously removes the autoreply configuration from the email account. Triggers a Temporal workflow to remove from Stalwart. Returns 202 Accepted.
 //	@Tags			Email Auto-Reply
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Email account ID"
@@ -120,6 +123,7 @@ func (h *EmailAutoReply) Delete(w http.ResponseWriter, r *http.Request) {
 // Retry godoc
 //
 //	@Summary		Retry a failed email auto-reply
+//	@Description	Re-triggers the provisioning workflow for an email autoreply that is in a failed state. Returns 202 Accepted.
 //	@Tags			Email Auto-Replies
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Email auto-reply ID"

@@ -24,6 +24,7 @@ func NewZone(services *core.Services) *Zone {
 // List godoc
 //
 //	@Summary		List zones
+//	@Description	Returns a paginated list of all DNS zones across all brands. Supports filtering by search term and status, and sorting by any column.
 //	@Tags			Zones
 //	@Security		ApiKeyAuth
 //	@Param			limit		query		int		false	"Page size"						default(50)
@@ -55,6 +56,7 @@ func (h *Zone) List(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create a zone
+//	@Description	Creates a DNS zone (e.g. "example.com"). Requires brand_id and region_id; if tenant_id is provided, the brand is derived from the tenant. Returns 202 and triggers a Temporal workflow to create the zone in the brand's PowerDNS database with SOA and NS records.
 //	@Tags			Zones
 //	@Security		ApiKeyAuth
 //	@Param			body	body		request.CreateZone	true	"Zone details"
@@ -107,6 +109,7 @@ func (h *Zone) Create(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get a zone
+//	@Description	Returns the details of a single DNS zone, including its region name.
 //	@Tags			Zones
 //	@Security		ApiKeyAuth
 //	@Param			id	path		string	true	"Zone ID"
@@ -133,6 +136,7 @@ func (h *Zone) Get(w http.ResponseWriter, r *http.Request) {
 // Update godoc
 //
 //	@Summary		Update a zone
+//	@Description	Updates a DNS zone. Currently only supports changing the tenant_id association. This is a synchronous operation.
 //	@Tags			Zones
 //	@Security		ApiKeyAuth
 //	@Param			id		path		string				true	"Zone ID"
@@ -174,6 +178,7 @@ func (h *Zone) Update(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete a zone
+//	@Description	Deletes a DNS zone and all its records from PowerDNS. Returns 202 and triggers a Temporal workflow.
 //	@Tags			Zones
 //	@Security		ApiKeyAuth
 //	@Param			id	path	string	true	"Zone ID"
@@ -199,6 +204,7 @@ func (h *Zone) Delete(w http.ResponseWriter, r *http.Request) {
 // ReassignTenant godoc
 //
 //	@Summary		Reassign zone to a different tenant
+//	@Description	Changes the tenant ownership of a DNS zone without affecting the zone data in PowerDNS. This is a synchronous operation. Pass null tenant_id to detach the zone from its current tenant.
 //	@Tags			Zones
 //	@Security		ApiKeyAuth
 //	@Param			id		path		string						true	"Zone ID"
@@ -237,6 +243,7 @@ func (h *Zone) ReassignTenant(w http.ResponseWriter, r *http.Request) {
 // Retry godoc
 //
 //	@Summary		Retry a failed zone
+//	@Description	Re-triggers the provisioning workflow for a DNS zone that is in a failed state. Returns 202 and starts a new Temporal workflow.
 //	@Tags			Zones
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Zone ID"

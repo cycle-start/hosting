@@ -24,6 +24,7 @@ func NewShard(svc *core.ShardService) *Shard {
 // ListByCluster godoc
 //
 //	@Summary		List shards in a cluster
+//	@Description	Returns a paginated list of shards belonging to a cluster.
 //	@Tags			Shards
 //	@Security		ApiKeyAuth
 //	@Param			clusterID	path		string	true	"Cluster ID"
@@ -58,6 +59,7 @@ func (h *Shard) ListByCluster(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create a shard
+//	@Description	Synchronously creates a shard with a role (web, database, dns, email, valkey, storage, dbadmin, or lb). The role determines what services the shard's nodes run. Returns 201 on success.
 //	@Tags			Shards
 //	@Security		ApiKeyAuth
 //	@Param			clusterID	path		string				true	"Cluster ID"
@@ -108,6 +110,7 @@ func (h *Shard) Create(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get a shard
+//	@Description	Returns the details of a single shard by ID.
 //	@Tags			Shards
 //	@Security		ApiKeyAuth
 //	@Param			id	path		string	true	"Shard ID"
@@ -134,6 +137,7 @@ func (h *Shard) Get(w http.ResponseWriter, r *http.Request) {
 // Update godoc
 //
 //	@Summary		Update a shard
+//	@Description	Synchronously performs a partial update of a shard's lb_backend, config, or status. Only provided fields are changed.
 //	@Tags			Shards
 //	@Security		ApiKeyAuth
 //	@Param			id		path		string				true	"Shard ID"
@@ -183,6 +187,7 @@ func (h *Shard) Update(w http.ResponseWriter, r *http.Request) {
 // Converge godoc
 //
 //	@Summary		Trigger shard convergence
+//	@Description	Starts an asynchronous convergence workflow that reconciles all nodes in the shard, ensuring web server configs, databases, DNS zones, and other services match the desired state. This is the primary mechanism for applying configuration changes. Returns 202 immediately.
 //	@Tags			Shards
 //	@Security		ApiKeyAuth
 //	@Param			id	path		string	true	"Shard ID"
@@ -215,6 +220,7 @@ func (h *Shard) Converge(w http.ResponseWriter, r *http.Request) {
 // Retry godoc
 //
 //	@Summary		Retry a failed shard convergence
+//	@Description	Re-triggers the convergence workflow for a shard that previously failed. Returns 202 immediately.
 //	@Tags			Shards
 //	@Security		ApiKeyAuth
 //	@Param			id	path	string	true	"Shard ID"
@@ -238,6 +244,7 @@ func (h *Shard) Retry(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete a shard
+//	@Description	Synchronously deletes a shard.
 //	@Tags			Shards
 //	@Security		ApiKeyAuth
 //	@Param			id	path	string	true	"Shard ID"

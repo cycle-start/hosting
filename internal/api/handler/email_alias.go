@@ -23,6 +23,7 @@ func NewEmailAlias(svc *core.EmailAliasService) *EmailAlias {
 // ListByAccount godoc
 //
 //	@Summary		List email aliases for an account
+//	@Description	Returns a paginated list of email aliases belonging to the specified email account.
 //	@Tags			Email Aliases
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Email account ID"
@@ -57,6 +58,7 @@ func (h *EmailAlias) ListByAccount(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create an email alias
+//	@Description	Asynchronously creates an email alias that delivers to the parent account. The alias address must be a valid email address. Triggers a Temporal workflow to configure the alias in Stalwart. Returns 202 Accepted.
 //	@Tags			Email Aliases
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Email account ID"
@@ -99,6 +101,7 @@ func (h *EmailAlias) Create(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get an email alias
+//	@Description	Returns the details of a single email alias.
 //	@Tags			Email Aliases
 //	@Security		ApiKeyAuth
 //	@Param			aliasID path string true "Email alias ID"
@@ -125,6 +128,7 @@ func (h *EmailAlias) Get(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete an email alias
+//	@Description	Asynchronously removes the email alias from Stalwart. Triggers a Temporal workflow. Returns 202 Accepted.
 //	@Tags			Email Aliases
 //	@Security		ApiKeyAuth
 //	@Param			aliasID path string true "Email alias ID"
@@ -150,6 +154,7 @@ func (h *EmailAlias) Delete(w http.ResponseWriter, r *http.Request) {
 // Retry godoc
 //
 //	@Summary		Retry a failed email alias
+//	@Description	Re-triggers the provisioning workflow for an email alias that is in a failed state. Returns 202 Accepted.
 //	@Tags			Email Aliases
 //	@Security		ApiKeyAuth
 //	@Param			aliasID path string true "Email alias ID"

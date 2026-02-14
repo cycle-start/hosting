@@ -18,6 +18,7 @@ func NewDashboard(svc *core.DashboardService) *Dashboard {
 // Stats godoc
 //
 //	@Summary		Get dashboard statistics
+//	@Description	Returns aggregate platform statistics including counts of regions, clusters, shards, nodes, tenants (broken down by status), databases, zones, valkey instances, and FQDNs. Also includes per-shard tenant distribution and per-cluster node counts. Synchronous.
 //	@Tags			Dashboard
 //	@Security		ApiKeyAuth
 //	@Success		200	{object}	map[string]any

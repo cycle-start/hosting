@@ -23,6 +23,7 @@ func NewDatabaseUser(svc *core.DatabaseUserService) *DatabaseUser {
 // ListByDatabase godoc
 //
 //	@Summary		List database users
+//	@Description	Returns a paginated list of users for the specified database. Passwords are not included in the response.
 //	@Tags			Database Users
 //	@Security		ApiKeyAuth
 //	@Param			databaseID	path		string	true	"Database ID"
@@ -60,6 +61,7 @@ func (h *DatabaseUser) ListByDatabase(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create a database user
+//	@Description	Creates a MySQL user with the given username, password, and privileges on the parent database. Returns 202 and triggers a Temporal workflow to provision the user on the MySQL node. The password is not returned in subsequent GET requests.
 //	@Tags			Database Users
 //	@Security		ApiKeyAuth
 //	@Param			databaseID	path		string						true	"Database ID"
@@ -105,6 +107,7 @@ func (h *DatabaseUser) Create(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get a database user
+//	@Description	Returns the details of a single database user. The password is never included in the response after initial creation.
 //	@Tags			Database Users
 //	@Security		ApiKeyAuth
 //	@Param			id	path		string	true	"Database user ID"
@@ -132,6 +135,7 @@ func (h *DatabaseUser) Get(w http.ResponseWriter, r *http.Request) {
 // Update godoc
 //
 //	@Summary		Update a database user
+//	@Description	Updates the password and/or privileges of a database user. Returns 202 and triggers a Temporal workflow to apply the changes on the MySQL node. Only provided fields are updated.
 //	@Tags			Database Users
 //	@Security		ApiKeyAuth
 //	@Param			id		path		string						true	"Database user ID"
@@ -179,6 +183,7 @@ func (h *DatabaseUser) Update(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete a database user
+//	@Description	Drops the MySQL user from the database node. Returns 202 and triggers a Temporal workflow to remove the user.
 //	@Tags			Database Users
 //	@Security		ApiKeyAuth
 //	@Param			id	path	string	true	"Database user ID"
@@ -204,6 +209,7 @@ func (h *DatabaseUser) Delete(w http.ResponseWriter, r *http.Request) {
 // Retry godoc
 //
 //	@Summary		Retry a failed database user
+//	@Description	Re-triggers the provisioning workflow for a database user that is in a failed state. Returns 202 and starts a new Temporal workflow.
 //	@Tags			Database Users
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Database user ID"

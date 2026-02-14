@@ -23,7 +23,17 @@ type createOIDCClientRequest struct {
 	RedirectURIs []string `json:"redirect_uris" validate:"required"`
 }
 
-// Create registers an OIDC client.
+// Create godoc
+//
+//	@Summary		Register an OIDC client
+//	@Description	Registers a new OIDC client (relying party) with the given ID and secret. The client can then initiate OIDC authorization code flows to authenticate tenants. The client secret is stored as a bcrypt hash and cannot be retrieved after creation.
+//	@Tags			OIDC
+//	@Security		ApiKeyAuth
+//	@Param			body body createOIDCClientRequest true "OIDC client details"
+//	@Success		201 {object} map[string]string
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/oidc/clients [post]
 func (h *OIDCClient) Create(w http.ResponseWriter, r *http.Request) {
 	var req createOIDCClientRequest
 	if err := request.Decode(r, &req); err != nil {

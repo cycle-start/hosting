@@ -25,6 +25,7 @@ func NewValkeyInstance(svc *core.ValkeyInstanceService, userSvc *core.ValkeyUser
 // ListByTenant godoc
 //
 //	@Summary		List Valkey instances for a tenant
+//	@Description	Returns a paginated list of Valkey (managed Redis) instances for a tenant. Passwords are redacted in list responses.
 //	@Tags			Valkey Instances
 //	@Security		ApiKeyAuth
 //	@Param			tenantID	path		string	true	"Tenant ID"
@@ -62,6 +63,7 @@ func (h *ValkeyInstance) ListByTenant(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create a Valkey instance
+//	@Description	Asynchronously creates a Valkey instance on the specified shard. Auto-generates a port and password. Optionally creates nested users in the same request. Triggers a Temporal workflow and returns 202 immediately.
 //	@Tags			Valkey Instances
 //	@Security		ApiKeyAuth
 //	@Param			tenantID	path		string							true	"Tenant ID"
@@ -138,6 +140,7 @@ func (h *ValkeyInstance) Create(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get a Valkey instance
+//	@Description	Returns instance details including port and shard name. The password is redacted.
 //	@Tags			Valkey Instances
 //	@Security		ApiKeyAuth
 //	@Param			id	path		string	true	"Valkey instance ID"
@@ -165,6 +168,7 @@ func (h *ValkeyInstance) Get(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete a Valkey instance
+//	@Description	Asynchronously deletes a Valkey instance. Triggers a Temporal workflow and returns 202 immediately.
 //	@Tags			Valkey Instances
 //	@Security		ApiKeyAuth
 //	@Param			id	path	string	true	"Valkey instance ID"
@@ -190,6 +194,7 @@ func (h *ValkeyInstance) Delete(w http.ResponseWriter, r *http.Request) {
 // Migrate godoc
 //
 //	@Summary		Migrate a Valkey instance to a different shard
+//	@Description	Asynchronously moves a Valkey instance to a different shard via a data migration workflow. Returns 202 immediately.
 //	@Tags			Valkey Instances
 //	@Security		ApiKeyAuth
 //	@Param			id		path	string							true	"Valkey instance ID"
@@ -222,6 +227,7 @@ func (h *ValkeyInstance) Migrate(w http.ResponseWriter, r *http.Request) {
 // ReassignTenant godoc
 //
 //	@Summary		Reassign Valkey instance to a different tenant
+//	@Description	Synchronously changes the tenant ownership of a Valkey instance. Pass null tenant_id to detach from any tenant.
 //	@Tags			Valkey Instances
 //	@Security		ApiKeyAuth
 //	@Param			id		path		string									true	"Valkey instance ID"
@@ -261,6 +267,7 @@ func (h *ValkeyInstance) ReassignTenant(w http.ResponseWriter, r *http.Request) 
 // Retry godoc
 //
 //	@Summary		Retry a failed Valkey instance
+//	@Description	Re-triggers the provisioning workflow for a Valkey instance that previously failed. Returns 202 immediately.
 //	@Tags			Valkey Instances
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Valkey instance ID"

@@ -23,6 +23,7 @@ func NewCertificate(svc *core.CertificateService) *Certificate {
 // ListByFQDN godoc
 //
 //	@Summary		List certificates for an FQDN
+//	@Description	Returns a paginated list of SSL certificates associated with the specified FQDN. Private keys are redacted from the response.
 //	@Tags			Certificates
 //	@Security		ApiKeyAuth
 //	@Param			fqdnID path string true "FQDN ID"
@@ -60,6 +61,7 @@ func (h *Certificate) ListByFQDN(w http.ResponseWriter, r *http.Request) {
 // Upload godoc
 //
 //	@Summary		Upload a custom certificate
+//	@Description	Uploads a custom SSL certificate (PEM-encoded cert, key, and optional chain) for an FQDN. The private key is redacted from the response. Async — returns 202 and triggers a workflow to deploy the certificate to all nodes in the shard.
 //	@Tags			Certificates
 //	@Security		ApiKeyAuth
 //	@Param			fqdnID path string true "FQDN ID"
@@ -106,6 +108,7 @@ func (h *Certificate) Upload(w http.ResponseWriter, r *http.Request) {
 // Retry godoc
 //
 //	@Summary		Retry a failed certificate
+//	@Description	Re-triggers the deployment workflow for a certificate in failed state. Async — returns 202 and starts a new Temporal workflow.
 //	@Tags			Certificates
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Certificate ID"

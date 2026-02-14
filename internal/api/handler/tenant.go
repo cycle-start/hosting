@@ -26,6 +26,7 @@ func NewTenant(services *core.Services) *Tenant {
 // List godoc
 //
 //	@Summary		List tenants
+//	@Description	Returns a paginated list of tenants with optional search, status filtering, and sorting. Includes computed region, cluster, and shard names.
 //	@Tags			Tenants
 //	@Security		ApiKeyAuth
 //	@Param			search query string false "Search query"
@@ -57,6 +58,7 @@ func (h *Tenant) List(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create a tenant
+//	@Description	Creates a new tenant with a generated short ID and UID. Supports nested creation of zones, webroots, databases, valkey instances, S3 buckets, and SFTP keys in one request. Validates that the target cluster is in the brand's allowed cluster list. Async — returns 202 and triggers Temporal provisioning workflows for each resource.
 //	@Tags			Tenants
 //	@Security		ApiKeyAuth
 //	@Param			body body request.CreateTenant true "Tenant details"
@@ -304,6 +306,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get a tenant
+//	@Description	Returns a single tenant by ID, including computed region, cluster, and shard names.
 //	@Tags			Tenants
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Tenant ID"
@@ -330,6 +333,7 @@ func (h *Tenant) Get(w http.ResponseWriter, r *http.Request) {
 // Update godoc
 //
 //	@Summary		Update a tenant
+//	@Description	Partial update of a tenant — currently supports toggling sftp_enabled and ssh_enabled. Async — returns 202 and triggers re-convergence of the tenant's web shard.
 //	@Tags			Tenants
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Tenant ID"
@@ -376,6 +380,7 @@ func (h *Tenant) Update(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete a tenant
+//	@Description	Marks a tenant for deletion. Async — returns 202 and triggers a Temporal workflow that cascades deletion to all child resources (webroots, FQDNs, databases, etc.).
 //	@Tags			Tenants
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Tenant ID"
@@ -401,6 +406,7 @@ func (h *Tenant) Delete(w http.ResponseWriter, r *http.Request) {
 // Suspend godoc
 //
 //	@Summary		Suspend a tenant
+//	@Description	Suspends a tenant, disabling all web traffic and services. Async — returns 202 and triggers a workflow that converges shard configuration.
 //	@Tags			Tenants
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Tenant ID"
@@ -426,6 +432,7 @@ func (h *Tenant) Suspend(w http.ResponseWriter, r *http.Request) {
 // Unsuspend godoc
 //
 //	@Summary		Unsuspend a tenant
+//	@Description	Re-enables a suspended tenant, restoring web traffic and services. Async — returns 202 and triggers a workflow that restores shard configuration.
 //	@Tags			Tenants
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Tenant ID"
@@ -451,6 +458,7 @@ func (h *Tenant) Unsuspend(w http.ResponseWriter, r *http.Request) {
 // ResourceSummary godoc
 //
 //	@Summary		Get resource summary for a tenant
+//	@Description	Returns a synchronous breakdown of all child resources grouped by type and status, including active, pending, and failed counts for each resource type.
 //	@Tags			Tenants
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Tenant ID"
@@ -477,6 +485,7 @@ func (h *Tenant) ResourceSummary(w http.ResponseWriter, r *http.Request) {
 // Migrate godoc
 //
 //	@Summary		Migrate a tenant to another shard
+//	@Description	Moves a tenant to a different web shard. Optionally migrates associated zones and FQDNs to the target shard. Async — returns 202 and triggers a multi-step Temporal migration workflow.
 //	@Tags			Tenants
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Tenant ID"
@@ -509,6 +518,7 @@ func (h *Tenant) Migrate(w http.ResponseWriter, r *http.Request) {
 // Retry godoc
 //
 //	@Summary		Retry a failed tenant
+//	@Description	Re-triggers the provisioning workflow for a tenant in failed state. Async — returns 202 and starts a new Temporal workflow.
 //	@Tags			Tenants
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Tenant ID"
@@ -532,6 +542,7 @@ func (h *Tenant) Retry(w http.ResponseWriter, r *http.Request) {
 // RetryFailed godoc
 //
 //	@Summary		Retry all failed resources for a tenant
+//	@Description	Finds all child resources in failed state and re-triggers their provisioning workflows. Async — returns 202 with the count of resources being retried.
 //	@Tags			Tenants
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Tenant ID"

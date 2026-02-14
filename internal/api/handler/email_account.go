@@ -25,6 +25,7 @@ func NewEmailAccount(services *core.Services) *EmailAccount {
 // ListByFQDN godoc
 //
 //	@Summary		List email accounts for an FQDN
+//	@Description	Returns a paginated list of email accounts belonging to the specified FQDN. Email accounts are hosted on the Stalwart mail server.
 //	@Tags			Email Accounts
 //	@Security		ApiKeyAuth
 //	@Param			fqdnID path string true "FQDN ID"
@@ -59,6 +60,7 @@ func (h *EmailAccount) ListByFQDN(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create an email account
+//	@Description	Asynchronously creates an email account (mailbox) under the specified FQDN, which must have email enabled. Supports nested aliases, forwards, and autoreply in a single request. Triggers a Temporal workflow to provision the account in Stalwart. Returns 202 Accepted.
 //	@Tags			Email Accounts
 //	@Security		ApiKeyAuth
 //	@Param			fqdnID path string true "FQDN ID"
@@ -163,6 +165,7 @@ func (h *EmailAccount) Create(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get an email account
+//	@Description	Returns the details of a single email account, including quota configuration.
 //	@Tags			Email Accounts
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Email account ID"
@@ -189,6 +192,7 @@ func (h *EmailAccount) Get(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete an email account
+//	@Description	Asynchronously deletes the email account and all associated aliases, forwards, and autoreplies. Triggers a Temporal workflow to remove the account from Stalwart. Returns 202 Accepted.
 //	@Tags			Email Accounts
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Email account ID"
@@ -214,6 +218,7 @@ func (h *EmailAccount) Delete(w http.ResponseWriter, r *http.Request) {
 // Retry godoc
 //
 //	@Summary		Retry a failed email account
+//	@Description	Re-triggers the provisioning workflow for an email account that is in a failed state. Returns 202 Accepted.
 //	@Tags			Email Accounts
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Email account ID"

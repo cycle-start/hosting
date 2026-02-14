@@ -23,6 +23,7 @@ func NewEmailForward(svc *core.EmailForwardService) *EmailForward {
 // ListByAccount godoc
 //
 //	@Summary		List email forwards for an account
+//	@Description	Returns a paginated list of forwarding rules belonging to the specified email account.
 //	@Tags			Email Forwards
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Email account ID"
@@ -57,6 +58,7 @@ func (h *EmailForward) ListByAccount(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create an email forward
+//	@Description	Asynchronously creates a forwarding rule that sends copies of incoming mail to an external destination. The keep_copy flag controls whether the original message is retained in the mailbox (defaults to true). Triggers a Temporal workflow. Returns 202 Accepted.
 //	@Tags			Email Forwards
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Email account ID"
@@ -105,6 +107,7 @@ func (h *EmailForward) Create(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get an email forward
+//	@Description	Returns the details of a single email forwarding rule.
 //	@Tags			Email Forwards
 //	@Security		ApiKeyAuth
 //	@Param			forwardID path string true "Email forward ID"
@@ -131,6 +134,7 @@ func (h *EmailForward) Get(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete an email forward
+//	@Description	Asynchronously removes the forwarding rule from Stalwart. Triggers a Temporal workflow. Returns 202 Accepted.
 //	@Tags			Email Forwards
 //	@Security		ApiKeyAuth
 //	@Param			forwardID path string true "Email forward ID"
@@ -156,6 +160,7 @@ func (h *EmailForward) Delete(w http.ResponseWriter, r *http.Request) {
 // Retry godoc
 //
 //	@Summary		Retry a failed email forward
+//	@Description	Re-triggers the provisioning workflow for an email forward that is in a failed state. Returns 202 Accepted.
 //	@Tags			Email Forwards
 //	@Security		ApiKeyAuth
 //	@Param			forwardID path string true "Email forward ID"

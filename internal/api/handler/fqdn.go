@@ -24,6 +24,7 @@ func NewFQDN(services *core.Services) *FQDN {
 // ListByWebroot godoc
 //
 //	@Summary		List FQDNs for a webroot
+//	@Description	Returns a paginated list of fully-qualified domain names bound to the specified webroot.
 //	@Tags			FQDNs
 //	@Security		ApiKeyAuth
 //	@Param			webrootID path string true "Webroot ID"
@@ -58,6 +59,7 @@ func (h *FQDN) ListByWebroot(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create an FQDN
+//	@Description	Binds a fully-qualified domain name to a webroot. Supports nested email account creation. Async — returns 202 and triggers a workflow that configures the web server virtual host and optionally provisions SSL.
 //	@Tags			FQDNs
 //	@Security		ApiKeyAuth
 //	@Param			webrootID path string true "Webroot ID"
@@ -109,6 +111,7 @@ func (h *FQDN) Create(w http.ResponseWriter, r *http.Request) {
 // Get godoc
 //
 //	@Summary		Get an FQDN
+//	@Description	Returns a single FQDN by ID, including its SSL and webroot binding details.
 //	@Tags			FQDNs
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "FQDN ID"
@@ -135,6 +138,7 @@ func (h *FQDN) Get(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete an FQDN
+//	@Description	Unbinds the FQDN from its webroot and removes the virtual host configuration. Async — returns 202 and triggers a Temporal workflow.
 //	@Tags			FQDNs
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "FQDN ID"
@@ -160,6 +164,7 @@ func (h *FQDN) Delete(w http.ResponseWriter, r *http.Request) {
 // Retry godoc
 //
 //	@Summary		Retry a failed FQDN
+//	@Description	Re-triggers the provisioning workflow for an FQDN in failed state. Async — returns 202 and starts a new Temporal workflow.
 //	@Tags			FQDNs
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "FQDN ID"

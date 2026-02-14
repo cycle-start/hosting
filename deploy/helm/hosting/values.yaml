@@ -8,6 +8,9 @@ image:
   adminUi:
     repository: hosting-admin-ui
     tag: latest
+  mcpServer:
+    repository: hosting-mcp-server
+    tag: latest
   pullPolicy: IfNotPresent
 
 coreApi:
@@ -29,6 +32,15 @@ adminUi:
   replicas: 1
   port: 3001
   hostNetwork: false
+  resources: {}
+  extraEnv: []
+
+mcpServer:
+  enabled: false
+  replicas: 1
+  port: 8091
+  hostNetwork: false
+  apiUrl: "http://localhost:8090"
   resources: {}
   extraEnv: []
 
