@@ -46,9 +46,9 @@ func (s *EmailAccountService) Create(ctx context.Context, a *model.EmailAccount)
 func (s *EmailAccountService) GetByID(ctx context.Context, id string) (*model.EmailAccount, error) {
 	var a model.EmailAccount
 	err := s.db.QueryRow(ctx,
-		`SELECT id, fqdn_id, address, display_name, quota_bytes, status, created_at, updated_at
+		`SELECT id, fqdn_id, address, display_name, quota_bytes, status, status_message, created_at, updated_at
 		 FROM email_accounts WHERE id = $1`, id,
-	).Scan(&a.ID, &a.FQDNID, &a.Address, &a.DisplayName, &a.QuotaBytes, &a.Status, &a.CreatedAt, &a.UpdatedAt)
+	).Scan(&a.ID, &a.FQDNID, &a.Address, &a.DisplayName, &a.QuotaBytes, &a.Status, &a.StatusMessage, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get email account %s: %w", id, err)
 	}
@@ -56,7 +56,7 @@ func (s *EmailAccountService) GetByID(ctx context.Context, id string) (*model.Em
 }
 
 func (s *EmailAccountService) ListByFQDN(ctx context.Context, fqdnID string, limit int, cursor string) ([]model.EmailAccount, bool, error) {
-	query := `SELECT id, fqdn_id, address, display_name, quota_bytes, status, created_at, updated_at FROM email_accounts WHERE fqdn_id = $1`
+	query := `SELECT id, fqdn_id, address, display_name, quota_bytes, status, status_message, created_at, updated_at FROM email_accounts WHERE fqdn_id = $1`
 	args := []any{fqdnID}
 	argIdx := 2
 
@@ -79,7 +79,7 @@ func (s *EmailAccountService) ListByFQDN(ctx context.Context, fqdnID string, lim
 	var accounts []model.EmailAccount
 	for rows.Next() {
 		var a model.EmailAccount
-		if err := rows.Scan(&a.ID, &a.FQDNID, &a.Address, &a.DisplayName, &a.QuotaBytes, &a.Status, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.FQDNID, &a.Address, &a.DisplayName, &a.QuotaBytes, &a.Status, &a.StatusMessage, &a.CreatedAt, &a.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan email account: %w", err)
 		}
 		accounts = append(accounts, a)
@@ -118,4 +118,28 @@ func (s *EmailAccountService) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (s *EmailAccountService) Retry(ctx context.Context, id string) error {
+	var status string
+	err := s.db.QueryRow(ctx, "SELECT status FROM email_accounts WHERE id = $1", id).Scan(&status)
+	if err != nil {
+		return fmt.Errorf("get email account status: %w", err)
+	}
+	if status != model.StatusFailed {
+		return fmt.Errorf("email account %s is not in failed state (current: %s)", id, status)
+	}
+	_, err = s.db.Exec(ctx, "UPDATE email_accounts SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", model.StatusProvisioning, id)
+	if err != nil {
+		return fmt.Errorf("set email account %s status to provisioning: %w", id, err)
+	}
+	tenantID, err := resolveTenantIDFromEmailAccount(ctx, s.db, id)
+	if err != nil {
+		return fmt.Errorf("retry email account: %w", err)
+	}
+	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateEmailAccountWorkflow",
+		WorkflowID:   fmt.Sprintf("email-account-%s", id),
+		Arg:          id,
+	})
 }

@@ -169,6 +169,8 @@ func (s *Server) setupRoutes() {
 		r.Post("/tenants/{id}/unsuspend", tenant.Unsuspend)
 		r.Post("/tenants/{id}/migrate", tenant.Migrate)
 		r.Get("/tenants/{id}/resource-summary", tenant.ResourceSummary)
+		r.Post("/tenants/{id}/retry", tenant.Retry)
+		r.Post("/tenants/{id}/retry-failed", tenant.RetryFailed)
 
 		// OIDC login sessions
 		oidcLogin := handler.NewOIDCLogin(s.services.OIDC)
@@ -185,6 +187,7 @@ func (s *Server) setupRoutes() {
 		r.Get("/webroots/{id}", webroot.Get)
 		r.Put("/webroots/{id}", webroot.Update)
 		r.Delete("/webroots/{id}", webroot.Delete)
+		r.Post("/webroots/{id}/retry", webroot.Retry)
 
 		// FQDNs
 		fqdn := handler.NewFQDN(s.services)
@@ -192,11 +195,13 @@ func (s *Server) setupRoutes() {
 		r.Post("/webroots/{webrootID}/fqdns", fqdn.Create)
 		r.Get("/fqdns/{id}", fqdn.Get)
 		r.Delete("/fqdns/{id}", fqdn.Delete)
+		r.Post("/fqdns/{id}/retry", fqdn.Retry)
 
 		// Certificates
 		cert := handler.NewCertificate(s.services.Certificate)
 		r.Get("/fqdns/{fqdnID}/certificates", cert.ListByFQDN)
 		r.Post("/fqdns/{fqdnID}/certificates", cert.Upload)
+		r.Post("/certificates/{id}/retry", cert.Retry)
 
 		// Zones
 		zone := handler.NewZone(s.services)
@@ -206,6 +211,7 @@ func (s *Server) setupRoutes() {
 		r.Put("/zones/{id}", zone.Update)
 		r.Delete("/zones/{id}", zone.Delete)
 		r.Put("/zones/{id}/tenant", zone.ReassignTenant)
+		r.Post("/zones/{id}/retry", zone.Retry)
 
 		// Zone records
 		zoneRecord := handler.NewZoneRecord(s.services.ZoneRecord)
@@ -214,6 +220,7 @@ func (s *Server) setupRoutes() {
 		r.Get("/zone-records/{id}", zoneRecord.Get)
 		r.Put("/zone-records/{id}", zoneRecord.Update)
 		r.Delete("/zone-records/{id}", zoneRecord.Delete)
+		r.Post("/zone-records/{id}/retry", zoneRecord.Retry)
 
 		// Databases
 		database := handler.NewDatabase(s.services.Database, s.services.DatabaseUser)
@@ -223,6 +230,7 @@ func (s *Server) setupRoutes() {
 		r.Delete("/databases/{id}", database.Delete)
 		r.Post("/databases/{id}/migrate", database.Migrate)
 		r.Put("/databases/{id}/tenant", database.ReassignTenant)
+		r.Post("/databases/{id}/retry", database.Retry)
 
 		// Database users
 		dbUser := handler.NewDatabaseUser(s.services.DatabaseUser)
@@ -231,6 +239,7 @@ func (s *Server) setupRoutes() {
 		r.Get("/database-users/{id}", dbUser.Get)
 		r.Put("/database-users/{id}", dbUser.Update)
 		r.Delete("/database-users/{id}", dbUser.Delete)
+		r.Post("/database-users/{id}/retry", dbUser.Retry)
 
 		// Valkey instances
 		valkeyInstance := handler.NewValkeyInstance(s.services.ValkeyInstance, s.services.ValkeyUser)
@@ -240,6 +249,7 @@ func (s *Server) setupRoutes() {
 		r.Delete("/valkey-instances/{id}", valkeyInstance.Delete)
 		r.Post("/valkey-instances/{id}/migrate", valkeyInstance.Migrate)
 		r.Put("/valkey-instances/{id}/tenant", valkeyInstance.ReassignTenant)
+		r.Post("/valkey-instances/{id}/retry", valkeyInstance.Retry)
 
 		// Valkey users
 		valkeyUser := handler.NewValkeyUser(s.services.ValkeyUser)
@@ -248,6 +258,7 @@ func (s *Server) setupRoutes() {
 		r.Get("/valkey-users/{id}", valkeyUser.Get)
 		r.Put("/valkey-users/{id}", valkeyUser.Update)
 		r.Delete("/valkey-users/{id}", valkeyUser.Delete)
+		r.Post("/valkey-users/{id}/retry", valkeyUser.Retry)
 
 		// S3 buckets
 		s3Bucket := handler.NewS3Bucket(s.services.S3Bucket, s.services.S3AccessKey)
@@ -256,12 +267,14 @@ func (s *Server) setupRoutes() {
 		r.Get("/s3-buckets/{id}", s3Bucket.Get)
 		r.Put("/s3-buckets/{id}", s3Bucket.Update)
 		r.Delete("/s3-buckets/{id}", s3Bucket.Delete)
+		r.Post("/s3-buckets/{id}/retry", s3Bucket.Retry)
 
 		// S3 access keys
 		s3AccessKey := handler.NewS3AccessKey(s.services.S3AccessKey)
 		r.Get("/s3-buckets/{bucketID}/access-keys", s3AccessKey.ListByBucket)
 		r.Post("/s3-buckets/{bucketID}/access-keys", s3AccessKey.Create)
 		r.Delete("/s3-access-keys/{id}", s3AccessKey.Delete)
+		r.Post("/s3-access-keys/{id}/retry", s3AccessKey.Retry)
 
 		// SFTP keys
 		sftpKey := handler.NewSFTPKey(s.services.SFTPKey)
@@ -269,6 +282,7 @@ func (s *Server) setupRoutes() {
 		r.Post("/tenants/{tenantID}/sftp-keys", sftpKey.Create)
 		r.Get("/sftp-keys/{id}", sftpKey.Get)
 		r.Delete("/sftp-keys/{id}", sftpKey.Delete)
+		r.Post("/sftp-keys/{id}/retry", sftpKey.Retry)
 
 		// Email accounts
 		emailAccount := handler.NewEmailAccount(s.services)
@@ -276,6 +290,7 @@ func (s *Server) setupRoutes() {
 		r.Post("/fqdns/{fqdnID}/email-accounts", emailAccount.Create)
 		r.Get("/email-accounts/{id}", emailAccount.Get)
 		r.Delete("/email-accounts/{id}", emailAccount.Delete)
+		r.Post("/email-accounts/{id}/retry", emailAccount.Retry)
 
 		// Email aliases
 		emailAlias := handler.NewEmailAlias(s.services.EmailAlias)
@@ -283,6 +298,7 @@ func (s *Server) setupRoutes() {
 		r.Post("/email-accounts/{id}/aliases", emailAlias.Create)
 		r.Get("/email-aliases/{aliasID}", emailAlias.Get)
 		r.Delete("/email-aliases/{aliasID}", emailAlias.Delete)
+		r.Post("/email-aliases/{aliasID}/retry", emailAlias.Retry)
 
 		// Email forwards
 		emailForward := handler.NewEmailForward(s.services.EmailForward)
@@ -290,12 +306,14 @@ func (s *Server) setupRoutes() {
 		r.Post("/email-accounts/{id}/forwards", emailForward.Create)
 		r.Get("/email-forwards/{forwardID}", emailForward.Get)
 		r.Delete("/email-forwards/{forwardID}", emailForward.Delete)
+		r.Post("/email-forwards/{forwardID}/retry", emailForward.Retry)
 
 		// Email auto-reply
 		emailAutoReply := handler.NewEmailAutoReply(s.services.EmailAutoReply)
 		r.Get("/email-accounts/{id}/autoreply", emailAutoReply.Get)
 		r.Put("/email-accounts/{id}/autoreply", emailAutoReply.Put)
 		r.Delete("/email-accounts/{id}/autoreply", emailAutoReply.Delete)
+		r.Post("/email-autoreplies/{id}/retry", emailAutoReply.Retry)
 
 		// Backups
 		backup := handler.NewBackup(s.services.Backup, s.services.Webroot, s.services.Database)
@@ -304,6 +322,7 @@ func (s *Server) setupRoutes() {
 		r.Get("/backups/{id}", backup.Get)
 		r.Delete("/backups/{id}", backup.Delete)
 		r.Post("/backups/{id}/restore", backup.Restore)
+		r.Post("/backups/{id}/retry", backup.Retry)
 
 		// Search
 		search := handler.NewSearch(s.services.Search)

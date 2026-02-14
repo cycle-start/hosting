@@ -46,13 +46,14 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 	var instance model.ValkeyInstance
 	err = workflow.ExecuteActivity(ctx, "GetValkeyInstanceByID", instanceID).Get(ctx, &instance)
 	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_instances", instanceID)
+		_ = setResourceFailed(ctx, "valkey_instances", instanceID, err)
 		return err
 	}
 
 	if instance.ShardID == nil {
-		_ = setResourceFailed(ctx, "valkey_instances", instanceID)
-		return fmt.Errorf("valkey instance %s has no current shard assignment", instanceID)
+		noShardErr := fmt.Errorf("valkey instance %s has no current shard assignment", instanceID)
+		_ = setResourceFailed(ctx, "valkey_instances", instanceID, noShardErr)
+		return noShardErr
 	}
 	sourceShardID := *instance.ShardID
 
@@ -60,11 +61,11 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 	var sourceNodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", sourceShardID).Get(ctx, &sourceNodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_instances", instanceID)
+		_ = setResourceFailed(ctx, "valkey_instances", instanceID, err)
 		return err
 	}
 	if len(sourceNodes) == 0 {
-		_ = setResourceFailed(ctx, "valkey_instances", instanceID)
+		_ = setResourceFailed(ctx, "valkey_instances", instanceID, err)
 		return fmt.Errorf("source shard %s has no nodes", sourceShardID)
 	}
 
@@ -72,11 +73,11 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 	var targetNodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", params.TargetShardID).Get(ctx, &targetNodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_instances", instanceID)
+		_ = setResourceFailed(ctx, "valkey_instances", instanceID, err)
 		return err
 	}
 	if len(targetNodes) == 0 {
-		_ = setResourceFailed(ctx, "valkey_instances", instanceID)
+		_ = setResourceFailed(ctx, "valkey_instances", instanceID, err)
 		return fmt.Errorf("target shard %s has no nodes", params.TargetShardID)
 	}
 
@@ -94,7 +95,7 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 		MaxMemoryMB: instance.MaxMemoryMB,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_instances", instanceID)
+		_ = setResourceFailed(ctx, "valkey_instances", instanceID, err)
 		return fmt.Errorf("create valkey instance on target node %s: %w", targetNode.ID, err)
 	}
 
@@ -107,7 +108,7 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 		DumpPath: dumpPath,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_instances", instanceID)
+		_ = setResourceFailed(ctx, "valkey_instances", instanceID, err)
 		return fmt.Errorf("dump valkey data on source node %s: %w", sourceNode.ID, err)
 	}
 
@@ -118,7 +119,7 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 		DumpPath: dumpPath,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_instances", instanceID)
+		_ = setResourceFailed(ctx, "valkey_instances", instanceID, err)
 		return fmt.Errorf("import valkey data on target node %s: %w", targetNode.ID, err)
 	}
 
@@ -126,7 +127,7 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 	var users []model.ValkeyUser
 	err = workflow.ExecuteActivity(ctx, "ListValkeyUsersByInstanceID", instanceID).Get(ctx, &users)
 	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_instances", instanceID)
+		_ = setResourceFailed(ctx, "valkey_instances", instanceID, err)
 		return fmt.Errorf("list valkey users: %w", err)
 	}
 
@@ -140,7 +141,7 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 			KeyPattern:   user.KeyPattern,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "valkey_instances", instanceID)
+			_ = setResourceFailed(ctx, "valkey_instances", instanceID, err)
 			return fmt.Errorf("create valkey user %s on target node %s: %w", user.Username, targetNode.ID, err)
 		}
 	}
@@ -148,7 +149,7 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 	// Update the instance shard assignment in the core DB.
 	err = workflow.ExecuteActivity(ctx, "UpdateValkeyInstanceShardID", instanceID, params.TargetShardID).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_instances", instanceID)
+		_ = setResourceFailed(ctx, "valkey_instances", instanceID, err)
 		return err
 	}
 

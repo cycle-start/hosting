@@ -110,8 +110,9 @@ func TestSFTPKeyService_GetByID_Success(t *testing.T) {
 		*(dest[3].(*string)) = "ssh-ed25519 AAAAC3..."
 		*(dest[4].(*string)) = "SHA256:abc123"
 		*(dest[5].(*string)) = model.StatusActive
-		*(dest[6].(*time.Time)) = now
+		*(dest[6].(**string)) = nil // status_message
 		*(dest[7].(*time.Time)) = now
+		*(dest[8].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -165,8 +166,9 @@ func TestSFTPKeyService_ListByTenant_Success(t *testing.T) {
 			*(dest[3].(*string)) = "ssh-ed25519 AAAAC3..."
 			*(dest[4].(*string)) = "SHA256:abc123"
 			*(dest[5].(*string)) = model.StatusActive
-			*(dest[6].(*time.Time)) = now
+			*(dest[6].(**string)) = nil // status_message
 			*(dest[7].(*time.Time)) = now
+			*(dest[8].(*time.Time)) = now
 			return nil
 		},
 	)

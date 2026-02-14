@@ -7,6 +7,7 @@ CREATE TABLE s3_buckets (
     public      BOOLEAN NOT NULL DEFAULT false,
     quota_bytes BIGINT NOT NULL DEFAULT 0,
     status      TEXT NOT NULL DEFAULT 'pending',
+    status_message TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE(tenant_id, name)

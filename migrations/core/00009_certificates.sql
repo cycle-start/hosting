@@ -9,6 +9,7 @@ CREATE TABLE certificates (
     issued_at  TIMESTAMPTZ,
     expires_at TIMESTAMPTZ,
     status     TEXT NOT NULL DEFAULT 'pending',
+    status_message TEXT,
     is_active  BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()

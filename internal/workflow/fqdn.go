@@ -36,7 +36,7 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 	var fqdn model.FQDN
 	err = workflow.ExecuteActivity(ctx, "GetFQDNByID", fqdnID).Get(ctx, &fqdn)
 	if err != nil {
-		_ = setResourceFailed(ctx, "fqdns", fqdnID)
+		_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 		return err
 	}
 
@@ -44,7 +44,7 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 	var webroot model.Webroot
 	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", fqdn.WebrootID).Get(ctx, &webroot)
 	if err != nil {
-		_ = setResourceFailed(ctx, "fqdns", fqdnID)
+		_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 		return err
 	}
 
@@ -52,7 +52,7 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 	var tenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", webroot.TenantID).Get(ctx, &tenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "fqdns", fqdnID)
+		_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 		return err
 	}
 
@@ -60,7 +60,7 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 	var lbAddresses []model.ClusterLBAddress
 	err = workflow.ExecuteActivity(ctx, "GetClusterLBAddresses", tenant.ClusterID).Get(ctx, &lbAddresses)
 	if err != nil {
-		_ = setResourceFailed(ctx, "fqdns", fqdnID)
+		_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 		return err
 	}
 
@@ -71,20 +71,21 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 		SourceFQDNID: fqdnID,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "fqdns", fqdnID)
+		_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 		return err
 	}
 
 	// Reload nginx on all nodes in the tenant's shard.
 	if tenant.ShardID == nil {
-		_ = setResourceFailed(ctx, "fqdns", fqdnID)
-		return fmt.Errorf("tenant %s has no shard assigned", webroot.TenantID)
+		noShardErr := fmt.Errorf("tenant %s has no shard assigned", webroot.TenantID)
+		_ = setResourceFailed(ctx, "fqdns", fqdnID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "fqdns", fqdnID)
+		_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 		return err
 	}
 
@@ -92,7 +93,7 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "ReloadNginx").Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "fqdns", fqdnID)
+			_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 			return err
 		}
 	}
@@ -115,7 +116,7 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 		var shard model.Shard
 		err = workflow.ExecuteActivity(ctx, "GetShardByID", *tenant.ShardID).Get(ctx, &shard)
 		if err != nil {
-			_ = setResourceFailed(ctx, "fqdns", fqdnID)
+			_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 			return err
 		}
 
@@ -125,7 +126,7 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 			LBBackend: shard.LBBackend,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "fqdns", fqdnID)
+			_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 			return err
 		}
 	}
@@ -162,7 +163,7 @@ func UnbindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 	var fqdn model.FQDN
 	err = workflow.ExecuteActivity(ctx, "GetFQDNByID", fqdnID).Get(ctx, &fqdn)
 	if err != nil {
-		_ = setResourceFailed(ctx, "fqdns", fqdnID)
+		_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 		return err
 	}
 
@@ -170,21 +171,21 @@ func UnbindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 	var ubWebroot model.Webroot
 	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", fqdn.WebrootID).Get(ctx, &ubWebroot)
 	if err != nil {
-		_ = setResourceFailed(ctx, "fqdns", fqdnID)
+		_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 		return err
 	}
 
 	var ubTenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", ubWebroot.TenantID).Get(ctx, &ubTenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "fqdns", fqdnID)
+		_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 		return err
 	}
 
 	// Delete auto-DNS records.
 	err = workflow.ExecuteActivity(ctx, "AutoDeleteDNSRecords", fqdn.FQDN).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "fqdns", fqdnID)
+		_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 		return err
 	}
 
@@ -193,7 +194,7 @@ func UnbindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 		var ubNodes []model.Node
 		err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *ubTenant.ShardID).Get(ctx, &ubNodes)
 		if err != nil {
-			_ = setResourceFailed(ctx, "fqdns", fqdnID)
+			_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 			return err
 		}
 
@@ -201,7 +202,7 @@ func UnbindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 			nodeCtx := nodeActivityCtx(ctx, node.ID)
 			err = workflow.ExecuteActivity(nodeCtx, "ReloadNginx").Get(ctx, nil)
 			if err != nil {
-				_ = setResourceFailed(ctx, "fqdns", fqdnID)
+				_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 				return err
 			}
 		}
@@ -213,7 +214,7 @@ func UnbindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 		FQDN:      fqdn.FQDN,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "fqdns", fqdnID)
+		_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 		return err
 	}
 

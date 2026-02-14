@@ -1,9 +1,11 @@
 package workflow
 
 import (
+	"github.com/stretchr/testify/mock"
 	"go.temporal.io/sdk/testsuite"
 
 	"github.com/edvin/hosting/internal/activity"
+	"github.com/edvin/hosting/internal/model"
 )
 
 // registerActivities registers activity structs with the test workflow
@@ -22,4 +24,18 @@ func registerActivities(env *testsuite.TestWorkflowEnvironment) {
 	env.RegisterActivity(&activity.LB{})
 	env.RegisterActivity(&activity.Migrate{})
 	env.RegisterActivity(&activity.Stalwart{})
+}
+
+// matchFailedStatus returns a mock.MatchedBy matcher for UpdateResourceStatusParams
+// that checks table, id, status=failed, and that StatusMessage is non-nil.
+// This is needed because setResourceFailed now sets StatusMessage to the error
+// string, and the exact message includes Temporal activity error wrapping that
+// is not predictable in tests.
+func matchFailedStatus(table, id string) interface{} {
+	return mock.MatchedBy(func(params activity.UpdateResourceStatusParams) bool {
+		return params.Table == table &&
+			params.ID == id &&
+			params.Status == model.StatusFailed &&
+			params.StatusMessage != nil
+	})
 }

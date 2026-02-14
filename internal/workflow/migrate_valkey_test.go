@@ -197,9 +197,7 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestGetInstanceFails_SetsStatus
 		Table: "valkey_instances", ID: instanceID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "valkey_instances", ID: instanceID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("valkey_instances", instanceID)).Return(nil)
 
 	s.env.ExecuteWorkflow(MigrateValkeyInstanceWorkflow, MigrateValkeyInstanceParams{
 		InstanceID:    instanceID,
@@ -224,10 +222,7 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestNoShard_SetsStatusFailed() 
 		Table: "valkey_instances", ID: instanceID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(&instance, nil)
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "valkey_instances", ID: instanceID, Status: model.StatusFailed,
-	}).Return(nil)
-
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("valkey_instances", instanceID)).Return(nil)
 	s.env.ExecuteWorkflow(MigrateValkeyInstanceWorkflow, MigrateValkeyInstanceParams{
 		InstanceID:    instanceID,
 		TargetShardID: "target-shard-4",
@@ -260,9 +255,7 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestDumpFails_SetsStatusFailed(
 	s.env.OnActivity("ListNodesByShard", mock.Anything, targetShardID).Return(targetNodes, nil)
 	s.env.OnActivity("CreateValkeyInstance", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("DumpValkeyData", mock.Anything, mock.Anything).Return(fmt.Errorf("BGSAVE failed"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "valkey_instances", ID: instanceID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("valkey_instances", instanceID)).Return(nil)
 
 	s.env.ExecuteWorkflow(MigrateValkeyInstanceWorkflow, MigrateValkeyInstanceParams{
 		InstanceID:    instanceID,
@@ -304,9 +297,7 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestImportFails_SetsStatusFaile
 		DumpPath: dumpPath,
 	}).Return(nil)
 	s.env.OnActivity("ImportValkeyData", mock.Anything, mock.Anything).Return(fmt.Errorf("import failed"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "valkey_instances", ID: instanceID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("valkey_instances", instanceID)).Return(nil)
 
 	s.env.ExecuteWorkflow(MigrateValkeyInstanceWorkflow, MigrateValkeyInstanceParams{
 		InstanceID:    instanceID,

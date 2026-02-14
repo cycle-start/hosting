@@ -64,10 +64,10 @@ func (s *ValkeyInstanceService) Create(ctx context.Context, instance *model.Valk
 func (s *ValkeyInstanceService) GetByID(ctx context.Context, id string) (*model.ValkeyInstance, error) {
 	var v model.ValkeyInstance
 	err := s.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, created_at, updated_at
+		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, status_message, created_at, updated_at
 		 FROM valkey_instances WHERE id = $1`, id,
 	).Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB,
-		&v.Password, &v.Status, &v.CreatedAt, &v.UpdatedAt)
+		&v.Password, &v.Status, &v.StatusMessage, &v.CreatedAt, &v.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get valkey instance %s: %w", id, err)
 	}
@@ -75,7 +75,7 @@ func (s *ValkeyInstanceService) GetByID(ctx context.Context, id string) (*model.
 }
 
 func (s *ValkeyInstanceService) ListByTenant(ctx context.Context, tenantID string, limit int, cursor string) ([]model.ValkeyInstance, bool, error) {
-	query := `SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, created_at, updated_at FROM valkey_instances WHERE tenant_id = $1`
+	query := `SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, status_message, created_at, updated_at FROM valkey_instances WHERE tenant_id = $1`
 	args := []any{tenantID}
 	argIdx := 2
 
@@ -99,7 +99,7 @@ func (s *ValkeyInstanceService) ListByTenant(ctx context.Context, tenantID strin
 	for rows.Next() {
 		var v model.ValkeyInstance
 		if err := rows.Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB,
-			&v.Password, &v.Status, &v.CreatedAt, &v.UpdatedAt); err != nil {
+			&v.Password, &v.Status, &v.StatusMessage, &v.CreatedAt, &v.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan valkey instance: %w", err)
 		}
 		instances = append(instances, v)
@@ -177,4 +177,28 @@ func (s *ValkeyInstanceService) ReassignTenant(ctx context.Context, id string, t
 		return fmt.Errorf("reassign valkey instance %s to tenant: %w", id, err)
 	}
 	return nil
+}
+
+func (s *ValkeyInstanceService) Retry(ctx context.Context, id string) error {
+	var status string
+	err := s.db.QueryRow(ctx, "SELECT status FROM valkey_instances WHERE id = $1", id).Scan(&status)
+	if err != nil {
+		return fmt.Errorf("get valkey instance status: %w", err)
+	}
+	if status != model.StatusFailed {
+		return fmt.Errorf("valkey instance %s is not in failed state (current: %s)", id, status)
+	}
+	_, err = s.db.Exec(ctx, "UPDATE valkey_instances SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", model.StatusProvisioning, id)
+	if err != nil {
+		return fmt.Errorf("set valkey instance %s status to provisioning: %w", id, err)
+	}
+	tenantID, err := resolveTenantIDFromValkeyInstance(ctx, s.db, id)
+	if err != nil {
+		return fmt.Errorf("retry valkey instance: %w", err)
+	}
+	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateValkeyInstanceWorkflow",
+		WorkflowID:   fmt.Sprintf("valkey-instance-%s", id),
+		Arg:          id,
+	})
 }

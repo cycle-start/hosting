@@ -115,9 +115,7 @@ func (s *CreateEmailAccountWorkflowTestSuite) TestGetEmailAccountFails_SetsStatu
 		Table: "email_accounts", ID: accountID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetEmailAccountByID", mock.Anything, accountID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "email_accounts", ID: accountID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("email_accounts", accountID)).Return(nil)
 
 	s.env.ExecuteWorkflow(CreateEmailAccountWorkflow, accountID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -139,9 +137,7 @@ func (s *CreateEmailAccountWorkflowTestSuite) TestGetFQDNFails_SetsStatusFailed(
 	}).Return(nil)
 	s.env.OnActivity("GetEmailAccountByID", mock.Anything, accountID).Return(&account, nil)
 	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(nil, fmt.Errorf("fqdn not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "email_accounts", ID: accountID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("email_accounts", accountID)).Return(nil)
 
 	s.env.ExecuteWorkflow(CreateEmailAccountWorkflow, accountID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -191,9 +187,7 @@ func (s *CreateEmailAccountWorkflowTestSuite) TestStalwartCreateAccountFails_Set
 		DisplayName: "Test User",
 		QuotaBytes:  1073741824,
 	}).Return(fmt.Errorf("stalwart error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "email_accounts", ID: accountID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("email_accounts", accountID)).Return(nil)
 
 	s.env.ExecuteWorkflow(CreateEmailAccountWorkflow, accountID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -319,9 +313,7 @@ func (s *DeleteEmailAccountWorkflowTestSuite) TestGetEmailAccountFails_SetsStatu
 		Table: "email_accounts", ID: accountID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetEmailAccountByID", mock.Anything, accountID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "email_accounts", ID: accountID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("email_accounts", accountID)).Return(nil)
 
 	s.env.ExecuteWorkflow(DeleteEmailAccountWorkflow, accountID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -362,9 +354,7 @@ func (s *DeleteEmailAccountWorkflowTestSuite) TestStalwartDeleteAccountFails_Set
 		AdminToken: "admin-token",
 		Address:    "user@example.com",
 	}).Return(fmt.Errorf("stalwart error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "email_accounts", ID: accountID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("email_accounts", accountID)).Return(nil)
 
 	s.env.ExecuteWorkflow(DeleteEmailAccountWorkflow, accountID)
 	s.True(s.env.IsWorkflowCompleted())

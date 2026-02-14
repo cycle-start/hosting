@@ -49,10 +49,10 @@ func (s *CertificateService) Upload(ctx context.Context, cert *model.Certificate
 func (s *CertificateService) GetByID(ctx context.Context, id string) (*model.Certificate, error) {
 	var c model.Certificate
 	err := s.db.QueryRow(ctx,
-		`SELECT id, fqdn_id, type, cert_pem, key_pem, chain_pem, issued_at, expires_at, status, is_active, created_at, updated_at
+		`SELECT id, fqdn_id, type, cert_pem, key_pem, chain_pem, issued_at, expires_at, status, status_message, is_active, created_at, updated_at
 		 FROM certificates WHERE id = $1`, id,
 	).Scan(&c.ID, &c.FQDNID, &c.Type, &c.CertPEM, &c.KeyPEM, &c.ChainPEM,
-		&c.IssuedAt, &c.ExpiresAt, &c.Status, &c.IsActive, &c.CreatedAt, &c.UpdatedAt)
+		&c.IssuedAt, &c.ExpiresAt, &c.Status, &c.StatusMessage, &c.IsActive, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get certificate %s: %w", id, err)
 	}
@@ -60,7 +60,7 @@ func (s *CertificateService) GetByID(ctx context.Context, id string) (*model.Cer
 }
 
 func (s *CertificateService) ListByFQDN(ctx context.Context, fqdnID string, limit int, cursor string) ([]model.Certificate, bool, error) {
-	query := `SELECT id, fqdn_id, type, cert_pem, key_pem, chain_pem, issued_at, expires_at, status, is_active, created_at, updated_at FROM certificates WHERE fqdn_id = $1`
+	query := `SELECT id, fqdn_id, type, cert_pem, key_pem, chain_pem, issued_at, expires_at, status, status_message, is_active, created_at, updated_at FROM certificates WHERE fqdn_id = $1`
 	args := []any{fqdnID}
 	argIdx := 2
 
@@ -84,7 +84,7 @@ func (s *CertificateService) ListByFQDN(ctx context.Context, fqdnID string, limi
 	for rows.Next() {
 		var c model.Certificate
 		if err := rows.Scan(&c.ID, &c.FQDNID, &c.Type, &c.CertPEM, &c.KeyPEM, &c.ChainPEM,
-			&c.IssuedAt, &c.ExpiresAt, &c.Status, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			&c.IssuedAt, &c.ExpiresAt, &c.Status, &c.StatusMessage, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan certificate: %w", err)
 		}
 		certs = append(certs, c)
@@ -98,4 +98,28 @@ func (s *CertificateService) ListByFQDN(ctx context.Context, fqdnID string, limi
 		certs = certs[:limit]
 	}
 	return certs, hasMore, nil
+}
+
+func (s *CertificateService) Retry(ctx context.Context, id string) error {
+	var status, fqdnID string
+	err := s.db.QueryRow(ctx, "SELECT status, fqdn_id FROM certificates WHERE id = $1", id).Scan(&status, &fqdnID)
+	if err != nil {
+		return fmt.Errorf("get certificate status: %w", err)
+	}
+	if status != model.StatusFailed {
+		return fmt.Errorf("certificate %s is not in failed state (current: %s)", id, status)
+	}
+	_, err = s.db.Exec(ctx, "UPDATE certificates SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", model.StatusProvisioning, id)
+	if err != nil {
+		return fmt.Errorf("set certificate %s status to provisioning: %w", id, err)
+	}
+	tenantID, err := resolveTenantIDFromFQDN(ctx, s.db, fqdnID)
+	if err != nil {
+		return fmt.Errorf("retry certificate: %w", err)
+	}
+	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "UploadCustomCertWorkflow",
+		WorkflowID:   fmt.Sprintf("certificate-%s", id),
+		Arg:          id,
+	})
 }

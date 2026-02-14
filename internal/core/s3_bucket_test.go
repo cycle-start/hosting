@@ -113,8 +113,9 @@ func TestS3BucketService_GetByID_Success(t *testing.T) {
 		*(dest[4].(*bool)) = false
 		*(dest[5].(*int64)) = 1073741824
 		*(dest[6].(*string)) = model.StatusActive
-		*(dest[7].(*time.Time)) = now
+		*(dest[7].(**string)) = nil // status_message
 		*(dest[8].(*time.Time)) = now
+		*(dest[9].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -174,8 +175,9 @@ func TestS3BucketService_ListByTenant_Success(t *testing.T) {
 			*(dest[4].(*bool)) = false
 			*(dest[5].(*int64)) = 1073741824
 			*(dest[6].(*string)) = model.StatusActive
-			*(dest[7].(*time.Time)) = now
+			*(dest[7].(**string)) = nil // status_message
 			*(dest[8].(*time.Time)) = now
+			*(dest[9].(*time.Time)) = now
 			return nil
 		},
 	)

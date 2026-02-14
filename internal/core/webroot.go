@@ -42,10 +42,10 @@ func (s *WebrootService) Create(ctx context.Context, webroot *model.Webroot) err
 func (s *WebrootService) GetByID(ctx context.Context, id string) (*model.Webroot, error) {
 	var w model.Webroot
 	err := s.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, status, created_at, updated_at
+		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, status, status_message, created_at, updated_at
 		 FROM webroots WHERE id = $1`, id,
 	).Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion,
-		&w.RuntimeConfig, &w.PublicFolder, &w.Status, &w.CreatedAt, &w.UpdatedAt)
+		&w.RuntimeConfig, &w.PublicFolder, &w.Status, &w.StatusMessage, &w.CreatedAt, &w.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get webroot %s: %w", id, err)
 	}
@@ -53,7 +53,7 @@ func (s *WebrootService) GetByID(ctx context.Context, id string) (*model.Webroot
 }
 
 func (s *WebrootService) ListByTenant(ctx context.Context, tenantID string, limit int, cursor string) ([]model.Webroot, bool, error) {
-	query := `SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, status, created_at, updated_at FROM webroots WHERE tenant_id = $1`
+	query := `SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, status, status_message, created_at, updated_at FROM webroots WHERE tenant_id = $1`
 	args := []any{tenantID}
 	argIdx := 2
 
@@ -77,7 +77,7 @@ func (s *WebrootService) ListByTenant(ctx context.Context, tenantID string, limi
 	for rows.Next() {
 		var w model.Webroot
 		if err := rows.Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion,
-			&w.RuntimeConfig, &w.PublicFolder, &w.Status, &w.CreatedAt, &w.UpdatedAt); err != nil {
+			&w.RuntimeConfig, &w.PublicFolder, &w.Status, &w.StatusMessage, &w.CreatedAt, &w.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan webroot: %w", err)
 		}
 		webroots = append(webroots, w)
@@ -138,4 +138,28 @@ func (s *WebrootService) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (s *WebrootService) Retry(ctx context.Context, id string) error {
+	var status string
+	err := s.db.QueryRow(ctx, "SELECT status FROM webroots WHERE id = $1", id).Scan(&status)
+	if err != nil {
+		return fmt.Errorf("get webroot status: %w", err)
+	}
+	if status != model.StatusFailed {
+		return fmt.Errorf("webroot %s is not in failed state (current: %s)", id, status)
+	}
+	_, err = s.db.Exec(ctx, "UPDATE webroots SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", model.StatusProvisioning, id)
+	if err != nil {
+		return fmt.Errorf("set webroot %s status to provisioning: %w", id, err)
+	}
+	tenantID, err := resolveTenantIDFromWebroot(ctx, s.db, id)
+	if err != nil {
+		return fmt.Errorf("retry webroot: %w", err)
+	}
+	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateWebrootWorkflow",
+		WorkflowID:   fmt.Sprintf("webroot-%s", id),
+		Arg:          id,
+	})
 }

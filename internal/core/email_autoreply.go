@@ -66,9 +66,9 @@ func (s *EmailAutoReplyService) Upsert(ctx context.Context, ar *model.EmailAutoR
 func (s *EmailAutoReplyService) GetByAccountID(ctx context.Context, accountID string) (*model.EmailAutoReply, error) {
 	var ar model.EmailAutoReply
 	err := s.db.QueryRow(ctx,
-		`SELECT id, email_account_id, subject, body, start_date, end_date, enabled, status, created_at, updated_at
+		`SELECT id, email_account_id, subject, body, start_date, end_date, enabled, status, status_message, created_at, updated_at
 		 FROM email_autoreplies WHERE email_account_id = $1`, accountID,
-	).Scan(&ar.ID, &ar.EmailAccountID, &ar.Subject, &ar.Body, &ar.StartDate, &ar.EndDate, &ar.Enabled, &ar.Status, &ar.CreatedAt, &ar.UpdatedAt)
+	).Scan(&ar.ID, &ar.EmailAccountID, &ar.Subject, &ar.Body, &ar.StartDate, &ar.EndDate, &ar.Enabled, &ar.Status, &ar.StatusMessage, &ar.CreatedAt, &ar.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get email autoreply for account %s: %w", accountID, err)
 	}
@@ -106,4 +106,28 @@ func (s *EmailAutoReplyService) Delete(ctx context.Context, accountID string) er
 	}
 
 	return nil
+}
+
+func (s *EmailAutoReplyService) Retry(ctx context.Context, id string) error {
+	var status, accountID string
+	err := s.db.QueryRow(ctx, "SELECT status, email_account_id FROM email_autoreplies WHERE id = $1", id).Scan(&status, &accountID)
+	if err != nil {
+		return fmt.Errorf("get email autoreply status: %w", err)
+	}
+	if status != model.StatusFailed {
+		return fmt.Errorf("email autoreply %s is not in failed state (current: %s)", id, status)
+	}
+	_, err = s.db.Exec(ctx, "UPDATE email_autoreplies SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", model.StatusProvisioning, id)
+	if err != nil {
+		return fmt.Errorf("set email autoreply %s status to provisioning: %w", id, err)
+	}
+	tenantID, err := resolveTenantIDFromEmailAccount(ctx, s.db, accountID)
+	if err != nil {
+		return fmt.Errorf("retry email autoreply: %w", err)
+	}
+	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "UpdateEmailAutoReplyWorkflow",
+		WorkflowID:   fmt.Sprintf("email-autoreply-%s", id),
+		Arg:          id,
+	})
 }

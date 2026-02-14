@@ -5,6 +5,7 @@ CREATE TABLE fqdns (
     webroot_id  TEXT NOT NULL REFERENCES webroots(id),
     ssl_enabled BOOLEAN NOT NULL DEFAULT true,
     status      TEXT NOT NULL DEFAULT 'pending',
+    status_message TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );

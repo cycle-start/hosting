@@ -10,6 +10,7 @@ type ValkeyUser struct {
 	Privileges       []string `json:"privileges" db:"privileges"`
 	KeyPattern       string   `json:"key_pattern" db:"key_pattern"`
 	Status           string   `json:"status" db:"status"`
+	StatusMessage    *string  `json:"status_message,omitempty" db:"status_message"`
 	CreatedAt        time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at" db:"updated_at"`
 }

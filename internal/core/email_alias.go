@@ -46,9 +46,9 @@ func (s *EmailAliasService) Create(ctx context.Context, a *model.EmailAlias) err
 func (s *EmailAliasService) GetByID(ctx context.Context, id string) (*model.EmailAlias, error) {
 	var a model.EmailAlias
 	err := s.db.QueryRow(ctx,
-		`SELECT id, email_account_id, address, status, created_at, updated_at
+		`SELECT id, email_account_id, address, status, status_message, created_at, updated_at
 		 FROM email_aliases WHERE id = $1`, id,
-	).Scan(&a.ID, &a.EmailAccountID, &a.Address, &a.Status, &a.CreatedAt, &a.UpdatedAt)
+	).Scan(&a.ID, &a.EmailAccountID, &a.Address, &a.Status, &a.StatusMessage, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get email alias %s: %w", id, err)
 	}
@@ -56,7 +56,7 @@ func (s *EmailAliasService) GetByID(ctx context.Context, id string) (*model.Emai
 }
 
 func (s *EmailAliasService) ListByAccountID(ctx context.Context, accountID string, limit int, cursor string) ([]model.EmailAlias, bool, error) {
-	query := `SELECT id, email_account_id, address, status, created_at, updated_at FROM email_aliases WHERE email_account_id = $1`
+	query := `SELECT id, email_account_id, address, status, status_message, created_at, updated_at FROM email_aliases WHERE email_account_id = $1`
 	args := []any{accountID}
 	argIdx := 2
 
@@ -79,7 +79,7 @@ func (s *EmailAliasService) ListByAccountID(ctx context.Context, accountID strin
 	var aliases []model.EmailAlias
 	for rows.Next() {
 		var a model.EmailAlias
-		if err := rows.Scan(&a.ID, &a.EmailAccountID, &a.Address, &a.Status, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.EmailAccountID, &a.Address, &a.Status, &a.StatusMessage, &a.CreatedAt, &a.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan email alias: %w", err)
 		}
 		aliases = append(aliases, a)
@@ -118,4 +118,28 @@ func (s *EmailAliasService) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (s *EmailAliasService) Retry(ctx context.Context, id string) error {
+	var status string
+	err := s.db.QueryRow(ctx, "SELECT status FROM email_aliases WHERE id = $1", id).Scan(&status)
+	if err != nil {
+		return fmt.Errorf("get email alias status: %w", err)
+	}
+	if status != model.StatusFailed {
+		return fmt.Errorf("email alias %s is not in failed state (current: %s)", id, status)
+	}
+	_, err = s.db.Exec(ctx, "UPDATE email_aliases SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", model.StatusProvisioning, id)
+	if err != nil {
+		return fmt.Errorf("set email alias %s status to provisioning: %w", id, err)
+	}
+	tenantID, err := resolveTenantIDFromEmailAlias(ctx, s.db, id)
+	if err != nil {
+		return fmt.Errorf("retry email alias: %w", err)
+	}
+	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateEmailAliasWorkflow",
+		WorkflowID:   fmt.Sprintf("email-alias-%s", id),
+		Arg:          id,
+	})
 }

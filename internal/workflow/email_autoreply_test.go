@@ -98,9 +98,7 @@ func (s *UpdateEmailAutoReplyWorkflowTestSuite) TestGetAutoReplyFails_SetsStatus
 		Table: "email_autoreplies", ID: autoReplyID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetEmailAutoReplyByID", mock.Anything, autoReplyID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "email_autoreplies", ID: autoReplyID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("email_autoreplies", autoReplyID)).Return(nil)
 
 	s.env.ExecuteWorkflow(UpdateEmailAutoReplyWorkflow, autoReplyID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -147,9 +145,7 @@ func (s *UpdateEmailAutoReplyWorkflowTestSuite) TestSetVacationFails_SetsStatusF
 			Enabled: true,
 		},
 	}).Return(fmt.Errorf("jmap error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "email_autoreplies", ID: autoReplyID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("email_autoreplies", autoReplyID)).Return(nil)
 
 	s.env.ExecuteWorkflow(UpdateEmailAutoReplyWorkflow, autoReplyID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -223,9 +219,7 @@ func (s *DeleteEmailAutoReplyWorkflowTestSuite) TestGetAutoReplyFails_SetsStatus
 		Table: "email_autoreplies", ID: autoReplyID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetEmailAutoReplyByID", mock.Anything, autoReplyID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "email_autoreplies", ID: autoReplyID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("email_autoreplies", autoReplyID)).Return(nil)
 
 	s.env.ExecuteWorkflow(DeleteEmailAutoReplyWorkflow, autoReplyID)
 	s.True(s.env.IsWorkflowCompleted())

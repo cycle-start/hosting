@@ -8,6 +8,7 @@ CREATE TABLE backups (
     storage_path TEXT NOT NULL DEFAULT '',
     size_bytes BIGINT NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'pending',
+    status_message TEXT,
     started_at TIMESTAMPTZ,
     completed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

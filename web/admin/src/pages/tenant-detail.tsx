@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Pause, Play, Trash2, Plus, RotateCcw, Loader2, FolderOpen, Database as DatabaseIcon, Globe, Boxes, HardDrive, Key, Archive } from 'lucide-react'
+import { Pause, Play, Trash2, Plus, RotateCcw, Loader2, FolderOpen, Database as DatabaseIcon, Globe, Boxes, HardDrive, Key, Archive, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { ResourceHeader } from '@/components/shared/resource-header'
 import { DataTable } from '@/components/shared/data-table'
 import { StatusBadge } from '@/components/shared/status-badge'
@@ -16,7 +17,7 @@ import { CopyButton } from '@/components/shared/copy-button'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { Breadcrumb } from '@/components/shared/breadcrumb'
-import { formatDate } from '@/lib/utils'
+import { cn, formatDate } from '@/lib/utils'
 import {
   useTenant, useTenantResourceSummary, useWebroots, useDatabases, useValkeyInstances,
   useS3Buckets,
@@ -28,6 +29,8 @@ import {
   useCreateSFTPKey, useDeleteSFTPKey,
   useCreateBackup, useDeleteBackup, useRestoreBackup,
   useCreateZone, useDeleteZone,
+  useRetryTenantFailed, useRetryWebroot, useRetryDatabase,
+  useRetryValkeyInstance, useRetryS3Bucket, useRetrySFTPKey, useRetryZone, useRetryBackup,
 } from '@/lib/hooks'
 import type { Webroot, Database, ValkeyInstance, S3Bucket, SFTPKey, Backup, Zone, WebrootFormData, DatabaseFormData, ValkeyInstanceFormData, S3BucketFormData, SFTPKeyFormData, ZoneFormData } from '@/lib/types'
 import { WebrootFields } from '@/components/forms/webroot-fields'
@@ -38,7 +41,8 @@ import { SFTPKeyFields } from '@/components/forms/sftp-key-fields'
 import { ZoneFields } from '@/components/forms/zone-fields'
 
 export function TenantDetailPage() {
-  const { id } = useParams({ from: '/tenants/$id' as never })
+  const { id: rawId } = useParams({ strict: false })
+  const id = rawId!
   const navigate = useNavigate()
   const [deleteOpen, setDeleteOpen] = useState(false)
 
@@ -125,6 +129,14 @@ export function TenantDetailPage() {
   const restoreBackupMut = useRestoreBackup()
   const createZoneMut = useCreateZone()
   const deleteZoneMut = useDeleteZone()
+  const retryFailedMut = useRetryTenantFailed()
+  const retryWebrootMut = useRetryWebroot()
+  const retryDbMut = useRetryDatabase()
+  const retryValkeyMut = useRetryValkeyInstance()
+  const retryS3Mut = useRetryS3Bucket()
+  const retrySftpMut = useRetrySFTPKey()
+  const retryZoneMut = useRetryZone()
+  const retryBackupMut = useRetryBackup()
 
   if (isLoading || !tenant) {
     return (
@@ -238,6 +250,13 @@ export function TenantDetailPage() {
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }
 
+  const handleRetryAllFailed = async () => {
+    try {
+      const result = await retryFailedMut.mutateAsync(id)
+      toast.success(`Retrying ${result.count} failed resource${result.count !== 1 ? 's' : ''}`)
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed to retry') }
+  }
+
   const webrootColumns: ColumnDef<Webroot>[] = [
     {
       accessorKey: 'name', header: 'Name',
@@ -250,14 +269,37 @@ export function TenantDetailPage() {
     { accessorKey: 'public_folder', header: 'Public Folder' },
     {
       accessorKey: 'status', header: 'Status',
-      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <StatusBadge status={row.original.status} />
+          {row.original.status_message && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertCircle className="h-3 w-3 text-destructive cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="text-xs">{row.original.status_message}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+      ),
     },
     {
       id: 'actions',
       cell: ({ row }) => (
-        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteWebroot(row.original) }}>
-          <Trash2 className="h-4 w-4 text-destructive" />
-        </Button>
+        <div className="flex gap-1">
+          {row.original.status === 'failed' && (
+            <Button variant="ghost" size="icon" title="Retry" onClick={(e) => { e.stopPropagation(); retryWebrootMut.mutate(row.original.id, { onSuccess: () => toast.success('Retrying webroot'), onError: (e) => toast.error(e.message) }) }}>
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteWebroot(row.original) }}>
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
       ),
     },
   ]
@@ -273,7 +315,23 @@ export function TenantDetailPage() {
     },
     {
       accessorKey: 'status', header: 'Status',
-      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <StatusBadge status={row.original.status} />
+          {row.original.status_message && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertCircle className="h-3 w-3 text-destructive cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="text-xs">{row.original.status_message}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+      ),
     },
     {
       accessorKey: 'created_at', header: 'Created',
@@ -282,9 +340,16 @@ export function TenantDetailPage() {
     {
       id: 'actions',
       cell: ({ row }) => (
-        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteDb(row.original) }}>
-          <Trash2 className="h-4 w-4 text-destructive" />
-        </Button>
+        <div className="flex gap-1">
+          {row.original.status === 'failed' && (
+            <Button variant="ghost" size="icon" title="Retry" onClick={(e) => { e.stopPropagation(); retryDbMut.mutate(row.original.id, { onSuccess: () => toast.success('Retrying database'), onError: (e) => toast.error(e.message) }) }}>
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteDb(row.original) }}>
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
       ),
     },
   ]
@@ -298,14 +363,37 @@ export function TenantDetailPage() {
     { accessorKey: 'max_memory_mb', header: 'Max Memory (MB)' },
     {
       accessorKey: 'status', header: 'Status',
-      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <StatusBadge status={row.original.status} />
+          {row.original.status_message && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertCircle className="h-3 w-3 text-destructive cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="text-xs">{row.original.status_message}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+      ),
     },
     {
       id: 'actions',
       cell: ({ row }) => (
-        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteValkey(row.original) }}>
-          <Trash2 className="h-4 w-4 text-destructive" />
-        </Button>
+        <div className="flex gap-1">
+          {row.original.status === 'failed' && (
+            <Button variant="ghost" size="icon" title="Retry" onClick={(e) => { e.stopPropagation(); retryValkeyMut.mutate(row.original.id, { onSuccess: () => toast.success('Retrying instance'), onError: (e) => toast.error(e.message) }) }}>
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteValkey(row.original) }}>
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
       ),
     },
   ]
@@ -325,14 +413,37 @@ export function TenantDetailPage() {
     },
     {
       accessorKey: 'status', header: 'Status',
-      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <StatusBadge status={row.original.status} />
+          {row.original.status_message && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertCircle className="h-3 w-3 text-destructive cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="text-xs">{row.original.status_message}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+      ),
     },
     {
       id: 'actions',
       cell: ({ row }) => (
-        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteS3(row.original) }}>
-          <Trash2 className="h-4 w-4 text-destructive" />
-        </Button>
+        <div className="flex gap-1">
+          {row.original.status === 'failed' && (
+            <Button variant="ghost" size="icon" title="Retry" onClick={(e) => { e.stopPropagation(); retryS3Mut.mutate(row.original.id, { onSuccess: () => toast.success('Retrying bucket'), onError: (e) => toast.error(e.message) }) }}>
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteS3(row.original) }}>
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
       ),
     },
   ]
@@ -345,14 +456,37 @@ export function TenantDetailPage() {
     { accessorKey: 'region_id', header: 'Region' },
     {
       accessorKey: 'status', header: 'Status',
-      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <StatusBadge status={row.original.status} />
+          {row.original.status_message && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertCircle className="h-3 w-3 text-destructive cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="text-xs">{row.original.status_message}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+      ),
     },
     {
       id: 'actions',
       cell: ({ row }) => (
-        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteZoneTarget(row.original) }}>
-          <Trash2 className="h-4 w-4 text-destructive" />
-        </Button>
+        <div className="flex gap-1">
+          {row.original.status === 'failed' && (
+            <Button variant="ghost" size="icon" title="Retry" onClick={(e) => { e.stopPropagation(); retryZoneMut.mutate(row.original.id, { onSuccess: () => toast.success('Retrying zone'), onError: (e) => toast.error(e.message) }) }}>
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteZoneTarget(row.original) }}>
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
       ),
     },
   ]
@@ -362,7 +496,23 @@ export function TenantDetailPage() {
     { accessorKey: 'fingerprint', header: 'Fingerprint', cell: ({ row }) => <code className="text-xs">{row.original.fingerprint}</code> },
     {
       accessorKey: 'status', header: 'Status',
-      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <StatusBadge status={row.original.status} />
+          {row.original.status_message && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertCircle className="h-3 w-3 text-destructive cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="text-xs">{row.original.status_message}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+      ),
     },
     {
       accessorKey: 'created_at', header: 'Created',
@@ -371,9 +521,16 @@ export function TenantDetailPage() {
     {
       id: 'actions',
       cell: ({ row }) => (
-        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteSftp(row.original) }}>
-          <Trash2 className="h-4 w-4 text-destructive" />
-        </Button>
+        <div className="flex gap-1">
+          {row.original.status === 'failed' && (
+            <Button variant="ghost" size="icon" title="Retry" onClick={(e) => { e.stopPropagation(); retrySftpMut.mutate(row.original.id, { onSuccess: () => toast.success('Retrying SFTP key'), onError: (e) => toast.error(e.message) }) }}>
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteSftp(row.original) }}>
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
       ),
     },
   ]
@@ -394,7 +551,23 @@ export function TenantDetailPage() {
     },
     {
       accessorKey: 'status', header: 'Status',
-      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <StatusBadge status={row.original.status} />
+          {row.original.status_message && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertCircle className="h-3 w-3 text-destructive cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="text-xs">{row.original.status_message}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+      ),
     },
     {
       accessorKey: 'created_at', header: 'Created',
@@ -404,6 +577,11 @@ export function TenantDetailPage() {
       id: 'actions',
       cell: ({ row }) => (
         <div className="flex gap-1">
+          {row.original.status === 'failed' && (
+            <Button variant="ghost" size="icon" title="Retry" onClick={(e) => { e.stopPropagation(); retryBackupMut.mutate(row.original.id, { onSuccess: () => toast.success('Retrying backup'), onError: (e) => toast.error(e.message) }) }}>
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          )}
           {row.original.status === 'completed' && (
             <Button variant="ghost" size="icon" title="Restore" onClick={(e) => { e.stopPropagation(); setRestoreBackupTarget(row.original) }}>
               <RotateCcw className="h-4 w-4" />
@@ -472,8 +650,13 @@ export function TenantDetailPage() {
 
       {hasFailed && (
         <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950 p-3">
-          <div className="text-sm font-medium text-red-700 dark:text-red-300">
-            {summary!.failed} resource{summary!.failed !== 1 ? 's' : ''} failed
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium text-red-700 dark:text-red-300">
+              {summary!.failed} resource{summary!.failed !== 1 ? 's' : ''} failed
+            </div>
+            <Button size="sm" variant="outline" onClick={handleRetryAllFailed} disabled={retryFailedMut.isPending}>
+              <RotateCcw className={cn("mr-2 h-3 w-3", retryFailedMut.isPending && "animate-spin")} /> Retry All Failed
+            </Button>
           </div>
         </div>
       )}

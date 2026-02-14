@@ -852,6 +852,92 @@ export function useUpdatePlatformConfig() {
   })
 }
 
+// Retry hooks
+export function useRetryTenant() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/tenants/${id}/retry`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tenants'] })
+      qc.invalidateQueries({ queryKey: ['tenant'] })
+    },
+  })
+}
+
+export function useRetryTenantFailed() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post<{ status: string; count: number }>(`/tenants/${id}/retry-failed`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tenants'] })
+      qc.invalidateQueries({ queryKey: ['tenant'] })
+      qc.invalidateQueries({ queryKey: ['webroots'] })
+      qc.invalidateQueries({ queryKey: ['databases'] })
+      qc.invalidateQueries({ queryKey: ['zones'] })
+      qc.invalidateQueries({ queryKey: ['valkey-instances'] })
+      qc.invalidateQueries({ queryKey: ['s3-buckets'] })
+      qc.invalidateQueries({ queryKey: ['sftp-keys'] })
+      qc.invalidateQueries({ queryKey: ['backups'] })
+    },
+  })
+}
+
+export function useRetryWebroot() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/webroots/${id}/retry`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['webroots'] }),
+  })
+}
+
+export function useRetryDatabase() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/databases/${id}/retry`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['databases'] }),
+  })
+}
+
+export function useRetryValkeyInstance() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/valkey-instances/${id}/retry`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['valkey-instances'] }),
+  })
+}
+
+export function useRetryS3Bucket() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/s3-buckets/${id}/retry`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['s3-buckets'] }),
+  })
+}
+
+export function useRetrySFTPKey() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/sftp-keys/${id}/retry`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sftp-keys'] }),
+  })
+}
+
+export function useRetryZone() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/zones/${id}/retry`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['zones'] }),
+  })
+}
+
+export function useRetryBackup() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/backups/${id}/retry`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['backups'] }),
+  })
+}
+
 // Search
 export interface SearchResult {
   type: 'brand' | 'tenant' | 'zone' | 'fqdn' | 'webroot' | 'database' | 'email_account' | 'valkey_instance' | 's3_bucket'

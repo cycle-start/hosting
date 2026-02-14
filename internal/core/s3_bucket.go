@@ -48,10 +48,10 @@ func (s *S3BucketService) Create(ctx context.Context, bucket *model.S3Bucket) er
 func (s *S3BucketService) GetByID(ctx context.Context, id string) (*model.S3Bucket, error) {
 	var b model.S3Bucket
 	err := s.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, shard_id, public, quota_bytes, status, created_at, updated_at
+		`SELECT id, tenant_id, name, shard_id, public, quota_bytes, status, status_message, created_at, updated_at
 		 FROM s3_buckets WHERE id = $1`, id,
 	).Scan(&b.ID, &b.TenantID, &b.Name, &b.ShardID,
-		&b.Public, &b.QuotaBytes, &b.Status, &b.CreatedAt, &b.UpdatedAt)
+		&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get s3 bucket %s: %w", id, err)
 	}
@@ -59,7 +59,7 @@ func (s *S3BucketService) GetByID(ctx context.Context, id string) (*model.S3Buck
 }
 
 func (s *S3BucketService) ListByTenant(ctx context.Context, tenantID string, params request.ListParams) ([]model.S3Bucket, bool, error) {
-	query := `SELECT id, tenant_id, name, shard_id, public, quota_bytes, status, created_at, updated_at FROM s3_buckets WHERE tenant_id = $1 AND status != 'deleted'`
+	query := `SELECT id, tenant_id, name, shard_id, public, quota_bytes, status, status_message, created_at, updated_at FROM s3_buckets WHERE tenant_id = $1 AND status != 'deleted'`
 	args := []any{tenantID}
 	argIdx := 2
 
@@ -106,7 +106,7 @@ func (s *S3BucketService) ListByTenant(ctx context.Context, tenantID string, par
 	for rows.Next() {
 		var b model.S3Bucket
 		if err := rows.Scan(&b.ID, &b.TenantID, &b.Name, &b.ShardID,
-			&b.Public, &b.QuotaBytes, &b.Status, &b.CreatedAt, &b.UpdatedAt); err != nil {
+			&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.CreatedAt, &b.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan s3 bucket: %w", err)
 		}
 		buckets = append(buckets, b)
@@ -181,4 +181,28 @@ func (s *S3BucketService) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (s *S3BucketService) Retry(ctx context.Context, id string) error {
+	var status string
+	err := s.db.QueryRow(ctx, "SELECT status FROM s3_buckets WHERE id = $1", id).Scan(&status)
+	if err != nil {
+		return fmt.Errorf("get s3 bucket status: %w", err)
+	}
+	if status != model.StatusFailed {
+		return fmt.Errorf("s3 bucket %s is not in failed state (current: %s)", id, status)
+	}
+	_, err = s.db.Exec(ctx, "UPDATE s3_buckets SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", model.StatusProvisioning, id)
+	if err != nil {
+		return fmt.Errorf("set s3 bucket %s status to provisioning: %w", id, err)
+	}
+	tenantID, err := resolveTenantIDFromS3Bucket(ctx, s.db, id)
+	if err != nil {
+		return fmt.Errorf("retry s3 bucket: %w", err)
+	}
+	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateS3BucketWorkflow",
+		WorkflowID:   fmt.Sprintf("s3-bucket-%s", id),
+		Arg:          id,
+	})
 }

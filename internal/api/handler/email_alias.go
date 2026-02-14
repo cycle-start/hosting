@@ -146,3 +146,26 @@ func (h *EmailAlias) Delete(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusAccepted)
 }
+
+// Retry godoc
+//
+//	@Summary		Retry a failed email alias
+//	@Tags			Email Aliases
+//	@Security		ApiKeyAuth
+//	@Param			aliasID path string true "Email alias ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/email-aliases/{aliasID}/retry [post]
+func (h *EmailAlias) Retry(w http.ResponseWriter, r *http.Request) {
+	id, err := request.RequireID(chi.URLParam(r, "aliasID"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.svc.Retry(r.Context(), id); err != nil {
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}

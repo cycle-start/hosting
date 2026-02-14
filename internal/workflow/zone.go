@@ -36,7 +36,7 @@ func CreateZoneWorkflow(ctx workflow.Context, zoneID string) error {
 	var zone model.Zone
 	err = workflow.ExecuteActivity(ctx, "GetZoneByID", zoneID).Get(ctx, &zone)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zones", zoneID)
+		_ = setResourceFailed(ctx, "zones", zoneID, err)
 		return err
 	}
 
@@ -44,7 +44,7 @@ func CreateZoneWorkflow(ctx workflow.Context, zoneID string) error {
 	var brand model.Brand
 	err = workflow.ExecuteActivity(ctx, "GetBrandByID", zone.BrandID).Get(ctx, &brand)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zones", zoneID)
+		_ = setResourceFailed(ctx, "zones", zoneID, err)
 		return err
 	}
 
@@ -55,7 +55,7 @@ func CreateZoneWorkflow(ctx workflow.Context, zoneID string) error {
 		Type: "NATIVE",
 	}).Get(ctx, &domainID)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zones", zoneID)
+		_ = setResourceFailed(ctx, "zones", zoneID, err)
 		return err
 	}
 
@@ -69,7 +69,7 @@ func CreateZoneWorkflow(ctx workflow.Context, zoneID string) error {
 		TTL:      86400,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zones", zoneID)
+		_ = setResourceFailed(ctx, "zones", zoneID, err)
 		return err
 	}
 
@@ -82,7 +82,7 @@ func CreateZoneWorkflow(ctx workflow.Context, zoneID string) error {
 		TTL:      86400,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zones", zoneID)
+		_ = setResourceFailed(ctx, "zones", zoneID, err)
 		return err
 	}
 
@@ -95,7 +95,7 @@ func CreateZoneWorkflow(ctx workflow.Context, zoneID string) error {
 		TTL:      86400,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zones", zoneID)
+		_ = setResourceFailed(ctx, "zones", zoneID, err)
 		return err
 	}
 
@@ -131,7 +131,7 @@ func DeleteZoneWorkflow(ctx workflow.Context, zoneID string) error {
 	var zone model.Zone
 	err = workflow.ExecuteActivity(ctx, "GetZoneByID", zoneID).Get(ctx, &zone)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zones", zoneID)
+		_ = setResourceFailed(ctx, "zones", zoneID, err)
 		return err
 	}
 
@@ -139,21 +139,21 @@ func DeleteZoneWorkflow(ctx workflow.Context, zoneID string) error {
 	var domainID int
 	err = workflow.ExecuteActivity(ctx, "GetDNSZoneIDByName", zone.Name).Get(ctx, &domainID)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zones", zoneID)
+		_ = setResourceFailed(ctx, "zones", zoneID, err)
 		return err
 	}
 
 	// Delete all records for this domain.
 	err = workflow.ExecuteActivity(ctx, "DeleteDNSRecordsByDomain", domainID).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zones", zoneID)
+		_ = setResourceFailed(ctx, "zones", zoneID, err)
 		return err
 	}
 
 	// Delete the zone from PowerDNS DB.
 	err = workflow.ExecuteActivity(ctx, "DeleteDNSZone", zone.Name).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zones", zoneID)
+		_ = setResourceFailed(ctx, "zones", zoneID, err)
 		return err
 	}
 

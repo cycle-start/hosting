@@ -9,7 +9,8 @@ type S3Bucket struct {
 	ShardID    *string `json:"shard_id,omitempty" db:"shard_id"`
 	Public     bool    `json:"public" db:"public"`
 	QuotaBytes int64   `json:"quota_bytes" db:"quota_bytes"`
-	Status     string  `json:"status" db:"status"`
+	Status        string  `json:"status" db:"status"`
+	StatusMessage *string `json:"status_message,omitempty" db:"status_message"`
 	CreatedAt  time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at" db:"updated_at"`
 }

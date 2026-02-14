@@ -166,9 +166,7 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestGetDatabaseFails_SetsStatusFailed
 		Table: "databases", ID: databaseID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetDatabaseByID", mock.Anything, databaseID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "databases", ID: databaseID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("databases", databaseID)).Return(nil)
 
 	s.env.ExecuteWorkflow(MigrateDatabaseWorkflow, MigrateDatabaseParams{
 		DatabaseID:    databaseID,
@@ -190,10 +188,7 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 		Table: "databases", ID: databaseID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetDatabaseByID", mock.Anything, databaseID).Return(&database, nil)
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "databases", ID: databaseID, Status: model.StatusFailed,
-	}).Return(nil)
-
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("databases", databaseID)).Return(nil)
 	s.env.ExecuteWorkflow(MigrateDatabaseWorkflow, MigrateDatabaseParams{
 		DatabaseID:    databaseID,
 		TargetShardID: "target-shard-4",
@@ -223,9 +218,7 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestDumpFails_SetsStatusFailed() {
 	s.env.OnActivity("ListNodesByShard", mock.Anything, targetShardID).Return(targetNodes, nil)
 	s.env.OnActivity("CreateDatabase", mock.Anything, "mydb").Return(nil)
 	s.env.OnActivity("DumpMySQLDatabase", mock.Anything, mock.Anything).Return(fmt.Errorf("mysqldump failed"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "databases", ID: databaseID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("databases", databaseID)).Return(nil)
 
 	s.env.ExecuteWorkflow(MigrateDatabaseWorkflow, MigrateDatabaseParams{
 		DatabaseID:    databaseID,
@@ -262,9 +255,7 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestImportFails_SetsStatusFailed() {
 		DumpPath:     dumpPath,
 	}).Return(nil)
 	s.env.OnActivity("ImportMySQLDatabase", mock.Anything, mock.Anything).Return(fmt.Errorf("import failed"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "databases", ID: databaseID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("databases", databaseID)).Return(nil)
 
 	s.env.ExecuteWorkflow(MigrateDatabaseWorkflow, MigrateDatabaseParams{
 		DatabaseID:    databaseID,

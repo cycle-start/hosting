@@ -35,7 +35,7 @@ func CreateS3AccessKeyWorkflow(ctx workflow.Context, keyID string) error {
 	var key model.S3AccessKey
 	err = workflow.ExecuteActivity(ctx, "GetS3AccessKeyByID", keyID).Get(ctx, &key)
 	if err != nil {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID)
+		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
 		return err
 	}
 
@@ -43,13 +43,14 @@ func CreateS3AccessKeyWorkflow(ctx workflow.Context, keyID string) error {
 	var bucket model.S3Bucket
 	err = workflow.ExecuteActivity(ctx, "GetS3BucketByID", key.S3BucketID).Get(ctx, &bucket)
 	if err != nil {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID)
+		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
 		return err
 	}
 
 	if bucket.ShardID == nil {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID)
-		return fmt.Errorf("s3 bucket %s has no shard assigned", key.S3BucketID)
+		noShardErr := fmt.Errorf("s3 bucket %s has no shard assigned", key.S3BucketID)
+		_ = setResourceFailed(ctx, "s3_access_keys", keyID, noShardErr)
+		return noShardErr
 	}
 
 	var tenantID string
@@ -60,12 +61,12 @@ func CreateS3AccessKeyWorkflow(ctx workflow.Context, keyID string) error {
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *bucket.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID)
+		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
 		return err
 	}
 
 	if len(nodes) == 0 {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID)
+		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
 		return fmt.Errorf("no nodes found in S3 shard %s", *bucket.ShardID)
 	}
 
@@ -77,7 +78,7 @@ func CreateS3AccessKeyWorkflow(ctx workflow.Context, keyID string) error {
 		SecretAccessKey: key.SecretAccessKey,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID)
+		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
 		return err
 	}
 
@@ -113,7 +114,7 @@ func DeleteS3AccessKeyWorkflow(ctx workflow.Context, keyID string) error {
 	var key model.S3AccessKey
 	err = workflow.ExecuteActivity(ctx, "GetS3AccessKeyByID", keyID).Get(ctx, &key)
 	if err != nil {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID)
+		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
 		return err
 	}
 
@@ -121,13 +122,14 @@ func DeleteS3AccessKeyWorkflow(ctx workflow.Context, keyID string) error {
 	var bucket model.S3Bucket
 	err = workflow.ExecuteActivity(ctx, "GetS3BucketByID", key.S3BucketID).Get(ctx, &bucket)
 	if err != nil {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID)
+		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
 		return err
 	}
 
 	if bucket.ShardID == nil {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID)
-		return fmt.Errorf("s3 bucket %s has no shard assigned", key.S3BucketID)
+		noShardErr := fmt.Errorf("s3 bucket %s has no shard assigned", key.S3BucketID)
+		_ = setResourceFailed(ctx, "s3_access_keys", keyID, noShardErr)
+		return noShardErr
 	}
 
 	var tenantID string
@@ -138,12 +140,12 @@ func DeleteS3AccessKeyWorkflow(ctx workflow.Context, keyID string) error {
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *bucket.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID)
+		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
 		return err
 	}
 
 	if len(nodes) == 0 {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID)
+		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
 		return fmt.Errorf("no nodes found in S3 shard %s", *bucket.ShardID)
 	}
 
@@ -154,7 +156,7 @@ func DeleteS3AccessKeyWorkflow(ctx workflow.Context, keyID string) error {
 		AccessKeyID: key.AccessKeyID,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "s3_access_keys", keyID)
+		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)
 		return err
 	}
 

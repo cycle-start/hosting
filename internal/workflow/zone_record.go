@@ -34,7 +34,7 @@ func CreateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	var record model.ZoneRecord
 	err = workflow.ExecuteActivity(ctx, "GetZoneRecordByID", recordID).Get(ctx, &record)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zone_records", recordID)
+		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
 	}
 
@@ -42,7 +42,7 @@ func CreateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	var zone model.Zone
 	err = workflow.ExecuteActivity(ctx, "GetZoneByID", record.ZoneID).Get(ctx, &zone)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zone_records", recordID)
+		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
 	}
 
@@ -50,7 +50,7 @@ func CreateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	var domainID int
 	err = workflow.ExecuteActivity(ctx, "GetDNSZoneIDByName", zone.Name).Get(ctx, &domainID)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zone_records", recordID)
+		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
 	}
 
@@ -64,7 +64,7 @@ func CreateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 		Priority: record.Priority,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zone_records", recordID)
+		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
 	}
 
@@ -100,7 +100,7 @@ func UpdateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	var record model.ZoneRecord
 	err = workflow.ExecuteActivity(ctx, "GetZoneRecordByID", recordID).Get(ctx, &record)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zone_records", recordID)
+		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
 	}
 
@@ -108,7 +108,7 @@ func UpdateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	var zone model.Zone
 	err = workflow.ExecuteActivity(ctx, "GetZoneByID", record.ZoneID).Get(ctx, &zone)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zone_records", recordID)
+		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
 	}
 
@@ -116,7 +116,7 @@ func UpdateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	var domainID int
 	err = workflow.ExecuteActivity(ctx, "GetDNSZoneIDByName", zone.Name).Get(ctx, &domainID)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zone_records", recordID)
+		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
 	}
 
@@ -130,7 +130,7 @@ func UpdateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 		Priority: record.Priority,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zone_records", recordID)
+		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
 	}
 
@@ -166,7 +166,7 @@ func DeleteZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	var record model.ZoneRecord
 	err = workflow.ExecuteActivity(ctx, "GetZoneRecordByID", recordID).Get(ctx, &record)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zone_records", recordID)
+		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
 	}
 
@@ -174,7 +174,7 @@ func DeleteZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	var zone model.Zone
 	err = workflow.ExecuteActivity(ctx, "GetZoneByID", record.ZoneID).Get(ctx, &zone)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zone_records", recordID)
+		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
 	}
 
@@ -182,7 +182,7 @@ func DeleteZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 	var domainID int
 	err = workflow.ExecuteActivity(ctx, "GetDNSZoneIDByName", zone.Name).Get(ctx, &domainID)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zone_records", recordID)
+		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
 	}
 
@@ -193,7 +193,7 @@ func DeleteZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 		Type:     record.Type,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "zone_records", recordID)
+		_ = setResourceFailed(ctx, "zone_records", recordID, err)
 		return err
 	}
 

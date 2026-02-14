@@ -35,20 +35,21 @@ func CreateDatabaseWorkflow(ctx workflow.Context, databaseID string) error {
 	var database model.Database
 	err = workflow.ExecuteActivity(ctx, "GetDatabaseByID", databaseID).Get(ctx, &database)
 	if err != nil {
-		_ = setResourceFailed(ctx, "databases", databaseID)
+		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return err
 	}
 
 	// Look up nodes in the database's shard.
 	if database.ShardID == nil {
-		_ = setResourceFailed(ctx, "databases", databaseID)
-		return fmt.Errorf("database %s has no shard assigned", databaseID)
+		noShardErr := fmt.Errorf("database %s has no shard assigned", databaseID)
+		_ = setResourceFailed(ctx, "databases", databaseID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *database.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "databases", databaseID)
+		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return err
 	}
 
@@ -57,7 +58,7 @@ func CreateDatabaseWorkflow(ctx workflow.Context, databaseID string) error {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "CreateDatabase", database.Name).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "databases", databaseID)
+			_ = setResourceFailed(ctx, "databases", databaseID, err)
 			return err
 		}
 	}
@@ -94,20 +95,21 @@ func DeleteDatabaseWorkflow(ctx workflow.Context, databaseID string) error {
 	var database model.Database
 	err = workflow.ExecuteActivity(ctx, "GetDatabaseByID", databaseID).Get(ctx, &database)
 	if err != nil {
-		_ = setResourceFailed(ctx, "databases", databaseID)
+		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return err
 	}
 
 	// Look up nodes in the database's shard.
 	if database.ShardID == nil {
-		_ = setResourceFailed(ctx, "databases", databaseID)
-		return fmt.Errorf("database %s has no shard assigned", databaseID)
+		noShardErr := fmt.Errorf("database %s has no shard assigned", databaseID)
+		_ = setResourceFailed(ctx, "databases", databaseID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *database.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "databases", databaseID)
+		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return err
 	}
 
@@ -116,7 +118,7 @@ func DeleteDatabaseWorkflow(ctx workflow.Context, databaseID string) error {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "DeleteDatabase", database.Name).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "databases", databaseID)
+			_ = setResourceFailed(ctx, "databases", databaseID, err)
 			return err
 		}
 	}

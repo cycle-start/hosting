@@ -36,7 +36,7 @@ func CreateEmailAliasWorkflow(ctx workflow.Context, aliasID string) error {
 	var alias model.EmailAlias
 	err = workflow.ExecuteActivity(ctx, "GetEmailAliasByID", aliasID).Get(ctx, &alias)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_aliases", aliasID)
+		_ = setResourceFailed(ctx, "email_aliases", aliasID, err)
 		return err
 	}
 
@@ -44,7 +44,7 @@ func CreateEmailAliasWorkflow(ctx workflow.Context, aliasID string) error {
 	var account model.EmailAccount
 	err = workflow.ExecuteActivity(ctx, "GetEmailAccountByID", alias.EmailAccountID).Get(ctx, &account)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_aliases", aliasID)
+		_ = setResourceFailed(ctx, "email_aliases", aliasID, err)
 		return err
 	}
 
@@ -62,7 +62,7 @@ func CreateEmailAliasWorkflow(ctx workflow.Context, aliasID string) error {
 		Address:     alias.Address,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_aliases", aliasID)
+		_ = setResourceFailed(ctx, "email_aliases", aliasID, err)
 		return err
 	}
 
@@ -98,7 +98,7 @@ func DeleteEmailAliasWorkflow(ctx workflow.Context, aliasID string) error {
 	var alias model.EmailAlias
 	err = workflow.ExecuteActivity(ctx, "GetEmailAliasByID", aliasID).Get(ctx, &alias)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_aliases", aliasID)
+		_ = setResourceFailed(ctx, "email_aliases", aliasID, err)
 		return err
 	}
 
@@ -106,7 +106,7 @@ func DeleteEmailAliasWorkflow(ctx workflow.Context, aliasID string) error {
 	var account model.EmailAccount
 	err = workflow.ExecuteActivity(ctx, "GetEmailAccountByID", alias.EmailAccountID).Get(ctx, &account)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_aliases", aliasID)
+		_ = setResourceFailed(ctx, "email_aliases", aliasID, err)
 		return err
 	}
 
@@ -124,7 +124,7 @@ func DeleteEmailAliasWorkflow(ctx workflow.Context, aliasID string) error {
 		Address:     alias.Address,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_aliases", aliasID)
+		_ = setResourceFailed(ctx, "email_aliases", aliasID, err)
 		return err
 	}
 
@@ -142,28 +142,28 @@ func resolveClusterStalwart(ctx workflow.Context, fqdnID, table, resourceID stri
 	var fqdn model.FQDN
 	err = workflow.ExecuteActivity(ctx, "GetFQDNByID", fqdnID).Get(ctx, &fqdn)
 	if err != nil {
-		_ = setResourceFailed(ctx, table, resourceID)
+		_ = setResourceFailed(ctx, table, resourceID, err)
 		return "", "", err
 	}
 
 	var webroot model.Webroot
 	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", fqdn.WebrootID).Get(ctx, &webroot)
 	if err != nil {
-		_ = setResourceFailed(ctx, table, resourceID)
+		_ = setResourceFailed(ctx, table, resourceID, err)
 		return "", "", err
 	}
 
 	var tenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", webroot.TenantID).Get(ctx, &tenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, table, resourceID)
+		_ = setResourceFailed(ctx, table, resourceID, err)
 		return "", "", err
 	}
 
 	var cluster model.Cluster
 	err = workflow.ExecuteActivity(ctx, "GetClusterByID", tenant.ClusterID).Get(ctx, &cluster)
 	if err != nil {
-		_ = setResourceFailed(ctx, table, resourceID)
+		_ = setResourceFailed(ctx, table, resourceID, err)
 		return "", "", err
 	}
 

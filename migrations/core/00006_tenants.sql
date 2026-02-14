@@ -8,6 +8,7 @@ CREATE TABLE tenants (
     sftp_enabled BOOLEAN NOT NULL DEFAULT true,
     ssh_enabled  BOOLEAN NOT NULL DEFAULT false,
     status       TEXT NOT NULL DEFAULT 'pending',
+    status_message TEXT,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );

@@ -111,10 +111,11 @@ func TestBackupService_GetByID_Success(t *testing.T) {
 		*(dest[5].(*string)) = "/var/backups/hosting/tenant1/test-backup-1.tar.gz"
 		*(dest[6].(*int64)) = 1024
 		*(dest[7].(*string)) = model.StatusActive
-		*(dest[8].(**time.Time)) = &now
+		*(dest[8].(**string)) = nil // status_message
 		*(dest[9].(**time.Time)) = &now
-		*(dest[10].(*time.Time)) = now
+		*(dest[10].(**time.Time)) = &now
 		*(dest[11].(*time.Time)) = now
+		*(dest[12].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -170,10 +171,11 @@ func TestBackupService_ListByTenant_Success(t *testing.T) {
 			*(dest[5].(*string)) = "/var/backups/hosting/tenant1/test-backup-1.tar.gz"
 			*(dest[6].(*int64)) = 1024
 			*(dest[7].(*string)) = model.StatusActive
-			*(dest[8].(**time.Time)) = &now
+			*(dest[8].(**string)) = nil // status_message
 			*(dest[9].(**time.Time)) = &now
-			*(dest[10].(*time.Time)) = now
+			*(dest[10].(**time.Time)) = &now
 			*(dest[11].(*time.Time)) = now
+			*(dest[12].(*time.Time)) = now
 			return nil
 		},
 	)
@@ -315,10 +317,11 @@ func TestBackupService_Restore_Success(t *testing.T) {
 		*(dest[5].(*string)) = "/var/backups/hosting/tenant1/test-backup-1.tar.gz"
 		*(dest[6].(*int64)) = 1024
 		*(dest[7].(*string)) = model.StatusActive
-		*(dest[8].(**time.Time)) = &now
+		*(dest[8].(**string)) = nil // status_message
 		*(dest[9].(**time.Time)) = &now
-		*(dest[10].(*time.Time)) = now
+		*(dest[10].(**time.Time)) = &now
 		*(dest[11].(*time.Time)) = now
+		*(dest[12].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -351,10 +354,11 @@ func TestBackupService_Restore_NotActive(t *testing.T) {
 		*(dest[5].(*string)) = ""
 		*(dest[6].(*int64)) = 0
 		*(dest[7].(*string)) = model.StatusPending
-		*(dest[8].(**time.Time)) = nil
+		*(dest[8].(**string)) = nil // status_message
 		*(dest[9].(**time.Time)) = nil
-		*(dest[10].(*time.Time)) = now
+		*(dest[10].(**time.Time)) = nil
 		*(dest[11].(*time.Time)) = now
+		*(dest[12].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -399,10 +403,11 @@ func TestBackupService_Restore_WorkflowError(t *testing.T) {
 		*(dest[5].(*string)) = "/var/backups/hosting/tenant1/test-backup-1.tar.gz"
 		*(dest[6].(*int64)) = 1024
 		*(dest[7].(*string)) = model.StatusActive
-		*(dest[8].(**time.Time)) = &now
+		*(dest[8].(**string)) = nil // status_message
 		*(dest[9].(**time.Time)) = &now
-		*(dest[10].(*time.Time)) = now
+		*(dest[10].(**time.Time)) = &now
 		*(dest[11].(*time.Time)) = now
+		*(dest[12].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)

@@ -110,8 +110,9 @@ func TestS3AccessKeyService_GetByID_Success(t *testing.T) {
 		*(dest[3].(*string)) = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 		*(dest[4].(*string)) = "read-write"
 		*(dest[5].(*string)) = model.StatusActive
-		*(dest[6].(*time.Time)) = now
+		*(dest[6].(**string)) = nil // status_message
 		*(dest[7].(*time.Time)) = now
+		*(dest[8].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -168,8 +169,9 @@ func TestS3AccessKeyService_ListByBucket_Success(t *testing.T) {
 			*(dest[3].(*string)) = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 			*(dest[4].(*string)) = "read-write"
 			*(dest[5].(*string)) = model.StatusActive
-			*(dest[6].(*time.Time)) = now
+			*(dest[6].(**string)) = nil // status_message
 			*(dest[7].(*time.Time)) = now
+			*(dest[8].(*time.Time)) = now
 			return nil
 		},
 	)

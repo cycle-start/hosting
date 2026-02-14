@@ -35,7 +35,7 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	var webroot model.Webroot
 	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", webrootID).Get(ctx, &webroot)
 	if err != nil {
-		_ = setResourceFailed(ctx, "webroots", webrootID)
+		_ = setResourceFailed(ctx, "webroots", webrootID, err)
 		return err
 	}
 
@@ -43,7 +43,7 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	var tenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", webroot.TenantID).Get(ctx, &tenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "webroots", webrootID)
+		_ = setResourceFailed(ctx, "webroots", webrootID, err)
 		return err
 	}
 
@@ -51,7 +51,7 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	var fqdns []model.FQDN
 	err = workflow.ExecuteActivity(ctx, "GetFQDNsByWebrootID", webrootID).Get(ctx, &fqdns)
 	if err != nil {
-		_ = setResourceFailed(ctx, "webroots", webrootID)
+		_ = setResourceFailed(ctx, "webroots", webrootID, err)
 		return err
 	}
 
@@ -66,14 +66,15 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 
 	// Look up nodes in the tenant's shard.
 	if tenant.ShardID == nil {
-		_ = setResourceFailed(ctx, "webroots", webrootID)
-		return fmt.Errorf("tenant %s has no shard assigned", webroot.TenantID)
+		noShardErr := fmt.Errorf("tenant %s has no shard assigned", webroot.TenantID)
+		_ = setResourceFailed(ctx, "webroots", webrootID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "webroots", webrootID)
+		_ = setResourceFailed(ctx, "webroots", webrootID, err)
 		return err
 	}
 
@@ -91,7 +92,7 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 			FQDNs:          fqdnParams,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "webroots", webrootID)
+			_ = setResourceFailed(ctx, "webroots", webrootID, err)
 			return err
 		}
 	}
@@ -128,7 +129,7 @@ func UpdateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	var webroot model.Webroot
 	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", webrootID).Get(ctx, &webroot)
 	if err != nil {
-		_ = setResourceFailed(ctx, "webroots", webrootID)
+		_ = setResourceFailed(ctx, "webroots", webrootID, err)
 		return err
 	}
 
@@ -136,7 +137,7 @@ func UpdateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	var tenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", webroot.TenantID).Get(ctx, &tenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "webroots", webrootID)
+		_ = setResourceFailed(ctx, "webroots", webrootID, err)
 		return err
 	}
 
@@ -144,7 +145,7 @@ func UpdateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	var fqdns []model.FQDN
 	err = workflow.ExecuteActivity(ctx, "GetFQDNsByWebrootID", webrootID).Get(ctx, &fqdns)
 	if err != nil {
-		_ = setResourceFailed(ctx, "webroots", webrootID)
+		_ = setResourceFailed(ctx, "webroots", webrootID, err)
 		return err
 	}
 
@@ -158,14 +159,15 @@ func UpdateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	}
 
 	if tenant.ShardID == nil {
-		_ = setResourceFailed(ctx, "webroots", webrootID)
-		return fmt.Errorf("tenant %s has no shard assigned", webroot.TenantID)
+		noShardErr := fmt.Errorf("tenant %s has no shard assigned", webroot.TenantID)
+		_ = setResourceFailed(ctx, "webroots", webrootID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "webroots", webrootID)
+		_ = setResourceFailed(ctx, "webroots", webrootID, err)
 		return err
 	}
 
@@ -183,7 +185,7 @@ func UpdateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 			FQDNs:          fqdnParams,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "webroots", webrootID)
+			_ = setResourceFailed(ctx, "webroots", webrootID, err)
 			return err
 		}
 	}
@@ -220,7 +222,7 @@ func DeleteWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	var webroot model.Webroot
 	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", webrootID).Get(ctx, &webroot)
 	if err != nil {
-		_ = setResourceFailed(ctx, "webroots", webrootID)
+		_ = setResourceFailed(ctx, "webroots", webrootID, err)
 		return err
 	}
 
@@ -228,19 +230,20 @@ func DeleteWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	var tenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", webroot.TenantID).Get(ctx, &tenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "webroots", webrootID)
+		_ = setResourceFailed(ctx, "webroots", webrootID, err)
 		return err
 	}
 
 	if tenant.ShardID == nil {
-		_ = setResourceFailed(ctx, "webroots", webrootID)
-		return fmt.Errorf("tenant %s has no shard assigned", webroot.TenantID)
+		noShardErr := fmt.Errorf("tenant %s has no shard assigned", webroot.TenantID)
+		_ = setResourceFailed(ctx, "webroots", webrootID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "webroots", webrootID)
+		_ = setResourceFailed(ctx, "webroots", webrootID, err)
 		return err
 	}
 
@@ -249,7 +252,7 @@ func DeleteWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "DeleteWebroot", tenant.ID, webroot.Name).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "webroots", webrootID)
+			_ = setResourceFailed(ctx, "webroots", webrootID, err)
 			return err
 		}
 	}

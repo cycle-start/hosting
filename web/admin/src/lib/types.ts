@@ -72,6 +72,7 @@ export interface Tenant {
   uid: number
   sftp_enabled: boolean
   status: string
+  status_message?: string
   created_at: string
   updated_at: string
 }
@@ -85,6 +86,7 @@ export interface Webroot {
   runtime_config: Record<string, unknown> | null
   public_folder: string
   status: string
+  status_message?: string
   created_at: string
   updated_at: string
 }
@@ -95,6 +97,7 @@ export interface FQDN {
   webroot_id: string
   ssl_enabled: boolean
   status: string
+  status_message?: string
   created_at: string
   updated_at: string
 }
@@ -109,6 +112,7 @@ export interface Certificate {
   issued_at?: string | null
   expires_at?: string | null
   status: string
+  status_message?: string
   is_active: boolean
   created_at: string
   updated_at: string
@@ -121,6 +125,7 @@ export interface Zone {
   name: string
   region_id: string
   status: string
+  status_message?: string
   created_at: string
   updated_at: string
 }
@@ -136,6 +141,7 @@ export interface ZoneRecord {
   managed_by: string
   source_fqdn_id?: string | null
   status: string
+  status_message?: string
   created_at: string
   updated_at: string
 }
@@ -147,6 +153,7 @@ export interface Database {
   shard_id?: string | null
   node_id?: string | null
   status: string
+  status_message?: string
   created_at: string
   updated_at: string
 }
@@ -158,6 +165,7 @@ export interface DatabaseUser {
   password?: string
   privileges: string[]
   status: string
+  status_message?: string
   created_at: string
   updated_at: string
 }
@@ -171,6 +179,7 @@ export interface ValkeyInstance {
   max_memory_mb: number
   password?: string
   status: string
+  status_message?: string
   created_at: string
   updated_at: string
 }
@@ -183,6 +192,7 @@ export interface ValkeyUser {
   privileges: string[]
   key_pattern: string
   status: string
+  status_message?: string
   created_at: string
   updated_at: string
 }
@@ -194,6 +204,7 @@ export interface EmailAccount {
   display_name: string
   quota_bytes: number
   status: string
+  status_message?: string
   created_at: string
   updated_at: string
 }
@@ -203,6 +214,7 @@ export interface EmailAlias {
   email_account_id: string
   address: string
   status: string
+  status_message?: string
   created_at: string
   updated_at: string
 }
@@ -213,6 +225,7 @@ export interface EmailForward {
   destination: string
   keep_copy: boolean
   status: string
+  status_message?: string
   created_at: string
   updated_at: string
 }
@@ -226,6 +239,7 @@ export interface EmailAutoReply {
   end_date?: string | null
   enabled: boolean
   status: string
+  status_message?: string
   created_at: string
   updated_at: string
 }
@@ -237,6 +251,7 @@ export interface SFTPKey {
   public_key?: string
   fingerprint: string
   status: string
+  status_message?: string
   created_at: string
   updated_at: string
 }
@@ -249,6 +264,7 @@ export interface S3Bucket {
   public: boolean
   quota_bytes: number
   status: string
+  status_message?: string
   created_at: string
   updated_at: string
 }
@@ -260,6 +276,7 @@ export interface S3AccessKey {
   secret_access_key?: string
   permissions: string
   status: string
+  status_message?: string
   created_at: string
   updated_at: string
 }
@@ -273,6 +290,7 @@ export interface Backup {
   storage_path?: string
   size_bytes: number
   status: string
+  status_message?: string
   started_at?: string | null
   completed_at?: string | null
   created_at: string

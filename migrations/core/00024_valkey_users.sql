@@ -7,6 +7,7 @@ CREATE TABLE valkey_users (
     privileges         TEXT[] NOT NULL DEFAULT '{+@all}',
     key_pattern        TEXT NOT NULL DEFAULT '~*',
     status             TEXT NOT NULL DEFAULT 'pending',
+    status_message     TEXT,
     created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );

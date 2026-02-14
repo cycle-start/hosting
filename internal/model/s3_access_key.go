@@ -9,6 +9,7 @@ type S3AccessKey struct {
 	SecretAccessKey string    `json:"secret_access_key,omitempty" db:"secret_access_key"`
 	Permissions     string    `json:"permissions" db:"permissions"`
 	Status          string    `json:"status" db:"status"`
+	StatusMessage   *string   `json:"status_message,omitempty" db:"status_message"`
 	CreatedAt       time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
 }

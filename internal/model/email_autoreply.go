@@ -11,6 +11,7 @@ type EmailAutoReply struct {
 	EndDate        *time.Time `json:"end_date,omitempty" db:"end_date"`
 	Enabled        bool       `json:"enabled" db:"enabled"`
 	Status         string     `json:"status" db:"status"`
+	StatusMessage  *string    `json:"status_message,omitempty" db:"status_message"`
 	CreatedAt      time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at" db:"updated_at"`
 }

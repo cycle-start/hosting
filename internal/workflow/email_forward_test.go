@@ -92,9 +92,7 @@ func (s *CreateEmailForwardWorkflowTestSuite) TestGetForwardFails_SetsStatusFail
 		Table: "email_forwards", ID: forwardID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetEmailForwardByID", mock.Anything, forwardID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "email_forwards", ID: forwardID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("email_forwards", forwardID)).Return(nil)
 
 	s.env.ExecuteWorkflow(CreateEmailForwardWorkflow, forwardID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -135,9 +133,7 @@ func (s *CreateEmailForwardWorkflowTestSuite) TestSyncFails_SetsStatusFailed() {
 		AccountName:    "user@example.com",
 		EmailAccountID: accountID,
 	}).Return(fmt.Errorf("jmap error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "email_forwards", ID: forwardID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("email_forwards", forwardID)).Return(nil)
 
 	s.env.ExecuteWorkflow(CreateEmailForwardWorkflow, forwardID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -211,9 +207,7 @@ func (s *DeleteEmailForwardWorkflowTestSuite) TestGetForwardFails_SetsStatusFail
 		Table: "email_forwards", ID: forwardID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetEmailForwardByID", mock.Anything, forwardID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "email_forwards", ID: forwardID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("email_forwards", forwardID)).Return(nil)
 
 	s.env.ExecuteWorkflow(DeleteEmailForwardWorkflow, forwardID)
 	s.True(s.env.IsWorkflowCompleted())

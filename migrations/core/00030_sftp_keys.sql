@@ -6,6 +6,7 @@ CREATE TABLE sftp_keys (
     public_key TEXT NOT NULL,
     fingerprint TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
+    status_message TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

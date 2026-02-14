@@ -35,7 +35,7 @@ func CreateValkeyUserWorkflow(ctx workflow.Context, userID string) error {
 	var vUser model.ValkeyUser
 	err = workflow.ExecuteActivity(ctx, "GetValkeyUserByID", userID).Get(ctx, &vUser)
 	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID)
+		_ = setResourceFailed(ctx, "valkey_users", userID, err)
 		return err
 	}
 
@@ -43,20 +43,21 @@ func CreateValkeyUserWorkflow(ctx workflow.Context, userID string) error {
 	var instance model.ValkeyInstance
 	err = workflow.ExecuteActivity(ctx, "GetValkeyInstanceByID", vUser.ValkeyInstanceID).Get(ctx, &instance)
 	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID)
+		_ = setResourceFailed(ctx, "valkey_users", userID, err)
 		return err
 	}
 
 	// Look up nodes in the instance's shard.
 	if instance.ShardID == nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID)
-		return fmt.Errorf("valkey instance %s has no shard assigned", vUser.ValkeyInstanceID)
+		noShardErr := fmt.Errorf("valkey instance %s has no shard assigned", vUser.ValkeyInstanceID)
+		_ = setResourceFailed(ctx, "valkey_users", userID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *instance.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID)
+		_ = setResourceFailed(ctx, "valkey_users", userID, err)
 		return err
 	}
 
@@ -72,7 +73,7 @@ func CreateValkeyUserWorkflow(ctx workflow.Context, userID string) error {
 			KeyPattern:   vUser.KeyPattern,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "valkey_users", userID)
+			_ = setResourceFailed(ctx, "valkey_users", userID, err)
 			return err
 		}
 	}
@@ -109,7 +110,7 @@ func UpdateValkeyUserWorkflow(ctx workflow.Context, userID string) error {
 	var vUser model.ValkeyUser
 	err = workflow.ExecuteActivity(ctx, "GetValkeyUserByID", userID).Get(ctx, &vUser)
 	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID)
+		_ = setResourceFailed(ctx, "valkey_users", userID, err)
 		return err
 	}
 
@@ -117,20 +118,21 @@ func UpdateValkeyUserWorkflow(ctx workflow.Context, userID string) error {
 	var instance model.ValkeyInstance
 	err = workflow.ExecuteActivity(ctx, "GetValkeyInstanceByID", vUser.ValkeyInstanceID).Get(ctx, &instance)
 	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID)
+		_ = setResourceFailed(ctx, "valkey_users", userID, err)
 		return err
 	}
 
 	// Look up nodes in the instance's shard.
 	if instance.ShardID == nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID)
-		return fmt.Errorf("valkey instance %s has no shard assigned", vUser.ValkeyInstanceID)
+		noShardErr := fmt.Errorf("valkey instance %s has no shard assigned", vUser.ValkeyInstanceID)
+		_ = setResourceFailed(ctx, "valkey_users", userID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *instance.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID)
+		_ = setResourceFailed(ctx, "valkey_users", userID, err)
 		return err
 	}
 
@@ -146,7 +148,7 @@ func UpdateValkeyUserWorkflow(ctx workflow.Context, userID string) error {
 			KeyPattern:   vUser.KeyPattern,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "valkey_users", userID)
+			_ = setResourceFailed(ctx, "valkey_users", userID, err)
 			return err
 		}
 	}
@@ -183,7 +185,7 @@ func DeleteValkeyUserWorkflow(ctx workflow.Context, userID string) error {
 	var vUser model.ValkeyUser
 	err = workflow.ExecuteActivity(ctx, "GetValkeyUserByID", userID).Get(ctx, &vUser)
 	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID)
+		_ = setResourceFailed(ctx, "valkey_users", userID, err)
 		return err
 	}
 
@@ -191,20 +193,21 @@ func DeleteValkeyUserWorkflow(ctx workflow.Context, userID string) error {
 	var instance model.ValkeyInstance
 	err = workflow.ExecuteActivity(ctx, "GetValkeyInstanceByID", vUser.ValkeyInstanceID).Get(ctx, &instance)
 	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID)
+		_ = setResourceFailed(ctx, "valkey_users", userID, err)
 		return err
 	}
 
 	// Look up nodes in the instance's shard.
 	if instance.ShardID == nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID)
-		return fmt.Errorf("valkey instance %s has no shard assigned", vUser.ValkeyInstanceID)
+		noShardErr := fmt.Errorf("valkey instance %s has no shard assigned", vUser.ValkeyInstanceID)
+		_ = setResourceFailed(ctx, "valkey_users", userID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *instance.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "valkey_users", userID)
+		_ = setResourceFailed(ctx, "valkey_users", userID, err)
 		return err
 	}
 
@@ -217,7 +220,7 @@ func DeleteValkeyUserWorkflow(ctx workflow.Context, userID string) error {
 			Username:     vUser.Username,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "valkey_users", userID)
+			_ = setResourceFailed(ctx, "valkey_users", userID, err)
 			return err
 		}
 	}

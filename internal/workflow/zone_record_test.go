@@ -119,9 +119,7 @@ func (s *CreateZoneRecordWorkflowTestSuite) TestGetRecordFails_SetsStatusFailed(
 		Table: "zone_records", ID: recordID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetZoneRecordByID", mock.Anything, recordID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", recordID)).Return(nil)
 	s.env.ExecuteWorkflow(CreateZoneRecordWorkflow, recordID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -148,9 +146,7 @@ func (s *CreateZoneRecordWorkflowTestSuite) TestWriteDNSRecordFails_SetsStatusFa
 	s.env.OnActivity("GetZoneByID", mock.Anything, zoneID).Return(&zone, nil)
 	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(42, nil)
 	s.env.OnActivity("WriteDNSRecord", mock.Anything, mock.Anything).Return(fmt.Errorf("db error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", recordID)).Return(nil)
 	s.env.ExecuteWorkflow(CreateZoneRecordWorkflow, recordID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -231,9 +227,7 @@ func (s *UpdateZoneRecordWorkflowTestSuite) TestUpdateDNSRecordFails_SetsStatusF
 	s.env.OnActivity("GetZoneByID", mock.Anything, zoneID).Return(&zone, nil)
 	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(42, nil)
 	s.env.OnActivity("UpdateDNSRecord", mock.Anything, mock.Anything).Return(fmt.Errorf("db error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", recordID)).Return(nil)
 	s.env.ExecuteWorkflow(UpdateZoneRecordWorkflow, recordID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -246,9 +240,7 @@ func (s *UpdateZoneRecordWorkflowTestSuite) TestGetRecordFails_SetsStatusFailed(
 		Table: "zone_records", ID: recordID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetZoneRecordByID", mock.Anything, recordID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", recordID)).Return(nil)
 	s.env.ExecuteWorkflow(UpdateZoneRecordWorkflow, recordID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -325,9 +317,7 @@ func (s *DeleteZoneRecordWorkflowTestSuite) TestDeleteDNSRecordFails_SetsStatusF
 	s.env.OnActivity("GetZoneByID", mock.Anything, zoneID).Return(&zone, nil)
 	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(42, nil)
 	s.env.OnActivity("DeleteDNSRecord", mock.Anything, mock.Anything).Return(fmt.Errorf("db error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", recordID)).Return(nil)
 	s.env.ExecuteWorkflow(DeleteZoneRecordWorkflow, recordID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -340,9 +330,7 @@ func (s *DeleteZoneRecordWorkflowTestSuite) TestGetRecordFails_SetsStatusFailed(
 		Table: "zone_records", ID: recordID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetZoneRecordByID", mock.Anything, recordID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", recordID)).Return(nil)
 	s.env.ExecuteWorkflow(DeleteZoneRecordWorkflow, recordID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())

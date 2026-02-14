@@ -160,9 +160,10 @@ func TestCertificateService_GetByID_Success(t *testing.T) {
 		*(dest[6].(**time.Time)) = &now
 		*(dest[7].(**time.Time)) = &expires
 		*(dest[8].(*string)) = model.StatusActive
-		*(dest[9].(*bool)) = true
-		*(dest[10].(*time.Time)) = now
+		*(dest[9].(**string)) = nil // status_message
+		*(dest[10].(*bool)) = true
 		*(dest[11].(*time.Time)) = now
+		*(dest[12].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -220,9 +221,10 @@ func TestCertificateService_ListByFQDN_Success(t *testing.T) {
 			*(dest[6].(**time.Time)) = &now
 			*(dest[7].(**time.Time)) = &expires
 			*(dest[8].(*string)) = model.StatusActive
-			*(dest[9].(*bool)) = true
-			*(dest[10].(*time.Time)) = now
+			*(dest[9].(**string)) = nil // status_message
+			*(dest[10].(*bool)) = true
 			*(dest[11].(*time.Time)) = now
+			*(dest[12].(*time.Time)) = now
 			return nil
 		},
 	)

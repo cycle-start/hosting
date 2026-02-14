@@ -131,10 +131,11 @@ func TestZoneRecordService_GetByID_Success(t *testing.T) {
 		*(dest[5].(*int)) = 3600
 		*(dest[6].(**int)) = &priority
 		*(dest[7].(*string)) = model.ManagedByUser
-		*(dest[8].(**string)) = nil
+		*(dest[8].(**string)) = nil // source_fqdn_id
 		*(dest[9].(*string)) = model.StatusActive
-		*(dest[10].(*time.Time)) = now
+		*(dest[10].(**string)) = nil // status_message
 		*(dest[11].(*time.Time)) = now
+		*(dest[12].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -192,10 +193,11 @@ func TestZoneRecordService_ListByZone_Success(t *testing.T) {
 			*(dest[5].(*int)) = 3600
 			*(dest[6].(**int)) = &priority
 			*(dest[7].(*string)) = model.ManagedByUser
-			*(dest[8].(**string)) = nil
+			*(dest[8].(**string)) = nil // source_fqdn_id
 			*(dest[9].(*string)) = model.StatusActive
-			*(dest[10].(*time.Time)) = now
+			*(dest[10].(**string)) = nil // status_message
 			*(dest[11].(*time.Time)) = now
+			*(dest[12].(*time.Time)) = now
 			return nil
 		},
 	)

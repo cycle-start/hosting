@@ -117,8 +117,9 @@ func TestFQDNService_GetByID_Success(t *testing.T) {
 		*(dest[2].(*string)) = webrootID
 		*(dest[3].(*bool)) = true
 		*(dest[4].(*string)) = model.StatusActive
-		*(dest[5].(*time.Time)) = now
+		*(dest[5].(**string)) = nil // status_message
 		*(dest[6].(*time.Time)) = now
+		*(dest[7].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -171,8 +172,9 @@ func TestFQDNService_ListByWebroot_Success(t *testing.T) {
 			*(dest[2].(*string)) = webrootID
 			*(dest[3].(*bool)) = true
 			*(dest[4].(*string)) = model.StatusActive
-			*(dest[5].(*time.Time)) = now
+			*(dest[5].(**string)) = nil // status_message
 			*(dest[6].(*time.Time)) = now
+			*(dest[7].(*time.Time)) = now
 			return nil
 		},
 		func(dest ...any) error {
@@ -181,8 +183,9 @@ func TestFQDNService_ListByWebroot_Success(t *testing.T) {
 			*(dest[2].(*string)) = webrootID
 			*(dest[3].(*bool)) = false
 			*(dest[4].(*string)) = model.StatusPending
-			*(dest[5].(*time.Time)) = now
+			*(dest[5].(**string)) = nil // status_message
 			*(dest[6].(*time.Time)) = now
+			*(dest[7].(*time.Time)) = now
 			return nil
 		},
 	)

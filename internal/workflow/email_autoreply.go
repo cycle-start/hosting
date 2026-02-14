@@ -35,7 +35,7 @@ func UpdateEmailAutoReplyWorkflow(ctx workflow.Context, autoReplyID string) erro
 	var ar model.EmailAutoReply
 	err = workflow.ExecuteActivity(ctx, "GetEmailAutoReplyByID", autoReplyID).Get(ctx, &ar)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_autoreplies", autoReplyID)
+		_ = setResourceFailed(ctx, "email_autoreplies", autoReplyID, err)
 		return err
 	}
 
@@ -43,7 +43,7 @@ func UpdateEmailAutoReplyWorkflow(ctx workflow.Context, autoReplyID string) erro
 	var account model.EmailAccount
 	err = workflow.ExecuteActivity(ctx, "GetEmailAccountByID", ar.EmailAccountID).Get(ctx, &account)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_autoreplies", autoReplyID)
+		_ = setResourceFailed(ctx, "email_autoreplies", autoReplyID, err)
 		return err
 	}
 
@@ -76,7 +76,7 @@ func UpdateEmailAutoReplyWorkflow(ctx workflow.Context, autoReplyID string) erro
 		Vacation:    vacation,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_autoreplies", autoReplyID)
+		_ = setResourceFailed(ctx, "email_autoreplies", autoReplyID, err)
 		return err
 	}
 
@@ -112,7 +112,7 @@ func DeleteEmailAutoReplyWorkflow(ctx workflow.Context, autoReplyID string) erro
 	var ar model.EmailAutoReply
 	err = workflow.ExecuteActivity(ctx, "GetEmailAutoReplyByID", autoReplyID).Get(ctx, &ar)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_autoreplies", autoReplyID)
+		_ = setResourceFailed(ctx, "email_autoreplies", autoReplyID, err)
 		return err
 	}
 
@@ -120,7 +120,7 @@ func DeleteEmailAutoReplyWorkflow(ctx workflow.Context, autoReplyID string) erro
 	var account model.EmailAccount
 	err = workflow.ExecuteActivity(ctx, "GetEmailAccountByID", ar.EmailAccountID).Get(ctx, &account)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_autoreplies", autoReplyID)
+		_ = setResourceFailed(ctx, "email_autoreplies", autoReplyID, err)
 		return err
 	}
 
@@ -138,7 +138,7 @@ func DeleteEmailAutoReplyWorkflow(ctx workflow.Context, autoReplyID string) erro
 		Vacation:    nil,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_autoreplies", autoReplyID)
+		_ = setResourceFailed(ctx, "email_autoreplies", autoReplyID, err)
 		return err
 	}
 

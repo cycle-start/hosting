@@ -6,6 +6,7 @@ CREATE TABLE s3_access_keys (
     secret_access_key TEXT NOT NULL,
     permissions       TEXT NOT NULL DEFAULT 'read-write',
     status            TEXT NOT NULL DEFAULT 'active',
+    status_message    TEXT,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );

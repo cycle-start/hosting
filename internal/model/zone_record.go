@@ -12,7 +12,8 @@ type ZoneRecord struct {
 	Priority     *int    `json:"priority,omitempty" db:"priority"`
 	ManagedBy    string  `json:"managed_by" db:"managed_by"`
 	SourceFQDNID *string `json:"source_fqdn_id,omitempty" db:"source_fqdn_id"`
-	Status       string  `json:"status" db:"status"`
+	Status        string    `json:"status" db:"status"`
+	StatusMessage *string   `json:"status_message,omitempty" db:"status_message"`
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 }

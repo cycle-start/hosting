@@ -71,9 +71,7 @@ func (s *CreateTenantWorkflowTestSuite) TestGetTenantFails_SetsStatusFailed() {
 		Table: "tenants", ID: tenantID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(nil, fmt.Errorf("db error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "tenants", ID: tenantID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("tenants", tenantID)).Return(nil)
 	s.env.ExecuteWorkflow(CreateTenantWorkflow, tenantID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -99,9 +97,7 @@ func (s *CreateTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("CreateTenant", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "tenants", ID: tenantID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("tenants", tenantID)).Return(nil)
 	s.env.ExecuteWorkflow(CreateTenantWorkflow, tenantID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -119,9 +115,7 @@ func (s *CreateTenantWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 		Table: "tenants", ID: tenantID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "tenants", ID: tenantID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("tenants", tenantID)).Return(nil)
 	s.env.ExecuteWorkflow(CreateTenantWorkflow, tenantID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -214,9 +208,7 @@ func (s *UpdateTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 			UID:         5001,
 		SFTPEnabled: true,
 	}).Return(fmt.Errorf("node agent down"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "tenants", ID: tenantID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("tenants", tenantID)).Return(nil)
 	s.env.ExecuteWorkflow(UpdateTenantWorkflow, tenantID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -279,9 +271,7 @@ func (s *SuspendTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("SuspendTenant", mock.Anything, tenantID).Return(fmt.Errorf("node agent down"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "tenants", ID: tenantID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("tenants", tenantID)).Return(nil)
 	s.env.ExecuteWorkflow(SuspendTenantWorkflow, tenantID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -359,9 +349,7 @@ func (s *UnsuspendTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("UnsuspendTenant", mock.Anything, tenantID).Return(fmt.Errorf("node agent down"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "tenants", ID: tenantID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("tenants", tenantID)).Return(nil)
 	s.env.ExecuteWorkflow(UnsuspendTenantWorkflow, tenantID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -432,9 +420,7 @@ func (s *DeleteTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("RemoveSSHConfig", mock.Anything, tenantID).Return(nil)
 	s.env.OnActivity("DeleteTenant", mock.Anything, tenantID).Return(fmt.Errorf("node agent down"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "tenants", ID: tenantID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("tenants", tenantID)).Return(nil)
 	s.env.ExecuteWorkflow(DeleteTenantWorkflow, tenantID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -447,9 +433,7 @@ func (s *DeleteTenantWorkflowTestSuite) TestGetTenantFails_SetsStatusFailed() {
 		Table: "tenants", ID: tenantID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(nil, fmt.Errorf("db error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "tenants", ID: tenantID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("tenants", tenantID)).Return(nil)
 	s.env.ExecuteWorkflow(DeleteTenantWorkflow, tenantID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())

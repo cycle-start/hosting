@@ -10,14 +10,16 @@ import (
 	"github.com/edvin/hosting/internal/model"
 )
 
-// setResourceFailed is a helper to set a resource status to failed.
+// setResourceFailed is a helper to set a resource status to failed with an error message.
 // It returns any error but callers typically ignore it since the primary
 // error is more important.
-func setResourceFailed(ctx workflow.Context, table string, id string) error {
+func setResourceFailed(ctx workflow.Context, table string, id string, err error) error {
+	msg := err.Error()
 	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
-		Table:  table,
-		ID:     id,
-		Status: model.StatusFailed,
+		Table:         table,
+		ID:            id,
+		Status:        model.StatusFailed,
+		StatusMessage: &msg,
 	}).Get(ctx, nil)
 }
 
@@ -29,7 +31,10 @@ func nodeActivityCtx(ctx workflow.Context, nodeID string) workflow.Context {
 		TaskQueue:           "node-" + nodeID,
 		StartToCloseTimeout: 2 * time.Minute,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    5,
+			InitialInterval:    5 * time.Second,
+			MaximumInterval:    30 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	})
 }

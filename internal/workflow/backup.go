@@ -35,7 +35,7 @@ func CreateBackupWorkflow(ctx workflow.Context, backupID string) error {
 	var backup model.Backup
 	err = workflow.ExecuteActivity(ctx, "GetBackupByID", backupID).Get(ctx, &backup)
 	if err != nil {
-		_ = setResourceFailed(ctx, "backups", backupID)
+		_ = setResourceFailed(ctx, "backups", backupID, err)
 		return err
 	}
 
@@ -43,25 +43,26 @@ func CreateBackupWorkflow(ctx workflow.Context, backupID string) error {
 	var tenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", backup.TenantID).Get(ctx, &tenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "backups", backupID)
+		_ = setResourceFailed(ctx, "backups", backupID, err)
 		return err
 	}
 
 	if tenant.ShardID == nil {
-		_ = setResourceFailed(ctx, "backups", backupID)
-		return fmt.Errorf("tenant %s has no shard assigned", backup.TenantID)
+		noShardErr := fmt.Errorf("tenant %s has no shard assigned", backup.TenantID)
+		_ = setResourceFailed(ctx, "backups", backupID, noShardErr)
+		return noShardErr
 	}
 
 	// Get shard nodes.
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "backups", backupID)
+		_ = setResourceFailed(ctx, "backups", backupID, err)
 		return err
 	}
 
 	if len(nodes) == 0 {
-		_ = setResourceFailed(ctx, "backups", backupID)
+		_ = setResourceFailed(ctx, "backups", backupID, err)
 		return fmt.Errorf("no nodes found for shard %s", *tenant.ShardID)
 	}
 
@@ -80,7 +81,7 @@ func CreateBackupWorkflow(ctx workflow.Context, backupID string) error {
 		var webroot model.Webroot
 		err = workflow.ExecuteActivity(ctx, "GetWebrootByID", backup.SourceID).Get(ctx, &webroot)
 		if err != nil {
-			_ = setResourceFailed(ctx, "backups", backupID)
+			_ = setResourceFailed(ctx, "backups", backupID, err)
 			return err
 		}
 
@@ -91,7 +92,7 @@ func CreateBackupWorkflow(ctx workflow.Context, backupID string) error {
 			BackupPath:  backupPath,
 		}).Get(ctx, &result)
 		if err != nil {
-			_ = setResourceFailed(ctx, "backups", backupID)
+			_ = setResourceFailed(ctx, "backups", backupID, err)
 			return err
 		}
 
@@ -102,12 +103,12 @@ func CreateBackupWorkflow(ctx workflow.Context, backupID string) error {
 			BackupPath:   backupPath,
 		}).Get(ctx, &result)
 		if err != nil {
-			_ = setResourceFailed(ctx, "backups", backupID)
+			_ = setResourceFailed(ctx, "backups", backupID, err)
 			return err
 		}
 
 	default:
-		_ = setResourceFailed(ctx, "backups", backupID)
+		_ = setResourceFailed(ctx, "backups", backupID, err)
 		return fmt.Errorf("unsupported backup type: %s", backup.Type)
 	}
 
@@ -122,7 +123,7 @@ func CreateBackupWorkflow(ctx workflow.Context, backupID string) error {
 		CompletedAt: completedAt,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "backups", backupID)
+		_ = setResourceFailed(ctx, "backups", backupID, err)
 		return err
 	}
 
@@ -165,24 +166,25 @@ func RestoreBackupWorkflow(ctx workflow.Context, backupID string) error {
 	var tenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", backup.TenantID).Get(ctx, &tenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "backups", backupID)
+		_ = setResourceFailed(ctx, "backups", backupID, err)
 		return err
 	}
 
 	if tenant.ShardID == nil {
-		_ = setResourceFailed(ctx, "backups", backupID)
-		return fmt.Errorf("tenant %s has no shard assigned", backup.TenantID)
+		noShardErr := fmt.Errorf("tenant %s has no shard assigned", backup.TenantID)
+		_ = setResourceFailed(ctx, "backups", backupID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "backups", backupID)
+		_ = setResourceFailed(ctx, "backups", backupID, err)
 		return err
 	}
 
 	if len(nodes) == 0 {
-		_ = setResourceFailed(ctx, "backups", backupID)
+		_ = setResourceFailed(ctx, "backups", backupID, err)
 		return fmt.Errorf("no nodes found for shard %s", *tenant.ShardID)
 	}
 
@@ -192,7 +194,7 @@ func RestoreBackupWorkflow(ctx workflow.Context, backupID string) error {
 		var webroot model.Webroot
 		err = workflow.ExecuteActivity(ctx, "GetWebrootByID", backup.SourceID).Get(ctx, &webroot)
 		if err != nil {
-			_ = setResourceFailed(ctx, "backups", backupID)
+			_ = setResourceFailed(ctx, "backups", backupID, err)
 			return err
 		}
 
@@ -205,7 +207,7 @@ func RestoreBackupWorkflow(ctx workflow.Context, backupID string) error {
 				BackupPath:  backup.StoragePath,
 			}).Get(ctx, nil)
 			if err != nil {
-				_ = setResourceFailed(ctx, "backups", backupID)
+				_ = setResourceFailed(ctx, "backups", backupID, err)
 				return err
 			}
 		}
@@ -218,12 +220,12 @@ func RestoreBackupWorkflow(ctx workflow.Context, backupID string) error {
 			BackupPath:   backup.StoragePath,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "backups", backupID)
+			_ = setResourceFailed(ctx, "backups", backupID, err)
 			return err
 		}
 
 	default:
-		_ = setResourceFailed(ctx, "backups", backupID)
+		_ = setResourceFailed(ctx, "backups", backupID, err)
 		return fmt.Errorf("unsupported backup type: %s", backup.Type)
 	}
 
@@ -249,7 +251,7 @@ func DeleteBackupWorkflow(ctx workflow.Context, backupID string) error {
 	var backup model.Backup
 	err := workflow.ExecuteActivity(ctx, "GetBackupByID", backupID).Get(ctx, &backup)
 	if err != nil {
-		_ = setResourceFailed(ctx, "backups", backupID)
+		_ = setResourceFailed(ctx, "backups", backupID, err)
 		return err
 	}
 
@@ -257,24 +259,25 @@ func DeleteBackupWorkflow(ctx workflow.Context, backupID string) error {
 	var tenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", backup.TenantID).Get(ctx, &tenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "backups", backupID)
+		_ = setResourceFailed(ctx, "backups", backupID, err)
 		return err
 	}
 
 	if tenant.ShardID == nil {
-		_ = setResourceFailed(ctx, "backups", backupID)
-		return fmt.Errorf("tenant %s has no shard assigned", backup.TenantID)
+		noShardErr := fmt.Errorf("tenant %s has no shard assigned", backup.TenantID)
+		_ = setResourceFailed(ctx, "backups", backupID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "backups", backupID)
+		_ = setResourceFailed(ctx, "backups", backupID, err)
 		return err
 	}
 
 	if len(nodes) == 0 {
-		_ = setResourceFailed(ctx, "backups", backupID)
+		_ = setResourceFailed(ctx, "backups", backupID, err)
 		return fmt.Errorf("no nodes found for shard %s", *tenant.ShardID)
 	}
 
@@ -283,7 +286,7 @@ func DeleteBackupWorkflow(ctx workflow.Context, backupID string) error {
 		nodeCtx := nodeActivityCtx(ctx, nodes[0].ID)
 		err = workflow.ExecuteActivity(nodeCtx, "DeleteBackupFile", backup.StoragePath).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "backups", backupID)
+			_ = setResourceFailed(ctx, "backups", backupID, err)
 			return err
 		}
 	}

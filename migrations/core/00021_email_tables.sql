@@ -6,6 +6,7 @@ CREATE TABLE email_accounts (
     display_name TEXT NOT NULL DEFAULT '',
     quota_bytes  BIGINT NOT NULL DEFAULT 0,
     status       TEXT NOT NULL DEFAULT 'pending',
+    status_message TEXT,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );

@@ -74,6 +74,8 @@ func (m *ValkeyManager) execValkeyCLI(ctx context.Context, port int, password st
 }
 
 // CreateInstance provisions a new Valkey instance with config and systemd unit.
+// This method is idempotent: if the instance already exists, its config is
+// converged and a running instance is updated via CONFIG SET.
 func (m *ValkeyManager) CreateInstance(ctx context.Context, name string, port int, password string, maxMemoryMB int) error {
 	if err := validateName(name); err != nil {
 		return err
@@ -81,7 +83,6 @@ func (m *ValkeyManager) CreateInstance(ctx context.Context, name string, port in
 
 	m.logger.Info().Str("instance", name).Int("port", port).Msg("creating valkey instance")
 
-	// Write config file.
 	dataPath := filepath.Join(m.dataDir, name)
 	config := fmt.Sprintf(`port %d
 bind 0.0.0.0
@@ -95,6 +96,44 @@ appendonly yes
 appendfilename "appendonly.aof"
 `, port, password, maxMemoryMB, dataPath)
 
+	// Check if instance already exists (idempotency on retry).
+	if existingPassword, err := m.readInstancePassword(name); err == nil {
+		m.logger.Info().Str("instance", name).Msg("instance already exists, converging config")
+
+		// Rewrite config file to desired state.
+		if err := os.WriteFile(m.configPath(name), []byte(config), 0640); err != nil {
+			return status.Errorf(codes.Internal, "rewrite config: %v", err)
+		}
+
+		// Try to update running instance via CLI.
+		if _, pingErr := m.execValkeyCLI(ctx, port, existingPassword, "PING"); pingErr == nil {
+			// Instance is running — update config live.
+			if _, err := m.execValkeyCLI(ctx, port, existingPassword, "CONFIG", "SET", "maxmemory", fmt.Sprintf("%dmb", maxMemoryMB)); err != nil {
+				m.logger.Warn().Err(err).Msg("CONFIG SET maxmemory failed")
+			}
+			if existingPassword != password {
+				if _, err := m.execValkeyCLI(ctx, port, existingPassword, "CONFIG", "SET", "requirepass", password); err != nil {
+					m.logger.Warn().Err(err).Msg("CONFIG SET requirepass failed")
+				}
+			}
+			return nil
+		}
+
+		// Instance config exists but process not running — start it.
+		m.logger.Info().Str("instance", name).Msg("instance not running, starting")
+		cmd := exec.CommandContext(ctx, "valkey-server", m.configPath(name), "--daemonize", "yes")
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return status.Errorf(codes.Internal, "valkey-server restart: %s: %v", string(output), err)
+		}
+
+		serviceName := fmt.Sprintf("valkey@%s.service", name)
+		if err := m.svcMgr.Start(ctx, serviceName); err != nil {
+			m.logger.Warn().Err(err).Str("service", serviceName).Msg("systemd enable failed")
+		}
+		return nil
+	}
+
+	// New instance — create from scratch.
 	if err := os.MkdirAll(dataPath, 0750); err != nil {
 		return status.Errorf(codes.Internal, "create data dir: %v", err)
 	}

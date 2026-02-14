@@ -42,8 +42,9 @@ func TestEmailAccountService_GetByID_Success(t *testing.T) {
 		*(dest[3].(*string)) = "Test User"
 		*(dest[4].(*int64)) = 1073741824
 		*(dest[5].(*string)) = model.StatusActive
-		*(dest[6].(*time.Time)) = now
+		*(dest[6].(**string)) = nil // status_message
 		*(dest[7].(*time.Time)) = now
+		*(dest[8].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -100,8 +101,9 @@ func TestEmailAccountService_ListByFQDN_Success(t *testing.T) {
 			*(dest[3].(*string)) = "Alice"
 			*(dest[4].(*int64)) = 536870912
 			*(dest[5].(*string)) = model.StatusActive
-			*(dest[6].(*time.Time)) = now
+			*(dest[6].(**string)) = nil // status_message
 			*(dest[7].(*time.Time)) = now
+			*(dest[8].(*time.Time)) = now
 			return nil
 		},
 	)

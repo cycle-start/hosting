@@ -91,9 +91,7 @@ func (s *CreateEmailAliasWorkflowTestSuite) TestGetAliasFails_SetsStatusFailed()
 		Table: "email_aliases", ID: aliasID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetEmailAliasByID", mock.Anything, aliasID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "email_aliases", ID: aliasID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("email_aliases", aliasID)).Return(nil)
 
 	s.env.ExecuteWorkflow(CreateEmailAliasWorkflow, aliasID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -134,9 +132,7 @@ func (s *CreateEmailAliasWorkflowTestSuite) TestStalwartAddAliasFails_SetsStatus
 		AccountName: "user@example.com",
 		Address:     "alias@example.com",
 	}).Return(fmt.Errorf("stalwart error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "email_aliases", ID: aliasID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("email_aliases", aliasID)).Return(nil)
 
 	s.env.ExecuteWorkflow(CreateEmailAliasWorkflow, aliasID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -210,9 +206,7 @@ func (s *DeleteEmailAliasWorkflowTestSuite) TestGetAliasFails_SetsStatusFailed()
 		Table: "email_aliases", ID: aliasID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetEmailAliasByID", mock.Anything, aliasID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "email_aliases", ID: aliasID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("email_aliases", aliasID)).Return(nil)
 
 	s.env.ExecuteWorkflow(DeleteEmailAliasWorkflow, aliasID)
 	s.True(s.env.IsWorkflowCompleted())

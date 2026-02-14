@@ -62,26 +62,27 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 	var certWebroot model.Webroot
 	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", fqdn.WebrootID).Get(ctx, &certWebroot)
 	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
+		_ = setResourceFailed(ctx, "certificates", certID, err)
 		return err
 	}
 
 	var certTenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", certWebroot.TenantID).Get(ctx, &certTenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
+		_ = setResourceFailed(ctx, "certificates", certID, err)
 		return err
 	}
 
 	if certTenant.ShardID == nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
-		return fmt.Errorf("tenant %s has no shard assigned", certWebroot.TenantID)
+		noShardErr := fmt.Errorf("tenant %s has no shard assigned", certWebroot.TenantID)
+		_ = setResourceFailed(ctx, "certificates", certID, noShardErr)
+		return noShardErr
 	}
 
 	var certNodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *certTenant.ShardID).Get(ctx, &certNodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
+		_ = setResourceFailed(ctx, "certificates", certID, err)
 		return err
 	}
 
@@ -91,7 +92,7 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 		FQDN: fqdn.FQDN,
 	}).Get(ctx, &orderResult)
 	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
+		_ = setResourceFailed(ctx, "certificates", certID, err)
 		return err
 	}
 
@@ -106,7 +107,7 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 			AccountKey: orderResult.AccountKey,
 		}).Get(ctx, &challengeResult)
 		if err != nil {
-			_ = setResourceFailed(ctx, "certificates", certID)
+			_ = setResourceFailed(ctx, "certificates", certID, err)
 			return err
 		}
 
@@ -119,7 +120,7 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 				KeyAuth:     challengeResult.KeyAuth,
 			}).Get(ctx, nil)
 			if err != nil {
-				_ = setResourceFailed(ctx, "certificates", certID)
+				_ = setResourceFailed(ctx, "certificates", certID, err)
 				return err
 			}
 		}
@@ -138,7 +139,7 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 					Token:       challengeResult.Token,
 				}).Get(ctx, nil)
 			}
-			_ = setResourceFailed(ctx, "certificates", certID)
+			_ = setResourceFailed(ctx, "certificates", certID, err)
 			return err
 		}
 	}
@@ -151,7 +152,7 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 		AccountKey: orderResult.AccountKey,
 	}).Get(ctx, &finalizeResult)
 	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
+		_ = setResourceFailed(ctx, "certificates", certID, err)
 		return err
 	}
 
@@ -184,7 +185,7 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 		ExpiresAt: finalizeResult.ExpiresAt,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
+		_ = setResourceFailed(ctx, "certificates", certID, err)
 		return err
 	}
 
@@ -198,7 +199,7 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 			ChainPEM: finalizeResult.ChainPEM,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "certificates", certID)
+			_ = setResourceFailed(ctx, "certificates", certID, err)
 			return err
 		}
 	}
@@ -206,14 +207,14 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 	// Step 9: Deactivate other certificates for this FQDN.
 	err = workflow.ExecuteActivity(ctx, "DeactivateOtherCerts", fqdnID, certID).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
+		_ = setResourceFailed(ctx, "certificates", certID, err)
 		return err
 	}
 
 	// Step 10: Activate this certificate.
 	err = workflow.ExecuteActivity(ctx, "ActivateCertificate", certID).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
+		_ = setResourceFailed(ctx, "certificates", certID, err)
 		return err
 	}
 
@@ -244,14 +245,14 @@ func UploadCustomCertWorkflow(ctx workflow.Context, certID string) error {
 	var cert model.Certificate
 	err = workflow.ExecuteActivity(ctx, "GetCertificateByID", certID).Get(ctx, &cert)
 	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
+		_ = setResourceFailed(ctx, "certificates", certID, err)
 		return err
 	}
 
 	// Validate the certificate and key.
 	err = workflow.ExecuteActivity(ctx, "ValidateCustomCert", cert.CertPEM, cert.KeyPEM).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
+		_ = setResourceFailed(ctx, "certificates", certID, err)
 		return err
 	}
 
@@ -259,7 +260,7 @@ func UploadCustomCertWorkflow(ctx workflow.Context, certID string) error {
 	var fqdn model.FQDN
 	err = workflow.ExecuteActivity(ctx, "GetFQDNByID", cert.FQDNID).Get(ctx, &fqdn)
 	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
+		_ = setResourceFailed(ctx, "certificates", certID, err)
 		return err
 	}
 
@@ -267,26 +268,27 @@ func UploadCustomCertWorkflow(ctx workflow.Context, certID string) error {
 	var ucWebroot model.Webroot
 	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", fqdn.WebrootID).Get(ctx, &ucWebroot)
 	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
+		_ = setResourceFailed(ctx, "certificates", certID, err)
 		return err
 	}
 
 	var ucTenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", ucWebroot.TenantID).Get(ctx, &ucTenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
+		_ = setResourceFailed(ctx, "certificates", certID, err)
 		return err
 	}
 
 	if ucTenant.ShardID == nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
-		return fmt.Errorf("tenant %s has no shard assigned", ucWebroot.TenantID)
+		noShardErr := fmt.Errorf("tenant %s has no shard assigned", ucWebroot.TenantID)
+		_ = setResourceFailed(ctx, "certificates", certID, noShardErr)
+		return noShardErr
 	}
 
 	var ucNodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *ucTenant.ShardID).Get(ctx, &ucNodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
+		_ = setResourceFailed(ctx, "certificates", certID, err)
 		return err
 	}
 
@@ -300,7 +302,7 @@ func UploadCustomCertWorkflow(ctx workflow.Context, certID string) error {
 			ChainPEM: cert.ChainPEM,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "certificates", certID)
+			_ = setResourceFailed(ctx, "certificates", certID, err)
 			return err
 		}
 	}
@@ -308,14 +310,14 @@ func UploadCustomCertWorkflow(ctx workflow.Context, certID string) error {
 	// Deactivate other certificates for this FQDN.
 	err = workflow.ExecuteActivity(ctx, "DeactivateOtherCerts", cert.FQDNID, certID).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
+		_ = setResourceFailed(ctx, "certificates", certID, err)
 		return err
 	}
 
 	// Activate this certificate.
 	err = workflow.ExecuteActivity(ctx, "ActivateCertificate", certID).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "certificates", certID)
+		_ = setResourceFailed(ctx, "certificates", certID, err)
 		return err
 	}
 

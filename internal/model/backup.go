@@ -10,7 +10,8 @@ type Backup struct {
 	SourceName  string     `json:"source_name"`
 	StoragePath string     `json:"storage_path,omitempty"`
 	SizeBytes   int64      `json:"size_bytes"`
-	Status      string     `json:"status"`
+	Status        string     `json:"status"`
+	StatusMessage *string    `json:"status_message,omitempty"`
 	StartedAt   *time.Time `json:"started_at,omitempty"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`

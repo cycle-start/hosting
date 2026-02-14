@@ -124,9 +124,7 @@ func (s *CreateBackupWorkflowTestSuite) TestGetBackupFails_SetsStatusFailed() {
 		Table: "backups", ID: backupID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetBackupByID", mock.Anything, backupID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "backups", ID: backupID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("backups", backupID)).Return(nil)
 
 	s.env.ExecuteWorkflow(CreateBackupWorkflow, backupID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -153,10 +151,7 @@ func (s *CreateBackupWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 	}).Return(nil)
 	s.env.OnActivity("GetBackupByID", mock.Anything, backupID).Return(&backup, nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "backups", ID: backupID, Status: model.StatusFailed,
-	}).Return(nil)
-
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("backups", backupID)).Return(nil)
 	s.env.ExecuteWorkflow(CreateBackupWorkflow, backupID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -207,9 +202,7 @@ func (s *CreateBackupWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("GetWebrootByID", mock.Anything, "test-webroot-1").Return(&webroot, nil)
 	s.env.OnActivity("CreateWebBackup", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("node agent down"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "backups", ID: backupID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("backups", backupID)).Return(nil)
 
 	s.env.ExecuteWorkflow(CreateBackupWorkflow, backupID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -367,9 +360,7 @@ func (s *RestoreBackupWorkflowTestSuite) TestRestoreFails_SetsStatusFailed() {
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("RestoreMySQLBackup", mock.Anything, mock.Anything).Return(fmt.Errorf("restore failed"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "backups", ID: backupID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("backups", backupID)).Return(nil)
 
 	s.env.ExecuteWorkflow(RestoreBackupWorkflow, backupID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -436,9 +427,7 @@ func (s *DeleteBackupWorkflowTestSuite) TestGetBackupFails_SetsStatusFailed() {
 	backupID := "test-backup-2"
 
 	s.env.OnActivity("GetBackupByID", mock.Anything, backupID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "backups", ID: backupID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("backups", backupID)).Return(nil)
 
 	s.env.ExecuteWorkflow(DeleteBackupWorkflow, backupID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -473,9 +462,7 @@ func (s *DeleteBackupWorkflowTestSuite) TestDeleteFileFails_SetsStatusFailed() {
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("DeleteBackupFile", mock.Anything, mock.Anything).Return(fmt.Errorf("file not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "backups", ID: backupID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("backups", backupID)).Return(nil)
 
 	s.env.ExecuteWorkflow(DeleteBackupWorkflow, backupID)
 	s.True(s.env.IsWorkflowCompleted())

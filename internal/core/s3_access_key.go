@@ -75,10 +75,10 @@ func (s *S3AccessKeyService) Create(ctx context.Context, key *model.S3AccessKey)
 func (s *S3AccessKeyService) GetByID(ctx context.Context, id string) (*model.S3AccessKey, error) {
 	var k model.S3AccessKey
 	err := s.db.QueryRow(ctx,
-		`SELECT id, s3_bucket_id, access_key_id, secret_access_key, permissions, status, created_at, updated_at
+		`SELECT id, s3_bucket_id, access_key_id, secret_access_key, permissions, status, status_message, created_at, updated_at
 		 FROM s3_access_keys WHERE id = $1`, id,
 	).Scan(&k.ID, &k.S3BucketID, &k.AccessKeyID, &k.SecretAccessKey,
-		&k.Permissions, &k.Status, &k.CreatedAt, &k.UpdatedAt)
+		&k.Permissions, &k.Status, &k.StatusMessage, &k.CreatedAt, &k.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get s3 access key %s: %w", id, err)
 	}
@@ -86,7 +86,7 @@ func (s *S3AccessKeyService) GetByID(ctx context.Context, id string) (*model.S3A
 }
 
 func (s *S3AccessKeyService) ListByBucket(ctx context.Context, bucketID string, limit int, cursor string) ([]model.S3AccessKey, bool, error) {
-	query := `SELECT id, s3_bucket_id, access_key_id, secret_access_key, permissions, status, created_at, updated_at FROM s3_access_keys WHERE s3_bucket_id = $1`
+	query := `SELECT id, s3_bucket_id, access_key_id, secret_access_key, permissions, status, status_message, created_at, updated_at FROM s3_access_keys WHERE s3_bucket_id = $1`
 	args := []any{bucketID}
 	argIdx := 2
 
@@ -110,7 +110,7 @@ func (s *S3AccessKeyService) ListByBucket(ctx context.Context, bucketID string, 
 	for rows.Next() {
 		var k model.S3AccessKey
 		if err := rows.Scan(&k.ID, &k.S3BucketID, &k.AccessKeyID, &k.SecretAccessKey,
-			&k.Permissions, &k.Status, &k.CreatedAt, &k.UpdatedAt); err != nil {
+			&k.Permissions, &k.Status, &k.StatusMessage, &k.CreatedAt, &k.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan s3 access key: %w", err)
 		}
 		keys = append(keys, k)
@@ -149,4 +149,28 @@ func (s *S3AccessKeyService) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (s *S3AccessKeyService) Retry(ctx context.Context, id string) error {
+	var status string
+	err := s.db.QueryRow(ctx, "SELECT status FROM s3_access_keys WHERE id = $1", id).Scan(&status)
+	if err != nil {
+		return fmt.Errorf("get s3 access key status: %w", err)
+	}
+	if status != model.StatusFailed {
+		return fmt.Errorf("s3 access key %s is not in failed state (current: %s)", id, status)
+	}
+	_, err = s.db.Exec(ctx, "UPDATE s3_access_keys SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", model.StatusProvisioning, id)
+	if err != nil {
+		return fmt.Errorf("set s3 access key %s status to provisioning: %w", id, err)
+	}
+	tenantID, err := resolveTenantIDFromS3AccessKey(ctx, s.db, id)
+	if err != nil {
+		return fmt.Errorf("retry s3 access key: %w", err)
+	}
+	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateS3AccessKeyWorkflow",
+		WorkflowID:   fmt.Sprintf("s3-access-key-%s", id),
+		Arg:          id,
+	})
 }

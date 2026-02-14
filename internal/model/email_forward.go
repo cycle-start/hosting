@@ -8,6 +8,7 @@ type EmailForward struct {
 	Destination    string    `json:"destination" db:"destination"`
 	KeepCopy       bool      `json:"keep_copy" db:"keep_copy"`
 	Status         string    `json:"status" db:"status"`
+	StatusMessage  *string   `json:"status_message,omitempty" db:"status_message"`
 	CreatedAt      time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
 }

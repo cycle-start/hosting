@@ -35,7 +35,7 @@ func AddSFTPKeyWorkflow(ctx workflow.Context, keyID string) error {
 	var key model.SFTPKey
 	err = workflow.ExecuteActivity(ctx, "GetSFTPKeyByID", keyID).Get(ctx, &key)
 	if err != nil {
-		_ = setResourceFailed(ctx, "sftp_keys", keyID)
+		_ = setResourceFailed(ctx, "sftp_keys", keyID, err)
 		return err
 	}
 
@@ -43,20 +43,21 @@ func AddSFTPKeyWorkflow(ctx workflow.Context, keyID string) error {
 	var tenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", key.TenantID).Get(ctx, &tenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "sftp_keys", keyID)
+		_ = setResourceFailed(ctx, "sftp_keys", keyID, err)
 		return err
 	}
 
 	if tenant.ShardID == nil {
-		_ = setResourceFailed(ctx, "sftp_keys", keyID)
-		return fmt.Errorf("tenant %s has no shard assigned", key.TenantID)
+		noShardErr := fmt.Errorf("tenant %s has no shard assigned", key.TenantID)
+		_ = setResourceFailed(ctx, "sftp_keys", keyID, noShardErr)
+		return noShardErr
 	}
 
 	// Get all active SFTP keys for the tenant.
 	var activeKeys []model.SFTPKey
 	err = workflow.ExecuteActivity(ctx, "GetSFTPKeysByTenant", key.TenantID).Get(ctx, &activeKeys)
 	if err != nil {
-		_ = setResourceFailed(ctx, "sftp_keys", keyID)
+		_ = setResourceFailed(ctx, "sftp_keys", keyID, err)
 		return err
 	}
 
@@ -72,7 +73,7 @@ func AddSFTPKeyWorkflow(ctx workflow.Context, keyID string) error {
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "sftp_keys", keyID)
+		_ = setResourceFailed(ctx, "sftp_keys", keyID, err)
 		return err
 	}
 
@@ -84,7 +85,7 @@ func AddSFTPKeyWorkflow(ctx workflow.Context, keyID string) error {
 			PublicKeys: publicKeys,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "sftp_keys", keyID)
+			_ = setResourceFailed(ctx, "sftp_keys", keyID, err)
 			return err
 		}
 	}
@@ -111,7 +112,7 @@ func RemoveSFTPKeyWorkflow(ctx workflow.Context, keyID string) error {
 	var key model.SFTPKey
 	err := workflow.ExecuteActivity(ctx, "GetSFTPKeyByID", keyID).Get(ctx, &key)
 	if err != nil {
-		_ = setResourceFailed(ctx, "sftp_keys", keyID)
+		_ = setResourceFailed(ctx, "sftp_keys", keyID, err)
 		return err
 	}
 
@@ -122,7 +123,7 @@ func RemoveSFTPKeyWorkflow(ctx workflow.Context, keyID string) error {
 		Status: model.StatusDeleted,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "sftp_keys", keyID)
+		_ = setResourceFailed(ctx, "sftp_keys", keyID, err)
 		return err
 	}
 

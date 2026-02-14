@@ -10,6 +10,7 @@ CREATE TABLE zone_records (
     managed_by     TEXT NOT NULL DEFAULT 'user',
     source_fqdn_id TEXT REFERENCES fqdns(id) ON DELETE SET NULL,
     status         TEXT NOT NULL DEFAULT 'pending',
+    status_message TEXT,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );

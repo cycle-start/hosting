@@ -111,9 +111,7 @@ func (s *CreateS3BucketWorkflowTestSuite) TestGetBucketFails_SetsStatusFailed() 
 		Table: "s3_buckets", ID: bucketID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetS3BucketByID", mock.Anything, bucketID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "s3_buckets", ID: bucketID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("s3_buckets", bucketID)).Return(nil)
 	s.env.ExecuteWorkflow(CreateS3BucketWorkflow, bucketID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -141,9 +139,7 @@ func (s *CreateS3BucketWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	s.env.OnActivity("GetS3BucketByID", mock.Anything, bucketID).Return(&bucket, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("CreateS3Bucket", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "s3_buckets", ID: bucketID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("s3_buckets", bucketID)).Return(nil)
 	s.env.ExecuteWorkflow(CreateS3BucketWorkflow, bucketID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -219,9 +215,7 @@ func (s *DeleteS3BucketWorkflowTestSuite) TestGetBucketFails_SetsStatusFailed() 
 		Table: "s3_buckets", ID: bucketID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetS3BucketByID", mock.Anything, bucketID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "s3_buckets", ID: bucketID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("s3_buckets", bucketID)).Return(nil)
 	s.env.ExecuteWorkflow(DeleteS3BucketWorkflow, bucketID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -249,9 +243,7 @@ func (s *DeleteS3BucketWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	s.env.OnActivity("GetS3BucketByID", mock.Anything, bucketID).Return(&bucket, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("DeleteS3Bucket", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "s3_buckets", ID: bucketID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("s3_buckets", bucketID)).Return(nil)
 	s.env.ExecuteWorkflow(DeleteS3BucketWorkflow, bucketID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())

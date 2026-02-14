@@ -118,9 +118,7 @@ func (s *AddSFTPKeyWorkflowTestSuite) TestGetKeyFails_SetsStatusFailed() {
 		Table: "sftp_keys", ID: keyID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetSFTPKeyByID", mock.Anything, keyID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "sftp_keys", ID: keyID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("sftp_keys", keyID)).Return(nil)
 
 	s.env.ExecuteWorkflow(AddSFTPKeyWorkflow, keyID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -145,10 +143,7 @@ func (s *AddSFTPKeyWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 	}).Return(nil)
 	s.env.OnActivity("GetSFTPKeyByID", mock.Anything, keyID).Return(&key, nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "sftp_keys", ID: keyID, Status: model.StatusFailed,
-	}).Return(nil)
-
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("sftp_keys", keyID)).Return(nil)
 	s.env.ExecuteWorkflow(AddSFTPKeyWorkflow, keyID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -178,9 +173,7 @@ func (s *AddSFTPKeyWorkflowTestSuite) TestSyncFails_SetsStatusFailed() {
 	s.env.OnActivity("GetSFTPKeysByTenant", mock.Anything, tenantID).Return([]model.SFTPKey{}, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("SyncSFTPKeys", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "sftp_keys", ID: keyID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("sftp_keys", keyID)).Return(nil)
 
 	s.env.ExecuteWorkflow(AddSFTPKeyWorkflow, keyID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -294,9 +287,7 @@ func (s *RemoveSFTPKeyWorkflowTestSuite) TestGetKeyFails_SetsStatusFailed() {
 	keyID := "test-key-2"
 
 	s.env.OnActivity("GetSFTPKeyByID", mock.Anything, keyID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "sftp_keys", ID: keyID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("sftp_keys", keyID)).Return(nil)
 
 	s.env.ExecuteWorkflow(RemoveSFTPKeyWorkflow, keyID)
 	s.True(s.env.IsWorkflowCompleted())

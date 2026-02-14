@@ -11,7 +11,8 @@ type Tenant struct {
 	UID         int     `json:"uid" db:"uid"`
 	SFTPEnabled bool    `json:"sftp_enabled" db:"sftp_enabled"`
 	SSHEnabled  bool    `json:"ssh_enabled" db:"ssh_enabled"`
-	Status      string  `json:"status" db:"status"`
+	Status        string  `json:"status" db:"status"`
+	StatusMessage *string `json:"status_message,omitempty" db:"status_message"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 }

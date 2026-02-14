@@ -250,9 +250,7 @@ func (s *BindFQDNWorkflowTestSuite) TestAutoCreateDNSFails_SetsStatusFailed() {
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("GetClusterLBAddresses", mock.Anything, clusterID).Return(lbAddresses, nil)
 	s.env.OnActivity("AutoCreateDNSRecords", mock.Anything, mock.Anything).Return(fmt.Errorf("dns error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "fqdns", ID: fqdnID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("fqdns", fqdnID)).Return(nil)
 	s.env.ExecuteWorkflow(BindFQDNWorkflow, fqdnID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -265,9 +263,7 @@ func (s *BindFQDNWorkflowTestSuite) TestGetFQDNFails_SetsStatusFailed() {
 		Table: "fqdns", ID: fqdnID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "fqdns", ID: fqdnID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("fqdns", fqdnID)).Return(nil)
 	s.env.ExecuteWorkflow(BindFQDNWorkflow, fqdnID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -323,9 +319,7 @@ func (s *BindFQDNWorkflowTestSuite) TestSetLBMapEntryFails_SetsStatusFailed() {
 		FQDN:      "example.com",
 		LBBackend: "backend-1.example.com",
 	}).Return(fmt.Errorf("lb map error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "fqdns", ID: fqdnID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("fqdns", fqdnID)).Return(nil)
 	s.env.ExecuteWorkflow(BindFQDNWorkflow, fqdnID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -363,9 +357,7 @@ func (s *BindFQDNWorkflowTestSuite) TestReloadNginxFails_SetsStatusFailed() {
 		{ID: "node-1"},
 	}, nil)
 	s.env.OnActivity("ReloadNginx", mock.Anything).Return(fmt.Errorf("nginx error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "fqdns", ID: fqdnID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("fqdns", fqdnID)).Return(nil)
 	s.env.ExecuteWorkflow(BindFQDNWorkflow, fqdnID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -446,9 +438,7 @@ func (s *UnbindFQDNWorkflowTestSuite) TestAutoDeleteDNSFails_SetsStatusFailed() 
 	s.env.OnActivity("GetWebrootByID", mock.Anything, webrootID).Return(&webroot, nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("AutoDeleteDNSRecords", mock.Anything, "example.com").Return(fmt.Errorf("dns error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "fqdns", ID: fqdnID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("fqdns", fqdnID)).Return(nil)
 	s.env.ExecuteWorkflow(UnbindFQDNWorkflow, fqdnID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -461,9 +451,7 @@ func (s *UnbindFQDNWorkflowTestSuite) TestGetFQDNFails_SetsStatusFailed() {
 		Table: "fqdns", ID: fqdnID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetFQDNByID", mock.Anything, fqdnID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "fqdns", ID: fqdnID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("fqdns", fqdnID)).Return(nil)
 	s.env.ExecuteWorkflow(UnbindFQDNWorkflow, fqdnID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -494,9 +482,7 @@ func (s *UnbindFQDNWorkflowTestSuite) TestReloadNginxFails_SetsStatusFailed() {
 		{ID: "node-1"},
 	}, nil)
 	s.env.OnActivity("ReloadNginx", mock.Anything).Return(fmt.Errorf("nginx error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "fqdns", ID: fqdnID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("fqdns", fqdnID)).Return(nil)
 	s.env.ExecuteWorkflow(UnbindFQDNWorkflow, fqdnID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())

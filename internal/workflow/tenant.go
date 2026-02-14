@@ -35,20 +35,21 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	var tenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", tenantID).Get(ctx, &tenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return err
 	}
 
 	// Look up all nodes in the tenant's shard.
 	if tenant.ShardID == nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
-		return fmt.Errorf("tenant %s has no shard assigned", tenantID)
+		noShardErr := fmt.Errorf("tenant %s has no shard assigned", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return err
 	}
 
@@ -62,7 +63,7 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 			SSHEnabled:  tenant.SSHEnabled,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "tenants", tenantID)
+			_ = setResourceFailed(ctx, "tenants", tenantID, err)
 			return err
 		}
 
@@ -73,7 +74,7 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 			SFTPEnabled: tenant.SFTPEnabled,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "tenants", tenantID)
+			_ = setResourceFailed(ctx, "tenants", tenantID, err)
 			return err
 		}
 	}
@@ -110,19 +111,20 @@ func UpdateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	var tenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", tenantID).Get(ctx, &tenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return err
 	}
 
 	if tenant.ShardID == nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
-		return fmt.Errorf("tenant %s has no shard assigned", tenantID)
+		noShardErr := fmt.Errorf("tenant %s has no shard assigned", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return err
 	}
 
@@ -136,7 +138,7 @@ func UpdateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 			SSHEnabled:  tenant.SSHEnabled,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "tenants", tenantID)
+			_ = setResourceFailed(ctx, "tenants", tenantID, err)
 			return err
 		}
 
@@ -147,7 +149,7 @@ func UpdateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 			SFTPEnabled: tenant.SFTPEnabled,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "tenants", tenantID)
+			_ = setResourceFailed(ctx, "tenants", tenantID, err)
 			return err
 		}
 	}
@@ -178,14 +180,15 @@ func SuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	}
 
 	if tenant.ShardID == nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
-		return fmt.Errorf("tenant %s has no shard assigned", tenantID)
+		noShardErr := fmt.Errorf("tenant %s has no shard assigned", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return err
 	}
 
@@ -194,7 +197,7 @@ func SuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "SuspendTenant", tenant.ID).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "tenants", tenantID)
+			_ = setResourceFailed(ctx, "tenants", tenantID, err)
 			return err
 		}
 	}
@@ -231,19 +234,20 @@ func UnsuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	var tenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", tenantID).Get(ctx, &tenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return err
 	}
 
 	if tenant.ShardID == nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
-		return fmt.Errorf("tenant %s has no shard assigned", tenantID)
+		noShardErr := fmt.Errorf("tenant %s has no shard assigned", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return err
 	}
 
@@ -252,7 +256,7 @@ func UnsuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "UnsuspendTenant", tenant.ID).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "tenants", tenantID)
+			_ = setResourceFailed(ctx, "tenants", tenantID, err)
 			return err
 		}
 	}
@@ -289,19 +293,20 @@ func DeleteTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	var tenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", tenantID).Get(ctx, &tenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return err
 	}
 
 	if tenant.ShardID == nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
-		return fmt.Errorf("tenant %s has no shard assigned", tenantID)
+		noShardErr := fmt.Errorf("tenant %s has no shard assigned", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return err
 	}
 
@@ -312,13 +317,13 @@ func DeleteTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		// Remove SSH config before deleting the tenant.
 		err = workflow.ExecuteActivity(nodeCtx, "RemoveSSHConfig", tenant.ID).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "tenants", tenantID)
+			_ = setResourceFailed(ctx, "tenants", tenantID, err)
 			return err
 		}
 
 		err = workflow.ExecuteActivity(nodeCtx, "DeleteTenant", tenant.ID).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "tenants", tenantID)
+			_ = setResourceFailed(ctx, "tenants", tenantID, err)
 			return err
 		}
 	}

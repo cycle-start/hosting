@@ -45,13 +45,14 @@ func MigrateDatabaseWorkflow(ctx workflow.Context, params MigrateDatabaseParams)
 	var database model.Database
 	err = workflow.ExecuteActivity(ctx, "GetDatabaseByID", databaseID).Get(ctx, &database)
 	if err != nil {
-		_ = setResourceFailed(ctx, "databases", databaseID)
+		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return err
 	}
 
 	if database.ShardID == nil {
-		_ = setResourceFailed(ctx, "databases", databaseID)
-		return fmt.Errorf("database %s has no current shard assignment", databaseID)
+		noShardErr := fmt.Errorf("database %s has no current shard assignment", databaseID)
+		_ = setResourceFailed(ctx, "databases", databaseID, noShardErr)
+		return noShardErr
 	}
 	sourceShardID := *database.ShardID
 
@@ -59,11 +60,11 @@ func MigrateDatabaseWorkflow(ctx workflow.Context, params MigrateDatabaseParams)
 	var sourceNodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", sourceShardID).Get(ctx, &sourceNodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "databases", databaseID)
+		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return err
 	}
 	if len(sourceNodes) == 0 {
-		_ = setResourceFailed(ctx, "databases", databaseID)
+		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return fmt.Errorf("source shard %s has no nodes", sourceShardID)
 	}
 
@@ -71,11 +72,11 @@ func MigrateDatabaseWorkflow(ctx workflow.Context, params MigrateDatabaseParams)
 	var targetNodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", params.TargetShardID).Get(ctx, &targetNodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "databases", databaseID)
+		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return err
 	}
 	if len(targetNodes) == 0 {
-		_ = setResourceFailed(ctx, "databases", databaseID)
+		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return fmt.Errorf("target shard %s has no nodes", params.TargetShardID)
 	}
 
@@ -88,7 +89,7 @@ func MigrateDatabaseWorkflow(ctx workflow.Context, params MigrateDatabaseParams)
 	targetCtx := nodeActivityCtx(ctx, targetNode.ID)
 	err = workflow.ExecuteActivity(targetCtx, "CreateDatabase", database.Name).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "databases", databaseID)
+		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return fmt.Errorf("create database on target node %s: %w", targetNode.ID, err)
 	}
 
@@ -99,7 +100,7 @@ func MigrateDatabaseWorkflow(ctx workflow.Context, params MigrateDatabaseParams)
 		DumpPath:     dumpPath,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "databases", databaseID)
+		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return fmt.Errorf("dump database on source node %s: %w", sourceNode.ID, err)
 	}
 
@@ -109,7 +110,7 @@ func MigrateDatabaseWorkflow(ctx workflow.Context, params MigrateDatabaseParams)
 		DumpPath:     dumpPath,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "databases", databaseID)
+		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return fmt.Errorf("import database on target node %s: %w", targetNode.ID, err)
 	}
 
@@ -117,7 +118,7 @@ func MigrateDatabaseWorkflow(ctx workflow.Context, params MigrateDatabaseParams)
 	var users []model.DatabaseUser
 	err = workflow.ExecuteActivity(ctx, "ListDatabaseUsersByDatabaseID", databaseID).Get(ctx, &users)
 	if err != nil {
-		_ = setResourceFailed(ctx, "databases", databaseID)
+		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return fmt.Errorf("list database users: %w", err)
 	}
 
@@ -129,7 +130,7 @@ func MigrateDatabaseWorkflow(ctx workflow.Context, params MigrateDatabaseParams)
 			Privileges:   user.Privileges,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "databases", databaseID)
+			_ = setResourceFailed(ctx, "databases", databaseID, err)
 			return fmt.Errorf("create user %s on target node %s: %w", user.Username, targetNode.ID, err)
 		}
 	}
@@ -137,7 +138,7 @@ func MigrateDatabaseWorkflow(ctx workflow.Context, params MigrateDatabaseParams)
 	// Update the database shard assignment in the core DB.
 	err = workflow.ExecuteActivity(ctx, "UpdateDatabaseShardID", databaseID, params.TargetShardID).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "databases", databaseID)
+		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return err
 	}
 

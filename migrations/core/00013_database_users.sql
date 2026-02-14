@@ -6,6 +6,7 @@ CREATE TABLE database_users (
     password    TEXT NOT NULL,
     privileges  TEXT[] NOT NULL DEFAULT '{ALL}',
     status      TEXT NOT NULL DEFAULT 'pending',
+    status_message TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );

@@ -35,7 +35,7 @@ func CreateDatabaseUserWorkflow(ctx workflow.Context, userID string) error {
 	var dbUser model.DatabaseUser
 	err = workflow.ExecuteActivity(ctx, "GetDatabaseUserByID", userID).Get(ctx, &dbUser)
 	if err != nil {
-		_ = setResourceFailed(ctx, "database_users", userID)
+		_ = setResourceFailed(ctx, "database_users", userID, err)
 		return err
 	}
 
@@ -43,20 +43,21 @@ func CreateDatabaseUserWorkflow(ctx workflow.Context, userID string) error {
 	var database model.Database
 	err = workflow.ExecuteActivity(ctx, "GetDatabaseByID", dbUser.DatabaseID).Get(ctx, &database)
 	if err != nil {
-		_ = setResourceFailed(ctx, "database_users", userID)
+		_ = setResourceFailed(ctx, "database_users", userID, err)
 		return err
 	}
 
 	// Look up nodes in the database's shard.
 	if database.ShardID == nil {
-		_ = setResourceFailed(ctx, "database_users", userID)
-		return fmt.Errorf("database %s has no shard assigned", dbUser.DatabaseID)
+		noShardErr := fmt.Errorf("database %s has no shard assigned", dbUser.DatabaseID)
+		_ = setResourceFailed(ctx, "database_users", userID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *database.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "database_users", userID)
+		_ = setResourceFailed(ctx, "database_users", userID, err)
 		return err
 	}
 
@@ -70,7 +71,7 @@ func CreateDatabaseUserWorkflow(ctx workflow.Context, userID string) error {
 			Privileges:   dbUser.Privileges,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "database_users", userID)
+			_ = setResourceFailed(ctx, "database_users", userID, err)
 			return err
 		}
 	}
@@ -107,7 +108,7 @@ func UpdateDatabaseUserWorkflow(ctx workflow.Context, userID string) error {
 	var dbUser model.DatabaseUser
 	err = workflow.ExecuteActivity(ctx, "GetDatabaseUserByID", userID).Get(ctx, &dbUser)
 	if err != nil {
-		_ = setResourceFailed(ctx, "database_users", userID)
+		_ = setResourceFailed(ctx, "database_users", userID, err)
 		return err
 	}
 
@@ -115,20 +116,21 @@ func UpdateDatabaseUserWorkflow(ctx workflow.Context, userID string) error {
 	var database model.Database
 	err = workflow.ExecuteActivity(ctx, "GetDatabaseByID", dbUser.DatabaseID).Get(ctx, &database)
 	if err != nil {
-		_ = setResourceFailed(ctx, "database_users", userID)
+		_ = setResourceFailed(ctx, "database_users", userID, err)
 		return err
 	}
 
 	// Look up nodes in the database's shard.
 	if database.ShardID == nil {
-		_ = setResourceFailed(ctx, "database_users", userID)
-		return fmt.Errorf("database %s has no shard assigned", dbUser.DatabaseID)
+		noShardErr := fmt.Errorf("database %s has no shard assigned", dbUser.DatabaseID)
+		_ = setResourceFailed(ctx, "database_users", userID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *database.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "database_users", userID)
+		_ = setResourceFailed(ctx, "database_users", userID, err)
 		return err
 	}
 
@@ -142,7 +144,7 @@ func UpdateDatabaseUserWorkflow(ctx workflow.Context, userID string) error {
 			Privileges:   dbUser.Privileges,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "database_users", userID)
+			_ = setResourceFailed(ctx, "database_users", userID, err)
 			return err
 		}
 	}
@@ -179,7 +181,7 @@ func DeleteDatabaseUserWorkflow(ctx workflow.Context, userID string) error {
 	var dbUser model.DatabaseUser
 	err = workflow.ExecuteActivity(ctx, "GetDatabaseUserByID", userID).Get(ctx, &dbUser)
 	if err != nil {
-		_ = setResourceFailed(ctx, "database_users", userID)
+		_ = setResourceFailed(ctx, "database_users", userID, err)
 		return err
 	}
 
@@ -187,20 +189,21 @@ func DeleteDatabaseUserWorkflow(ctx workflow.Context, userID string) error {
 	var database model.Database
 	err = workflow.ExecuteActivity(ctx, "GetDatabaseByID", dbUser.DatabaseID).Get(ctx, &database)
 	if err != nil {
-		_ = setResourceFailed(ctx, "database_users", userID)
+		_ = setResourceFailed(ctx, "database_users", userID, err)
 		return err
 	}
 
 	// Look up nodes in the database's shard.
 	if database.ShardID == nil {
-		_ = setResourceFailed(ctx, "database_users", userID)
-		return fmt.Errorf("database %s has no shard assigned", dbUser.DatabaseID)
+		noShardErr := fmt.Errorf("database %s has no shard assigned", dbUser.DatabaseID)
+		_ = setResourceFailed(ctx, "database_users", userID, noShardErr)
+		return noShardErr
 	}
 
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *database.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "database_users", userID)
+		_ = setResourceFailed(ctx, "database_users", userID, err)
 		return err
 	}
 
@@ -209,7 +212,7 @@ func DeleteDatabaseUserWorkflow(ctx workflow.Context, userID string) error {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "DeleteDatabaseUser", database.Name, dbUser.Username).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "database_users", userID)
+			_ = setResourceFailed(ctx, "database_users", userID, err)
 			return err
 		}
 	}

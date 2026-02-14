@@ -47,10 +47,10 @@ func (s *ValkeyUserService) Create(ctx context.Context, user *model.ValkeyUser) 
 func (s *ValkeyUserService) GetByID(ctx context.Context, id string) (*model.ValkeyUser, error) {
 	var u model.ValkeyUser
 	err := s.db.QueryRow(ctx,
-		`SELECT id, valkey_instance_id, username, password, privileges, key_pattern, status, created_at, updated_at
+		`SELECT id, valkey_instance_id, username, password, privileges, key_pattern, status, status_message, created_at, updated_at
 		 FROM valkey_users WHERE id = $1`, id,
 	).Scan(&u.ID, &u.ValkeyInstanceID, &u.Username, &u.Password,
-		&u.Privileges, &u.KeyPattern, &u.Status, &u.CreatedAt, &u.UpdatedAt)
+		&u.Privileges, &u.KeyPattern, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get valkey user %s: %w", id, err)
 	}
@@ -58,7 +58,7 @@ func (s *ValkeyUserService) GetByID(ctx context.Context, id string) (*model.Valk
 }
 
 func (s *ValkeyUserService) ListByInstance(ctx context.Context, instanceID string, limit int, cursor string) ([]model.ValkeyUser, bool, error) {
-	query := `SELECT id, valkey_instance_id, username, password, privileges, key_pattern, status, created_at, updated_at FROM valkey_users WHERE valkey_instance_id = $1`
+	query := `SELECT id, valkey_instance_id, username, password, privileges, key_pattern, status, status_message, created_at, updated_at FROM valkey_users WHERE valkey_instance_id = $1`
 	args := []any{instanceID}
 	argIdx := 2
 
@@ -82,7 +82,7 @@ func (s *ValkeyUserService) ListByInstance(ctx context.Context, instanceID strin
 	for rows.Next() {
 		var u model.ValkeyUser
 		if err := rows.Scan(&u.ID, &u.ValkeyInstanceID, &u.Username, &u.Password,
-			&u.Privileges, &u.KeyPattern, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			&u.Privileges, &u.KeyPattern, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan valkey user: %w", err)
 		}
 		users = append(users, u)
@@ -147,4 +147,28 @@ func (s *ValkeyUserService) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (s *ValkeyUserService) Retry(ctx context.Context, id string) error {
+	var status string
+	err := s.db.QueryRow(ctx, "SELECT status FROM valkey_users WHERE id = $1", id).Scan(&status)
+	if err != nil {
+		return fmt.Errorf("get valkey user status: %w", err)
+	}
+	if status != model.StatusFailed {
+		return fmt.Errorf("valkey user %s is not in failed state (current: %s)", id, status)
+	}
+	_, err = s.db.Exec(ctx, "UPDATE valkey_users SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", model.StatusProvisioning, id)
+	if err != nil {
+		return fmt.Errorf("set valkey user %s status to provisioning: %w", id, err)
+	}
+	tenantID, err := resolveTenantIDFromValkeyUser(ctx, s.db, id)
+	if err != nil {
+		return fmt.Errorf("retry valkey user: %w", err)
+	}
+	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateValkeyUserWorkflow",
+		WorkflowID:   fmt.Sprintf("valkey-user-%s", id),
+		Arg:          id,
+	})
 }

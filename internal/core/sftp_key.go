@@ -46,10 +46,10 @@ func (s *SFTPKeyService) Create(ctx context.Context, key *model.SFTPKey) error {
 func (s *SFTPKeyService) GetByID(ctx context.Context, id string) (*model.SFTPKey, error) {
 	var k model.SFTPKey
 	err := s.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, public_key, fingerprint, status, created_at, updated_at
+		`SELECT id, tenant_id, name, public_key, fingerprint, status, status_message, created_at, updated_at
 		 FROM sftp_keys WHERE id = $1`, id,
 	).Scan(&k.ID, &k.TenantID, &k.Name, &k.PublicKey, &k.Fingerprint,
-		&k.Status, &k.CreatedAt, &k.UpdatedAt)
+		&k.Status, &k.StatusMessage, &k.CreatedAt, &k.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get sftp key %s: %w", id, err)
 	}
@@ -58,7 +58,7 @@ func (s *SFTPKeyService) GetByID(ctx context.Context, id string) (*model.SFTPKey
 
 // ListByTenant retrieves SFTP keys for a tenant with cursor-based pagination.
 func (s *SFTPKeyService) ListByTenant(ctx context.Context, tenantID string, limit int, cursor string) ([]model.SFTPKey, bool, error) {
-	query := `SELECT id, tenant_id, name, public_key, fingerprint, status, created_at, updated_at FROM sftp_keys WHERE tenant_id = $1`
+	query := `SELECT id, tenant_id, name, public_key, fingerprint, status, status_message, created_at, updated_at FROM sftp_keys WHERE tenant_id = $1`
 	args := []any{tenantID}
 	argIdx := 2
 
@@ -82,7 +82,7 @@ func (s *SFTPKeyService) ListByTenant(ctx context.Context, tenantID string, limi
 	for rows.Next() {
 		var k model.SFTPKey
 		if err := rows.Scan(&k.ID, &k.TenantID, &k.Name, &k.PublicKey, &k.Fingerprint,
-			&k.Status, &k.CreatedAt, &k.UpdatedAt); err != nil {
+			&k.Status, &k.StatusMessage, &k.CreatedAt, &k.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan sftp key: %w", err)
 		}
 		keys = append(keys, k)
@@ -122,4 +122,28 @@ func (s *SFTPKeyService) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (s *SFTPKeyService) Retry(ctx context.Context, id string) error {
+	var status string
+	err := s.db.QueryRow(ctx, "SELECT status FROM sftp_keys WHERE id = $1", id).Scan(&status)
+	if err != nil {
+		return fmt.Errorf("get sftp key status: %w", err)
+	}
+	if status != model.StatusFailed {
+		return fmt.Errorf("sftp key %s is not in failed state (current: %s)", id, status)
+	}
+	_, err = s.db.Exec(ctx, "UPDATE sftp_keys SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", model.StatusProvisioning, id)
+	if err != nil {
+		return fmt.Errorf("set sftp key %s status to provisioning: %w", id, err)
+	}
+	tenantID, err := resolveTenantIDFromSFTPKey(ctx, s.db, id)
+	if err != nil {
+		return fmt.Errorf("retry sftp key: %w", err)
+	}
+	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "AddSFTPKeyWorkflow",
+		WorkflowID:   fmt.Sprintf("sftp-key-%s", id),
+		Arg:          id,
+	})
 }

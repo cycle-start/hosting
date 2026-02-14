@@ -31,13 +31,25 @@ func NewCoreDB(db DB) *CoreDB {
 
 // UpdateResourceStatusParams holds the parameters for UpdateResourceStatus.
 type UpdateResourceStatusParams struct {
-	Table  string
-	ID     string
-	Status string
+	Table         string
+	ID            string
+	Status        string
+	StatusMessage *string // nil = don't change; set to store message
 }
 
 // UpdateResourceStatus sets the status of a resource row in the given table.
 func (a *CoreDB) UpdateResourceStatus(ctx context.Context, params UpdateResourceStatusParams) error {
+	if params.Status == model.StatusActive || params.Status == model.StatusDeleted {
+		// Clear status_message on success transitions.
+		query := fmt.Sprintf("UPDATE %s SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", params.Table)
+		_, err := a.db.Exec(ctx, query, params.Status, params.ID)
+		return err
+	}
+	if params.StatusMessage != nil {
+		query := fmt.Sprintf("UPDATE %s SET status = $1, status_message = $2, updated_at = now() WHERE id = $3", params.Table)
+		_, err := a.db.Exec(ctx, query, params.Status, *params.StatusMessage, params.ID)
+		return err
+	}
 	query := fmt.Sprintf("UPDATE %s SET status = $1, updated_at = now() WHERE id = $2", params.Table)
 	_, err := a.db.Exec(ctx, query, params.Status, params.ID)
 	return err
@@ -61,9 +73,9 @@ func (a *CoreDB) GetBrandByID(ctx context.Context, id string) (*model.Brand, err
 func (a *CoreDB) GetTenantByID(ctx context.Context, id string) (*model.Tenant, error) {
 	var t model.Tenant
 	err := a.db.QueryRow(ctx,
-		`SELECT id, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, status, created_at, updated_at
+		`SELECT id, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, status, status_message, created_at, updated_at
 		 FROM tenants WHERE id = $1`, id,
-	).Scan(&t.ID, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.Status, &t.CreatedAt, &t.UpdatedAt)
+	).Scan(&t.ID, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.Status, &t.StatusMessage, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get tenant by id: %w", err)
 	}
@@ -74,9 +86,9 @@ func (a *CoreDB) GetTenantByID(ctx context.Context, id string) (*model.Tenant, e
 func (a *CoreDB) GetWebrootByID(ctx context.Context, id string) (*model.Webroot, error) {
 	var w model.Webroot
 	err := a.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, status, created_at, updated_at
+		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, status, status_message, created_at, updated_at
 		 FROM webroots WHERE id = $1`, id,
-	).Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion, &w.RuntimeConfig, &w.PublicFolder, &w.Status, &w.CreatedAt, &w.UpdatedAt)
+	).Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion, &w.RuntimeConfig, &w.PublicFolder, &w.Status, &w.StatusMessage, &w.CreatedAt, &w.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get webroot by id: %w", err)
 	}
@@ -87,9 +99,9 @@ func (a *CoreDB) GetWebrootByID(ctx context.Context, id string) (*model.Webroot,
 func (a *CoreDB) GetFQDNByID(ctx context.Context, id string) (*model.FQDN, error) {
 	var f model.FQDN
 	err := a.db.QueryRow(ctx,
-		`SELECT id, fqdn, webroot_id, ssl_enabled, status, created_at, updated_at
+		`SELECT id, fqdn, webroot_id, ssl_enabled, status, status_message, created_at, updated_at
 		 FROM fqdns WHERE id = $1`, id,
-	).Scan(&f.ID, &f.FQDN, &f.WebrootID, &f.SSLEnabled, &f.Status, &f.CreatedAt, &f.UpdatedAt)
+	).Scan(&f.ID, &f.FQDN, &f.WebrootID, &f.SSLEnabled, &f.Status, &f.StatusMessage, &f.CreatedAt, &f.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get fqdn by id: %w", err)
 	}
@@ -100,9 +112,9 @@ func (a *CoreDB) GetFQDNByID(ctx context.Context, id string) (*model.FQDN, error
 func (a *CoreDB) GetZoneByID(ctx context.Context, id string) (*model.Zone, error) {
 	var z model.Zone
 	err := a.db.QueryRow(ctx,
-		`SELECT id, brand_id, tenant_id, name, region_id, status, created_at, updated_at
+		`SELECT id, brand_id, tenant_id, name, region_id, status, status_message, created_at, updated_at
 		 FROM zones WHERE id = $1`, id,
-	).Scan(&z.ID, &z.BrandID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.CreatedAt, &z.UpdatedAt)
+	).Scan(&z.ID, &z.BrandID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.StatusMessage, &z.CreatedAt, &z.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get zone by id: %w", err)
 	}
@@ -113,9 +125,9 @@ func (a *CoreDB) GetZoneByID(ctx context.Context, id string) (*model.Zone, error
 func (a *CoreDB) GetZoneByName(ctx context.Context, name string) (*model.Zone, error) {
 	var z model.Zone
 	err := a.db.QueryRow(ctx,
-		`SELECT id, brand_id, tenant_id, name, region_id, status, created_at, updated_at
+		`SELECT id, brand_id, tenant_id, name, region_id, status, status_message, created_at, updated_at
 		 FROM zones WHERE name = $1 AND status = $2`, name, model.StatusActive,
-	).Scan(&z.ID, &z.BrandID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.CreatedAt, &z.UpdatedAt)
+	).Scan(&z.ID, &z.BrandID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.StatusMessage, &z.CreatedAt, &z.UpdatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -129,9 +141,9 @@ func (a *CoreDB) GetZoneByName(ctx context.Context, name string) (*model.Zone, e
 func (a *CoreDB) GetZoneRecordByID(ctx context.Context, id string) (*model.ZoneRecord, error) {
 	var r model.ZoneRecord
 	err := a.db.QueryRow(ctx,
-		`SELECT id, zone_id, type, name, content, ttl, priority, managed_by, source_fqdn_id, status, created_at, updated_at
+		`SELECT id, zone_id, type, name, content, ttl, priority, managed_by, source_fqdn_id, status, status_message, created_at, updated_at
 		 FROM zone_records WHERE id = $1`, id,
-	).Scan(&r.ID, &r.ZoneID, &r.Type, &r.Name, &r.Content, &r.TTL, &r.Priority, &r.ManagedBy, &r.SourceFQDNID, &r.Status, &r.CreatedAt, &r.UpdatedAt)
+	).Scan(&r.ID, &r.ZoneID, &r.Type, &r.Name, &r.Content, &r.TTL, &r.Priority, &r.ManagedBy, &r.SourceFQDNID, &r.Status, &r.StatusMessage, &r.CreatedAt, &r.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get zone record by id: %w", err)
 	}
@@ -142,9 +154,9 @@ func (a *CoreDB) GetZoneRecordByID(ctx context.Context, id string) (*model.ZoneR
 func (a *CoreDB) GetDatabaseByID(ctx context.Context, id string) (*model.Database, error) {
 	var d model.Database
 	err := a.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, shard_id, node_id, status, created_at, updated_at
+		`SELECT id, tenant_id, name, shard_id, node_id, status, status_message, created_at, updated_at
 		 FROM databases WHERE id = $1`, id,
-	).Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID, &d.Status, &d.CreatedAt, &d.UpdatedAt)
+	).Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get database by id: %w", err)
 	}
@@ -155,9 +167,9 @@ func (a *CoreDB) GetDatabaseByID(ctx context.Context, id string) (*model.Databas
 func (a *CoreDB) GetDatabaseUserByID(ctx context.Context, id string) (*model.DatabaseUser, error) {
 	var u model.DatabaseUser
 	err := a.db.QueryRow(ctx,
-		`SELECT id, database_id, username, password, privileges, status, created_at, updated_at
+		`SELECT id, database_id, username, password, privileges, status, status_message, created_at, updated_at
 		 FROM database_users WHERE id = $1`, id,
-	).Scan(&u.ID, &u.DatabaseID, &u.Username, &u.Password, &u.Privileges, &u.Status, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.DatabaseID, &u.Username, &u.Password, &u.Privileges, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get database user by id: %w", err)
 	}
@@ -168,9 +180,9 @@ func (a *CoreDB) GetDatabaseUserByID(ctx context.Context, id string) (*model.Dat
 func (a *CoreDB) GetCertificateByID(ctx context.Context, id string) (*model.Certificate, error) {
 	var c model.Certificate
 	err := a.db.QueryRow(ctx,
-		`SELECT id, fqdn_id, type, cert_pem, key_pem, chain_pem, issued_at, expires_at, status, is_active, created_at, updated_at
+		`SELECT id, fqdn_id, type, cert_pem, key_pem, chain_pem, issued_at, expires_at, status, status_message, is_active, created_at, updated_at
 		 FROM certificates WHERE id = $1`, id,
-	).Scan(&c.ID, &c.FQDNID, &c.Type, &c.CertPEM, &c.KeyPEM, &c.ChainPEM, &c.IssuedAt, &c.ExpiresAt, &c.Status, &c.IsActive, &c.CreatedAt, &c.UpdatedAt)
+	).Scan(&c.ID, &c.FQDNID, &c.Type, &c.CertPEM, &c.KeyPEM, &c.ChainPEM, &c.IssuedAt, &c.ExpiresAt, &c.Status, &c.StatusMessage, &c.IsActive, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get certificate by id: %w", err)
 	}
@@ -248,7 +260,7 @@ func (a *CoreDB) GetNodesByClusterAndRole(ctx context.Context, clusterID string,
 // GetFQDNsByWebrootID retrieves all FQDNs bound to a webroot.
 func (a *CoreDB) GetFQDNsByWebrootID(ctx context.Context, webrootID string) ([]model.FQDN, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, fqdn, webroot_id, ssl_enabled, status, created_at, updated_at
+		`SELECT id, fqdn, webroot_id, ssl_enabled, status, status_message, created_at, updated_at
 		 FROM fqdns WHERE webroot_id = $1 AND status != $2`, webrootID, model.StatusDeleted,
 	)
 	if err != nil {
@@ -259,7 +271,7 @@ func (a *CoreDB) GetFQDNsByWebrootID(ctx context.Context, webrootID string) ([]m
 	var fqdns []model.FQDN
 	for rows.Next() {
 		var f model.FQDN
-		if err := rows.Scan(&f.ID, &f.FQDN, &f.WebrootID, &f.SSLEnabled, &f.Status, &f.CreatedAt, &f.UpdatedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.FQDN, &f.WebrootID, &f.SSLEnabled, &f.Status, &f.StatusMessage, &f.CreatedAt, &f.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan fqdn row: %w", err)
 		}
 		fqdns = append(fqdns, f)
@@ -287,7 +299,7 @@ func (a *CoreDB) CreateCertificate(ctx context.Context, params CreateCertificate
 // ListTenantsByShard retrieves all tenants assigned to a shard.
 func (a *CoreDB) ListTenantsByShard(ctx context.Context, shardID string) ([]model.Tenant, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, status, created_at, updated_at
+		`SELECT id, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, status, status_message, created_at, updated_at
 		 FROM tenants WHERE shard_id = $1 ORDER BY id`, shardID,
 	)
 	if err != nil {
@@ -298,7 +310,7 @@ func (a *CoreDB) ListTenantsByShard(ctx context.Context, shardID string) ([]mode
 	var tenants []model.Tenant
 	for rows.Next() {
 		var t model.Tenant
-		if err := rows.Scan(&t.ID, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.Status, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.Status, &t.StatusMessage, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan tenant row: %w", err)
 		}
 		tenants = append(tenants, t)
@@ -389,7 +401,7 @@ func (a *CoreDB) UpdateValkeyInstanceShardID(ctx context.Context, instanceID str
 // ListWebrootsByTenantID retrieves all webroots for a tenant.
 func (a *CoreDB) ListWebrootsByTenantID(ctx context.Context, tenantID string) ([]model.Webroot, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, status, created_at, updated_at
+		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, status, status_message, created_at, updated_at
 		 FROM webroots WHERE tenant_id = $1 AND status != $2`, tenantID, model.StatusDeleted,
 	)
 	if err != nil {
@@ -400,7 +412,7 @@ func (a *CoreDB) ListWebrootsByTenantID(ctx context.Context, tenantID string) ([
 	var webroots []model.Webroot
 	for rows.Next() {
 		var w model.Webroot
-		if err := rows.Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion, &w.RuntimeConfig, &w.PublicFolder, &w.Status, &w.CreatedAt, &w.UpdatedAt); err != nil {
+		if err := rows.Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion, &w.RuntimeConfig, &w.PublicFolder, &w.Status, &w.StatusMessage, &w.CreatedAt, &w.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan webroot row: %w", err)
 		}
 		webroots = append(webroots, w)
@@ -411,7 +423,7 @@ func (a *CoreDB) ListWebrootsByTenantID(ctx context.Context, tenantID string) ([
 // ListDatabasesByTenantID retrieves all databases for a tenant.
 func (a *CoreDB) ListDatabasesByTenantID(ctx context.Context, tenantID string) ([]model.Database, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, name, shard_id, node_id, status, created_at, updated_at
+		`SELECT id, tenant_id, name, shard_id, node_id, status, status_message, created_at, updated_at
 		 FROM databases WHERE tenant_id = $1 AND status != $2`, tenantID, model.StatusDeleted,
 	)
 	if err != nil {
@@ -422,7 +434,7 @@ func (a *CoreDB) ListDatabasesByTenantID(ctx context.Context, tenantID string) (
 	var databases []model.Database
 	for rows.Next() {
 		var d model.Database
-		if err := rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID, &d.Status, &d.CreatedAt, &d.UpdatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan database row: %w", err)
 		}
 		databases = append(databases, d)
@@ -434,10 +446,10 @@ func (a *CoreDB) ListDatabasesByTenantID(ctx context.Context, tenantID string) (
 func (a *CoreDB) GetValkeyInstanceByID(ctx context.Context, id string) (*model.ValkeyInstance, error) {
 	var v model.ValkeyInstance
 	err := a.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, created_at, updated_at
+		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, status_message, created_at, updated_at
 		 FROM valkey_instances WHERE id = $1`, id,
 	).Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB,
-		&v.Password, &v.Status, &v.CreatedAt, &v.UpdatedAt)
+		&v.Password, &v.Status, &v.StatusMessage, &v.CreatedAt, &v.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get valkey instance by id: %w", err)
 	}
@@ -448,10 +460,10 @@ func (a *CoreDB) GetValkeyInstanceByID(ctx context.Context, id string) (*model.V
 func (a *CoreDB) GetValkeyUserByID(ctx context.Context, id string) (*model.ValkeyUser, error) {
 	var u model.ValkeyUser
 	err := a.db.QueryRow(ctx,
-		`SELECT id, valkey_instance_id, username, password, privileges, key_pattern, status, created_at, updated_at
+		`SELECT id, valkey_instance_id, username, password, privileges, key_pattern, status, status_message, created_at, updated_at
 		 FROM valkey_users WHERE id = $1`, id,
 	).Scan(&u.ID, &u.ValkeyInstanceID, &u.Username, &u.Password,
-		&u.Privileges, &u.KeyPattern, &u.Status, &u.CreatedAt, &u.UpdatedAt)
+		&u.Privileges, &u.KeyPattern, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get valkey user by id: %w", err)
 	}
@@ -462,9 +474,9 @@ func (a *CoreDB) GetValkeyUserByID(ctx context.Context, id string) (*model.Valke
 func (a *CoreDB) GetEmailAccountByID(ctx context.Context, id string) (*model.EmailAccount, error) {
 	var acct model.EmailAccount
 	err := a.db.QueryRow(ctx,
-		`SELECT id, fqdn_id, address, display_name, quota_bytes, status, created_at, updated_at
+		`SELECT id, fqdn_id, address, display_name, quota_bytes, status, status_message, created_at, updated_at
 		 FROM email_accounts WHERE id = $1`, id,
-	).Scan(&acct.ID, &acct.FQDNID, &acct.Address, &acct.DisplayName, &acct.QuotaBytes, &acct.Status, &acct.CreatedAt, &acct.UpdatedAt)
+	).Scan(&acct.ID, &acct.FQDNID, &acct.Address, &acct.DisplayName, &acct.QuotaBytes, &acct.Status, &acct.StatusMessage, &acct.CreatedAt, &acct.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get email account by id: %w", err)
 	}
@@ -508,7 +520,7 @@ func (a *CoreDB) CreateNode(ctx context.Context, n *model.Node) error {
 // ListDatabasesByShard retrieves all databases assigned to a shard (excluding deleted).
 func (a *CoreDB) ListDatabasesByShard(ctx context.Context, shardID string) ([]model.Database, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, name, shard_id, node_id, status, created_at, updated_at
+		`SELECT id, tenant_id, name, shard_id, node_id, status, status_message, created_at, updated_at
 		 FROM databases WHERE shard_id = $1 AND status != $2 ORDER BY name`, shardID, model.StatusDeleted,
 	)
 	if err != nil {
@@ -519,7 +531,7 @@ func (a *CoreDB) ListDatabasesByShard(ctx context.Context, shardID string) ([]mo
 	var databases []model.Database
 	for rows.Next() {
 		var d model.Database
-		if err := rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID, &d.Status, &d.CreatedAt, &d.UpdatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan database row: %w", err)
 		}
 		databases = append(databases, d)
@@ -530,7 +542,7 @@ func (a *CoreDB) ListDatabasesByShard(ctx context.Context, shardID string) ([]mo
 // ListValkeyInstancesByShard retrieves all valkey instances assigned to a shard (excluding deleted).
 func (a *CoreDB) ListValkeyInstancesByShard(ctx context.Context, shardID string) ([]model.ValkeyInstance, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, created_at, updated_at
+		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, status_message, created_at, updated_at
 		 FROM valkey_instances WHERE shard_id = $1 AND status != $2 ORDER BY name`, shardID, model.StatusDeleted,
 	)
 	if err != nil {
@@ -541,7 +553,7 @@ func (a *CoreDB) ListValkeyInstancesByShard(ctx context.Context, shardID string)
 	var instances []model.ValkeyInstance
 	for rows.Next() {
 		var v model.ValkeyInstance
-		if err := rows.Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB, &v.Password, &v.Status, &v.CreatedAt, &v.UpdatedAt); err != nil {
+		if err := rows.Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB, &v.Password, &v.Status, &v.StatusMessage, &v.CreatedAt, &v.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan valkey instance row: %w", err)
 		}
 		instances = append(instances, v)
@@ -552,7 +564,7 @@ func (a *CoreDB) ListValkeyInstancesByShard(ctx context.Context, shardID string)
 // ListDatabaseUsersByDatabaseID retrieves all users for a database (excluding deleted).
 func (a *CoreDB) ListDatabaseUsersByDatabaseID(ctx context.Context, databaseID string) ([]model.DatabaseUser, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, database_id, username, password, privileges, status, created_at, updated_at
+		`SELECT id, database_id, username, password, privileges, status, status_message, created_at, updated_at
 		 FROM database_users WHERE database_id = $1 AND status != $2`, databaseID, model.StatusDeleted,
 	)
 	if err != nil {
@@ -563,7 +575,7 @@ func (a *CoreDB) ListDatabaseUsersByDatabaseID(ctx context.Context, databaseID s
 	var users []model.DatabaseUser
 	for rows.Next() {
 		var u model.DatabaseUser
-		if err := rows.Scan(&u.ID, &u.DatabaseID, &u.Username, &u.Password, &u.Privileges, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.DatabaseID, &u.Username, &u.Password, &u.Privileges, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan database user row: %w", err)
 		}
 		users = append(users, u)
@@ -574,7 +586,7 @@ func (a *CoreDB) ListDatabaseUsersByDatabaseID(ctx context.Context, databaseID s
 // ListValkeyUsersByInstanceID retrieves all users for a valkey instance (excluding deleted).
 func (a *CoreDB) ListValkeyUsersByInstanceID(ctx context.Context, instanceID string) ([]model.ValkeyUser, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, valkey_instance_id, username, password, privileges, key_pattern, status, created_at, updated_at
+		`SELECT id, valkey_instance_id, username, password, privileges, key_pattern, status, status_message, created_at, updated_at
 		 FROM valkey_users WHERE valkey_instance_id = $1 AND status != $2`, instanceID, model.StatusDeleted,
 	)
 	if err != nil {
@@ -585,7 +597,7 @@ func (a *CoreDB) ListValkeyUsersByInstanceID(ctx context.Context, instanceID str
 	var users []model.ValkeyUser
 	for rows.Next() {
 		var u model.ValkeyUser
-		if err := rows.Scan(&u.ID, &u.ValkeyInstanceID, &u.Username, &u.Password, &u.Privileges, &u.KeyPattern, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.ValkeyInstanceID, &u.Username, &u.Password, &u.Privileges, &u.KeyPattern, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan valkey user row: %w", err)
 		}
 		users = append(users, u)
@@ -597,9 +609,9 @@ func (a *CoreDB) ListValkeyUsersByInstanceID(ctx context.Context, instanceID str
 func (a *CoreDB) GetEmailAliasByID(ctx context.Context, id string) (*model.EmailAlias, error) {
 	var alias model.EmailAlias
 	err := a.db.QueryRow(ctx,
-		`SELECT id, email_account_id, address, status, created_at, updated_at
+		`SELECT id, email_account_id, address, status, status_message, created_at, updated_at
 		 FROM email_aliases WHERE id = $1`, id,
-	).Scan(&alias.ID, &alias.EmailAccountID, &alias.Address, &alias.Status, &alias.CreatedAt, &alias.UpdatedAt)
+	).Scan(&alias.ID, &alias.EmailAccountID, &alias.Address, &alias.Status, &alias.StatusMessage, &alias.CreatedAt, &alias.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get email alias by id: %w", err)
 	}
@@ -610,9 +622,9 @@ func (a *CoreDB) GetEmailAliasByID(ctx context.Context, id string) (*model.Email
 func (a *CoreDB) GetEmailForwardByID(ctx context.Context, id string) (*model.EmailForward, error) {
 	var fwd model.EmailForward
 	err := a.db.QueryRow(ctx,
-		`SELECT id, email_account_id, destination, keep_copy, status, created_at, updated_at
+		`SELECT id, email_account_id, destination, keep_copy, status, status_message, created_at, updated_at
 		 FROM email_forwards WHERE id = $1`, id,
-	).Scan(&fwd.ID, &fwd.EmailAccountID, &fwd.Destination, &fwd.KeepCopy, &fwd.Status, &fwd.CreatedAt, &fwd.UpdatedAt)
+	).Scan(&fwd.ID, &fwd.EmailAccountID, &fwd.Destination, &fwd.KeepCopy, &fwd.Status, &fwd.StatusMessage, &fwd.CreatedAt, &fwd.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get email forward by id: %w", err)
 	}
@@ -623,9 +635,9 @@ func (a *CoreDB) GetEmailForwardByID(ctx context.Context, id string) (*model.Ema
 func (a *CoreDB) GetEmailAutoReplyByAccountID(ctx context.Context, accountID string) (*model.EmailAutoReply, error) {
 	var ar model.EmailAutoReply
 	err := a.db.QueryRow(ctx,
-		`SELECT id, email_account_id, subject, body, start_date, end_date, enabled, status, created_at, updated_at
+		`SELECT id, email_account_id, subject, body, start_date, end_date, enabled, status, status_message, created_at, updated_at
 		 FROM email_autoreplies WHERE email_account_id = $1`, accountID,
-	).Scan(&ar.ID, &ar.EmailAccountID, &ar.Subject, &ar.Body, &ar.StartDate, &ar.EndDate, &ar.Enabled, &ar.Status, &ar.CreatedAt, &ar.UpdatedAt)
+	).Scan(&ar.ID, &ar.EmailAccountID, &ar.Subject, &ar.Body, &ar.StartDate, &ar.EndDate, &ar.Enabled, &ar.Status, &ar.StatusMessage, &ar.CreatedAt, &ar.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get email autoreply by account id: %w", err)
 	}
@@ -636,9 +648,9 @@ func (a *CoreDB) GetEmailAutoReplyByAccountID(ctx context.Context, accountID str
 func (a *CoreDB) GetEmailAutoReplyByID(ctx context.Context, id string) (*model.EmailAutoReply, error) {
 	var ar model.EmailAutoReply
 	err := a.db.QueryRow(ctx,
-		`SELECT id, email_account_id, subject, body, start_date, end_date, enabled, status, created_at, updated_at
+		`SELECT id, email_account_id, subject, body, start_date, end_date, enabled, status, status_message, created_at, updated_at
 		 FROM email_autoreplies WHERE id = $1`, id,
-	).Scan(&ar.ID, &ar.EmailAccountID, &ar.Subject, &ar.Body, &ar.StartDate, &ar.EndDate, &ar.Enabled, &ar.Status, &ar.CreatedAt, &ar.UpdatedAt)
+	).Scan(&ar.ID, &ar.EmailAccountID, &ar.Subject, &ar.Body, &ar.StartDate, &ar.EndDate, &ar.Enabled, &ar.Status, &ar.StatusMessage, &ar.CreatedAt, &ar.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get email autoreply by id: %w", err)
 	}
@@ -648,7 +660,7 @@ func (a *CoreDB) GetEmailAutoReplyByID(ctx context.Context, id string) (*model.E
 // GetExpiringLECerts returns Let's Encrypt certificates expiring within the given number of days.
 func (a *CoreDB) GetExpiringLECerts(ctx context.Context, daysBeforeExpiry int) ([]model.Certificate, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, fqdn_id, type, cert_pem, key_pem, chain_pem, issued_at, expires_at, status, is_active, created_at, updated_at
+		`SELECT id, fqdn_id, type, cert_pem, key_pem, chain_pem, issued_at, expires_at, status, status_message, is_active, created_at, updated_at
 		 FROM certificates
 		 WHERE type = $1 AND status = $2 AND is_active = true
 		   AND expires_at <= now() + make_interval(days => $3)
@@ -664,7 +676,7 @@ func (a *CoreDB) GetExpiringLECerts(ctx context.Context, daysBeforeExpiry int) (
 	for rows.Next() {
 		var c model.Certificate
 		if err := rows.Scan(&c.ID, &c.FQDNID, &c.Type, &c.CertPEM, &c.KeyPEM, &c.ChainPEM,
-			&c.IssuedAt, &c.ExpiresAt, &c.Status, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			&c.IssuedAt, &c.ExpiresAt, &c.Status, &c.StatusMessage, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan expiring cert: %w", err)
 		}
 		certs = append(certs, c)
@@ -675,7 +687,7 @@ func (a *CoreDB) GetExpiringLECerts(ctx context.Context, daysBeforeExpiry int) (
 // GetExpiredCerts returns certificates that have been expired for more than the given number of days.
 func (a *CoreDB) GetExpiredCerts(ctx context.Context, daysAfterExpiry int) ([]model.Certificate, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, fqdn_id, type, cert_pem, key_pem, chain_pem, issued_at, expires_at, status, is_active, created_at, updated_at
+		`SELECT id, fqdn_id, type, cert_pem, key_pem, chain_pem, issued_at, expires_at, status, status_message, is_active, created_at, updated_at
 		 FROM certificates
 		 WHERE status = $1
 		   AND expires_at < now() - make_interval(days => $2)
@@ -691,7 +703,7 @@ func (a *CoreDB) GetExpiredCerts(ctx context.Context, daysAfterExpiry int) ([]mo
 	for rows.Next() {
 		var c model.Certificate
 		if err := rows.Scan(&c.ID, &c.FQDNID, &c.Type, &c.CertPEM, &c.KeyPEM, &c.ChainPEM,
-			&c.IssuedAt, &c.ExpiresAt, &c.Status, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			&c.IssuedAt, &c.ExpiresAt, &c.Status, &c.StatusMessage, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan expired cert: %w", err)
 		}
 		certs = append(certs, c)
@@ -703,10 +715,10 @@ func (a *CoreDB) GetExpiredCerts(ctx context.Context, daysAfterExpiry int) ([]mo
 func (a *CoreDB) GetSFTPKeyByID(ctx context.Context, id string) (*model.SFTPKey, error) {
 	var k model.SFTPKey
 	err := a.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, public_key, fingerprint, status, created_at, updated_at
+		`SELECT id, tenant_id, name, public_key, fingerprint, status, status_message, created_at, updated_at
 		 FROM sftp_keys WHERE id = $1`, id,
 	).Scan(&k.ID, &k.TenantID, &k.Name, &k.PublicKey, &k.Fingerprint,
-		&k.Status, &k.CreatedAt, &k.UpdatedAt)
+		&k.Status, &k.StatusMessage, &k.CreatedAt, &k.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get sftp key by id: %w", err)
 	}
@@ -716,7 +728,7 @@ func (a *CoreDB) GetSFTPKeyByID(ctx context.Context, id string) (*model.SFTPKey,
 // GetSFTPKeysByTenant retrieves all active SFTP keys for a tenant.
 func (a *CoreDB) GetSFTPKeysByTenant(ctx context.Context, tenantID string) ([]model.SFTPKey, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, name, public_key, fingerprint, status, created_at, updated_at
+		`SELECT id, tenant_id, name, public_key, fingerprint, status, status_message, created_at, updated_at
 		 FROM sftp_keys WHERE tenant_id = $1 AND status = $2`, tenantID, model.StatusActive,
 	)
 	if err != nil {
@@ -728,7 +740,7 @@ func (a *CoreDB) GetSFTPKeysByTenant(ctx context.Context, tenantID string) ([]mo
 	for rows.Next() {
 		var k model.SFTPKey
 		if err := rows.Scan(&k.ID, &k.TenantID, &k.Name, &k.PublicKey, &k.Fingerprint,
-			&k.Status, &k.CreatedAt, &k.UpdatedAt); err != nil {
+			&k.Status, &k.StatusMessage, &k.CreatedAt, &k.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan sftp key row: %w", err)
 		}
 		keys = append(keys, k)
@@ -750,10 +762,10 @@ func (a *CoreDB) GetPlatformConfig(ctx context.Context, key string) (string, err
 func (a *CoreDB) GetBackupByID(ctx context.Context, id string) (*model.Backup, error) {
 	var b model.Backup
 	err := a.db.QueryRow(ctx,
-		`SELECT id, tenant_id, type, source_id, source_name, storage_path, size_bytes, status, started_at, completed_at, created_at, updated_at
+		`SELECT id, tenant_id, type, source_id, source_name, storage_path, size_bytes, status, status_message, started_at, completed_at, created_at, updated_at
 		 FROM backups WHERE id = $1`, id,
 	).Scan(&b.ID, &b.TenantID, &b.Type, &b.SourceID, &b.SourceName,
-		&b.StoragePath, &b.SizeBytes, &b.Status, &b.StartedAt,
+		&b.StoragePath, &b.SizeBytes, &b.Status, &b.StatusMessage, &b.StartedAt,
 		&b.CompletedAt, &b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get backup by id: %w", err)
@@ -797,10 +809,10 @@ func (a *CoreDB) DeleteOldAuditLogs(ctx context.Context, retentionDays int) (int
 func (a *CoreDB) GetS3BucketByID(ctx context.Context, id string) (*model.S3Bucket, error) {
 	var b model.S3Bucket
 	err := a.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, shard_id, public, quota_bytes, status, created_at, updated_at
+		`SELECT id, tenant_id, name, shard_id, public, quota_bytes, status, status_message, created_at, updated_at
 		 FROM s3_buckets WHERE id = $1`, id,
 	).Scan(&b.ID, &b.TenantID, &b.Name, &b.ShardID,
-		&b.Public, &b.QuotaBytes, &b.Status, &b.CreatedAt, &b.UpdatedAt)
+		&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get s3 bucket by id: %w", err)
 	}
@@ -811,10 +823,10 @@ func (a *CoreDB) GetS3BucketByID(ctx context.Context, id string) (*model.S3Bucke
 func (a *CoreDB) GetS3AccessKeyByID(ctx context.Context, id string) (*model.S3AccessKey, error) {
 	var k model.S3AccessKey
 	err := a.db.QueryRow(ctx,
-		`SELECT id, s3_bucket_id, access_key_id, secret_access_key, permissions, status, created_at, updated_at
+		`SELECT id, s3_bucket_id, access_key_id, secret_access_key, permissions, status, status_message, created_at, updated_at
 		 FROM s3_access_keys WHERE id = $1`, id,
 	).Scan(&k.ID, &k.S3BucketID, &k.AccessKeyID, &k.SecretAccessKey,
-		&k.Permissions, &k.Status, &k.CreatedAt, &k.UpdatedAt)
+		&k.Permissions, &k.Status, &k.StatusMessage, &k.CreatedAt, &k.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get s3 access key by id: %w", err)
 	}
@@ -824,7 +836,7 @@ func (a *CoreDB) GetS3AccessKeyByID(ctx context.Context, id string) (*model.S3Ac
 // GetOldBackups returns active backups that are older than the specified number of days.
 func (a *CoreDB) GetOldBackups(ctx context.Context, retentionDays int) ([]model.Backup, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, type, source_id, source_name, storage_path, size_bytes, status, started_at, completed_at, created_at, updated_at
+		`SELECT id, tenant_id, type, source_id, source_name, storage_path, size_bytes, status, status_message, started_at, completed_at, created_at, updated_at
 		 FROM backups
 		 WHERE status = $1
 		   AND created_at < now() - make_interval(days => $2)
@@ -840,7 +852,7 @@ func (a *CoreDB) GetOldBackups(ctx context.Context, retentionDays int) ([]model.
 	for rows.Next() {
 		var b model.Backup
 		if err := rows.Scan(&b.ID, &b.TenantID, &b.Type, &b.SourceID, &b.SourceName,
-			&b.StoragePath, &b.SizeBytes, &b.Status, &b.StartedAt,
+			&b.StoragePath, &b.SizeBytes, &b.Status, &b.StatusMessage, &b.StartedAt,
 			&b.CompletedAt, &b.CreatedAt, &b.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan old backup: %w", err)
 		}

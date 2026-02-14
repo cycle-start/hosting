@@ -36,7 +36,7 @@ func CreateEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 	var account model.EmailAccount
 	err = workflow.ExecuteActivity(ctx, "GetEmailAccountByID", accountID).Get(ctx, &account)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID)
+		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
 		return err
 	}
 
@@ -44,7 +44,7 @@ func CreateEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 	var fqdn model.FQDN
 	err = workflow.ExecuteActivity(ctx, "GetFQDNByID", account.FQDNID).Get(ctx, &fqdn)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID)
+		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
 		return err
 	}
 
@@ -52,7 +52,7 @@ func CreateEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 	var webroot model.Webroot
 	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", fqdn.WebrootID).Get(ctx, &webroot)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID)
+		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
 		return err
 	}
 
@@ -60,7 +60,7 @@ func CreateEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 	var tenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", webroot.TenantID).Get(ctx, &tenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID)
+		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
 		return err
 	}
 
@@ -68,7 +68,7 @@ func CreateEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 	var cluster model.Cluster
 	err = workflow.ExecuteActivity(ctx, "GetClusterByID", tenant.ClusterID).Get(ctx, &cluster)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID)
+		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
 		return err
 	}
 
@@ -89,7 +89,7 @@ func CreateEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 		Domain:     domain,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID)
+		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
 		return err
 	}
 
@@ -102,7 +102,7 @@ func CreateEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 		QuotaBytes:  account.QuotaBytes,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID)
+		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
 		return err
 	}
 
@@ -117,7 +117,7 @@ func CreateEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 		SourceFQDNID: fqdn.ID,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID)
+		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
 		return err
 	}
 
@@ -155,7 +155,7 @@ func DeleteEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 	var account model.EmailAccount
 	err = workflow.ExecuteActivity(ctx, "GetEmailAccountByID", accountID).Get(ctx, &account)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID)
+		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
 		return err
 	}
 
@@ -163,7 +163,7 @@ func DeleteEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 	var fqdn model.FQDN
 	err = workflow.ExecuteActivity(ctx, "GetFQDNByID", account.FQDNID).Get(ctx, &fqdn)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID)
+		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
 		return err
 	}
 
@@ -171,7 +171,7 @@ func DeleteEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 	var webroot model.Webroot
 	err = workflow.ExecuteActivity(ctx, "GetWebrootByID", fqdn.WebrootID).Get(ctx, &webroot)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID)
+		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
 		return err
 	}
 
@@ -179,7 +179,7 @@ func DeleteEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 	var tenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", webroot.TenantID).Get(ctx, &tenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID)
+		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
 		return err
 	}
 
@@ -187,7 +187,7 @@ func DeleteEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 	var cluster model.Cluster
 	err = workflow.ExecuteActivity(ctx, "GetClusterByID", tenant.ClusterID).Get(ctx, &cluster)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID)
+		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
 		return err
 	}
 
@@ -204,7 +204,7 @@ func DeleteEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 		Address:    account.Address,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_accounts", accountID)
+		_ = setResourceFailed(ctx, "email_accounts", accountID, err)
 		return err
 	}
 

@@ -5,6 +5,7 @@ CREATE TABLE email_aliases (
     email_account_id TEXT NOT NULL REFERENCES email_accounts(id),
     address          TEXT NOT NULL UNIQUE,
     status           TEXT NOT NULL DEFAULT 'pending',
+    status_message   TEXT,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -15,6 +16,7 @@ CREATE TABLE email_forwards (
     destination      TEXT NOT NULL,
     keep_copy        BOOLEAN NOT NULL DEFAULT true,
     status           TEXT NOT NULL DEFAULT 'pending',
+    status_message   TEXT,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE(email_account_id, destination)
@@ -29,6 +31,7 @@ CREATE TABLE email_autoreplies (
     end_date         TIMESTAMPTZ,
     enabled          BOOLEAN NOT NULL DEFAULT false,
     status           TEXT NOT NULL DEFAULT 'pending',
+    status_message   TEXT,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );

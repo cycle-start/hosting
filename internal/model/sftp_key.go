@@ -9,7 +9,8 @@ type SFTPKey struct {
 	Name        string    `json:"name"`
 	PublicKey   string    `json:"public_key,omitempty"`
 	Fingerprint string    `json:"fingerprint"`
-	Status      string    `json:"status"`
+	Status        string    `json:"status"`
+	StatusMessage *string   `json:"status_message,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

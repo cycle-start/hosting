@@ -233,3 +233,26 @@ func (h *Zone) ReassignTenant(w http.ResponseWriter, r *http.Request) {
 
 	response.WriteJSON(w, http.StatusOK, zone)
 }
+
+// Retry godoc
+//
+//	@Summary		Retry a failed zone
+//	@Tags			Zones
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Zone ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/zones/{id}/retry [post]
+func (h *Zone) Retry(w http.ResponseWriter, r *http.Request) {
+	id, err := request.RequireID(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.svc.Retry(r.Context(), id); err != nil {
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}

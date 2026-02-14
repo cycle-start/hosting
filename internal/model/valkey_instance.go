@@ -10,7 +10,8 @@ type ValkeyInstance struct {
 	Port        int     `json:"port" db:"port"`
 	MaxMemoryMB int     `json:"max_memory_mb" db:"max_memory_mb"`
 	Password    string  `json:"password,omitempty" db:"password"`
-	Status      string  `json:"status" db:"status"`
+	Status        string  `json:"status" db:"status"`
+	StatusMessage *string `json:"status_message,omitempty" db:"status_message"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 }

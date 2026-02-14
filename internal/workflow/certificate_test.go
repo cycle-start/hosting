@@ -422,9 +422,7 @@ func (s *UploadCustomCertWorkflowTestSuite) TestGetCertificateFails_SetsStatusFa
 		Table: "certificates", ID: certID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetCertificateByID", mock.Anything, certID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "certificates", ID: certID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("certificates", certID)).Return(nil)
 
 	s.env.ExecuteWorkflow(UploadCustomCertWorkflow, certID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -448,9 +446,7 @@ func (s *UploadCustomCertWorkflowTestSuite) TestValidationFails_SetsStatusFailed
 	}).Return(nil)
 	s.env.OnActivity("GetCertificateByID", mock.Anything, certID).Return(&cert, nil)
 	s.env.OnActivity("ValidateCustomCert", mock.Anything, "BAD_CERT", "BAD_KEY").Return(fmt.Errorf("cert and key do not match"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "certificates", ID: certID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("certificates", certID)).Return(nil)
 
 	s.env.ExecuteWorkflow(UploadCustomCertWorkflow, certID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -489,9 +485,7 @@ func (s *UploadCustomCertWorkflowTestSuite) TestInstallFails_SetsStatusFailed() 
 	s.env.OnActivity("GetTenantByID", mock.Anything, "test-tenant-4").Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("InstallCertificate", mock.Anything, mock.Anything).Return(fmt.Errorf("node agent down"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "certificates", ID: certID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("certificates", certID)).Return(nil)
 
 	s.env.ExecuteWorkflow(UploadCustomCertWorkflow, certID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -531,9 +525,7 @@ func (s *UploadCustomCertWorkflowTestSuite) TestDeactivateOtherCertsFails_SetsSt
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("InstallCertificate", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("DeactivateOtherCerts", mock.Anything, fqdnID, certID).Return(fmt.Errorf("db error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "certificates", ID: certID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("certificates", certID)).Return(nil)
 
 	s.env.ExecuteWorkflow(UploadCustomCertWorkflow, certID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -574,9 +566,7 @@ func (s *UploadCustomCertWorkflowTestSuite) TestActivateCertFails_SetsStatusFail
 	s.env.OnActivity("InstallCertificate", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("DeactivateOtherCerts", mock.Anything, fqdnID, certID).Return(nil)
 	s.env.OnActivity("ActivateCertificate", mock.Anything, certID).Return(fmt.Errorf("db error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "certificates", ID: certID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("certificates", certID)).Return(nil)
 
 	s.env.ExecuteWorkflow(UploadCustomCertWorkflow, certID)
 	s.True(s.env.IsWorkflowCompleted())

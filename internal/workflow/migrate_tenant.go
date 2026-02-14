@@ -39,39 +39,40 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 	var tenant model.Tenant
 	err = workflow.ExecuteActivity(ctx, "GetTenantByID", tenantID).Get(ctx, &tenant)
 	if err != nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return err
 	}
 
 	if tenant.ShardID == nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
-		return fmt.Errorf("tenant %s has no current shard assignment", tenantID)
+		noShardErr := fmt.Errorf("tenant %s has no current shard assignment", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, noShardErr)
+		return noShardErr
 	}
 
 	// Get source and target shards.
 	var sourceShard model.Shard
 	err = workflow.ExecuteActivity(ctx, "GetShardByID", *tenant.ShardID).Get(ctx, &sourceShard)
 	if err != nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return err
 	}
 
 	var targetShard model.Shard
 	err = workflow.ExecuteActivity(ctx, "GetShardByID", params.TargetShardID).Get(ctx, &targetShard)
 	if err != nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return err
 	}
 
 	// Validate: same cluster.
 	if sourceShard.ClusterID != targetShard.ClusterID {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return fmt.Errorf("source shard cluster %s != target shard cluster %s", sourceShard.ClusterID, targetShard.ClusterID)
 	}
 
 	// Validate: target shard is a web shard.
 	if targetShard.Role != model.ShardRoleWeb {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return fmt.Errorf("target shard %s is not a web shard (role: %s)", targetShard.ID, targetShard.Role)
 	}
 
@@ -79,7 +80,7 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 	var targetNodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", params.TargetShardID).Get(ctx, &targetNodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return err
 	}
 
@@ -92,7 +93,7 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 			SFTPEnabled: tenant.SFTPEnabled,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "tenants", tenantID)
+			_ = setResourceFailed(ctx, "tenants", tenantID, err)
 			return fmt.Errorf("create tenant on node %s: %w", node.ID, err)
 		}
 	}
@@ -101,7 +102,7 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 	var webroots []model.Webroot
 	err = workflow.ExecuteActivity(ctx, "ListWebrootsByTenantID", tenantID).Get(ctx, &webroots)
 	if err != nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return err
 	}
 
@@ -110,7 +111,7 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 		var fqdns []model.FQDN
 		err = workflow.ExecuteActivity(ctx, "GetFQDNsByWebrootID", webroot.ID).Get(ctx, &fqdns)
 		if err != nil {
-			_ = setResourceFailed(ctx, "tenants", tenantID)
+			_ = setResourceFailed(ctx, "tenants", tenantID, err)
 			return err
 		}
 
@@ -136,7 +137,7 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 				FQDNs:          fqdnParams,
 			}).Get(ctx, nil)
 			if err != nil {
-				_ = setResourceFailed(ctx, "tenants", tenantID)
+				_ = setResourceFailed(ctx, "tenants", tenantID, err)
 				return fmt.Errorf("create webroot %s on node %s: %w", webroot.Name, node.ID, err)
 			}
 		}
@@ -154,7 +155,7 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 					LBBackend: targetShard.LBBackend,
 				}).Get(ctx, nil)
 				if err != nil {
-					_ = setResourceFailed(ctx, "tenants", tenantID)
+					_ = setResourceFailed(ctx, "tenants", tenantID, err)
 					return fmt.Errorf("update LB map for %s: %w", fqdn.FQDN, err)
 				}
 			}
@@ -164,7 +165,7 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 	// Update tenant shard assignment in core DB.
 	err = workflow.ExecuteActivity(ctx, "UpdateTenantShardID", tenantID, params.TargetShardID).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return err
 	}
 
@@ -173,7 +174,7 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &sourceNodes)
 	if err != nil {
 		// Non-fatal: tenant is already migrated, just log cleanup failure.
-		_ = setResourceFailed(ctx, "tenants", tenantID)
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
 		return err
 	}
 

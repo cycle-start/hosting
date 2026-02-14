@@ -14,6 +14,7 @@ type Webroot struct {
 	RuntimeConfig  json.RawMessage `json:"runtime_config" db:"runtime_config"`
 	PublicFolder   string          `json:"public_folder" db:"public_folder"`
 	Status         string          `json:"status" db:"status"`
+	StatusMessage  *string         `json:"status_message,omitempty" db:"status_message"`
 	CreatedAt      time.Time       `json:"created_at" db:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at" db:"updated_at"`
 }

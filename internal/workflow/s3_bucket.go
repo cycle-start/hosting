@@ -35,13 +35,14 @@ func CreateS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 	var bucket model.S3Bucket
 	err = workflow.ExecuteActivity(ctx, "GetS3BucketByID", bucketID).Get(ctx, &bucket)
 	if err != nil {
-		_ = setResourceFailed(ctx, "s3_buckets", bucketID)
+		_ = setResourceFailed(ctx, "s3_buckets", bucketID, err)
 		return err
 	}
 
 	if bucket.ShardID == nil {
-		_ = setResourceFailed(ctx, "s3_buckets", bucketID)
-		return fmt.Errorf("s3 bucket %s has no shard assigned", bucketID)
+		noShardErr := fmt.Errorf("s3 bucket %s has no shard assigned", bucketID)
+		_ = setResourceFailed(ctx, "s3_buckets", bucketID, noShardErr)
+		return noShardErr
 	}
 
 	// Look up the tenant for the tenant ID used by RGW.
@@ -50,7 +51,7 @@ func CreateS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 		tenantID = *bucket.TenantID
 	}
 	if tenantID == "" {
-		_ = setResourceFailed(ctx, "s3_buckets", bucketID)
+		_ = setResourceFailed(ctx, "s3_buckets", bucketID, err)
 		return fmt.Errorf("s3 bucket %s has no tenant assigned", bucketID)
 	}
 
@@ -58,12 +59,12 @@ func CreateS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *bucket.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "s3_buckets", bucketID)
+		_ = setResourceFailed(ctx, "s3_buckets", bucketID, err)
 		return err
 	}
 
 	if len(nodes) == 0 {
-		_ = setResourceFailed(ctx, "s3_buckets", bucketID)
+		_ = setResourceFailed(ctx, "s3_buckets", bucketID, err)
 		return fmt.Errorf("no nodes found in S3 shard %s", *bucket.ShardID)
 	}
 
@@ -77,7 +78,7 @@ func CreateS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 		QuotaBytes: bucket.QuotaBytes,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "s3_buckets", bucketID)
+		_ = setResourceFailed(ctx, "s3_buckets", bucketID, err)
 		return err
 	}
 
@@ -89,7 +90,7 @@ func CreateS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 			Public:   true,
 		}).Get(ctx, nil)
 		if err != nil {
-			_ = setResourceFailed(ctx, "s3_buckets", bucketID)
+			_ = setResourceFailed(ctx, "s3_buckets", bucketID, err)
 			return err
 		}
 	}
@@ -189,13 +190,14 @@ func DeleteS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 	var bucket model.S3Bucket
 	err = workflow.ExecuteActivity(ctx, "GetS3BucketByID", bucketID).Get(ctx, &bucket)
 	if err != nil {
-		_ = setResourceFailed(ctx, "s3_buckets", bucketID)
+		_ = setResourceFailed(ctx, "s3_buckets", bucketID, err)
 		return err
 	}
 
 	if bucket.ShardID == nil {
-		_ = setResourceFailed(ctx, "s3_buckets", bucketID)
-		return fmt.Errorf("s3 bucket %s has no shard assigned", bucketID)
+		noShardErr := fmt.Errorf("s3 bucket %s has no shard assigned", bucketID)
+		_ = setResourceFailed(ctx, "s3_buckets", bucketID, noShardErr)
+		return noShardErr
 	}
 
 	var tenantID string
@@ -206,12 +208,12 @@ func DeleteS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *bucket.ShardID).Get(ctx, &nodes)
 	if err != nil {
-		_ = setResourceFailed(ctx, "s3_buckets", bucketID)
+		_ = setResourceFailed(ctx, "s3_buckets", bucketID, err)
 		return err
 	}
 
 	if len(nodes) == 0 {
-		_ = setResourceFailed(ctx, "s3_buckets", bucketID)
+		_ = setResourceFailed(ctx, "s3_buckets", bucketID, err)
 		return fmt.Errorf("no nodes found in S3 shard %s", *bucket.ShardID)
 	}
 
@@ -223,7 +225,7 @@ func DeleteS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 		Name:     internalName,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "s3_buckets", bucketID)
+		_ = setResourceFailed(ctx, "s3_buckets", bucketID, err)
 		return err
 	}
 

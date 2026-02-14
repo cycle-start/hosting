@@ -199,6 +199,29 @@ func (h *S3Bucket) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// Retry godoc
+//
+//	@Summary		Retry a failed S3 bucket
+//	@Tags			S3 Buckets
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "S3 bucket ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/s3-buckets/{id}/retry [post]
+func (h *S3Bucket) Retry(w http.ResponseWriter, r *http.Request) {
+	id, err := request.RequireID(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.svc.Retry(r.Context(), id); err != nil {
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
 // CreateNested creates S3 buckets as part of tenant creation.
 func (h *S3Bucket) CreateNested(w http.ResponseWriter, r *http.Request, tenantID string, buckets []request.CreateS3BucketNested) error {
 	for _, br := range buckets {

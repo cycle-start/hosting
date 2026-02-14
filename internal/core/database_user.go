@@ -47,10 +47,10 @@ func (s *DatabaseUserService) Create(ctx context.Context, user *model.DatabaseUs
 func (s *DatabaseUserService) GetByID(ctx context.Context, id string) (*model.DatabaseUser, error) {
 	var u model.DatabaseUser
 	err := s.db.QueryRow(ctx,
-		`SELECT id, database_id, username, password, privileges, status, created_at, updated_at
+		`SELECT id, database_id, username, password, privileges, status, status_message, created_at, updated_at
 		 FROM database_users WHERE id = $1`, id,
 	).Scan(&u.ID, &u.DatabaseID, &u.Username, &u.Password,
-		&u.Privileges, &u.Status, &u.CreatedAt, &u.UpdatedAt)
+		&u.Privileges, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get database user %s: %w", id, err)
 	}
@@ -58,7 +58,7 @@ func (s *DatabaseUserService) GetByID(ctx context.Context, id string) (*model.Da
 }
 
 func (s *DatabaseUserService) ListByDatabase(ctx context.Context, dbID string, limit int, cursor string) ([]model.DatabaseUser, bool, error) {
-	query := `SELECT id, database_id, username, password, privileges, status, created_at, updated_at FROM database_users WHERE database_id = $1`
+	query := `SELECT id, database_id, username, password, privileges, status, status_message, created_at, updated_at FROM database_users WHERE database_id = $1`
 	args := []any{dbID}
 	argIdx := 2
 
@@ -82,7 +82,7 @@ func (s *DatabaseUserService) ListByDatabase(ctx context.Context, dbID string, l
 	for rows.Next() {
 		var u model.DatabaseUser
 		if err := rows.Scan(&u.ID, &u.DatabaseID, &u.Username, &u.Password,
-			&u.Privileges, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			&u.Privileges, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan database user: %w", err)
 		}
 		users = append(users, u)
@@ -147,4 +147,28 @@ func (s *DatabaseUserService) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (s *DatabaseUserService) Retry(ctx context.Context, id string) error {
+	var status string
+	err := s.db.QueryRow(ctx, "SELECT status FROM database_users WHERE id = $1", id).Scan(&status)
+	if err != nil {
+		return fmt.Errorf("get database user status: %w", err)
+	}
+	if status != model.StatusFailed {
+		return fmt.Errorf("database user %s is not in failed state (current: %s)", id, status)
+	}
+	_, err = s.db.Exec(ctx, "UPDATE database_users SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", model.StatusProvisioning, id)
+	if err != nil {
+		return fmt.Errorf("set database user %s status to provisioning: %w", id, err)
+	}
+	tenantID, err := resolveTenantIDFromDatabaseUser(ctx, s.db, id)
+	if err != nil {
+		return fmt.Errorf("retry database user: %w", err)
+	}
+	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateDatabaseUserWorkflow",
+		WorkflowID:   fmt.Sprintf("database-user-%s", id),
+		Arg:          id,
+	})
 }

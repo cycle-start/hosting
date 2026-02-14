@@ -8,6 +8,7 @@ CREATE TABLE webroots (
     runtime_config  JSONB NOT NULL DEFAULT '{}',
     public_folder   TEXT NOT NULL DEFAULT '',
     status          TEXT NOT NULL DEFAULT 'pending',
+    status_message  TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE(tenant_id, name)

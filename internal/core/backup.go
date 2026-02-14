@@ -43,10 +43,10 @@ func (s *BackupService) Create(ctx context.Context, backup *model.Backup) error 
 func (s *BackupService) GetByID(ctx context.Context, id string) (*model.Backup, error) {
 	var b model.Backup
 	err := s.db.QueryRow(ctx,
-		`SELECT id, tenant_id, type, source_id, source_name, storage_path, size_bytes, status, started_at, completed_at, created_at, updated_at
+		`SELECT id, tenant_id, type, source_id, source_name, storage_path, size_bytes, status, status_message, started_at, completed_at, created_at, updated_at
 		 FROM backups WHERE id = $1`, id,
 	).Scan(&b.ID, &b.TenantID, &b.Type, &b.SourceID, &b.SourceName,
-		&b.StoragePath, &b.SizeBytes, &b.Status, &b.StartedAt,
+		&b.StoragePath, &b.SizeBytes, &b.Status, &b.StatusMessage, &b.StartedAt,
 		&b.CompletedAt, &b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get backup %s: %w", id, err)
@@ -55,7 +55,7 @@ func (s *BackupService) GetByID(ctx context.Context, id string) (*model.Backup, 
 }
 
 func (s *BackupService) ListByTenant(ctx context.Context, tenantID string, limit int, cursor string) ([]model.Backup, bool, error) {
-	query := `SELECT id, tenant_id, type, source_id, source_name, storage_path, size_bytes, status, started_at, completed_at, created_at, updated_at FROM backups WHERE tenant_id = $1`
+	query := `SELECT id, tenant_id, type, source_id, source_name, storage_path, size_bytes, status, status_message, started_at, completed_at, created_at, updated_at FROM backups WHERE tenant_id = $1`
 	args := []any{tenantID}
 	argIdx := 2
 
@@ -79,7 +79,7 @@ func (s *BackupService) ListByTenant(ctx context.Context, tenantID string, limit
 	for rows.Next() {
 		var b model.Backup
 		if err := rows.Scan(&b.ID, &b.TenantID, &b.Type, &b.SourceID, &b.SourceName,
-			&b.StoragePath, &b.SizeBytes, &b.Status, &b.StartedAt,
+			&b.StoragePath, &b.SizeBytes, &b.Status, &b.StatusMessage, &b.StartedAt,
 			&b.CompletedAt, &b.CreatedAt, &b.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan backup: %w", err)
 		}
@@ -140,4 +140,28 @@ func (s *BackupService) Restore(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (s *BackupService) Retry(ctx context.Context, id string) error {
+	var status string
+	err := s.db.QueryRow(ctx, "SELECT status FROM backups WHERE id = $1", id).Scan(&status)
+	if err != nil {
+		return fmt.Errorf("get backup status: %w", err)
+	}
+	if status != model.StatusFailed {
+		return fmt.Errorf("backup %s is not in failed state (current: %s)", id, status)
+	}
+	_, err = s.db.Exec(ctx, "UPDATE backups SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", model.StatusProvisioning, id)
+	if err != nil {
+		return fmt.Errorf("set backup %s status to provisioning: %w", id, err)
+	}
+	tenantID, err := resolveTenantIDFromBackup(ctx, s.db, id)
+	if err != nil {
+		return fmt.Errorf("retry backup: %w", err)
+	}
+	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateBackupWorkflow",
+		WorkflowID:   fmt.Sprintf("backup-create-%s", id),
+		Arg:          id,
+	})
 }

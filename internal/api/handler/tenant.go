@@ -505,3 +505,50 @@ func (h *Tenant) Migrate(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusAccepted)
 }
+
+// Retry godoc
+//
+//	@Summary		Retry a failed tenant
+//	@Tags			Tenants
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Tenant ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants/{id}/retry [post]
+func (h *Tenant) Retry(w http.ResponseWriter, r *http.Request) {
+	id, err := request.RequireID(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.svc.Retry(r.Context(), id); err != nil {
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+// RetryFailed godoc
+//
+//	@Summary		Retry all failed resources for a tenant
+//	@Tags			Tenants
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Tenant ID"
+//	@Success		202 {object} map[string]any
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants/{id}/retry-failed [post]
+func (h *Tenant) RetryFailed(w http.ResponseWriter, r *http.Request) {
+	id, err := request.RequireID(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	count, err := h.svc.RetryFailed(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response.WriteJSON(w, http.StatusAccepted, map[string]any{"status": "retrying", "count": count})
+}

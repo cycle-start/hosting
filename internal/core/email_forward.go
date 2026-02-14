@@ -46,9 +46,9 @@ func (s *EmailForwardService) Create(ctx context.Context, f *model.EmailForward)
 func (s *EmailForwardService) GetByID(ctx context.Context, id string) (*model.EmailForward, error) {
 	var f model.EmailForward
 	err := s.db.QueryRow(ctx,
-		`SELECT id, email_account_id, destination, keep_copy, status, created_at, updated_at
+		`SELECT id, email_account_id, destination, keep_copy, status, status_message, created_at, updated_at
 		 FROM email_forwards WHERE id = $1`, id,
-	).Scan(&f.ID, &f.EmailAccountID, &f.Destination, &f.KeepCopy, &f.Status, &f.CreatedAt, &f.UpdatedAt)
+	).Scan(&f.ID, &f.EmailAccountID, &f.Destination, &f.KeepCopy, &f.Status, &f.StatusMessage, &f.CreatedAt, &f.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get email forward %s: %w", id, err)
 	}
@@ -56,7 +56,7 @@ func (s *EmailForwardService) GetByID(ctx context.Context, id string) (*model.Em
 }
 
 func (s *EmailForwardService) ListByAccountID(ctx context.Context, accountID string, limit int, cursor string) ([]model.EmailForward, bool, error) {
-	query := `SELECT id, email_account_id, destination, keep_copy, status, created_at, updated_at FROM email_forwards WHERE email_account_id = $1`
+	query := `SELECT id, email_account_id, destination, keep_copy, status, status_message, created_at, updated_at FROM email_forwards WHERE email_account_id = $1`
 	args := []any{accountID}
 	argIdx := 2
 
@@ -79,7 +79,7 @@ func (s *EmailForwardService) ListByAccountID(ctx context.Context, accountID str
 	var forwards []model.EmailForward
 	for rows.Next() {
 		var f model.EmailForward
-		if err := rows.Scan(&f.ID, &f.EmailAccountID, &f.Destination, &f.KeepCopy, &f.Status, &f.CreatedAt, &f.UpdatedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.EmailAccountID, &f.Destination, &f.KeepCopy, &f.Status, &f.StatusMessage, &f.CreatedAt, &f.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan email forward: %w", err)
 		}
 		forwards = append(forwards, f)
@@ -118,4 +118,28 @@ func (s *EmailForwardService) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (s *EmailForwardService) Retry(ctx context.Context, id string) error {
+	var status string
+	err := s.db.QueryRow(ctx, "SELECT status FROM email_forwards WHERE id = $1", id).Scan(&status)
+	if err != nil {
+		return fmt.Errorf("get email forward status: %w", err)
+	}
+	if status != model.StatusFailed {
+		return fmt.Errorf("email forward %s is not in failed state (current: %s)", id, status)
+	}
+	_, err = s.db.Exec(ctx, "UPDATE email_forwards SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", model.StatusProvisioning, id)
+	if err != nil {
+		return fmt.Errorf("set email forward %s status to provisioning: %w", id, err)
+	}
+	tenantID, err := resolveTenantIDFromEmailForward(ctx, s.db, id)
+	if err != nil {
+		return fmt.Errorf("retry email forward: %w", err)
+	}
+	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateEmailForwardWorkflow",
+		WorkflowID:   fmt.Sprintf("email-forward-%s", id),
+		Arg:          id,
+	})
 }

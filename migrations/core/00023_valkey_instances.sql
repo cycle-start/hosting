@@ -8,6 +8,7 @@ CREATE TABLE valkey_instances (
     max_memory_mb  INTEGER NOT NULL DEFAULT 64,
     password       TEXT NOT NULL,
     status         TEXT NOT NULL DEFAULT 'pending',
+    status_message TEXT,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE(shard_id, port),

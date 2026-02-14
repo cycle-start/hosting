@@ -47,9 +47,9 @@ func (s *FQDNService) Create(ctx context.Context, fqdn *model.FQDN) error {
 func (s *FQDNService) GetByID(ctx context.Context, id string) (*model.FQDN, error) {
 	var f model.FQDN
 	err := s.db.QueryRow(ctx,
-		`SELECT id, fqdn, webroot_id, ssl_enabled, status, created_at, updated_at
+		`SELECT id, fqdn, webroot_id, ssl_enabled, status, status_message, created_at, updated_at
 		 FROM fqdns WHERE id = $1`, id,
-	).Scan(&f.ID, &f.FQDN, &f.WebrootID, &f.SSLEnabled, &f.Status,
+	).Scan(&f.ID, &f.FQDN, &f.WebrootID, &f.SSLEnabled, &f.Status, &f.StatusMessage,
 		&f.CreatedAt, &f.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get fqdn %s: %w", id, err)
@@ -58,7 +58,7 @@ func (s *FQDNService) GetByID(ctx context.Context, id string) (*model.FQDN, erro
 }
 
 func (s *FQDNService) ListByWebroot(ctx context.Context, webrootID string, limit int, cursor string) ([]model.FQDN, bool, error) {
-	query := `SELECT id, fqdn, webroot_id, ssl_enabled, status, created_at, updated_at FROM fqdns WHERE webroot_id = $1`
+	query := `SELECT id, fqdn, webroot_id, ssl_enabled, status, status_message, created_at, updated_at FROM fqdns WHERE webroot_id = $1`
 	args := []any{webrootID}
 	argIdx := 2
 
@@ -81,7 +81,7 @@ func (s *FQDNService) ListByWebroot(ctx context.Context, webrootID string, limit
 	var fqdns []model.FQDN
 	for rows.Next() {
 		var f model.FQDN
-		if err := rows.Scan(&f.ID, &f.FQDN, &f.WebrootID, &f.SSLEnabled, &f.Status,
+		if err := rows.Scan(&f.ID, &f.FQDN, &f.WebrootID, &f.SSLEnabled, &f.Status, &f.StatusMessage,
 			&f.CreatedAt, &f.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan fqdn: %w", err)
 		}
@@ -121,4 +121,28 @@ func (s *FQDNService) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (s *FQDNService) Retry(ctx context.Context, id string) error {
+	var status string
+	err := s.db.QueryRow(ctx, "SELECT status FROM fqdns WHERE id = $1", id).Scan(&status)
+	if err != nil {
+		return fmt.Errorf("get fqdn status: %w", err)
+	}
+	if status != model.StatusFailed {
+		return fmt.Errorf("fqdn %s is not in failed state (current: %s)", id, status)
+	}
+	_, err = s.db.Exec(ctx, "UPDATE fqdns SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", model.StatusProvisioning, id)
+	if err != nil {
+		return fmt.Errorf("set fqdn %s status to provisioning: %w", id, err)
+	}
+	tenantID, err := resolveTenantIDFromFQDN(ctx, s.db, id)
+	if err != nil {
+		return fmt.Errorf("retry fqdn: %w", err)
+	}
+	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		WorkflowName: "CreateFQDNWorkflow",
+		WorkflowID:   fmt.Sprintf("fqdn-%s", id),
+		Arg:          id,
+	})
 }

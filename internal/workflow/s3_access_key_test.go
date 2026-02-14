@@ -77,9 +77,7 @@ func (s *CreateS3AccessKeyWorkflowTestSuite) TestGetKeyFails_SetsStatusFailed() 
 		Table: "s3_access_keys", ID: keyID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetS3AccessKeyByID", mock.Anything, keyID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "s3_access_keys", ID: keyID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("s3_access_keys", keyID)).Return(nil)
 	s.env.ExecuteWorkflow(CreateS3AccessKeyWorkflow, keyID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
@@ -149,9 +147,7 @@ func (s *DeleteS3AccessKeyWorkflowTestSuite) TestGetKeyFails_SetsStatusFailed() 
 		Table: "s3_access_keys", ID: keyID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetS3AccessKeyByID", mock.Anything, keyID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "s3_access_keys", ID: keyID, Status: model.StatusFailed,
-	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("s3_access_keys", keyID)).Return(nil)
 	s.env.ExecuteWorkflow(DeleteS3AccessKeyWorkflow, keyID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())

@@ -129,3 +129,26 @@ func (h *S3AccessKey) Delete(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusAccepted)
 }
+
+// Retry godoc
+//
+//	@Summary		Retry a failed S3 access key
+//	@Tags			S3 Access Keys
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "S3 access key ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/s3-access-keys/{id}/retry [post]
+func (h *S3AccessKey) Retry(w http.ResponseWriter, r *http.Request) {
+	id, err := request.RequireID(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.svc.Retry(r.Context(), id); err != nil {
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}

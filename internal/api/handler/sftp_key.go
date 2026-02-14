@@ -157,3 +157,26 @@ func (h *SFTPKey) Delete(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusAccepted)
 }
+
+// Retry godoc
+//
+//	@Summary		Retry a failed SFTP key
+//	@Tags			SFTP Keys
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "SFTP key ID"
+//	@Success		202
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/sftp-keys/{id}/retry [post]
+func (h *SFTPKey) Retry(w http.ResponseWriter, r *http.Request) {
+	id, err := request.RequireID(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.svc.Retry(r.Context(), id); err != nil {
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}

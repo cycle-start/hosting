@@ -35,7 +35,7 @@ func CreateEmailForwardWorkflow(ctx workflow.Context, forwardID string) error {
 	var fwd model.EmailForward
 	err = workflow.ExecuteActivity(ctx, "GetEmailForwardByID", forwardID).Get(ctx, &fwd)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_forwards", forwardID)
+		_ = setResourceFailed(ctx, "email_forwards", forwardID, err)
 		return err
 	}
 
@@ -43,7 +43,7 @@ func CreateEmailForwardWorkflow(ctx workflow.Context, forwardID string) error {
 	var account model.EmailAccount
 	err = workflow.ExecuteActivity(ctx, "GetEmailAccountByID", fwd.EmailAccountID).Get(ctx, &account)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_forwards", forwardID)
+		_ = setResourceFailed(ctx, "email_forwards", forwardID, err)
 		return err
 	}
 
@@ -61,7 +61,7 @@ func CreateEmailForwardWorkflow(ctx workflow.Context, forwardID string) error {
 		EmailAccountID: account.ID,
 	}).Get(ctx, nil)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_forwards", forwardID)
+		_ = setResourceFailed(ctx, "email_forwards", forwardID, err)
 		return err
 	}
 
@@ -98,7 +98,7 @@ func DeleteEmailForwardWorkflow(ctx workflow.Context, forwardID string) error {
 	var fwd model.EmailForward
 	err = workflow.ExecuteActivity(ctx, "GetEmailForwardByID", forwardID).Get(ctx, &fwd)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_forwards", forwardID)
+		_ = setResourceFailed(ctx, "email_forwards", forwardID, err)
 		return err
 	}
 
@@ -106,7 +106,7 @@ func DeleteEmailForwardWorkflow(ctx workflow.Context, forwardID string) error {
 	var account model.EmailAccount
 	err = workflow.ExecuteActivity(ctx, "GetEmailAccountByID", fwd.EmailAccountID).Get(ctx, &account)
 	if err != nil {
-		_ = setResourceFailed(ctx, "email_forwards", forwardID)
+		_ = setResourceFailed(ctx, "email_forwards", forwardID, err)
 		return err
 	}
 

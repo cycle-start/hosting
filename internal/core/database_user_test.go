@@ -124,8 +124,9 @@ func TestDatabaseUserService_GetByID_Success(t *testing.T) {
 		*(dest[3].(*string)) = "hashed-pw"
 		*(dest[4].(*[]string)) = []string{"ALL"}
 		*(dest[5].(*string)) = model.StatusActive
-		*(dest[6].(*time.Time)) = now
+		*(dest[6].(**string)) = nil // status_message
 		*(dest[7].(*time.Time)) = now
+		*(dest[8].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -178,8 +179,9 @@ func TestDatabaseUserService_ListByDatabase_Success(t *testing.T) {
 			*(dest[3].(*string)) = "pw1"
 			*(dest[4].(*[]string)) = []string{"ALL"}
 			*(dest[5].(*string)) = model.StatusActive
-			*(dest[6].(*time.Time)) = now
+			*(dest[6].(**string)) = nil // status_message
 			*(dest[7].(*time.Time)) = now
+			*(dest[8].(*time.Time)) = now
 			return nil
 		},
 		func(dest ...any) error {
@@ -189,8 +191,9 @@ func TestDatabaseUserService_ListByDatabase_Success(t *testing.T) {
 			*(dest[3].(*string)) = "pw2"
 			*(dest[4].(*[]string)) = []string{"SELECT"}
 			*(dest[5].(*string)) = model.StatusActive
-			*(dest[6].(*time.Time)) = now
+			*(dest[6].(**string)) = nil // status_message
 			*(dest[7].(*time.Time)) = now
+			*(dest[8].(*time.Time)) = now
 			return nil
 		},
 	)
