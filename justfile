@@ -240,8 +240,12 @@ ssl-init:
     cat /tmp/hosting-cert.pem /tmp/hosting-key.pem > /tmp/hosting.pem
     scp -o StrictHostKeyChecking=no /tmp/hosting.pem ubuntu@{{lb}}:/tmp/hosting.pem
     ssh -o StrictHostKeyChecking=no ubuntu@{{lb}} "sudo cp /tmp/hosting.pem /etc/haproxy/certs/hosting.pem && sudo systemctl reload haproxy"
+    # Deploy to DB Admin VM nginx
+    scp -o StrictHostKeyChecking=no /tmp/hosting-cert.pem ubuntu@10.10.10.60:/tmp/dbadmin.pem
+    scp -o StrictHostKeyChecking=no /tmp/hosting-key.pem ubuntu@10.10.10.60:/tmp/dbadmin-key.pem
+    ssh -o StrictHostKeyChecking=no ubuntu@10.10.10.60 "sudo mkdir -p /etc/nginx/certs && sudo cp /tmp/dbadmin.pem /etc/nginx/certs/dbadmin.pem && sudo cp /tmp/dbadmin-key.pem /etc/nginx/certs/dbadmin-key.pem && sudo systemctl reload nginx"
     rm /tmp/hosting-cert.pem /tmp/hosting-key.pem /tmp/hosting.pem
-    @echo "Trusted SSL certs installed on Traefik and LB VM. Visit https://admin.hosting.test"
+    @echo "Trusted SSL certs installed on Traefik, LB VM, and DB Admin VM. Visit https://admin.hosting.test"
 
 # Generate self-signed SSL cert (used by vm-deploy, no browser trust)
 _ssl-self-signed:

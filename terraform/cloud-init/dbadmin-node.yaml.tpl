@@ -22,12 +22,23 @@ write_files:
               "expireSessionAfterPeriod": 1800000,
               "develMode": false,
               "enableSecurityManager": false,
-              "forwardProxy": true
+              "forwardProxy": true,
+              "database": {
+                  "driver": "h2_embedded_v2",
+                  "url": "jdbc:h2:$${workspace}/.data/cb.h2v2.dat",
+                  "initialDataConfiguration": "conf/initial-data.conf",
+                  "pool": {
+                      "minIdleConnections": 4,
+                      "maxIdleConnections": 10,
+                      "maxConnections": 100,
+                      "validationQuery": "SELECT 1"
+                  },
+                  "backupEnabled": true
+              }
           },
           "app": {
               "anonymousAccessEnabled": false,
               "supportsCustomConnections": false,
-              "enableReverseProxyAuth": true,
               "forwardProxy": true,
               "publicCredentialsSaveEnabled": false,
               "adminCredentialsSaveEnabled": true,
@@ -81,7 +92,58 @@ write_files:
       SERVICE_NAME=node-agent
       METRICS_ADDR=:9100
 
+  - path: /etc/nginx/sites-available/dbadmin
+    permissions: '0644'
+    content: |
+      server {
+          listen 80;
+          listen [::]:80;
+          server_name _;
+
+          location / {
+              proxy_pass http://127.0.0.1:8978;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "upgrade";
+          }
+      }
+
+      server {
+          listen 443 ssl;
+          listen [::]:443 ssl;
+          server_name _;
+
+          ssl_certificate /etc/nginx/certs/dbadmin.pem;
+          ssl_certificate_key /etc/nginx/certs/dbadmin-key.pem;
+
+          location / {
+              proxy_pass http://127.0.0.1:8978;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "upgrade";
+          }
+      }
+
 runcmd:
+  # Generate self-signed cert for nginx.
+  - mkdir -p /etc/nginx/certs
+  - |
+    openssl req -x509 -newkey rsa:2048 \
+      -keyout /etc/nginx/certs/dbadmin-key.pem -out /etc/nginx/certs/dbadmin.pem \
+      -days 365 -nodes -subj '/CN=dbadmin.${base_domain}' \
+      -addext 'subjectAltName=DNS:dbadmin.${base_domain}' 2>/dev/null
+  # Enable nginx site.
+  - rm -f /etc/nginx/sites-enabled/default
+  - ln -sf /etc/nginx/sites-available/dbadmin /etc/nginx/sites-enabled/dbadmin
   - systemctl daemon-reload
+  - systemctl restart nginx
   - systemctl start cloudbeaver
   - systemctl start node-agent
