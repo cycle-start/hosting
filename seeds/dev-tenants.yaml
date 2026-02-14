@@ -1,5 +1,5 @@
 api_url: http://10.10.10.2:8090/api/v1
-api_key: hst_f8b14bf30d9293f36d3c2b0690ced4f8ed1874bc9c2b91b4e4639bc90d11fc63
+# API key loaded from HOSTING_API_KEY env var
 
 region: dev
 cluster: vm-cluster-1

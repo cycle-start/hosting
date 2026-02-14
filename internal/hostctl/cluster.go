@@ -20,7 +20,14 @@ func ClusterApply(configPath string, timeout time.Duration) error {
 		return fmt.Errorf("parse config: %w", err)
 	}
 
-	client := NewClient(cfg.APIURL, cfg.APIKey)
+	apiKey := cfg.APIKey
+	if apiKey == "" {
+		apiKey = os.Getenv("HOSTING_API_KEY")
+	}
+	if apiKey == "" {
+		return fmt.Errorf("no API key: set api_key in config or HOSTING_API_KEY env var")
+	}
+	client := NewClient(cfg.APIURL, apiKey)
 
 	// 1. Find or create region
 	regionID, err := findOrCreateRegion(client, cfg.Region)
@@ -87,7 +94,7 @@ func ClusterApply(configPath string, timeout time.Duration) error {
 }
 
 func applyNodes(client *Client, clusterID string, def ClusterDef) error {
-	// Build shard name -> shard ID map.
+	// Build shard name -> ID map and shard name -> role map.
 	resp, err := client.Get(fmt.Sprintf("/clusters/%s/shards", clusterID))
 	if err != nil {
 		return fmt.Errorf("list shards: %w", err)
@@ -104,19 +111,20 @@ func applyNodes(client *Client, clusterID string, def ClusterDef) error {
 	if err := json.Unmarshal(items, &shards); err != nil {
 		return fmt.Errorf("parse shards: %w", err)
 	}
-	shardMap := make(map[string]string)
+	shardNameToID := make(map[string]string)
 	shardRoleMap := make(map[string]string)
 	for _, s := range shards {
-		shardMap[s.Name] = s.ID
+		shardNameToID[s.Name] = s.ID
 		shardRoleMap[s.Name] = s.Role
 	}
 
 	// For each node, ensure it exists with the correct shard assignment.
 	for _, node := range def.Nodes {
-		shardID, ok := shardMap[node.ShardName]
+		role, ok := shardRoleMap[node.ShardName]
 		if !ok {
 			return fmt.Errorf("shard %q not found for node %s", node.ShardName, node.ID)
 		}
+		shardID := shardNameToID[node.ShardName]
 
 		// Try to find existing node by ID.
 		_, err := client.Get(fmt.Sprintf("/nodes/%s", node.ID))
@@ -126,7 +134,6 @@ func applyNodes(client *Client, clusterID string, def ClusterDef) error {
 		}
 
 		// Create node with pre-assigned ID and shard.
-		role := shardRoleMap[node.ShardName]
 		_, err = client.Post(fmt.Sprintf("/clusters/%s/nodes", clusterID), map[string]any{
 			"id":         node.ID,
 			"hostname":   node.ID, // node-agent registers by ID
@@ -143,12 +150,12 @@ func applyNodes(client *Client, clusterID string, def ClusterDef) error {
 	// Trigger convergence for each shard that has nodes.
 	convergedShards := make(map[string]bool)
 	for _, node := range def.Nodes {
-		shardID := shardMap[node.ShardName]
-		if convergedShards[shardID] {
+		if convergedShards[node.ShardName] {
 			continue
 		}
-		convergedShards[shardID] = true
+		convergedShards[node.ShardName] = true
 
+		shardID := shardNameToID[node.ShardName]
 		fmt.Printf("Converging shard %q...\n", node.ShardName)
 		_, err := client.Post(fmt.Sprintf("/shards/%s/converge", shardID), nil)
 		if err != nil {
@@ -166,13 +173,7 @@ func findOrCreateRegion(client *Client, def RegionDef) (string, error) {
 		return id, nil
 	}
 
-	regionID := def.ID
-	if regionID == "" {
-		regionID = def.Name
-	}
-
 	resp, err := client.Post("/regions", map[string]any{
-		"id":   regionID,
 		"name": def.Name,
 	})
 	if err != nil {
@@ -188,13 +189,7 @@ func findOrCreateCluster(client *Client, regionID string, def ClusterDef) (strin
 		return id, false, nil
 	}
 
-	clusterID := def.ID
-	if clusterID == "" {
-		clusterID = def.Name
-	}
-
 	body := map[string]any{
-		"id":   clusterID,
 		"name": def.Name,
 	}
 	if def.Config != nil {
@@ -292,7 +287,7 @@ func printClusterSummary(client *Client, clusterID string) error {
 
 	fmt.Println("\nShards:")
 	for _, s := range shards {
-		fmt.Printf("  %-20s role=%-10s id=%s\n", s.Name, s.Role, s.ID)
+		fmt.Printf("  %-20s role=%s  id=%s\n", s.Name, s.Role, s.ID)
 	}
 
 	// List nodes

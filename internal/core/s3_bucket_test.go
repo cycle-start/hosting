@@ -103,6 +103,7 @@ func TestS3BucketService_GetByID_Success(t *testing.T) {
 	bucketID := "test-bucket-1"
 	tenantID := "test-tenant-1"
 	shardID := "test-shard-1"
+	shardName := "Test Shard"
 	now := time.Now().Truncate(time.Microsecond)
 
 	row := &mockRow{scanFunc: func(dest ...any) error {
@@ -116,6 +117,7 @@ func TestS3BucketService_GetByID_Success(t *testing.T) {
 		*(dest[7].(**string)) = nil // status_message
 		*(dest[8].(*time.Time)) = now
 		*(dest[9].(*time.Time)) = now
+		*(dest[10].(**string)) = &shardName
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -132,6 +134,7 @@ func TestS3BucketService_GetByID_Success(t *testing.T) {
 	assert.Equal(t, model.StatusActive, result.Status)
 	assert.Equal(t, now, result.CreatedAt)
 	assert.Equal(t, now, result.UpdatedAt)
+	assert.Equal(t, &shardName, result.ShardName)
 	db.AssertExpectations(t)
 }
 
@@ -164,6 +167,7 @@ func TestS3BucketService_ListByTenant_Success(t *testing.T) {
 	tenantID := "test-tenant-1"
 	id1 := "test-bucket-1"
 	shardID := "test-shard-1"
+	shardName := "Test Shard"
 	now := time.Now().Truncate(time.Microsecond)
 
 	rows := newMockRows(
@@ -178,6 +182,7 @@ func TestS3BucketService_ListByTenant_Success(t *testing.T) {
 			*(dest[7].(**string)) = nil // status_message
 			*(dest[8].(*time.Time)) = now
 			*(dest[9].(*time.Time)) = now
+			*(dest[10].(**string)) = &shardName
 			return nil
 		},
 	)
@@ -216,14 +221,18 @@ func TestS3BucketService_Delete_Success(t *testing.T) {
 
 	bucketID := "test-bucket-1"
 
-	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+	updateRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "my-bucket"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
 		tid := "test-tenant-1"
 		*(dest[0].(**string)) = &tid
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -242,7 +251,10 @@ func TestS3BucketService_Delete_DBError(t *testing.T) {
 	svc := NewS3BucketService(db, tc)
 	ctx := context.Background()
 
-	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
+	errorRow := &mockRow{scanFunc: func(dest ...any) error {
+		return errors.New("db error")
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(errorRow)
 
 	err := svc.Delete(ctx, "test-bucket-1")
 	require.Error(t, err)

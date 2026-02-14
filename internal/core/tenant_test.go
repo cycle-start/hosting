@@ -200,6 +200,9 @@ func TestTenantService_GetByID_Success(t *testing.T) {
 	shardID := "test-shard-1"
 	now := time.Now().Truncate(time.Microsecond)
 
+	regionName := "Test Region"
+	clusterName := "Test Cluster"
+	shardName := "Test Shard"
 	row := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = tenantID
 		*(dest[1].(*string)) = "test-brand"
@@ -213,6 +216,9 @@ func TestTenantService_GetByID_Success(t *testing.T) {
 		*(dest[9].(**string)) = nil // status_message
 		*(dest[10].(*time.Time)) = now
 		*(dest[11].(*time.Time)) = now
+		*(dest[12].(*string)) = regionName
+		*(dest[13].(*string)) = clusterName
+		*(dest[14].(**string)) = &shardName
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -230,6 +236,9 @@ func TestTenantService_GetByID_Success(t *testing.T) {
 	assert.Equal(t, model.StatusActive, result.Status)
 	assert.Equal(t, now, result.CreatedAt)
 	assert.Equal(t, now, result.UpdatedAt)
+	assert.Equal(t, regionName, result.RegionName)
+	assert.Equal(t, clusterName, result.ClusterName)
+	assert.Equal(t, &shardName, result.ShardName)
 	db.AssertExpectations(t)
 }
 
@@ -265,6 +274,9 @@ func TestTenantService_List_Success(t *testing.T) {
 	regionID := "test-region-1"
 	clusterID := "test-cluster-1"
 	shardID := "test-shard-1"
+	regionName := "Test Region"
+	clusterName := "Test Cluster"
+	shardName := "Test Shard"
 	now := time.Now().Truncate(time.Microsecond)
 
 	rows := newMockRows(
@@ -281,6 +293,9 @@ func TestTenantService_List_Success(t *testing.T) {
 			*(dest[9].(**string)) = nil // status_message
 			*(dest[10].(*time.Time)) = now
 			*(dest[11].(*time.Time)) = now
+			*(dest[12].(*string)) = regionName
+			*(dest[13].(*string)) = clusterName
+			*(dest[14].(**string)) = &shardName
 			return nil
 		},
 		func(dest ...any) error {
@@ -296,6 +311,9 @@ func TestTenantService_List_Success(t *testing.T) {
 			*(dest[9].(**string)) = nil // status_message
 			*(dest[10].(*time.Time)) = now
 			*(dest[11].(*time.Time)) = now
+			*(dest[12].(*string)) = regionName
+			*(dest[13].(*string)) = clusterName
+			*(dest[14].(**string)) = &shardName
 			return nil
 		},
 	)
@@ -551,6 +569,9 @@ func TestTenantService_ListByShard_Success(t *testing.T) {
 	id1, id2 := "test-tenant-1", "test-tenant-2"
 	regionID := "test-region-1"
 	clusterID := "test-cluster-1"
+	regionName := "Test Region"
+	clusterName := "Test Cluster"
+	shardName := "Test Shard"
 	now := time.Now().Truncate(time.Microsecond)
 
 	rows := newMockRows(
@@ -567,6 +588,9 @@ func TestTenantService_ListByShard_Success(t *testing.T) {
 			*(dest[9].(**string)) = nil // status_message
 			*(dest[10].(*time.Time)) = now
 			*(dest[11].(*time.Time)) = now
+			*(dest[12].(*string)) = regionName
+			*(dest[13].(*string)) = clusterName
+			*(dest[14].(**string)) = &shardName
 			return nil
 		},
 		func(dest ...any) error {
@@ -582,6 +606,9 @@ func TestTenantService_ListByShard_Success(t *testing.T) {
 			*(dest[9].(**string)) = nil // status_message
 			*(dest[10].(*time.Time)) = now
 			*(dest[11].(*time.Time)) = now
+			*(dest[12].(*string)) = regionName
+			*(dest[13].(*string)) = clusterName
+			*(dest[14].(**string)) = &shardName
 			return nil
 		},
 	)

@@ -9,6 +9,7 @@ import (
 	"github.com/edvin/hosting/internal/api/response"
 	"github.com/edvin/hosting/internal/core"
 	"github.com/edvin/hosting/internal/model"
+	"github.com/edvin/hosting/internal/platform"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -70,7 +71,7 @@ func (h *Region) Create(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	region := &model.Region{
-		ID:        req.ID,
+		ID:        platform.NewID(),
 		Name:      req.Name,
 		Config:    cfg,
 		CreatedAt: now,

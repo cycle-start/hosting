@@ -27,7 +27,7 @@ import type { DatabaseUser } from '@/lib/types'
 const allPrivileges = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER', 'INDEX', 'REFERENCES', 'ALL']
 
 export function DatabaseDetailPage() {
-  const { id: tenantId, databaseId } = useParams({ from: '/tenants/$id/databases/$databaseId' as never })
+  const { id: tenantId, databaseId } = useParams({ from: '/auth/tenants/$id/databases/$databaseId' as never })
 
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<DatabaseUser | null>(null)
@@ -151,13 +151,13 @@ export function DatabaseDetailPage() {
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
         { label: tenantId, href: `/tenants/${tenantId}` },
-        { label: 'Databases' },
+        { label: 'Databases', href: `/tenants/${tenantId}`, hash: 'databases' },
         { label: database.name },
       ]} />
 
       <ResourceHeader
         title={database.name}
-        subtitle={`Shard: ${database.shard_id || '-'}`}
+        subtitle={`Shard: ${database.shard_name || database.shard_id || '-'}`}
         status={database.status}
         actions={
           <Button variant="outline" size="sm" onClick={handleOpenDbAdmin}>

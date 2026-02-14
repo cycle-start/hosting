@@ -33,7 +33,7 @@ func (s *SFTPKeyService) Create(ctx context.Context, key *model.SFTPKey) error {
 
 	if err := signalProvision(ctx, s.tc, key.TenantID, model.ProvisionTask{
 		WorkflowName: "AddSFTPKeyWorkflow",
-		WorkflowID:   fmt.Sprintf("sftp-key-%s", key.ID),
+		WorkflowID:   workflowID("sftp-key", key.Name, key.ID),
 		Arg:          key.ID,
 	}); err != nil {
 		return fmt.Errorf("start AddSFTPKeyWorkflow: %w", err)
@@ -100,10 +100,11 @@ func (s *SFTPKeyService) ListByTenant(ctx context.Context, tenantID string, limi
 
 // Delete sets the key status to deleting and starts the removal workflow.
 func (s *SFTPKeyService) Delete(ctx context.Context, id string) error {
-	_, err := s.db.Exec(ctx,
-		"UPDATE sftp_keys SET status = $1, updated_at = now() WHERE id = $2",
+	var name string
+	err := s.db.QueryRow(ctx,
+		"UPDATE sftp_keys SET status = $1, updated_at = now() WHERE id = $2 RETURNING name",
 		model.StatusDeleting, id,
-	)
+	).Scan(&name)
 	if err != nil {
 		return fmt.Errorf("set sftp key %s status to deleting: %w", id, err)
 	}
@@ -115,7 +116,7 @@ func (s *SFTPKeyService) Delete(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "RemoveSFTPKeyWorkflow",
-		WorkflowID:   fmt.Sprintf("sftp-key-%s", id),
+		WorkflowID:   workflowID("sftp-key", name, id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("start RemoveSFTPKeyWorkflow: %w", err)
@@ -125,8 +126,8 @@ func (s *SFTPKeyService) Delete(ctx context.Context, id string) error {
 }
 
 func (s *SFTPKeyService) Retry(ctx context.Context, id string) error {
-	var status string
-	err := s.db.QueryRow(ctx, "SELECT status FROM sftp_keys WHERE id = $1", id).Scan(&status)
+	var status, name string
+	err := s.db.QueryRow(ctx, "SELECT status, name FROM sftp_keys WHERE id = $1", id).Scan(&status, &name)
 	if err != nil {
 		return fmt.Errorf("get sftp key status: %w", err)
 	}
@@ -143,7 +144,7 @@ func (s *SFTPKeyService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "AddSFTPKeyWorkflow",
-		WorkflowID:   fmt.Sprintf("sftp-key-%s", id),
+		WorkflowID:   workflowID("sftp-key", name, id),
 		Arg:          id,
 	})
 }

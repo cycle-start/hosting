@@ -35,7 +35,7 @@ func (s *FQDNService) Create(ctx context.Context, fqdn *model.FQDN) error {
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "BindFQDNWorkflow",
-		WorkflowID:   fmt.Sprintf("fqdn-%s", fqdn.ID),
+		WorkflowID:   workflowID("fqdn", fqdn.FQDN, fqdn.ID),
 		Arg:          fqdn.ID,
 	}); err != nil {
 		return fmt.Errorf("start BindFQDNWorkflow: %w", err)
@@ -99,10 +99,11 @@ func (s *FQDNService) ListByWebroot(ctx context.Context, webrootID string, limit
 }
 
 func (s *FQDNService) Delete(ctx context.Context, id string) error {
-	_, err := s.db.Exec(ctx,
-		"UPDATE fqdns SET status = $1, updated_at = now() WHERE id = $2",
+	var fqdnName string
+	err := s.db.QueryRow(ctx,
+		"UPDATE fqdns SET status = $1, updated_at = now() WHERE id = $2 RETURNING fqdn",
 		model.StatusDeleting, id,
-	)
+	).Scan(&fqdnName)
 	if err != nil {
 		return fmt.Errorf("set fqdn %s status to deleting: %w", id, err)
 	}
@@ -114,7 +115,7 @@ func (s *FQDNService) Delete(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "UnbindFQDNWorkflow",
-		WorkflowID:   fmt.Sprintf("fqdn-%s", id),
+		WorkflowID:   workflowID("fqdn", fqdnName, id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("start UnbindFQDNWorkflow: %w", err)
@@ -124,8 +125,8 @@ func (s *FQDNService) Delete(ctx context.Context, id string) error {
 }
 
 func (s *FQDNService) Retry(ctx context.Context, id string) error {
-	var status string
-	err := s.db.QueryRow(ctx, "SELECT status FROM fqdns WHERE id = $1", id).Scan(&status)
+	var status, fqdnName string
+	err := s.db.QueryRow(ctx, "SELECT status, fqdn FROM fqdns WHERE id = $1", id).Scan(&status, &fqdnName)
 	if err != nil {
 		return fmt.Errorf("get fqdn status: %w", err)
 	}
@@ -142,7 +143,7 @@ func (s *FQDNService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateFQDNWorkflow",
-		WorkflowID:   fmt.Sprintf("fqdn-%s", id),
+		WorkflowID:   workflowID("fqdn", fqdnName, id),
 		Arg:          id,
 	})
 }

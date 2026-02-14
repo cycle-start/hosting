@@ -28,8 +28,15 @@ import {
 } from '@/lib/hooks'
 import type { EmailAlias, EmailForward } from '@/lib/types'
 
+const emailTabs = ['aliases', 'forwards', 'autoreply']
+function getEmailTabFromHash() {
+  const hash = window.location.hash.slice(1)
+  return emailTabs.includes(hash) ? hash : 'aliases'
+}
+
 export function EmailAccountDetailPage() {
-  const { id: tenantId, accountId } = useParams({ from: '/tenants/$id/email-accounts/$accountId' as never })
+  const { id: tenantId, accountId } = useParams({ from: '/auth/tenants/$id/email-accounts/$accountId' as never })
+  const [activeTab, setActiveTab] = useState(getEmailTabFromHash)
 
   const [createAliasOpen, setCreateAliasOpen] = useState(false)
   const [createForwardOpen, setCreateForwardOpen] = useState(false)
@@ -162,7 +169,7 @@ export function EmailAccountDetailPage() {
         <span className="ml-4">Created: {formatDate(account.created_at)}</span>
       </div>
 
-      <Tabs defaultValue="aliases">
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); window.history.replaceState(null, '', `#${v}`) }}>
         <TabsList>
           <TabsTrigger value="aliases">Aliases ({aliasesData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="forwards">Forwards ({forwardsData?.items?.length ?? 0})</TabsTrigger>

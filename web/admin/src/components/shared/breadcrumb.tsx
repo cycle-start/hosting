@@ -5,6 +5,7 @@ import { Fragment } from 'react'
 export interface BreadcrumbSegment {
   label: string
   href?: string
+  hash?: string
 }
 
 interface BreadcrumbProps {
@@ -18,7 +19,7 @@ export function Breadcrumb({ segments }: BreadcrumbProps) {
         <Fragment key={i}>
           {i > 0 && <ChevronRight className="h-3 w-3 shrink-0" />}
           {seg.href ? (
-            <Link to={seg.href} className="hover:text-foreground transition-colors truncate max-w-[200px]">
+            <Link to={seg.href} hash={seg.hash} className="hover:text-foreground transition-colors truncate max-w-[200px]">
               {seg.label}
             </Link>
           ) : (

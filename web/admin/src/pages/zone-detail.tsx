@@ -25,7 +25,7 @@ import type { ZoneRecord } from '@/lib/types'
 const recordTypes = ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'SRV', 'CAA', 'PTR']
 
 export function ZoneDetailPage() {
-  const { id } = useParams({ from: '/zones/$id' as never })
+  const { id } = useParams({ from: '/auth/zones/$id' as never })
   const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<ZoneRecord | null>(null)
@@ -132,7 +132,7 @@ export function ZoneDetailPage() {
 
       <ResourceHeader
         title={zone.name}
-        subtitle={`Region: ${zone.region_id}${zone.tenant_id ? ` | Tenant: ${zone.tenant_id}` : ''}`}
+        subtitle={`Region: ${zone.region_name || zone.region_id}${zone.tenant_id ? ` | Tenant: ${zone.tenant_id}` : ''}`}
         status={zone.status}
         actions={
           <Button onClick={() => setCreateOpen(true)}>

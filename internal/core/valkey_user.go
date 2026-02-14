@@ -35,7 +35,7 @@ func (s *ValkeyUserService) Create(ctx context.Context, user *model.ValkeyUser) 
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateValkeyUserWorkflow",
-		WorkflowID:   fmt.Sprintf("valkey-user-%s", user.ID),
+		WorkflowID:   workflowID("valkey-user", user.Username, user.ID),
 		Arg:          user.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateValkeyUserWorkflow: %w", err)
@@ -115,7 +115,7 @@ func (s *ValkeyUserService) Update(ctx context.Context, user *model.ValkeyUser) 
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateValkeyUserWorkflow",
-		WorkflowID:   fmt.Sprintf("valkey-user-%s", user.ID),
+		WorkflowID:   workflowID("valkey-user", user.Username, user.ID),
 		Arg:          user.ID,
 	}); err != nil {
 		return fmt.Errorf("start UpdateValkeyUserWorkflow: %w", err)
@@ -125,10 +125,11 @@ func (s *ValkeyUserService) Update(ctx context.Context, user *model.ValkeyUser) 
 }
 
 func (s *ValkeyUserService) Delete(ctx context.Context, id string) error {
-	_, err := s.db.Exec(ctx,
-		"UPDATE valkey_users SET status = $1, updated_at = now() WHERE id = $2",
+	var username string
+	err := s.db.QueryRow(ctx,
+		"UPDATE valkey_users SET status = $1, updated_at = now() WHERE id = $2 RETURNING username",
 		model.StatusDeleting, id,
-	)
+	).Scan(&username)
 	if err != nil {
 		return fmt.Errorf("set valkey user %s status to deleting: %w", id, err)
 	}
@@ -140,7 +141,7 @@ func (s *ValkeyUserService) Delete(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteValkeyUserWorkflow",
-		WorkflowID:   fmt.Sprintf("valkey-user-%s", id),
+		WorkflowID:   workflowID("valkey-user", username, id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteValkeyUserWorkflow: %w", err)
@@ -150,8 +151,8 @@ func (s *ValkeyUserService) Delete(ctx context.Context, id string) error {
 }
 
 func (s *ValkeyUserService) Retry(ctx context.Context, id string) error {
-	var status string
-	err := s.db.QueryRow(ctx, "SELECT status FROM valkey_users WHERE id = $1", id).Scan(&status)
+	var status, username string
+	err := s.db.QueryRow(ctx, "SELECT status, username FROM valkey_users WHERE id = $1", id).Scan(&status, &username)
 	if err != nil {
 		return fmt.Errorf("get valkey user status: %w", err)
 	}
@@ -168,7 +169,7 @@ func (s *ValkeyUserService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateValkeyUserWorkflow",
-		WorkflowID:   fmt.Sprintf("valkey-user-%s", id),
+		WorkflowID:   workflowID("valkey-user", username, id),
 		Arg:          id,
 	})
 }

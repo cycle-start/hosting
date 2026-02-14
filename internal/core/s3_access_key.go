@@ -63,7 +63,7 @@ func (s *S3AccessKeyService) Create(ctx context.Context, key *model.S3AccessKey)
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateS3AccessKeyWorkflow",
-		WorkflowID:   fmt.Sprintf("s3-access-key-%s", key.ID),
+		WorkflowID:   workflowID("s3-access-key", key.AccessKeyID, key.ID),
 		Arg:          key.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateS3AccessKeyWorkflow: %w", err)
@@ -127,10 +127,11 @@ func (s *S3AccessKeyService) ListByBucket(ctx context.Context, bucketID string, 
 }
 
 func (s *S3AccessKeyService) Delete(ctx context.Context, id string) error {
-	_, err := s.db.Exec(ctx,
-		"UPDATE s3_access_keys SET status = $1, updated_at = now() WHERE id = $2",
+	var accessKeyID string
+	err := s.db.QueryRow(ctx,
+		"UPDATE s3_access_keys SET status = $1, updated_at = now() WHERE id = $2 RETURNING access_key_id",
 		model.StatusDeleting, id,
-	)
+	).Scan(&accessKeyID)
 	if err != nil {
 		return fmt.Errorf("set s3 access key %s status to deleting: %w", id, err)
 	}
@@ -142,7 +143,7 @@ func (s *S3AccessKeyService) Delete(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteS3AccessKeyWorkflow",
-		WorkflowID:   fmt.Sprintf("s3-access-key-%s", id),
+		WorkflowID:   workflowID("s3-access-key", accessKeyID, id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteS3AccessKeyWorkflow: %w", err)
@@ -152,8 +153,8 @@ func (s *S3AccessKeyService) Delete(ctx context.Context, id string) error {
 }
 
 func (s *S3AccessKeyService) Retry(ctx context.Context, id string) error {
-	var status string
-	err := s.db.QueryRow(ctx, "SELECT status FROM s3_access_keys WHERE id = $1", id).Scan(&status)
+	var status, accessKeyID string
+	err := s.db.QueryRow(ctx, "SELECT status, access_key_id FROM s3_access_keys WHERE id = $1", id).Scan(&status, &accessKeyID)
 	if err != nil {
 		return fmt.Errorf("get s3 access key status: %w", err)
 	}
@@ -170,7 +171,7 @@ func (s *S3AccessKeyService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateS3AccessKeyWorkflow",
-		WorkflowID:   fmt.Sprintf("s3-access-key-%s", id),
+		WorkflowID:   workflowID("s3-access-key", accessKeyID, id),
 		Arg:          id,
 	})
 }

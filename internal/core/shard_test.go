@@ -32,7 +32,7 @@ func TestShardService_Create_Success(t *testing.T) {
 	shard := &model.Shard{
 		ID:        "test-shard-1",
 		ClusterID: "test-cluster-1",
-		Name:      "web-shard-01",
+		Name:      "web-1",
 		Role:      model.ShardRoleWeb,
 		LBBackend: "backend-1",
 		Config:    json.RawMessage(`{"replicas":3}`),
@@ -56,7 +56,7 @@ func TestShardService_Create_NilConfig(t *testing.T) {
 	shard := &model.Shard{
 		ID:        "test-shard-1",
 		ClusterID: "test-cluster-1",
-		Name:      "web-shard-01",
+		Name:      "web-1",
 		Role:      model.ShardRoleWeb,
 		Config:    nil,
 		Status:    model.StatusActive,
@@ -77,7 +77,7 @@ func TestShardService_Create_DBError(t *testing.T) {
 	svc := NewShardService(db, nil)
 	ctx := context.Background()
 
-	shard := &model.Shard{ID: "test-shard-1", Name: "web-shard-01"}
+	shard := &model.Shard{ID: "test-shard-1"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
 
@@ -102,7 +102,7 @@ func TestShardService_GetByID_Success(t *testing.T) {
 	row := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = shardID
 		*(dest[1].(*string)) = clusterID
-		*(dest[2].(*string)) = "web-shard-01"
+		*(dest[2].(*string)) = "web-1"
 		*(dest[3].(*string)) = model.ShardRoleWeb
 		*(dest[4].(*string)) = "backend-1"
 		*(dest[5].(*json.RawMessage)) = cfg
@@ -118,7 +118,7 @@ func TestShardService_GetByID_Success(t *testing.T) {
 	require.NotNil(t, result)
 	assert.Equal(t, shardID, result.ID)
 	assert.Equal(t, clusterID, result.ClusterID)
-	assert.Equal(t, "web-shard-01", result.Name)
+	assert.Equal(t, "web-1", result.Name)
 	assert.Equal(t, model.ShardRoleWeb, result.Role)
 	assert.Equal(t, "backend-1", result.LBBackend)
 	assert.Equal(t, model.StatusActive, result.Status)
@@ -159,7 +159,7 @@ func TestShardService_ListByCluster_Success(t *testing.T) {
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
 			*(dest[1].(*string)) = clusterID
-			*(dest[2].(*string)) = "db-shard-01"
+			*(dest[2].(*string)) = "db-1"
 			*(dest[3].(*string)) = model.ShardRoleDatabase
 			*(dest[4].(*string)) = "backend-db"
 			*(dest[5].(*json.RawMessage)) = cfg
@@ -171,7 +171,7 @@ func TestShardService_ListByCluster_Success(t *testing.T) {
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id2
 			*(dest[1].(*string)) = clusterID
-			*(dest[2].(*string)) = "web-shard-01"
+			*(dest[2].(*string)) = "web-1"
 			*(dest[3].(*string)) = model.ShardRoleWeb
 			*(dest[4].(*string)) = "backend-web"
 			*(dest[5].(*json.RawMessage)) = cfg
@@ -187,8 +187,8 @@ func TestShardService_ListByCluster_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, hasMore)
 	require.Len(t, result, 2)
-	assert.Equal(t, "db-shard-01", result[0].Name)
-	assert.Equal(t, "web-shard-01", result[1].Name)
+	assert.Equal(t, id1, result[0].ID)
+	assert.Equal(t, id2, result[1].ID)
 	db.AssertExpectations(t)
 }
 

@@ -50,14 +50,20 @@ func TestCertificateService_Upload_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	wfRun := &temporalmocks.WorkflowRun{}
-	wfRun.On("GetID").Return("mock-wf-id")
-	wfRun.On("GetRunID").Return("mock-run-id")
+	fqdnRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "example.com"
+		return nil
+	}}
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "test-tenant-1"
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(fqdnRow).Once()
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	wfRun := &temporalmocks.WorkflowRun{}
+	wfRun.On("GetID").Return("mock-wf-id")
+	wfRun.On("GetRunID").Return("mock-run-id")
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Upload(ctx, cert)
@@ -81,14 +87,20 @@ func TestCertificateService_Upload_SetsTypeToCustom(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	wfRun := &temporalmocks.WorkflowRun{}
-	wfRun.On("GetID").Return("mock-wf-id")
-	wfRun.On("GetRunID").Return("mock-run-id")
+	fqdnRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "example.com"
+		return nil
+	}}
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "test-tenant-1"
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(fqdnRow).Once()
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	wfRun := &temporalmocks.WorkflowRun{}
+	wfRun.On("GetID").Return("mock-wf-id")
+	wfRun.On("GetRunID").Return("mock-run-id")
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Upload(ctx, cert)
@@ -123,11 +135,16 @@ func TestCertificateService_Upload_WorkflowError(t *testing.T) {
 	cert := &model.Certificate{ID: "test-cert-1", FQDNID: "test-fqdn-1"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+	fqdnRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "example.com"
+		return nil
+	}}
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "test-tenant-1"
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(fqdnRow).Once()
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Upload(ctx, cert)

@@ -51,26 +51,10 @@ func TestRegionCreate_MissingRequiredFields(t *testing.T) {
 	assert.Contains(t, body["error"], "validation error")
 }
 
-func TestRegionCreate_MissingID(t *testing.T) {
-	h := newRegionHandler()
-	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/regions", map[string]any{
-		"name": "us-east-1",
-	})
-
-	h.Create(rec, r)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	body := decodeErrorResponse(rec)
-	assert.Contains(t, body["error"], "validation error")
-}
-
 func TestRegionCreate_MissingName(t *testing.T) {
 	h := newRegionHandler()
 	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/regions", map[string]any{
-		"id": "us-east-1",
-	})
+	r := newRequest(http.MethodPost, "/regions", map[string]any{})
 
 	h.Create(rec, r)
 
@@ -94,7 +78,6 @@ func TestRegionCreate_InvalidSlugName(t *testing.T) {
 			h := newRegionHandler()
 			rec := httptest.NewRecorder()
 			r := newRequest(http.MethodPost, "/regions", map[string]any{
-				"id":   "us-east-1",
 				"name": tt.slug,
 			})
 
@@ -109,7 +92,6 @@ func TestRegionCreate_ValidBody(t *testing.T) {
 	h := newRegionHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/regions", map[string]any{
-		"id":   "us-east-1",
 		"name": "us-east-1",
 	})
 
@@ -125,7 +107,6 @@ func TestRegionCreate_ValidBodyWithConfig(t *testing.T) {
 	h := newRegionHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/regions", map[string]any{
-		"id":     "us-east-1",
 		"name":   "us-east-1",
 		"config": map[string]any{"dns_provider": "cloudflare"},
 	})
@@ -142,7 +123,6 @@ func TestRegionCreate_OptionalConfig(t *testing.T) {
 	h := newRegionHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/regions", map[string]any{
-		"id":   "us-east-2",
 		"name": "us-east-2",
 	})
 

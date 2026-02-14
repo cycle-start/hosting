@@ -27,7 +27,11 @@ export function S3BucketsPage() {
         </div>
       ),
     },
-    { accessorKey: 'region_id', header: 'Region' },
+    {
+      accessorKey: 'region_name',
+      header: 'Region',
+      cell: ({ row }) => row.original.region_name || row.original.region_id,
+    },
     {
       accessorKey: 'status',
       header: 'Status',

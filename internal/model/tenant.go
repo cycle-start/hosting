@@ -15,6 +15,9 @@ type Tenant struct {
 	StatusMessage *string `json:"status_message,omitempty" db:"status_message"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
+	RegionName  string    `json:"region_name,omitempty" db:"-"`
+	ClusterName string    `json:"cluster_name,omitempty" db:"-"`
+	ShardName   *string   `json:"shard_name,omitempty" db:"-"`
 }
 
 // ResourceStatusCounts maps status strings to their counts.

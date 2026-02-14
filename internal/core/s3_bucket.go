@@ -36,7 +36,7 @@ func (s *S3BucketService) Create(ctx context.Context, bucket *model.S3Bucket) er
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateS3BucketWorkflow",
-		WorkflowID:   fmt.Sprintf("s3-bucket-%s", bucket.ID),
+		WorkflowID:   workflowID("s3-bucket", bucket.Name, bucket.ID),
 		Arg:          bucket.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateS3BucketWorkflow: %w", err)
@@ -48,10 +48,14 @@ func (s *S3BucketService) Create(ctx context.Context, bucket *model.S3Bucket) er
 func (s *S3BucketService) GetByID(ctx context.Context, id string) (*model.S3Bucket, error) {
 	var b model.S3Bucket
 	err := s.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, shard_id, public, quota_bytes, status, status_message, created_at, updated_at
-		 FROM s3_buckets WHERE id = $1`, id,
+		`SELECT b.id, b.tenant_id, b.name, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.created_at, b.updated_at,
+		        sh.name
+		 FROM s3_buckets b
+		 LEFT JOIN shards sh ON sh.id = b.shard_id
+		 WHERE b.id = $1`, id,
 	).Scan(&b.ID, &b.TenantID, &b.Name, &b.ShardID,
-		&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.CreatedAt, &b.UpdatedAt)
+		&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.CreatedAt, &b.UpdatedAt,
+		&b.ShardName)
 	if err != nil {
 		return nil, fmt.Errorf("get s3 bucket %s: %w", id, err)
 	}
@@ -59,34 +63,34 @@ func (s *S3BucketService) GetByID(ctx context.Context, id string) (*model.S3Buck
 }
 
 func (s *S3BucketService) ListByTenant(ctx context.Context, tenantID string, params request.ListParams) ([]model.S3Bucket, bool, error) {
-	query := `SELECT id, tenant_id, name, shard_id, public, quota_bytes, status, status_message, created_at, updated_at FROM s3_buckets WHERE tenant_id = $1 AND status != 'deleted'`
+	query := `SELECT b.id, b.tenant_id, b.name, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.created_at, b.updated_at, sh.name FROM s3_buckets b LEFT JOIN shards sh ON sh.id = b.shard_id WHERE b.tenant_id = $1 AND b.status != 'deleted'`
 	args := []any{tenantID}
 	argIdx := 2
 
 	if params.Search != "" {
-		query += fmt.Sprintf(` AND name ILIKE $%d`, argIdx)
+		query += fmt.Sprintf(` AND b.name ILIKE $%d`, argIdx)
 		args = append(args, "%"+params.Search+"%")
 		argIdx++
 	}
 	if params.Status != "" {
-		query += fmt.Sprintf(` AND status = $%d`, argIdx)
+		query += fmt.Sprintf(` AND b.status = $%d`, argIdx)
 		args = append(args, params.Status)
 		argIdx++
 	}
 	if params.Cursor != "" {
-		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		query += fmt.Sprintf(` AND b.id > $%d`, argIdx)
 		args = append(args, params.Cursor)
 		argIdx++
 	}
 
-	sortCol := "created_at"
+	sortCol := "b.created_at"
 	switch params.Sort {
 	case "name":
-		sortCol = "name"
+		sortCol = "b.name"
 	case "status":
-		sortCol = "status"
+		sortCol = "b.status"
 	case "created_at":
-		sortCol = "created_at"
+		sortCol = "b.created_at"
 	}
 	order := "DESC"
 	if params.Order == "asc" {
@@ -106,7 +110,8 @@ func (s *S3BucketService) ListByTenant(ctx context.Context, tenantID string, par
 	for rows.Next() {
 		var b model.S3Bucket
 		if err := rows.Scan(&b.ID, &b.TenantID, &b.Name, &b.ShardID,
-			&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.CreatedAt, &b.UpdatedAt); err != nil {
+			&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.CreatedAt, &b.UpdatedAt,
+			&b.ShardName); err != nil {
 			return nil, false, fmt.Errorf("scan s3 bucket: %w", err)
 		}
 		buckets = append(buckets, b)
@@ -142,6 +147,12 @@ func (s *S3BucketService) Update(ctx context.Context, id string, public *bool, q
 		}
 	}
 
+	var name string
+	err := s.db.QueryRow(ctx, "SELECT name FROM s3_buckets WHERE id = $1", id).Scan(&name)
+	if err != nil {
+		return fmt.Errorf("get s3 bucket %s name: %w", id, err)
+	}
+
 	tenantID, err := resolveTenantIDFromS3Bucket(ctx, s.db, id)
 	if err != nil {
 		return fmt.Errorf("update s3 bucket: %w", err)
@@ -149,7 +160,7 @@ func (s *S3BucketService) Update(ctx context.Context, id string, public *bool, q
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateS3BucketWorkflow",
-		WorkflowID:   fmt.Sprintf("s3-bucket-%s", id),
+		WorkflowID:   workflowID("s3-bucket", name, id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("start UpdateS3BucketWorkflow: %w", err)
@@ -159,10 +170,11 @@ func (s *S3BucketService) Update(ctx context.Context, id string, public *bool, q
 }
 
 func (s *S3BucketService) Delete(ctx context.Context, id string) error {
-	_, err := s.db.Exec(ctx,
-		"UPDATE s3_buckets SET status = $1, updated_at = now() WHERE id = $2",
+	var name string
+	err := s.db.QueryRow(ctx,
+		"UPDATE s3_buckets SET status = $1, updated_at = now() WHERE id = $2 RETURNING name",
 		model.StatusDeleting, id,
-	)
+	).Scan(&name)
 	if err != nil {
 		return fmt.Errorf("set s3 bucket %s status to deleting: %w", id, err)
 	}
@@ -174,7 +186,7 @@ func (s *S3BucketService) Delete(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteS3BucketWorkflow",
-		WorkflowID:   fmt.Sprintf("s3-bucket-%s", id),
+		WorkflowID:   workflowID("s3-bucket", name, id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteS3BucketWorkflow: %w", err)
@@ -184,8 +196,8 @@ func (s *S3BucketService) Delete(ctx context.Context, id string) error {
 }
 
 func (s *S3BucketService) Retry(ctx context.Context, id string) error {
-	var status string
-	err := s.db.QueryRow(ctx, "SELECT status FROM s3_buckets WHERE id = $1", id).Scan(&status)
+	var status, name string
+	err := s.db.QueryRow(ctx, "SELECT status, name FROM s3_buckets WHERE id = $1", id).Scan(&status, &name)
 	if err != nil {
 		return fmt.Errorf("get s3 bucket status: %w", err)
 	}
@@ -202,7 +214,7 @@ func (s *S3BucketService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateS3BucketWorkflow",
-		WorkflowID:   fmt.Sprintf("s3-bucket-%s", id),
+		WorkflowID:   workflowID("s3-bucket", name, id),
 		Arg:          id,
 	})
 }

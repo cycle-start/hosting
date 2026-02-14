@@ -36,7 +36,7 @@ func (s *ZoneRecordService) Create(ctx context.Context, record *model.ZoneRecord
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateZoneRecordWorkflow",
-		WorkflowID:   fmt.Sprintf("zone-record-%s", record.ID),
+		WorkflowID:   workflowID("zone-record", record.Name+"/"+record.Type, record.ID),
 		Arg:          record.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateZoneRecordWorkflow: %w", err)
@@ -118,7 +118,7 @@ func (s *ZoneRecordService) Update(ctx context.Context, record *model.ZoneRecord
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateZoneRecordWorkflow",
-		WorkflowID:   fmt.Sprintf("zone-record-%s", record.ID),
+		WorkflowID:   workflowID("zone-record", record.Name+"/"+record.Type, record.ID),
 		Arg:          record.ID,
 	}); err != nil {
 		return fmt.Errorf("start UpdateZoneRecordWorkflow: %w", err)
@@ -128,10 +128,11 @@ func (s *ZoneRecordService) Update(ctx context.Context, record *model.ZoneRecord
 }
 
 func (s *ZoneRecordService) Delete(ctx context.Context, id string) error {
-	_, err := s.db.Exec(ctx,
-		"UPDATE zone_records SET status = $1, updated_at = now() WHERE id = $2",
+	var name string
+	err := s.db.QueryRow(ctx,
+		"UPDATE zone_records SET status = $1, updated_at = now() WHERE id = $2 RETURNING name || '/' || type",
 		model.StatusDeleting, id,
-	)
+	).Scan(&name)
 	if err != nil {
 		return fmt.Errorf("set zone record %s status to deleting: %w", id, err)
 	}
@@ -143,7 +144,7 @@ func (s *ZoneRecordService) Delete(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteZoneRecordWorkflow",
-		WorkflowID:   fmt.Sprintf("zone-record-%s", id),
+		WorkflowID:   workflowID("zone-record", name, id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteZoneRecordWorkflow: %w", err)
@@ -153,8 +154,8 @@ func (s *ZoneRecordService) Delete(ctx context.Context, id string) error {
 }
 
 func (s *ZoneRecordService) Retry(ctx context.Context, id string) error {
-	var status string
-	err := s.db.QueryRow(ctx, "SELECT status FROM zone_records WHERE id = $1", id).Scan(&status)
+	var status, name string
+	err := s.db.QueryRow(ctx, "SELECT status, name || '/' || type FROM zone_records WHERE id = $1", id).Scan(&status, &name)
 	if err != nil {
 		return fmt.Errorf("get zone record status: %w", err)
 	}
@@ -171,7 +172,7 @@ func (s *ZoneRecordService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateZoneRecordWorkflow",
-		WorkflowID:   fmt.Sprintf("zone-record-%s", id),
+		WorkflowID:   workflowID("zone-record", name, id),
 		Arg:          id,
 	})
 }

@@ -25,7 +25,7 @@ import {
 import type { S3AccessKey } from '@/lib/types'
 
 export function S3BucketDetailPage() {
-  const { id: tenantId, bucketId } = useParams({ from: '/tenants/$id/s3-buckets/$bucketId' as never })
+  const { id: tenantId, bucketId } = useParams({ from: '/auth/tenants/$id/s3-buckets/$bucketId' as never })
 
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<S3AccessKey | null>(null)
@@ -95,13 +95,13 @@ export function S3BucketDetailPage() {
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
         { label: tenantId, href: `/tenants/${tenantId}` },
-        { label: 'S3 Buckets' },
+        { label: 'S3 Buckets', href: `/tenants/${tenantId}`, hash: 's3' },
         { label: bucket.name },
       ]} />
 
       <ResourceHeader
         title={bucket.name}
-        subtitle={`Shard: ${bucket.shard_id || '-'} | Quota: ${formatQuota(bucket.quota_bytes)}`}
+        subtitle={`Shard: ${bucket.shard_name || bucket.shard_id || '-'} | Quota: ${formatQuota(bucket.quota_bytes)}`}
         status={bucket.status}
       />
 

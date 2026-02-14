@@ -18,7 +18,7 @@ import { formatDate } from '@/lib/utils'
 import { useBrand, useUpdateBrand, useDeleteBrand, useBrandClusters, useSetBrandClusters, useRegions, useClusters } from '@/lib/hooks'
 
 export function BrandDetailPage() {
-  const { id } = useParams({ strict: false }) as { id: string }
+  const { id } = useParams({ from: '/auth/brands/$id' as never })
   const navigate = useNavigate()
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [editing, setEditing] = useState(false)

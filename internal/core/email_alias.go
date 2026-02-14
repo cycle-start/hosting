@@ -34,7 +34,7 @@ func (s *EmailAliasService) Create(ctx context.Context, a *model.EmailAlias) err
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateEmailAliasWorkflow",
-		WorkflowID:   fmt.Sprintf("email-alias-%s", a.ID),
+		WorkflowID:   workflowID("email-alias", a.Address, a.ID),
 		Arg:          a.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateEmailAliasWorkflow: %w", err)
@@ -96,10 +96,11 @@ func (s *EmailAliasService) ListByAccountID(ctx context.Context, accountID strin
 }
 
 func (s *EmailAliasService) Delete(ctx context.Context, id string) error {
-	_, err := s.db.Exec(ctx,
-		"UPDATE email_aliases SET status = $1, updated_at = now() WHERE id = $2",
+	var address string
+	err := s.db.QueryRow(ctx,
+		"UPDATE email_aliases SET status = $1, updated_at = now() WHERE id = $2 RETURNING address",
 		model.StatusDeleting, id,
-	)
+	).Scan(&address)
 	if err != nil {
 		return fmt.Errorf("set email alias %s status to deleting: %w", id, err)
 	}
@@ -111,7 +112,7 @@ func (s *EmailAliasService) Delete(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteEmailAliasWorkflow",
-		WorkflowID:   fmt.Sprintf("email-alias-%s", id),
+		WorkflowID:   workflowID("email-alias", address, id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteEmailAliasWorkflow: %w", err)
@@ -121,8 +122,8 @@ func (s *EmailAliasService) Delete(ctx context.Context, id string) error {
 }
 
 func (s *EmailAliasService) Retry(ctx context.Context, id string) error {
-	var status string
-	err := s.db.QueryRow(ctx, "SELECT status FROM email_aliases WHERE id = $1", id).Scan(&status)
+	var status, address string
+	err := s.db.QueryRow(ctx, "SELECT status, address FROM email_aliases WHERE id = $1", id).Scan(&status, &address)
 	if err != nil {
 		return fmt.Errorf("get email alias status: %w", err)
 	}
@@ -139,7 +140,7 @@ func (s *EmailAliasService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateEmailAliasWorkflow",
-		WorkflowID:   fmt.Sprintf("email-alias-%s", id),
+		WorkflowID:   workflowID("email-alias", address, id),
 		Arg:          id,
 	})
 }

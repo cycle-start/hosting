@@ -1,0 +1,43 @@
+# Packer golden images (27 GB+)
+packer/output/
+
+# Terraform state and providers
+terraform/.terraform/
+terraform/terraform.tfstate*
+
+# Built binaries
+bin/
+
+# Admin UI build artifacts (rebuilt in Docker)
+web/admin/node_modules/
+web/admin/dist/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Claude Code
+.claude/
+
+# Environment files
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+
+# Certificates
+certs/
+
+# Test artifacts
+coverage.out
+*.prof
+
+# Clusters (generated)
+clusters/

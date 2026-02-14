@@ -13,4 +13,5 @@ type S3Bucket struct {
 	StatusMessage *string `json:"status_message,omitempty" db:"status_message"`
 	CreatedAt  time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at" db:"updated_at"`
+	ShardName  *string   `json:"shard_name,omitempty" db:"-"`
 }

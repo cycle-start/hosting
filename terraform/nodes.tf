@@ -287,6 +287,7 @@ resource "libvirt_cloudinit_disk" "dbadmin_node" {
     ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
     region_id        = var.region_id
     cluster_id       = var.cluster_id
+    base_domain      = var.base_domain
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.dbadmin_nodes[count.index].ip

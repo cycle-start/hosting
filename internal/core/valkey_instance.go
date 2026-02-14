@@ -52,7 +52,7 @@ func (s *ValkeyInstanceService) Create(ctx context.Context, instance *model.Valk
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateValkeyInstanceWorkflow",
-		WorkflowID:   fmt.Sprintf("valkey-instance-%s", instance.ID),
+		WorkflowID:   workflowID("valkey-instance", instance.Name, instance.ID),
 		Arg:          instance.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateValkeyInstanceWorkflow: %w", err)
@@ -64,10 +64,14 @@ func (s *ValkeyInstanceService) Create(ctx context.Context, instance *model.Valk
 func (s *ValkeyInstanceService) GetByID(ctx context.Context, id string) (*model.ValkeyInstance, error) {
 	var v model.ValkeyInstance
 	err := s.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, status_message, created_at, updated_at
-		 FROM valkey_instances WHERE id = $1`, id,
+		`SELECT vi.id, vi.tenant_id, vi.name, vi.shard_id, vi.port, vi.max_memory_mb, vi.password, vi.status, vi.status_message, vi.created_at, vi.updated_at,
+		        s.name
+		 FROM valkey_instances vi
+		 LEFT JOIN shards s ON s.id = vi.shard_id
+		 WHERE vi.id = $1`, id,
 	).Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB,
-		&v.Password, &v.Status, &v.StatusMessage, &v.CreatedAt, &v.UpdatedAt)
+		&v.Password, &v.Status, &v.StatusMessage, &v.CreatedAt, &v.UpdatedAt,
+		&v.ShardName)
 	if err != nil {
 		return nil, fmt.Errorf("get valkey instance %s: %w", id, err)
 	}
@@ -75,17 +79,17 @@ func (s *ValkeyInstanceService) GetByID(ctx context.Context, id string) (*model.
 }
 
 func (s *ValkeyInstanceService) ListByTenant(ctx context.Context, tenantID string, limit int, cursor string) ([]model.ValkeyInstance, bool, error) {
-	query := `SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, status_message, created_at, updated_at FROM valkey_instances WHERE tenant_id = $1`
+	query := `SELECT vi.id, vi.tenant_id, vi.name, vi.shard_id, vi.port, vi.max_memory_mb, vi.password, vi.status, vi.status_message, vi.created_at, vi.updated_at, s.name FROM valkey_instances vi LEFT JOIN shards s ON s.id = vi.shard_id WHERE vi.tenant_id = $1`
 	args := []any{tenantID}
 	argIdx := 2
 
 	if cursor != "" {
-		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		query += fmt.Sprintf(` AND vi.id > $%d`, argIdx)
 		args = append(args, cursor)
 		argIdx++
 	}
 
-	query += ` ORDER BY id`
+	query += ` ORDER BY vi.id`
 	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
 	args = append(args, limit+1)
 
@@ -99,7 +103,8 @@ func (s *ValkeyInstanceService) ListByTenant(ctx context.Context, tenantID strin
 	for rows.Next() {
 		var v model.ValkeyInstance
 		if err := rows.Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB,
-			&v.Password, &v.Status, &v.StatusMessage, &v.CreatedAt, &v.UpdatedAt); err != nil {
+			&v.Password, &v.Status, &v.StatusMessage, &v.CreatedAt, &v.UpdatedAt,
+			&v.ShardName); err != nil {
 			return nil, false, fmt.Errorf("scan valkey instance: %w", err)
 		}
 		instances = append(instances, v)
@@ -116,10 +121,11 @@ func (s *ValkeyInstanceService) ListByTenant(ctx context.Context, tenantID strin
 }
 
 func (s *ValkeyInstanceService) Delete(ctx context.Context, id string) error {
-	_, err := s.db.Exec(ctx,
-		"UPDATE valkey_instances SET status = $1, updated_at = now() WHERE id = $2",
+	var name string
+	err := s.db.QueryRow(ctx,
+		"UPDATE valkey_instances SET status = $1, updated_at = now() WHERE id = $2 RETURNING name",
 		model.StatusDeleting, id,
-	)
+	).Scan(&name)
 	if err != nil {
 		return fmt.Errorf("set valkey instance %s status to deleting: %w", id, err)
 	}
@@ -131,7 +137,7 @@ func (s *ValkeyInstanceService) Delete(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteValkeyInstanceWorkflow",
-		WorkflowID:   fmt.Sprintf("valkey-instance-%s", id),
+		WorkflowID:   workflowID("valkey-instance", name, id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteValkeyInstanceWorkflow: %w", err)
@@ -141,10 +147,11 @@ func (s *ValkeyInstanceService) Delete(ctx context.Context, id string) error {
 }
 
 func (s *ValkeyInstanceService) Migrate(ctx context.Context, id string, targetShardID string) error {
-	_, err := s.db.Exec(ctx,
-		"UPDATE valkey_instances SET status = $1, updated_at = now() WHERE id = $2",
+	var name string
+	err := s.db.QueryRow(ctx,
+		"UPDATE valkey_instances SET status = $1, updated_at = now() WHERE id = $2 RETURNING name",
 		model.StatusProvisioning, id,
-	)
+	).Scan(&name)
 	if err != nil {
 		return fmt.Errorf("set valkey instance %s status to provisioning: %w", id, err)
 	}
@@ -156,7 +163,7 @@ func (s *ValkeyInstanceService) Migrate(ctx context.Context, id string, targetSh
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "MigrateValkeyInstanceWorkflow",
-		WorkflowID:   fmt.Sprintf("migrate-valkey-instance-%s", id),
+		WorkflowID:   workflowID("migrate-valkey-instance", name, id),
 		Arg: MigrateValkeyInstanceParams{
 			InstanceID:    id,
 			TargetShardID: targetShardID,
@@ -180,8 +187,8 @@ func (s *ValkeyInstanceService) ReassignTenant(ctx context.Context, id string, t
 }
 
 func (s *ValkeyInstanceService) Retry(ctx context.Context, id string) error {
-	var status string
-	err := s.db.QueryRow(ctx, "SELECT status FROM valkey_instances WHERE id = $1", id).Scan(&status)
+	var status, name string
+	err := s.db.QueryRow(ctx, "SELECT status, name FROM valkey_instances WHERE id = $1", id).Scan(&status, &name)
 	if err != nil {
 		return fmt.Errorf("get valkey instance status: %w", err)
 	}
@@ -198,7 +205,7 @@ func (s *ValkeyInstanceService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateValkeyInstanceWorkflow",
-		WorkflowID:   fmt.Sprintf("valkey-instance-%s", id),
+		WorkflowID:   workflowID("valkey-instance", name, id),
 		Arg:          id,
 	})
 }

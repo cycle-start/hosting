@@ -26,7 +26,7 @@ import type { ValkeyUser } from '@/lib/types'
 const allPrivileges = ['allcommands', 'allkeys', 'read', 'write', 'pubsub', 'admin']
 
 export function ValkeyDetailPage() {
-  const { id: tenantId, instanceId } = useParams({ from: '/tenants/$id/valkey/$instanceId' as never })
+  const { id: tenantId, instanceId } = useParams({ from: '/auth/tenants/$id/valkey/$instanceId' as never })
 
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<ValkeyUser | null>(null)
@@ -143,7 +143,7 @@ export function ValkeyDetailPage() {
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
         { label: tenantId, href: `/tenants/${tenantId}` },
-        { label: 'Valkey' },
+        { label: 'Valkey', href: `/tenants/${tenantId}`, hash: 'valkey' },
         { label: instance.name },
       ]} />
 

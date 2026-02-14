@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
 	"github.com/edvin/hosting/internal/agent/runtime"
@@ -36,7 +35,7 @@ type Server struct {
 	runtimes map[string]runtime.Manager
 
 	// ShardID is the shard this node belongs to, resolved at startup from the core DB.
-	ShardID *uuid.UUID
+	ShardID string
 }
 
 // NewServer creates a new node agent server.

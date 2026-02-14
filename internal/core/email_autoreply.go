@@ -54,7 +54,7 @@ func (s *EmailAutoReplyService) Upsert(ctx context.Context, ar *model.EmailAutoR
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateEmailAutoReplyWorkflow",
-		WorkflowID:   fmt.Sprintf("email-autoreply-%s", actualID),
+		WorkflowID:   workflowID("email-autoreply", ar.Subject, actualID),
 		Arg:          actualID,
 	}); err != nil {
 		return fmt.Errorf("start UpdateEmailAutoReplyWorkflow: %w", err)
@@ -76,10 +76,10 @@ func (s *EmailAutoReplyService) GetByAccountID(ctx context.Context, accountID st
 }
 
 func (s *EmailAutoReplyService) Delete(ctx context.Context, accountID string) error {
-	var id string
+	var id, subject string
 	err := s.db.QueryRow(ctx,
-		`SELECT id FROM email_autoreplies WHERE email_account_id = $1`, accountID,
-	).Scan(&id)
+		`SELECT id, subject FROM email_autoreplies WHERE email_account_id = $1`, accountID,
+	).Scan(&id, &subject)
 	if err != nil {
 		return fmt.Errorf("find email autoreply for account %s: %w", accountID, err)
 	}
@@ -99,7 +99,7 @@ func (s *EmailAutoReplyService) Delete(ctx context.Context, accountID string) er
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteEmailAutoReplyWorkflow",
-		WorkflowID:   fmt.Sprintf("email-autoreply-%s", id),
+		WorkflowID:   workflowID("email-autoreply", subject, id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteEmailAutoReplyWorkflow: %w", err)
@@ -109,8 +109,8 @@ func (s *EmailAutoReplyService) Delete(ctx context.Context, accountID string) er
 }
 
 func (s *EmailAutoReplyService) Retry(ctx context.Context, id string) error {
-	var status, accountID string
-	err := s.db.QueryRow(ctx, "SELECT status, email_account_id FROM email_autoreplies WHERE id = $1", id).Scan(&status, &accountID)
+	var status, accountID, subject string
+	err := s.db.QueryRow(ctx, "SELECT status, email_account_id, subject FROM email_autoreplies WHERE id = $1", id).Scan(&status, &accountID, &subject)
 	if err != nil {
 		return fmt.Errorf("get email autoreply status: %w", err)
 	}
@@ -127,7 +127,7 @@ func (s *EmailAutoReplyService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateEmailAutoReplyWorkflow",
-		WorkflowID:   fmt.Sprintf("email-autoreply-%s", id),
+		WorkflowID:   workflowID("email-autoreply", subject, id),
 		Arg:          id,
 	})
 }

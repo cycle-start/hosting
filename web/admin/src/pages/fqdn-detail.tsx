@@ -25,9 +25,16 @@ import {
 } from '@/lib/hooks'
 import type { Certificate, EmailAccount } from '@/lib/types'
 
+const fqdnTabs = ['certificates', 'email']
+function getFQDNTabFromHash() {
+  const hash = window.location.hash.slice(1)
+  return fqdnTabs.includes(hash) ? hash : 'certificates'
+}
+
 export function FQDNDetailPage() {
-  const { id: tenantId, fqdnId } = useParams({ from: '/tenants/$id/fqdns/$fqdnId' as never })
+  const { id: tenantId, fqdnId } = useParams({ from: '/auth/tenants/$id/fqdns/$fqdnId' as never })
   const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState(getFQDNTabFromHash)
 
   const [uploadCertOpen, setUploadCertOpen] = useState(false)
   const [createEmailOpen, setCreateEmailOpen] = useState(false)
@@ -126,7 +133,7 @@ export function FQDNDetailPage() {
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
         { label: tenantId, href: `/tenants/${tenantId}` },
-        { label: 'FQDNs' },
+        { label: 'FQDNs', href: `/tenants/${tenantId}`, hash: 'webroots' },
         { label: fqdn.fqdn },
       ]} />
 
@@ -142,7 +149,7 @@ export function FQDNDetailPage() {
         <span className="ml-4">Created: {formatDate(fqdn.created_at)}</span>
       </div>
 
-      <Tabs defaultValue="certificates">
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); window.history.replaceState(null, '', `#${v}`) }}>
         <TabsList>
           <TabsTrigger value="certificates">Certificates ({certsData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="email">Email Accounts ({emailsData?.items?.length ?? 0})</TabsTrigger>

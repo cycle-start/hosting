@@ -35,7 +35,7 @@ func (s *DatabaseUserService) Create(ctx context.Context, user *model.DatabaseUs
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateDatabaseUserWorkflow",
-		WorkflowID:   fmt.Sprintf("database-user-%s", user.ID),
+		WorkflowID:   workflowID("database-user", user.Username, user.ID),
 		Arg:          user.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateDatabaseUserWorkflow: %w", err)
@@ -115,7 +115,7 @@ func (s *DatabaseUserService) Update(ctx context.Context, user *model.DatabaseUs
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateDatabaseUserWorkflow",
-		WorkflowID:   fmt.Sprintf("database-user-%s", user.ID),
+		WorkflowID:   workflowID("database-user", user.Username, user.ID),
 		Arg:          user.ID,
 	}); err != nil {
 		return fmt.Errorf("start UpdateDatabaseUserWorkflow: %w", err)
@@ -125,10 +125,11 @@ func (s *DatabaseUserService) Update(ctx context.Context, user *model.DatabaseUs
 }
 
 func (s *DatabaseUserService) Delete(ctx context.Context, id string) error {
-	_, err := s.db.Exec(ctx,
-		"UPDATE database_users SET status = $1, updated_at = now() WHERE id = $2",
+	var username string
+	err := s.db.QueryRow(ctx,
+		"UPDATE database_users SET status = $1, updated_at = now() WHERE id = $2 RETURNING username",
 		model.StatusDeleting, id,
-	)
+	).Scan(&username)
 	if err != nil {
 		return fmt.Errorf("set database user %s status to deleting: %w", id, err)
 	}
@@ -140,7 +141,7 @@ func (s *DatabaseUserService) Delete(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteDatabaseUserWorkflow",
-		WorkflowID:   fmt.Sprintf("database-user-%s", id),
+		WorkflowID:   workflowID("database-user", username, id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteDatabaseUserWorkflow: %w", err)
@@ -150,8 +151,8 @@ func (s *DatabaseUserService) Delete(ctx context.Context, id string) error {
 }
 
 func (s *DatabaseUserService) Retry(ctx context.Context, id string) error {
-	var status string
-	err := s.db.QueryRow(ctx, "SELECT status FROM database_users WHERE id = $1", id).Scan(&status)
+	var status, username string
+	err := s.db.QueryRow(ctx, "SELECT status, username FROM database_users WHERE id = $1", id).Scan(&status, &username)
 	if err != nil {
 		return fmt.Errorf("get database user status: %w", err)
 	}
@@ -168,7 +169,7 @@ func (s *DatabaseUserService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateDatabaseUserWorkflow",
-		WorkflowID:   fmt.Sprintf("database-user-%s", id),
+		WorkflowID:   workflowID("database-user", username, id),
 		Arg:          id,
 	})
 }

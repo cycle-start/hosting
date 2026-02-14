@@ -212,7 +212,11 @@ func TestS3AccessKeyService_Delete_Success(t *testing.T) {
 
 	keyID := "test-key-1"
 
-	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+	updateRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "AKIAIOSFODNN7EXAMPLE"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 
 	// Mock the join query for resolveTenantIDFromS3AccessKey
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
@@ -220,7 +224,7 @@ func TestS3AccessKeyService_Delete_Success(t *testing.T) {
 		*(dest[0].(**string)) = &tid
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -239,7 +243,10 @@ func TestS3AccessKeyService_Delete_DBError(t *testing.T) {
 	svc := NewS3AccessKeyService(db, tc)
 	ctx := context.Background()
 
-	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
+	errorRow := &mockRow{scanFunc: func(dest ...any) error {
+		return errors.New("db error")
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(errorRow)
 
 	err := svc.Delete(ctx, "test-key-1")
 	require.Error(t, err)

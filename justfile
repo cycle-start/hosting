@@ -1,4 +1,5 @@
 # Hosting Platform - Development Commands
+set dotenv-load
 
 # Control plane VM IP (k3s). Change if using a different Terraform controlplane_ip.
 cp := "10.10.10.2"
@@ -185,8 +186,8 @@ vm-deploy:
       ssh -o StrictHostKeyChecking=no ubuntu@{{cp}} "sudo k3s ctr images import -"
     # Apply infra manifests (includes Traefik config and Ingress)
     kubectl --context hosting apply -f deploy/k3s/
-    # Create self-signed SSL cert for Traefik (replace with `just ssl-init` for trusted certs)
-    just _ssl-self-signed
+    # Deploy SSL certs (mkcert if available, otherwise self-signed)
+    just _ssl-deploy
     # Create Grafana dashboards ConfigMap
     kubectl --context hosting delete configmap grafana-dashboards --ignore-not-found
     kubectl --context hosting create configmap grafana-dashboards \
@@ -247,21 +248,33 @@ ssl-init:
     rm /tmp/hosting-cert.pem /tmp/hosting-key.pem /tmp/hosting.pem
     @echo "Trusted SSL certs installed on Traefik, LB VM, and DB Admin VM. Visit https://admin.hosting.test"
 
-# Generate self-signed SSL cert (used by vm-deploy, no browser trust)
-_ssl-self-signed:
-    openssl req -x509 -newkey rsa:2048 \
-      -keyout /tmp/hosting-key.pem -out /tmp/hosting-cert.pem \
-      -days 365 -nodes -subj '/CN=*.hosting.test' \
-      -addext 'subjectAltName=DNS:*.hosting.test,DNS:hosting.test' 2>/dev/null
+# Deploy SSL certs: uses mkcert (trusted) if available, otherwise self-signed
+_ssl-deploy:
+    #!/usr/bin/env bash
+    set -e
+    if command -v mkcert &>/dev/null; then
+      echo "Using mkcert for trusted SSL certs..."
+      mkcert -cert-file /tmp/hosting-cert.pem -key-file /tmp/hosting-key.pem "*.hosting.test" "hosting.test"
+    else
+      echo "mkcert not found, using self-signed certs (browsers will show warnings)..."
+      openssl req -x509 -newkey rsa:2048 \
+        -keyout /tmp/hosting-key.pem -out /tmp/hosting-cert.pem \
+        -days 365 -nodes -subj '/CN=*.hosting.test' \
+        -addext 'subjectAltName=DNS:*.hosting.test,DNS:hosting.test' 2>/dev/null
+    fi
     # Deploy to Traefik (k3s)
     kubectl --context hosting -n kube-system create secret tls traefik-default-cert \
       --cert=/tmp/hosting-cert.pem --key=/tmp/hosting-key.pem \
       --dry-run=client -o yaml | kubectl --context hosting -n kube-system apply -f -
-    # Deploy to LB VM HAProxy
+    # Deploy to LB VM HAProxy (skip if not reachable)
     cat /tmp/hosting-cert.pem /tmp/hosting-key.pem > /tmp/hosting.pem
-    scp -o StrictHostKeyChecking=no /tmp/hosting.pem ubuntu@{{lb}}:/tmp/hosting.pem
-    ssh -o StrictHostKeyChecking=no ubuntu@{{lb}} "sudo cp /tmp/hosting.pem /etc/haproxy/certs/hosting.pem && sudo systemctl reload haproxy" || true
-    rm /tmp/hosting-cert.pem /tmp/hosting-key.pem /tmp/hosting.pem
+    scp -o StrictHostKeyChecking=no -o ConnectTimeout=3 /tmp/hosting.pem ubuntu@{{lb}}:/tmp/hosting.pem && \
+      ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 ubuntu@{{lb}} "sudo cp /tmp/hosting.pem /etc/haproxy/certs/hosting.pem && sudo systemctl reload haproxy" || true
+    # Deploy to DB Admin VM nginx (skip if not reachable)
+    scp -o StrictHostKeyChecking=no -o ConnectTimeout=3 /tmp/hosting-cert.pem ubuntu@10.10.10.60:/tmp/dbadmin.pem && \
+      scp -o StrictHostKeyChecking=no -o ConnectTimeout=3 /tmp/hosting-key.pem ubuntu@10.10.10.60:/tmp/dbadmin-key.pem && \
+      ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 ubuntu@10.10.10.60 "sudo mkdir -p /etc/nginx/certs && sudo cp /tmp/dbadmin.pem /etc/nginx/certs/dbadmin.pem && sudo cp /tmp/dbadmin-key.pem /etc/nginx/certs/dbadmin-key.pem && sudo systemctl reload nginx" || true
+    rm -f /tmp/hosting-cert.pem /tmp/hosting-key.pem /tmp/hosting.pem
 
 # --- Networking ---
 

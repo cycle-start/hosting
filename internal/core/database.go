@@ -36,7 +36,7 @@ func (s *DatabaseService) Create(ctx context.Context, database *model.Database) 
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateDatabaseWorkflow",
-		WorkflowID:   fmt.Sprintf("database-%s", database.ID),
+		WorkflowID:   workflowID("database", database.Name, database.ID),
 		Arg:          database.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateDatabaseWorkflow: %w", err)
@@ -48,10 +48,14 @@ func (s *DatabaseService) Create(ctx context.Context, database *model.Database) 
 func (s *DatabaseService) GetByID(ctx context.Context, id string) (*model.Database, error) {
 	var d model.Database
 	err := s.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, shard_id, node_id, status, status_message, created_at, updated_at
-		 FROM databases WHERE id = $1`, id,
+		`SELECT d.id, d.tenant_id, d.name, d.shard_id, d.node_id, d.status, d.status_message, d.created_at, d.updated_at,
+		        s.name
+		 FROM databases d
+		 LEFT JOIN shards s ON s.id = d.shard_id
+		 WHERE d.id = $1`, id,
 	).Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID,
-		&d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt)
+		&d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt,
+		&d.ShardName)
 	if err != nil {
 		return nil, fmt.Errorf("get database %s: %w", id, err)
 	}
@@ -59,34 +63,34 @@ func (s *DatabaseService) GetByID(ctx context.Context, id string) (*model.Databa
 }
 
 func (s *DatabaseService) ListByTenant(ctx context.Context, tenantID string, params request.ListParams) ([]model.Database, bool, error) {
-	query := `SELECT id, tenant_id, name, shard_id, node_id, status, status_message, created_at, updated_at FROM databases WHERE tenant_id = $1 AND status != 'deleted'`
+	query := `SELECT d.id, d.tenant_id, d.name, d.shard_id, d.node_id, d.status, d.status_message, d.created_at, d.updated_at, s.name FROM databases d LEFT JOIN shards s ON s.id = d.shard_id WHERE d.tenant_id = $1 AND d.status != 'deleted'`
 	args := []any{tenantID}
 	argIdx := 2
 
 	if params.Search != "" {
-		query += fmt.Sprintf(` AND name ILIKE $%d`, argIdx)
+		query += fmt.Sprintf(` AND d.name ILIKE $%d`, argIdx)
 		args = append(args, "%"+params.Search+"%")
 		argIdx++
 	}
 	if params.Status != "" {
-		query += fmt.Sprintf(` AND status = $%d`, argIdx)
+		query += fmt.Sprintf(` AND d.status = $%d`, argIdx)
 		args = append(args, params.Status)
 		argIdx++
 	}
 	if params.Cursor != "" {
-		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		query += fmt.Sprintf(` AND d.id > $%d`, argIdx)
 		args = append(args, params.Cursor)
 		argIdx++
 	}
 
-	sortCol := "created_at"
+	sortCol := "d.created_at"
 	switch params.Sort {
 	case "name":
-		sortCol = "name"
+		sortCol = "d.name"
 	case "status":
-		sortCol = "status"
+		sortCol = "d.status"
 	case "created_at":
-		sortCol = "created_at"
+		sortCol = "d.created_at"
 	}
 	order := "DESC"
 	if params.Order == "asc" {
@@ -106,7 +110,8 @@ func (s *DatabaseService) ListByTenant(ctx context.Context, tenantID string, par
 	for rows.Next() {
 		var d model.Database
 		if err := rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID,
-			&d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt); err != nil {
+			&d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt,
+			&d.ShardName); err != nil {
 			return nil, false, fmt.Errorf("scan database: %w", err)
 		}
 		databases = append(databases, d)
@@ -123,17 +128,17 @@ func (s *DatabaseService) ListByTenant(ctx context.Context, tenantID string, par
 }
 
 func (s *DatabaseService) ListByShard(ctx context.Context, shardID string, limit int, cursor string) ([]model.Database, bool, error) {
-	query := `SELECT id, tenant_id, name, shard_id, node_id, status, status_message, created_at, updated_at FROM databases WHERE shard_id = $1`
+	query := `SELECT d.id, d.tenant_id, d.name, d.shard_id, d.node_id, d.status, d.status_message, d.created_at, d.updated_at, s.name FROM databases d LEFT JOIN shards s ON s.id = d.shard_id WHERE d.shard_id = $1`
 	args := []any{shardID}
 	argIdx := 2
 
 	if cursor != "" {
-		query += fmt.Sprintf(` AND id > $%d`, argIdx)
+		query += fmt.Sprintf(` AND d.id > $%d`, argIdx)
 		args = append(args, cursor)
 		argIdx++
 	}
 
-	query += ` ORDER BY id`
+	query += ` ORDER BY d.id`
 	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
 	args = append(args, limit+1)
 
@@ -147,7 +152,8 @@ func (s *DatabaseService) ListByShard(ctx context.Context, shardID string, limit
 	for rows.Next() {
 		var d model.Database
 		if err := rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID,
-			&d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt); err != nil {
+			&d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt,
+			&d.ShardName); err != nil {
 			return nil, false, fmt.Errorf("scan database: %w", err)
 		}
 		databases = append(databases, d)
@@ -164,10 +170,11 @@ func (s *DatabaseService) ListByShard(ctx context.Context, shardID string, limit
 }
 
 func (s *DatabaseService) Delete(ctx context.Context, id string) error {
-	_, err := s.db.Exec(ctx,
-		"UPDATE databases SET status = $1, updated_at = now() WHERE id = $2",
+	var name string
+	err := s.db.QueryRow(ctx,
+		"UPDATE databases SET status = $1, updated_at = now() WHERE id = $2 RETURNING name",
 		model.StatusDeleting, id,
-	)
+	).Scan(&name)
 	if err != nil {
 		return fmt.Errorf("set database %s status to deleting: %w", id, err)
 	}
@@ -179,7 +186,7 @@ func (s *DatabaseService) Delete(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteDatabaseWorkflow",
-		WorkflowID:   fmt.Sprintf("database-%s", id),
+		WorkflowID:   workflowID("database", name, id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteDatabaseWorkflow: %w", err)
@@ -189,10 +196,11 @@ func (s *DatabaseService) Delete(ctx context.Context, id string) error {
 }
 
 func (s *DatabaseService) Migrate(ctx context.Context, id string, targetShardID string) error {
-	_, err := s.db.Exec(ctx,
-		"UPDATE databases SET status = $1, updated_at = now() WHERE id = $2",
+	var name string
+	err := s.db.QueryRow(ctx,
+		"UPDATE databases SET status = $1, updated_at = now() WHERE id = $2 RETURNING name",
 		model.StatusProvisioning, id,
-	)
+	).Scan(&name)
 	if err != nil {
 		return fmt.Errorf("set database %s status to provisioning: %w", id, err)
 	}
@@ -204,7 +212,7 @@ func (s *DatabaseService) Migrate(ctx context.Context, id string, targetShardID 
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "MigrateDatabaseWorkflow",
-		WorkflowID:   fmt.Sprintf("migrate-database-%s", id),
+		WorkflowID:   workflowID("migrate-database", name, id),
 		Arg: MigrateDatabaseParams{
 			DatabaseID:    id,
 			TargetShardID: targetShardID,
@@ -234,8 +242,8 @@ func (s *DatabaseService) ReassignTenant(ctx context.Context, id string, tenantI
 }
 
 func (s *DatabaseService) Retry(ctx context.Context, id string) error {
-	var status string
-	err := s.db.QueryRow(ctx, "SELECT status FROM databases WHERE id = $1", id).Scan(&status)
+	var status, name string
+	err := s.db.QueryRow(ctx, "SELECT status, name FROM databases WHERE id = $1", id).Scan(&status, &name)
 	if err != nil {
 		return fmt.Errorf("get database status: %w", err)
 	}
@@ -252,7 +260,7 @@ func (s *DatabaseService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateDatabaseWorkflow",
-		WorkflowID:   fmt.Sprintf("database-%s", id),
+		WorkflowID:   workflowID("database", name, id),
 		Arg:          id,
 	})
 }

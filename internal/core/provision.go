@@ -10,6 +10,21 @@ import (
 
 const taskQueue = "hosting-tasks"
 
+// workflowID builds a human-readable Temporal workflow ID from a resource type
+// prefix, a human-readable name, and the resource's unique ID.
+// Example: workflowID("database", "mydb", "917090fc-ab8e-4943-bc5d-4fb511551e5d")
+// returns "database-mydb-917090fc".
+func workflowID(prefix, name, id string) string {
+	short := id
+	if len(id) > 8 {
+		short = id[:8]
+	}
+	if name == "" {
+		return fmt.Sprintf("%s-%s", prefix, short)
+	}
+	return fmt.Sprintf("%s-%s-%s", prefix, name, short)
+}
+
 // signalProvision enqueues a provisioning task into the per-tenant
 // orchestrator workflow. If the workflow is not running, it is started
 // automatically via SignalWithStartWorkflow.

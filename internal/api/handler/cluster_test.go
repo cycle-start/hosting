@@ -36,7 +36,6 @@ func TestClusterCreate_EmptyRegionID(t *testing.T) {
 	h := newClusterHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/regions//clusters", map[string]any{
-		"id":   "osl-1",
 		"name": "cluster-01",
 	})
 	r = withChiURLParam(r, "regionID", "")
@@ -85,26 +84,10 @@ func TestClusterCreate_MissingRequiredFields(t *testing.T) {
 	assert.Contains(t, body["error"], "validation error")
 }
 
-func TestClusterCreate_MissingID(t *testing.T) {
-	h := newClusterHandler()
-	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/regions/"+validID+"/clusters", map[string]any{
-		"name": "cluster-01",
-	})
-	r = withChiURLParam(r, "regionID", validID)
-
-	h.Create(rec, r)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	body := decodeErrorResponse(rec)
-	assert.Contains(t, body["error"], "validation error")
-}
-
 func TestClusterCreate_MissingName(t *testing.T) {
 	h := newClusterHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/regions/"+validID+"/clusters", map[string]any{
-		"id":     "osl-1",
 		"config": map[string]any{"max_nodes": 10},
 	})
 	r = withChiURLParam(r, "regionID", validID)
@@ -114,32 +97,6 @@ func TestClusterCreate_MissingName(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	body := decodeErrorResponse(rec)
 	assert.Contains(t, body["error"], "validation error")
-}
-
-func TestClusterCreate_InvalidSlugID(t *testing.T) {
-	tests := []struct {
-		name string
-		slug string
-	}{
-		{"uppercase", "OSL-1"},
-		{"spaces", "osl 1"},
-		{"special chars", "osl@1"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := newClusterHandler()
-			rec := httptest.NewRecorder()
-			r := newRequest(http.MethodPost, "/regions/"+validID+"/clusters", map[string]any{
-				"id":   tt.slug,
-				"name": "cluster-01",
-			})
-			r = withChiURLParam(r, "regionID", validID)
-
-			h.Create(rec, r)
-
-			assert.Equal(t, http.StatusBadRequest, rec.Code)
-		})
-	}
 }
 
 func TestClusterCreate_InvalidSlugName(t *testing.T) {
@@ -157,7 +114,6 @@ func TestClusterCreate_InvalidSlugName(t *testing.T) {
 			h := newClusterHandler()
 			rec := httptest.NewRecorder()
 			r := newRequest(http.MethodPost, "/regions/"+validID+"/clusters", map[string]any{
-				"id":   "osl-1",
 				"name": tt.slug,
 			})
 			r = withChiURLParam(r, "regionID", validID)
@@ -174,7 +130,6 @@ func TestClusterCreate_ValidBody(t *testing.T) {
 	rec := httptest.NewRecorder()
 	rid := "test-region-1"
 	r := newRequest(http.MethodPost, "/regions/"+rid+"/clusters", map[string]any{
-		"id":   "osl-1",
 		"name": "cluster-01",
 	})
 	r = withChiURLParam(r, "regionID", rid)
@@ -192,7 +147,6 @@ func TestClusterCreate_ValidBodyWithOptionals(t *testing.T) {
 	rec := httptest.NewRecorder()
 	rid := "test-region-2"
 	r := newRequest(http.MethodPost, "/regions/"+rid+"/clusters", map[string]any{
-		"id":     "osl-2",
 		"name":   "cluster-01",
 		"config": map[string]any{"max_nodes": 10},
 		"spec":   map[string]any{"cpu": 4},

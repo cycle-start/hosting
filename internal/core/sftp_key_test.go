@@ -238,12 +238,17 @@ func TestSFTPKeyService_Delete_Success(t *testing.T) {
 	svc := NewSFTPKeyService(db, tc)
 	ctx := context.Background()
 
+	updateRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "my-key"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
+
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "test-tenant-1"
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
-	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -262,7 +267,10 @@ func TestSFTPKeyService_Delete_ExecError(t *testing.T) {
 	svc := NewSFTPKeyService(db, tc)
 	ctx := context.Background()
 
-	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
+	errorRow := &mockRow{scanFunc: func(dest ...any) error {
+		return errors.New("db error")
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(errorRow)
 
 	err := svc.Delete(ctx, "test-key-1")
 	require.Error(t, err)
@@ -276,12 +284,17 @@ func TestSFTPKeyService_Delete_WorkflowError(t *testing.T) {
 	svc := NewSFTPKeyService(db, tc)
 	ctx := context.Background()
 
+	updateRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "my-key"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
+
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "test-tenant-1"
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
-	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Delete(ctx, "test-key-1")

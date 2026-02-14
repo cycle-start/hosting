@@ -110,9 +110,14 @@ func (s *ShardService) Delete(ctx context.Context, id string) error {
 }
 
 func (s *ShardService) Converge(ctx context.Context, shardID string) error {
-	workflowID := fmt.Sprintf("converge-shard-%s", shardID)
+	var shardName string
+	if err := s.db.QueryRow(ctx, "SELECT name FROM shards WHERE id = $1", shardID).Scan(&shardName); err != nil {
+		return fmt.Errorf("get shard name for converge: %w", err)
+	}
+
+	wfID := workflowID("converge-shard", shardName, shardID)
 	_, err := s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
+		ID:        wfID,
 		TaskQueue: "hosting-tasks",
 	}, "ConvergeShardWorkflow", struct {
 		ShardID string `json:"shard_id"`

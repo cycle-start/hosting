@@ -30,6 +30,11 @@ func (s *CertificateService) Upload(ctx context.Context, cert *model.Certificate
 		return fmt.Errorf("insert certificate: %w", err)
 	}
 
+	var fqdnName string
+	if err := s.db.QueryRow(ctx, "SELECT fqdn FROM fqdns WHERE id = $1", cert.FQDNID).Scan(&fqdnName); err != nil {
+		return fmt.Errorf("get fqdn name for certificate: %w", err)
+	}
+
 	tenantID, err := resolveTenantIDFromFQDN(ctx, s.db, cert.FQDNID)
 	if err != nil {
 		return fmt.Errorf("upload certificate: %w", err)
@@ -37,7 +42,7 @@ func (s *CertificateService) Upload(ctx context.Context, cert *model.Certificate
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "UploadCustomCertWorkflow",
-		WorkflowID:   fmt.Sprintf("certificate-%s", cert.ID),
+		WorkflowID:   workflowID("certificate", fqdnName, cert.ID),
 		Arg:          cert.ID,
 	}); err != nil {
 		return fmt.Errorf("start UploadCustomCertWorkflow: %w", err)
@@ -101,8 +106,10 @@ func (s *CertificateService) ListByFQDN(ctx context.Context, fqdnID string, limi
 }
 
 func (s *CertificateService) Retry(ctx context.Context, id string) error {
-	var status, fqdnID string
-	err := s.db.QueryRow(ctx, "SELECT status, fqdn_id FROM certificates WHERE id = $1", id).Scan(&status, &fqdnID)
+	var status, fqdnID, fqdnName string
+	err := s.db.QueryRow(ctx,
+		"SELECT c.status, c.fqdn_id, f.fqdn FROM certificates c JOIN fqdns f ON f.id = c.fqdn_id WHERE c.id = $1", id,
+	).Scan(&status, &fqdnID, &fqdnName)
 	if err != nil {
 		return fmt.Errorf("get certificate status: %w", err)
 	}
@@ -119,7 +126,7 @@ func (s *CertificateService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "UploadCustomCertWorkflow",
-		WorkflowID:   fmt.Sprintf("certificate-%s", id),
+		WorkflowID:   workflowID("certificate", fqdnName, id),
 		Arg:          id,
 	})
 }

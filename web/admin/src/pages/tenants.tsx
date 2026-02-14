@@ -57,8 +57,16 @@ export function TenantsPage() {
         </div>
       ),
     },
-    { accessorKey: 'region_id', header: 'Region' },
-    { accessorKey: 'cluster_id', header: 'Cluster' },
+    {
+      accessorKey: 'region_name',
+      header: 'Region',
+      cell: ({ row }) => row.original.region_name || row.original.region_id,
+    },
+    {
+      accessorKey: 'cluster_name',
+      header: 'Cluster',
+      cell: ({ row }) => row.original.cluster_name || row.original.cluster_id,
+    },
     {
       accessorKey: 'status',
       header: 'Status',

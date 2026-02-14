@@ -17,6 +17,8 @@ write_files:
           "server": {
               "serverPort": 8978,
               "serverName": "CloudBeaver DB Admin",
+              "contentRoot": "web",
+              "driversLocation": "drivers",
               "rootURI": "/",
               "serviceURI": "/api/",
               "expireSessionAfterPeriod": 1800000,
@@ -54,6 +56,9 @@ write_files:
                   "sqlTextPreviewMaxLength": 4096,
                   "sqlBinaryPreviewMaxLength": 261120
               },
+              "enabledAuthProviders": [
+                  "local"
+              ],
               "disabledDrivers": []
           }
       }
@@ -64,18 +69,18 @@ write_files:
       {
           "adminName": "cbadmin",
           "adminPassword": "cbadmin-dev",
-          "schemaName": "",
-          "roles": [
+          "teams": [
               {
-                  "roleId": "admin",
-                  "name": "Admin",
-                  "description": "Administrative access",
+                  "subjectId": "admin",
+                  "teamName": "Admin",
+                  "description": "Administrative access. Has all permissions.",
                   "permissions": ["admin"]
               },
               {
-                  "roleId": "user",
-                  "name": "User",
-                  "description": "Standard user"
+                  "subjectId": "user",
+                  "teamName": "User",
+                  "description": "All users, including anonymous.",
+                  "permissions": []
               }
           ]
       }

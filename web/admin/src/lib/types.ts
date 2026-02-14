@@ -75,6 +75,9 @@ export interface Tenant {
   status_message?: string
   created_at: string
   updated_at: string
+  region_name?: string
+  cluster_name?: string
+  shard_name?: string
 }
 
 export interface Webroot {
@@ -128,6 +131,7 @@ export interface Zone {
   status_message?: string
   created_at: string
   updated_at: string
+  region_name?: string
 }
 
 export interface ZoneRecord {
@@ -156,6 +160,7 @@ export interface Database {
   status_message?: string
   created_at: string
   updated_at: string
+  shard_name?: string
 }
 
 export interface DatabaseUser {
@@ -182,6 +187,7 @@ export interface ValkeyInstance {
   status_message?: string
   created_at: string
   updated_at: string
+  shard_name?: string
 }
 
 export interface ValkeyUser {
@@ -267,6 +273,7 @@ export interface S3Bucket {
   status_message?: string
   created_at: string
   updated_at: string
+  shard_name?: string
 }
 
 export interface S3AccessKey {

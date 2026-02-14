@@ -31,7 +31,7 @@ func (s *BackupService) Create(ctx context.Context, backup *model.Backup) error 
 
 	if err := signalProvision(ctx, s.tc, backup.TenantID, model.ProvisionTask{
 		WorkflowName: "CreateBackupWorkflow",
-		WorkflowID:   fmt.Sprintf("backup-create-%s", backup.ID),
+		WorkflowID:   workflowID("backup-create", backup.Type+"/"+backup.SourceName, backup.ID),
 		Arg:          backup.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateBackupWorkflow: %w", err)
@@ -97,10 +97,11 @@ func (s *BackupService) ListByTenant(ctx context.Context, tenantID string, limit
 }
 
 func (s *BackupService) Delete(ctx context.Context, id string) error {
-	_, err := s.db.Exec(ctx,
-		"UPDATE backups SET status = $1, updated_at = now() WHERE id = $2",
+	var name string
+	err := s.db.QueryRow(ctx,
+		"UPDATE backups SET status = $1, updated_at = now() WHERE id = $2 RETURNING type || '/' || source_name",
 		model.StatusDeleting, id,
-	)
+	).Scan(&name)
 	if err != nil {
 		return fmt.Errorf("set backup %s status to deleting: %w", id, err)
 	}
@@ -112,7 +113,7 @@ func (s *BackupService) Delete(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteBackupWorkflow",
-		WorkflowID:   fmt.Sprintf("backup-delete-%s", id),
+		WorkflowID:   workflowID("backup-delete", name, id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteBackupWorkflow: %w", err)
@@ -133,7 +134,7 @@ func (s *BackupService) Restore(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, backup.TenantID, model.ProvisionTask{
 		WorkflowName: "RestoreBackupWorkflow",
-		WorkflowID:   fmt.Sprintf("backup-restore-%s", id),
+		WorkflowID:   workflowID("backup-restore", backup.Type+"/"+backup.SourceName, id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("start RestoreBackupWorkflow: %w", err)
@@ -143,8 +144,8 @@ func (s *BackupService) Restore(ctx context.Context, id string) error {
 }
 
 func (s *BackupService) Retry(ctx context.Context, id string) error {
-	var status string
-	err := s.db.QueryRow(ctx, "SELECT status FROM backups WHERE id = $1", id).Scan(&status)
+	var status, name string
+	err := s.db.QueryRow(ctx, "SELECT status, type || '/' || source_name FROM backups WHERE id = $1", id).Scan(&status, &name)
 	if err != nil {
 		return fmt.Errorf("get backup status: %w", err)
 	}
@@ -161,7 +162,7 @@ func (s *BackupService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateBackupWorkflow",
-		WorkflowID:   fmt.Sprintf("backup-create-%s", id),
+		WorkflowID:   workflowID("backup-create", name, id),
 		Arg:          id,
 	})
 }

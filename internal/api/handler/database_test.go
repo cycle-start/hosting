@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/edvin/hosting/internal/core"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -323,13 +322,18 @@ func TestDatabaseMigrate_Success(t *testing.T) {
 	svc := core.NewDatabaseService(db, tc)
 	h := &Database{svc: svc, userSvc: nil}
 
+	updateRow := &handlerMockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "mydb"
+		return nil
+	}}
+	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
+
 	resolveRow := &handlerMockRow{scanFunc: func(dest ...any) error {
 		tid := "test-tenant-1"
 		*(dest[0].(**string)) = &tid
 		return nil
 	}}
-	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
-	db.On("Exec", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")

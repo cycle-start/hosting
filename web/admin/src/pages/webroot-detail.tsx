@@ -28,7 +28,7 @@ import type { FQDN } from '@/lib/types'
 const runtimes = ['php', 'node', 'python', 'ruby', 'static']
 
 export function WebrootDetailPage() {
-  const { id: tenantId, webrootId } = useParams({ from: '/tenants/$id/webroots/$webrootId' as never })
+  const { id: tenantId, webrootId } = useParams({ from: '/auth/tenants/$id/webroots/$webrootId' as never })
   const navigate = useNavigate()
 
   const [editOpen, setEditOpen] = useState(false)
@@ -113,7 +113,7 @@ export function WebrootDetailPage() {
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
         { label: tenantId, href: `/tenants/${tenantId}` },
-        { label: 'Webroots' },
+        { label: 'Webroots', href: `/tenants/${tenantId}`, hash: 'webroots' },
         { label: webroot.name },
       ]} />
 

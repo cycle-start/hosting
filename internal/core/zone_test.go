@@ -103,6 +103,7 @@ func TestZoneService_GetByID_Success(t *testing.T) {
 	zoneID := "test-zone-1"
 	tenantID := "test-tenant-1"
 	regionID := "test-region-1"
+	regionName := "Test Region"
 	now := time.Now().Truncate(time.Microsecond)
 
 	row := &mockRow{scanFunc: func(dest ...any) error {
@@ -115,6 +116,7 @@ func TestZoneService_GetByID_Success(t *testing.T) {
 		*(dest[6].(**string)) = nil // status_message
 		*(dest[7].(*time.Time)) = now
 		*(dest[8].(*time.Time)) = now
+		*(dest[9].(*string)) = regionName
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -125,6 +127,7 @@ func TestZoneService_GetByID_Success(t *testing.T) {
 	assert.Equal(t, zoneID, result.ID)
 	assert.Equal(t, "example.com", result.Name)
 	assert.Equal(t, &tenantID, result.TenantID)
+	assert.Equal(t, regionName, result.RegionName)
 	db.AssertExpectations(t)
 }
 
@@ -157,6 +160,7 @@ func TestZoneService_List_Success(t *testing.T) {
 	id1 := "test-zone-1"
 	tenantID := "test-tenant-1"
 	regionID := "test-region-1"
+	regionName := "Test Region"
 	now := time.Now().Truncate(time.Microsecond)
 
 	rows := newMockRows(
@@ -170,6 +174,7 @@ func TestZoneService_List_Success(t *testing.T) {
 			*(dest[6].(**string)) = nil // status_message
 			*(dest[7].(*time.Time)) = now
 			*(dest[8].(*time.Time)) = now
+			*(dest[9].(*string)) = regionName
 			return nil
 		},
 	)
@@ -240,14 +245,17 @@ func TestZoneService_Delete_Success(t *testing.T) {
 
 	zoneID := "test-zone-1"
 
-	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-
+	updateRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "example.com"
+		return nil
+	}}
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
 		tid := "test-tenant-1"
 		*(dest[0].(**string)) = &tid
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -266,7 +274,10 @@ func TestZoneService_Delete_DBError(t *testing.T) {
 	svc := NewZoneService(db, tc)
 	ctx := context.Background()
 
-	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
+	row := &mockRow{scanFunc: func(dest ...any) error {
+		return errors.New("db error")
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
 
 	err := svc.Delete(ctx, "test-zone-1")
 	require.Error(t, err)
@@ -280,14 +291,17 @@ func TestZoneService_Delete_WorkflowError(t *testing.T) {
 	svc := NewZoneService(db, tc)
 	ctx := context.Background()
 
-	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-
+	updateRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "example.com"
+		return nil
+	}}
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
 		tid := "test-tenant-1"
 		*(dest[0].(**string)) = &tid
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
 
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 

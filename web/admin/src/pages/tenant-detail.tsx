@@ -40,10 +40,18 @@ import { S3BucketFields } from '@/components/forms/s3-bucket-fields'
 import { SFTPKeyFields } from '@/components/forms/sftp-key-fields'
 import { ZoneFields } from '@/components/forms/zone-fields'
 
+const defaultTab = 'webroots'
+const validTabs = ['webroots', 'databases', 'zones', 'valkey', 's3', 'sftp', 'backups']
+
+function getTabFromHash() {
+  const hash = window.location.hash.slice(1)
+  return validTabs.includes(hash) ? hash : defaultTab
+}
+
 export function TenantDetailPage() {
-  const { id: rawId } = useParams({ strict: false })
-  const id = rawId!
+  const { id } = useParams({ from: '/auth/tenants/$id' as never })
   const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState(getTabFromHash)
   const [deleteOpen, setDeleteOpen] = useState(false)
 
   // Create dialogs
@@ -310,8 +318,8 @@ export function TenantDetailPage() {
       cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
     },
     {
-      accessorKey: 'shard_id', header: 'Shard',
-      cell: ({ row }) => row.original.shard_id ? <code className="text-xs">{row.original.shard_id}</code> : '-',
+      accessorKey: 'shard_name', header: 'Shard',
+      cell: ({ row }) => row.original.shard_name || (row.original.shard_id ? <code className="text-xs">{row.original.shard_id}</code> : '-'),
     },
     {
       accessorKey: 'status', header: 'Status',
@@ -408,8 +416,8 @@ export function TenantDetailPage() {
       cell: ({ row }) => row.original.public ? 'Public' : 'Private',
     },
     {
-      accessorKey: 'shard_id', header: 'Shard',
-      cell: ({ row }) => row.original.shard_id ? <code className="text-xs">{row.original.shard_id}</code> : '-',
+      accessorKey: 'shard_name', header: 'Shard',
+      cell: ({ row }) => row.original.shard_name || (row.original.shard_id ? <code className="text-xs">{row.original.shard_id}</code> : '-'),
     },
     {
       accessorKey: 'status', header: 'Status',
@@ -453,7 +461,10 @@ export function TenantDetailPage() {
       accessorKey: 'name', header: 'Name',
       cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
     },
-    { accessorKey: 'region_id', header: 'Region' },
+    {
+      accessorKey: 'region_name', header: 'Region',
+      cell: ({ row }) => row.original.region_name || row.original.region_id,
+    },
     {
       accessorKey: 'status', header: 'Status',
       cell: ({ row }) => (
@@ -604,7 +615,7 @@ export function TenantDetailPage() {
 
       <ResourceHeader
         title={tenant.id}
-        subtitle={`UID: ${tenant.uid} | Brand: ${tenant.brand_id} | Region: ${tenant.region_id} | Cluster: ${tenant.cluster_id}`}
+        subtitle={`UID: ${tenant.uid} | Brand: ${tenant.brand_id} | Region: ${tenant.region_name || tenant.region_id} | Cluster: ${tenant.cluster_name || tenant.cluster_id}`}
         status={tenant.status}
         actions={
           <div className="flex gap-2">
@@ -661,7 +672,7 @@ export function TenantDetailPage() {
         </div>
       )}
 
-      <Tabs defaultValue="webroots">
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); window.history.replaceState(null, '', `#${v}`) }}>
         <TabsList>
           <TabsTrigger value="webroots">Webroots ({webrootsData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="databases">Databases ({databasesData?.items?.length ?? 0})</TabsTrigger>
@@ -936,7 +947,7 @@ export function TenantDetailPage() {
           <DialogHeader><DialogTitle>Create Zone</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <ZoneFields value={znForm} onChange={setZnForm} />
-            <p className="text-xs text-muted-foreground">Region: {tenant.region_id} (inherited from tenant)</p>
+            <p className="text-xs text-muted-foreground">Region: {tenant.region_name || tenant.region_id} (inherited from tenant)</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateZoneOpen(false)}>Cancel</Button>

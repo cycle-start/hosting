@@ -35,7 +35,11 @@ export function ZonesPage() {
       ),
     },
     { accessorKey: 'name', header: 'Name' },
-    { accessorKey: 'region_id', header: 'Region' },
+    {
+      accessorKey: 'region_name',
+      header: 'Region',
+      cell: ({ row }) => row.original.region_name || row.original.region_id,
+    },
     {
       accessorKey: 'tenant_id',
       header: 'Tenant',

@@ -34,7 +34,7 @@ func (s *EmailForwardService) Create(ctx context.Context, f *model.EmailForward)
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateEmailForwardWorkflow",
-		WorkflowID:   fmt.Sprintf("email-forward-%s", f.ID),
+		WorkflowID:   workflowID("email-forward", f.Destination, f.ID),
 		Arg:          f.ID,
 	}); err != nil {
 		return fmt.Errorf("start CreateEmailForwardWorkflow: %w", err)
@@ -96,10 +96,11 @@ func (s *EmailForwardService) ListByAccountID(ctx context.Context, accountID str
 }
 
 func (s *EmailForwardService) Delete(ctx context.Context, id string) error {
-	_, err := s.db.Exec(ctx,
-		"UPDATE email_forwards SET status = $1, updated_at = now() WHERE id = $2",
+	var destination string
+	err := s.db.QueryRow(ctx,
+		"UPDATE email_forwards SET status = $1, updated_at = now() WHERE id = $2 RETURNING destination",
 		model.StatusDeleting, id,
-	)
+	).Scan(&destination)
 	if err != nil {
 		return fmt.Errorf("set email forward %s status to deleting: %w", id, err)
 	}
@@ -111,7 +112,7 @@ func (s *EmailForwardService) Delete(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteEmailForwardWorkflow",
-		WorkflowID:   fmt.Sprintf("email-forward-%s", id),
+		WorkflowID:   workflowID("email-forward", destination, id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("start DeleteEmailForwardWorkflow: %w", err)
@@ -121,8 +122,8 @@ func (s *EmailForwardService) Delete(ctx context.Context, id string) error {
 }
 
 func (s *EmailForwardService) Retry(ctx context.Context, id string) error {
-	var status string
-	err := s.db.QueryRow(ctx, "SELECT status FROM email_forwards WHERE id = $1", id).Scan(&status)
+	var status, destination string
+	err := s.db.QueryRow(ctx, "SELECT status, destination FROM email_forwards WHERE id = $1", id).Scan(&status, &destination)
 	if err != nil {
 		return fmt.Errorf("get email forward status: %w", err)
 	}
@@ -139,7 +140,7 @@ func (s *EmailForwardService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateEmailForwardWorkflow",
-		WorkflowID:   fmt.Sprintf("email-forward-%s", id),
+		WorkflowID:   workflowID("email-forward", destination, id),
 		Arg:          id,
 	})
 }
