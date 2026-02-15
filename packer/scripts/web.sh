@@ -8,6 +8,7 @@ apt-get install -y \
   nginx \
   php8.3-fpm php8.3-cli php8.3-mysql php8.3-curl \
   php8.3-mbstring php8.3-xml php8.3-zip \
+  supervisor \
   ceph-common \
   openssh-server
 
@@ -16,6 +17,12 @@ mkdir -p /var/www/storage /etc/ssl/hosting /etc/ceph /etc/ssh/sshd_config.d
 
 # SSH hardening config.
 cp /tmp/00-hosting-base.conf /etc/ssh/sshd_config.d/00-hosting-base.conf
+
+# Enable supervisord for php-worker runtime.
+systemctl enable supervisor
+
+# Base supervisord config for hosting platform.
+cp /tmp/supervisor-hosting.conf /etc/supervisor/conf.d/hosting.conf
 
 # Hide other users' processes (applied on every boot via fstab).
 echo "proc /proc proc defaults,hidepid=2 0 0" >> /etc/fstab

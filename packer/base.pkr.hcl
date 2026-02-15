@@ -229,6 +229,11 @@ build {
     destination = "/tmp/vector-web.toml"
   }
 
+  provisioner "file" {
+    source      = "files/supervisor-hosting.conf"
+    destination = "/tmp/supervisor-hosting.conf"
+  }
+
   provisioner "shell" {
     execute_command = "sudo sh -c '{{ .Vars }} {{ .Path }}'"
     scripts = [

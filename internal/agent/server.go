@@ -50,11 +50,12 @@ func NewServer(logger zerolog.Logger, cfg Config) *Server {
 	}
 
 	runtimes := map[string]runtime.Manager{
-		"php":    runtime.NewPHP(logger, svcMgr),
-		"node":   runtime.NewNode(logger, svcMgr),
-		"python": runtime.NewPython(logger, svcMgr),
-		"ruby":   runtime.NewRuby(logger, svcMgr),
-		"static": runtime.NewStatic(logger),
+		"php":        runtime.NewPHP(logger, svcMgr),
+		"php-worker": runtime.NewPHPWorker(logger),
+		"node":       runtime.NewNode(logger, svcMgr),
+		"python":     runtime.NewPython(logger, svcMgr),
+		"ruby":       runtime.NewRuby(logger, svcMgr),
+		"static":     runtime.NewStatic(logger),
 	}
 	nginxMgr := NewNginxManager(logger, cfg)
 	if cfg.ShardName != "" {

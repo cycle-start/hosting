@@ -64,7 +64,7 @@ func (h *Webroot) ListByTenant(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create a webroot
-//	@Description	Creates a webroot (website document root) for a tenant. Requires name, runtime (php/node/python/ruby/static), and runtime version. Supports nested FQDN creation. Async — returns 202 and triggers a Temporal workflow to configure the web server.
+//	@Description	Creates a webroot (website document root) for a tenant. Requires name, runtime (php/php-worker/node/python/ruby/static), and runtime version. For php-worker, runtime_config must include a command field. Workers have no HTTP interface (no nginx, no FQDNs). Supports nested FQDN creation for web-facing runtimes. Async — returns 202 and triggers a Temporal workflow.
 //	@Tags			Webroots
 //	@Security		ApiKeyAuth
 //	@Param			tenantID path string true "Tenant ID"
@@ -88,6 +88,18 @@ func (h *Webroot) Create(w http.ResponseWriter, r *http.Request) {
 
 	if !checkTenantBrand(w, r, h.services.Tenant, tenantID) {
 		return
+	}
+
+	// Validate php-worker runtime config.
+	if req.Runtime == "php-worker" {
+		if err := request.ValidateWorkerConfig(req.RuntimeConfig); err != nil {
+			response.WriteError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if len(req.FQDNs) > 0 {
+			response.WriteError(w, http.StatusBadRequest, "php-worker webroots cannot have FQDNs")
+			return
+		}
 	}
 
 	now := time.Now()
@@ -200,6 +212,14 @@ func (h *Webroot) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.PublicFolder != nil {
 		webroot.PublicFolder = *req.PublicFolder
+	}
+
+	// Validate php-worker runtime config when runtime is php-worker.
+	if webroot.Runtime == "php-worker" && req.RuntimeConfig != nil {
+		if err := request.ValidateWorkerConfig(webroot.RuntimeConfig); err != nil {
+			response.WriteError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 
 	if err := h.svc.Update(r.Context(), webroot); err != nil {

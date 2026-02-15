@@ -17,6 +17,11 @@ import (
 	"github.com/edvin/hosting/internal/agent/runtime"
 )
 
+// isWorkerRuntime returns true if the runtime type has no HTTP interface.
+func isWorkerRuntime(rt string) bool {
+	return rt == "php-worker"
+}
+
 // grpcStatusError is the interface implemented by gRPC status errors.
 // Used with errors.As to extract gRPC status from wrapped errors.
 type grpcStatusError interface {
@@ -176,6 +181,11 @@ func (a *NodeLocal) CreateWebroot(ctx context.Context, params CreateWebrootParam
 		return asNonRetryable(fmt.Errorf("start runtime: %w", err))
 	}
 
+	// Skip nginx config for worker runtimes (no HTTP traffic).
+	if isWorkerRuntime(info.Runtime) {
+		return nil
+	}
+
 	// Generate and write nginx config.
 	nginxConfig, err := a.nginx.GenerateConfig(info, fqdns)
 	if err != nil {
@@ -233,6 +243,11 @@ func (a *NodeLocal) UpdateWebroot(ctx context.Context, params UpdateWebrootParam
 		return asNonRetryable(fmt.Errorf("reload runtime: %w", err))
 	}
 
+	// Skip nginx config for worker runtimes (no HTTP traffic).
+	if isWorkerRuntime(info.Runtime) {
+		return nil
+	}
+
 	// Regenerate and write nginx config.
 	nginxConfig, err := a.nginx.GenerateConfig(info, fqdns)
 	if err != nil {
@@ -254,8 +269,8 @@ func (a *NodeLocal) UpdateWebroot(ctx context.Context, params UpdateWebrootParam
 func (a *NodeLocal) DeleteWebroot(ctx context.Context, tenantName, webrootName string) error {
 	a.logger.Info().Str("tenant", tenantName).Str("webroot", webrootName).Msg("DeleteWebroot")
 
-	// Remove nginx config.
-	if err := a.nginx.RemoveConfig(tenantName, webrootName); err != nil {
+	// Remove nginx config (worker webroots have no nginx config, so tolerate missing files).
+	if err := a.nginx.RemoveConfig(tenantName, webrootName); err != nil && !os.IsNotExist(err) {
 		return asNonRetryable(fmt.Errorf("remove nginx config: %w", err))
 	}
 
