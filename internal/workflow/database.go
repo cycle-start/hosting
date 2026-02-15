@@ -39,28 +39,26 @@ func CreateDatabaseWorkflow(ctx workflow.Context, databaseID string) error {
 		return err
 	}
 
-	// Look up nodes in the database's shard.
+	// Look up the primary node in the database's shard.
 	if database.ShardID == nil {
 		noShardErr := fmt.Errorf("database %s has no shard assigned", databaseID)
 		_ = setResourceFailed(ctx, "databases", databaseID, noShardErr)
 		return noShardErr
 	}
 
-	var nodes []model.Node
-	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *database.ShardID).Get(ctx, &nodes)
+	// Determine the primary node.
+	primaryID, _, err := dbShardPrimary(ctx, *database.ShardID)
 	if err != nil {
 		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return err
 	}
 
-	// Create database on each node in the shard.
-	for _, node := range nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "CreateDatabase", database.Name).Get(ctx, nil)
-		if err != nil {
-			_ = setResourceFailed(ctx, "databases", databaseID, err)
-			return err
-		}
+	// Create database on the PRIMARY only (replicas get data via replication).
+	primaryCtx := nodeActivityCtx(ctx, primaryID)
+	err = workflow.ExecuteActivity(primaryCtx, "CreateDatabase", database.Name).Get(ctx, nil)
+	if err != nil {
+		_ = setResourceFailed(ctx, "databases", databaseID, err)
+		return err
 	}
 
 	// Set status to active.
@@ -99,28 +97,26 @@ func DeleteDatabaseWorkflow(ctx workflow.Context, databaseID string) error {
 		return err
 	}
 
-	// Look up nodes in the database's shard.
+	// Look up the primary node in the database's shard.
 	if database.ShardID == nil {
 		noShardErr := fmt.Errorf("database %s has no shard assigned", databaseID)
 		_ = setResourceFailed(ctx, "databases", databaseID, noShardErr)
 		return noShardErr
 	}
 
-	var nodes []model.Node
-	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *database.ShardID).Get(ctx, &nodes)
+	// Determine the primary node.
+	primaryID, _, err := dbShardPrimary(ctx, *database.ShardID)
 	if err != nil {
 		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return err
 	}
 
-	// Delete database on each node in the shard.
-	for _, node := range nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "DeleteDatabase", database.Name).Get(ctx, nil)
-		if err != nil {
-			_ = setResourceFailed(ctx, "databases", databaseID, err)
-			return err
-		}
+	// Delete database on the PRIMARY only (change replicates to replicas).
+	primaryCtx := nodeActivityCtx(ctx, primaryID)
+	err = workflow.ExecuteActivity(primaryCtx, "DeleteDatabase", database.Name).Get(ctx, nil)
+	if err != nil {
+		_ = setResourceFailed(ctx, "databases", databaseID, err)
+		return err
 	}
 
 	// Set status to deleted.

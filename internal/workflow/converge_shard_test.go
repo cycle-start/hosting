@@ -121,6 +121,8 @@ func (s *ConvergeShardWorkflowTestSuite) TestDatabaseShard() {
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusConverging)).Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	// SetReadOnly(false) on the primary node.
+	s.env.OnActivity("SetReadOnly", mock.Anything, false).Return(nil)
 	s.env.OnActivity("ListDatabasesByShard", mock.Anything, shardID).Return(databases, nil)
 	s.env.OnActivity("CreateDatabase", mock.Anything, "mydb").Return(nil)
 	s.env.OnActivity("ListDatabaseUsersByDatabaseID", mock.Anything, "db-1").Return(users, nil)
@@ -251,12 +253,13 @@ func (s *ConvergeShardWorkflowTestSuite) TestGetShardFails() {
 
 func (s *ConvergeShardWorkflowTestSuite) TestPartialFailureContinues() {
 	shardID := "shard-db-partial"
+	primaryIP := "10.0.0.1"
 	shard := model.Shard{
 		ID:   shardID,
 		Role: model.ShardRoleDatabase,
 	}
 	nodes := []model.Node{
-		{ID: "node-ok"},
+		{ID: "node-ok", IPAddress: &primaryIP},
 		{ID: "node-bad"},
 	}
 	databases := []model.Database{
@@ -266,16 +269,30 @@ func (s *ConvergeShardWorkflowTestSuite) TestPartialFailureContinues() {
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusConverging)).Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+
+	// SetReadOnly(false) on primary (node-ok).
+	s.env.OnActivity("SetReadOnly", mock.Anything, false).Return(nil)
+
 	s.env.OnActivity("ListDatabasesByShard", mock.Anything, shardID).Return(databases, nil)
 
-	// CreateDatabase succeeds on node-ok, fails on node-bad
-	s.env.OnActivity("CreateDatabase", mock.Anything, "mydb").Return(nil).Once()
-	s.env.OnActivity("CreateDatabase", mock.Anything, "mydb").Return(fmt.Errorf("node unreachable")).Once()
+	// CreateDatabase on primary only - succeeds.
+	s.env.OnActivity("CreateDatabase", mock.Anything, "mydb").Return(nil)
 
-	// User listing still runs (workflow doesn't stop)
+	// User listing still runs (workflow doesn't stop).
 	s.env.OnActivity("ListDatabaseUsersByDatabaseID", mock.Anything, "db-1").Return([]model.DatabaseUser{}, nil)
 
-	// Should end in failed state with error message
+	// SetReadOnly(true) on replica (node-bad) - fails.
+	s.env.OnActivity("SetReadOnly", mock.Anything, true).Return(fmt.Errorf("node unreachable"))
+
+	// GetReplicationStatus on replica - fails.
+	s.env.OnActivity("GetReplicationStatus", mock.Anything).Return(nil, fmt.Errorf("node unreachable"))
+
+	// ConfigureReplication on replica - fails.
+	s.env.OnActivity("ConfigureReplication", mock.Anything, activity.ConfigureReplicationParams{
+		PrimaryHost: primaryIP, ReplUser: "repl", ReplPassword: "repl",
+	}).Return(fmt.Errorf("node unreachable"))
+
+	// Should end in failed state with error message.
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusFailed)).Return(nil)
 
 	s.env.ExecuteWorkflow(ConvergeShardWorkflow, ConvergeShardParams{ShardID: shardID})

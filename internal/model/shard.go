@@ -33,3 +33,8 @@ type StorageShardConfig struct {
 	S3Enabled        bool `json:"s3_enabled"`
 	FilestoreEnabled bool `json:"filestore_enabled"`
 }
+
+// DatabaseShardConfig holds replication configuration for a database shard.
+type DatabaseShardConfig struct {
+	PrimaryNodeID string `json:"primary_node_id"`
+}

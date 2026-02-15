@@ -157,6 +157,7 @@ func main() {
 	w.RegisterWorkflow(workflow.DeleteBackupWorkflow)
 	w.RegisterWorkflow(workflow.CleanupAuditLogsWorkflow)
 	w.RegisterWorkflow(workflow.CleanupOldBackupsWorkflow)
+	w.RegisterWorkflow(workflow.CheckReplicationHealthWorkflow)
 
 	if cfg.MetricsAddr != "" {
 		metricsSrv := metrics.NewServer(cfg.MetricsAddr)
@@ -217,6 +218,11 @@ func registerCronSchedules(ctx context.Context, tc temporalclient.Client, taskQu
 			cron:     "0 5 * * *",
 			workflow: workflow.CleanupOldBackupsWorkflow,
 			args:     []interface{}{cfg.BackupRetentionDays},
+		},
+		{
+			id:       "replication-health-cron",
+			cron:     "* * * * *",
+			workflow: workflow.CheckReplicationHealthWorkflow,
 		},
 	}
 

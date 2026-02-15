@@ -1,5 +1,7 @@
 package activity
 
+import "encoding/json"
+
 // CreateTenantParams holds parameters for creating a tenant on a node.
 type CreateTenantParams struct {
 	ID          string
@@ -264,4 +266,17 @@ type CronJobTimerParams struct {
 type BackupResult struct {
 	StoragePath string
 	SizeBytes   int64
+}
+
+// ConfigureReplicationParams holds parameters for configuring MySQL replication.
+type ConfigureReplicationParams struct {
+	PrimaryHost  string
+	ReplUser     string
+	ReplPassword string
+}
+
+// UpdateShardConfigParams holds parameters for updating a shard's config JSON.
+type UpdateShardConfigParams struct {
+	ShardID string
+	Config  json.RawMessage
 }

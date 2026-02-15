@@ -22,6 +22,18 @@ write_files:
       SERVICE_NAME=node-agent
       METRICS_ADDR=:9100
 
+  - path: /etc/mysql/mysql.conf.d/server-id.cnf
+    content: |
+      [mysqld]
+      server-id = ${server_id}
+
 runcmd:
+  - systemctl restart mysql
+  - |
+    mysql -u root -e "
+      CREATE USER IF NOT EXISTS 'repl'@'%' IDENTIFIED BY '${repl_password}';
+      GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'repl'@'%';
+      FLUSH PRIVILEGES;
+    "
   - systemctl daemon-reload
   - systemctl start node-agent

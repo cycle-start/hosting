@@ -45,19 +45,24 @@ func CreateDatabaseUserWorkflow(ctx workflow.Context, userID string) error {
 		return noShardErr
 	}
 
-	// Create database user on each node in the shard.
-	for _, node := range dctx.Nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "CreateDatabaseUser", activity.CreateDatabaseUserParams{
-			DatabaseName: dctx.Database.Name,
-			Username:     dctx.User.Username,
-			Password:     dctx.User.Password,
-			Privileges:   dctx.User.Privileges,
-		}).Get(ctx, nil)
-		if err != nil {
-			_ = setResourceFailed(ctx, "database_users", userID, err)
-			return err
-		}
+	// Determine the primary node.
+	primaryID, _, err := dbShardPrimary(ctx, *dctx.Database.ShardID)
+	if err != nil {
+		_ = setResourceFailed(ctx, "database_users", userID, err)
+		return err
+	}
+
+	// Create database user on the PRIMARY only (replicates to replicas).
+	primaryCtx := nodeActivityCtx(ctx, primaryID)
+	err = workflow.ExecuteActivity(primaryCtx, "CreateDatabaseUser", activity.CreateDatabaseUserParams{
+		DatabaseName: dctx.Database.Name,
+		Username:     dctx.User.Username,
+		Password:     dctx.User.Password,
+		Privileges:   dctx.User.Privileges,
+	}).Get(ctx, nil)
+	if err != nil {
+		_ = setResourceFailed(ctx, "database_users", userID, err)
+		return err
 	}
 
 	// Set status to active.
@@ -102,19 +107,24 @@ func UpdateDatabaseUserWorkflow(ctx workflow.Context, userID string) error {
 		return noShardErr
 	}
 
-	// Update database user on each node in the shard.
-	for _, node := range dctx.Nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "UpdateDatabaseUser", activity.UpdateDatabaseUserParams{
-			DatabaseName: dctx.Database.Name,
-			Username:     dctx.User.Username,
-			Password:     dctx.User.Password,
-			Privileges:   dctx.User.Privileges,
-		}).Get(ctx, nil)
-		if err != nil {
-			_ = setResourceFailed(ctx, "database_users", userID, err)
-			return err
-		}
+	// Determine the primary node.
+	primaryID, _, err := dbShardPrimary(ctx, *dctx.Database.ShardID)
+	if err != nil {
+		_ = setResourceFailed(ctx, "database_users", userID, err)
+		return err
+	}
+
+	// Update database user on the PRIMARY only (replicates to replicas).
+	primaryCtx := nodeActivityCtx(ctx, primaryID)
+	err = workflow.ExecuteActivity(primaryCtx, "UpdateDatabaseUser", activity.UpdateDatabaseUserParams{
+		DatabaseName: dctx.Database.Name,
+		Username:     dctx.User.Username,
+		Password:     dctx.User.Password,
+		Privileges:   dctx.User.Privileges,
+	}).Get(ctx, nil)
+	if err != nil {
+		_ = setResourceFailed(ctx, "database_users", userID, err)
+		return err
 	}
 
 	// Set status to active.
@@ -159,14 +169,19 @@ func DeleteDatabaseUserWorkflow(ctx workflow.Context, userID string) error {
 		return noShardErr
 	}
 
-	// Delete database user on each node in the shard.
-	for _, node := range dctx.Nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "DeleteDatabaseUser", dctx.Database.Name, dctx.User.Username).Get(ctx, nil)
-		if err != nil {
-			_ = setResourceFailed(ctx, "database_users", userID, err)
-			return err
-		}
+	// Determine the primary node.
+	primaryID, _, err := dbShardPrimary(ctx, *dctx.Database.ShardID)
+	if err != nil {
+		_ = setResourceFailed(ctx, "database_users", userID, err)
+		return err
+	}
+
+	// Delete database user on the PRIMARY only (replicates to replicas).
+	primaryCtx := nodeActivityCtx(ctx, primaryID)
+	err = workflow.ExecuteActivity(primaryCtx, "DeleteDatabaseUser", dctx.Database.Name, dctx.User.Username).Get(ctx, nil)
+	if err != nil {
+		_ = setResourceFailed(ctx, "database_users", userID, err)
+		return err
 	}
 
 	// Set status to deleted.

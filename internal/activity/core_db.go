@@ -1207,6 +1207,37 @@ func (a *CoreDB) ListCronJobsByWebroot(ctx context.Context, webrootID string) ([
 	return jobs, rows.Err()
 }
 
+// ListShardsByRole retrieves all shards with the specified role.
+func (a *CoreDB) ListShardsByRole(ctx context.Context, role string) ([]model.Shard, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, cluster_id, name, role, lb_backend, config, status, status_message, created_at, updated_at
+		 FROM shards WHERE role = $1`, role,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list shards by role: %w", err)
+	}
+	defer rows.Close()
+
+	var shards []model.Shard
+	for rows.Next() {
+		var s model.Shard
+		if err := rows.Scan(&s.ID, &s.ClusterID, &s.Name, &s.Role, &s.LBBackend, &s.Config, &s.Status, &s.StatusMessage, &s.CreatedAt, &s.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan shard row: %w", err)
+		}
+		shards = append(shards, s)
+	}
+	return shards, rows.Err()
+}
+
+// UpdateShardConfig updates the config JSON for a shard.
+func (a *CoreDB) UpdateShardConfig(ctx context.Context, params UpdateShardConfigParams) error {
+	_, err := a.db.Exec(ctx,
+		`UPDATE shards SET config = $1, updated_at = NOW() WHERE id = $2`,
+		params.Config, params.ShardID,
+	)
+	return err
+}
+
 // ListCronJobsByTenant retrieves all active cron jobs for a tenant (used in convergence).
 func (a *CoreDB) ListCronJobsByTenant(ctx context.Context, tenantID string) ([]model.CronJob, error) {
 	rows, err := a.db.Query(ctx,

@@ -101,7 +101,15 @@ variable "db_nodes" {
   }))
   default = [
     { name = "db-1-node-0", ip = "10.10.10.20" },
+    { name = "db-1-node-1", ip = "10.10.10.21" },
   ]
+}
+
+variable "db_repl_password" {
+  description = "MySQL replication user password"
+  type        = string
+  default     = "repl"
+  sensitive   = true
 }
 
 variable "db_shard_name" {

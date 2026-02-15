@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -351,6 +352,105 @@ func quoteArgs(args []string) []string {
 		quoted[i] = "'" + strings.ReplaceAll(a, "'", "'\\''") + "'"
 	}
 	return quoted
+}
+
+// ReplicationStatus holds the parsed output of SHOW REPLICA STATUS.
+type ReplicationStatus struct {
+	IORunning        bool   `json:"io_running"`
+	SQLRunning       bool   `json:"sql_running"`
+	SecondsBehind    *int   `json:"seconds_behind"`
+	LastError        string `json:"last_error"`
+	ExecutedGTIDSet  string `json:"executed_gtid_set"`
+	RetrievedGTIDSet string `json:"retrieved_gtid_set"`
+}
+
+// ConfigureReplication sets up this node as a replica of the given primary.
+func (m *DatabaseManager) ConfigureReplication(ctx context.Context, primaryHost, replUser, replPassword string) error {
+	m.logger.Info().Str("primary", primaryHost).Msg("configuring replication")
+	_ = m.execMySQL(ctx, "STOP REPLICA")
+	if err := m.execMySQL(ctx, "RESET REPLICA ALL"); err != nil {
+		return fmt.Errorf("reset replica: %w", err)
+	}
+	sql := fmt.Sprintf(
+		`CHANGE REPLICATION SOURCE TO SOURCE_HOST='%s', SOURCE_PORT=3306, SOURCE_USER='%s', SOURCE_PASSWORD='%s', SOURCE_AUTO_POSITION=1, SOURCE_CONNECT_RETRY=10, SOURCE_RETRY_COUNT=86400, GET_SOURCE_PUBLIC_KEY=1`,
+		primaryHost, replUser, replPassword,
+	)
+	if err := m.execMySQL(ctx, sql); err != nil {
+		return fmt.Errorf("change replication source: %w", err)
+	}
+	if err := m.execMySQL(ctx, "START REPLICA"); err != nil {
+		return fmt.Errorf("start replica: %w", err)
+	}
+	return nil
+}
+
+// SetReadOnly makes this MySQL instance read-only or read-write.
+func (m *DatabaseManager) SetReadOnly(ctx context.Context, readOnly bool) error {
+	if readOnly {
+		if err := m.execMySQL(ctx, "SET GLOBAL read_only = ON"); err != nil {
+			return err
+		}
+		return m.execMySQL(ctx, "SET GLOBAL super_read_only = ON")
+	}
+	if err := m.execMySQL(ctx, "SET GLOBAL super_read_only = OFF"); err != nil {
+		return err
+	}
+	return m.execMySQL(ctx, "SET GLOBAL read_only = OFF")
+}
+
+// GetReplicationStatus returns the current replication status of this node.
+func (m *DatabaseManager) GetReplicationStatus(ctx context.Context) (*ReplicationStatus, error) {
+	baseArgs, err := m.mysqlArgs()
+	if err != nil {
+		return nil, fmt.Errorf("parse mysql DSN: %w", err)
+	}
+	args := append(baseArgs, "-e", "SHOW REPLICA STATUS\\G")
+	cmd := exec.CommandContext(ctx, "mysql", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("show replica status: %s: %w", string(output), err)
+	}
+	return parseReplicaStatus(string(output)), nil
+}
+
+// StopReplication stops replication on this node.
+func (m *DatabaseManager) StopReplication(ctx context.Context) error {
+	m.logger.Info().Msg("stopping replication")
+	return m.execMySQL(ctx, "STOP REPLICA")
+}
+
+// parseReplicaStatus parses the vertical output of SHOW REPLICA STATUS.
+func parseReplicaStatus(output string) *ReplicationStatus {
+	status := &ReplicationStatus{}
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		parts := strings.SplitN(line, ": ", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		val := strings.TrimSpace(parts[1])
+		switch key {
+		case "Replica_IO_Running":
+			status.IORunning = val == "Yes"
+		case "Replica_SQL_Running":
+			status.SQLRunning = val == "Yes"
+		case "Seconds_Behind_Source":
+			if val != "NULL" && val != "" {
+				n, err := strconv.Atoi(val)
+				if err == nil {
+					status.SecondsBehind = &n
+				}
+			}
+		case "Last_Error":
+			status.LastError = val
+		case "Executed_Gtid_Set":
+			status.ExecutedGTIDSet = val
+		case "Retrieved_Gtid_Set":
+			status.RetrievedGTIDSet = val
+		}
+	}
+	return status
 }
 
 // DeleteUser drops a MySQL user.

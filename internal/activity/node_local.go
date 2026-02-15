@@ -374,6 +374,34 @@ func (a *NodeLocal) DeleteDatabaseUser(ctx context.Context, dbName, username str
 	return asNonRetryable(a.database.DeleteUser(ctx, dbName, username))
 }
 
+// ConfigureReplication sets up this node as a replica of the given primary.
+func (a *NodeLocal) ConfigureReplication(ctx context.Context, params ConfigureReplicationParams) error {
+	a.logger.Info().Str("primary", params.PrimaryHost).Msg("ConfigureReplication")
+	return asNonRetryable(a.database.ConfigureReplication(ctx, params.PrimaryHost, params.ReplUser, params.ReplPassword))
+}
+
+// SetReadOnly makes this MySQL instance read-only or read-write.
+func (a *NodeLocal) SetReadOnly(ctx context.Context, readOnly bool) error {
+	a.logger.Info().Bool("read_only", readOnly).Msg("SetReadOnly")
+	return asNonRetryable(a.database.SetReadOnly(ctx, readOnly))
+}
+
+// GetReplicationStatus returns the current replication status of this node.
+func (a *NodeLocal) GetReplicationStatus(ctx context.Context) (*agent.ReplicationStatus, error) {
+	a.logger.Info().Msg("GetReplicationStatus")
+	status, err := a.database.GetReplicationStatus(ctx)
+	if err != nil {
+		return nil, asNonRetryable(err)
+	}
+	return status, nil
+}
+
+// StopReplication stops replication on this node.
+func (a *NodeLocal) StopReplication(ctx context.Context) error {
+	a.logger.Info().Msg("StopReplication")
+	return asNonRetryable(a.database.StopReplication(ctx))
+}
+
 // --------------------------------------------------------------------------
 // Valkey activities
 // --------------------------------------------------------------------------

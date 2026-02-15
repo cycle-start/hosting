@@ -9,6 +9,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/edvin/hosting/internal/activity"
+	"github.com/edvin/hosting/internal/agent"
 	"github.com/edvin/hosting/internal/model"
 )
 
@@ -329,29 +330,49 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 }
 
 func convergeDatabaseShard(ctx workflow.Context, shardID string, nodes []model.Node) []string {
+	// Determine primary node.
+	primaryID, _, err := dbShardPrimary(ctx, shardID)
+	if err != nil {
+		return []string{fmt.Sprintf("determine primary: %v", err)}
+	}
+
+	var primary model.Node
+	var replicas []model.Node
+	for _, n := range nodes {
+		if n.ID == primaryID {
+			primary = n
+		} else {
+			replicas = append(replicas, n)
+		}
+	}
+
+	var errs []string
+
+	// Ensure primary is read-write.
+	primaryCtx := nodeActivityCtx(ctx, primary.ID)
+	err = workflow.ExecuteActivity(primaryCtx, "SetReadOnly", false).Get(ctx, nil)
+	if err != nil {
+		errs = append(errs, fmt.Sprintf("set primary read-write: %v", err))
+	}
+
 	// List all databases on this shard.
 	var databases []model.Database
-	err := workflow.ExecuteActivity(ctx, "ListDatabasesByShard", shardID).Get(ctx, &databases)
+	err = workflow.ExecuteActivity(ctx, "ListDatabasesByShard", shardID).Get(ctx, &databases)
 	if err != nil {
 		return []string{fmt.Sprintf("list databases: %v", err)}
 	}
 
-	var errs []string
+	// Create databases and users on the PRIMARY ONLY.
 	for _, database := range databases {
 		if database.Status != model.StatusActive {
 			continue
 		}
 
-		// Create database on each node.
-		for _, node := range nodes {
-			nodeCtx := nodeActivityCtx(ctx, node.ID)
-			err = workflow.ExecuteActivity(nodeCtx, "CreateDatabase", database.Name).Get(ctx, nil)
-			if err != nil {
-				errs = append(errs, fmt.Sprintf("create database %s on node %s: %v", database.ID, node.ID, err))
-			}
+		err = workflow.ExecuteActivity(primaryCtx, "CreateDatabase", database.Name).Get(ctx, nil)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("create database %s on primary: %v", database.ID, err))
 		}
 
-		// List users for this database.
 		var users []model.DatabaseUser
 		err = workflow.ExecuteActivity(ctx, "ListDatabaseUsersByDatabaseID", database.ID).Get(ctx, &users)
 		if err != nil {
@@ -363,19 +384,44 @@ func convergeDatabaseShard(ctx workflow.Context, shardID string, nodes []model.N
 			if user.Status != model.StatusActive {
 				continue
 			}
+			err = workflow.ExecuteActivity(primaryCtx, "CreateDatabaseUser", activity.CreateDatabaseUserParams{
+				DatabaseName: database.Name,
+				Username:     user.Username,
+				Password:     user.Password,
+				Privileges:   user.Privileges,
+			}).Get(ctx, nil)
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("create db user %s on primary: %v", user.ID, err))
+			}
+		}
+	}
 
-			// Create user on each node.
-			for _, node := range nodes {
-				nodeCtx := nodeActivityCtx(ctx, node.ID)
-				err = workflow.ExecuteActivity(nodeCtx, "CreateDatabaseUser", activity.CreateDatabaseUserParams{
-					DatabaseName: database.Name,
-					Username:     user.Username,
-					Password:     user.Password,
-					Privileges:   user.Privileges,
-				}).Get(ctx, nil)
-				if err != nil {
-					errs = append(errs, fmt.Sprintf("create db user %s on node %s: %v", user.ID, node.ID, err))
-				}
+	// Configure replication on each replica.
+	for _, replica := range replicas {
+		replicaCtx := nodeActivityCtx(ctx, replica.ID)
+
+		// Set replica to read-only.
+		err = workflow.ExecuteActivity(replicaCtx, "SetReadOnly", true).Get(ctx, nil)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("set replica %s read-only: %v", replica.ID, err))
+		}
+
+		// Check if replication is already running and healthy.
+		var status agent.ReplicationStatus
+		err = workflow.ExecuteActivity(replicaCtx, "GetReplicationStatus").Get(ctx, &status)
+		if err == nil && status.IORunning && status.SQLRunning {
+			continue // Replication healthy, nothing to do.
+		}
+
+		// Configure replication from primary.
+		if primary.IPAddress != nil {
+			err = workflow.ExecuteActivity(replicaCtx, "ConfigureReplication", activity.ConfigureReplicationParams{
+				PrimaryHost:  *primary.IPAddress,
+				ReplUser:     "repl",
+				ReplPassword: "repl", // Default replication password for dev
+			}).Get(ctx, nil)
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("configure replication on %s: %v", replica.ID, err))
 			}
 		}
 	}
