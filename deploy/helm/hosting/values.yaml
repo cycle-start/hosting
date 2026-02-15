@@ -56,6 +56,7 @@ config:
   regionId: ""
   clusterId: ""
   lokiUrl: "http://127.0.0.1:3100"
+  tenantLokiUrl: "http://127.0.0.1:3101"
 
 # Secrets — either inline or reference an existing K8s Secret
 secrets:

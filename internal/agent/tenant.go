@@ -33,7 +33,8 @@ func (m *TenantManager) WebStorageDir() string {
 	return m.webStorageDir
 }
 
-// Create provisions a new Linux user account and sets up the CephFS directory structure.
+// Create provisions a new Linux user account and sets up the CephFS directory structure
+// and local log directory.
 // This operation is idempotent: if the user already exists, it ensures the
 // directory structure and permissions converge to the desired state.
 //
@@ -42,8 +43,11 @@ func (m *TenantManager) WebStorageDir() string {
 //	/var/www/storage/{tenant}/           root:root 0755 (ChrootDirectory)
 //	├── home/                            tenant:tenant 0700
 //	├── webroots/                        tenant:tenant 0750
-//	├── logs/                            tenant:tenant 0750
 //	└── tmp/                             tenant:tenant 1777
+//
+// Local log directory:
+//
+//	/var/log/hosting/{tenant}/           tenant:tenant 0750
 func (m *TenantManager) Create(ctx context.Context, info *TenantInfo) error {
 	name := info.Name
 	uid := info.UID
@@ -84,9 +88,8 @@ func (m *TenantManager) Create(ctx context.Context, info *TenantInfo) error {
 	// Create the tenant directory structure inside the chroot.
 	homeDir := filepath.Join(chrootDir, "home")
 	dirs := map[string]os.FileMode{
-		homeDir:                            0700,
+		homeDir:                              0700,
 		filepath.Join(chrootDir, "webroots"): 0750,
-		filepath.Join(chrootDir, "logs"):     0750,
 		filepath.Join(chrootDir, "tmp"):      os.ModeSticky | 0777,
 	}
 
@@ -99,13 +102,27 @@ func (m *TenantManager) Create(ctx context.Context, info *TenantInfo) error {
 		}
 	}
 
-	// Set ownership of tenant-owned directories.
-	for _, dir := range []string{homeDir, filepath.Join(chrootDir, "webroots"), filepath.Join(chrootDir, "logs"), filepath.Join(chrootDir, "tmp")} {
+	// Set ownership of tenant-owned CephFS directories.
+	for _, dir := range []string{homeDir, filepath.Join(chrootDir, "webroots"), filepath.Join(chrootDir, "tmp")} {
 		chownCmd := exec.CommandContext(ctx, "chown", fmt.Sprintf("%s:%s", name, name), dir)
 		m.logger.Debug().Strs("cmd", chownCmd.Args).Msg("executing chown")
 		if output, err := chownCmd.CombinedOutput(); err != nil {
 			return status.Errorf(codes.Internal, "chown failed for %s: %s: %v", dir, string(output), err)
 		}
+	}
+
+	// Create local log directory on SSD.
+	logDir := filepath.Join("/var/log/hosting", name)
+	if err := os.MkdirAll(logDir, 0750); err != nil {
+		return status.Errorf(codes.Internal, "mkdir log dir %s: %v", logDir, err)
+	}
+	if err := os.Chmod(logDir, 0750); err != nil {
+		return status.Errorf(codes.Internal, "chmod log dir %s: %v", logDir, err)
+	}
+	chownCmd := exec.CommandContext(ctx, "chown", fmt.Sprintf("%s:%s", name, name), logDir)
+	m.logger.Debug().Strs("cmd", chownCmd.Args).Msg("executing chown")
+	if output, err := chownCmd.CombinedOutput(); err != nil {
+		return status.Errorf(codes.Internal, "chown failed for %s: %s: %v", logDir, string(output), err)
 	}
 
 	return nil
@@ -174,6 +191,12 @@ func (m *TenantManager) Delete(ctx context.Context, name string) error {
 	chrootDir := filepath.Join(m.webStorageDir, name)
 	if err := os.RemoveAll(chrootDir); err != nil {
 		return status.Errorf(codes.Internal, "remove CephFS dir %s: %v", chrootDir, err)
+	}
+
+	// Remove the local log directory.
+	logDir := filepath.Join("/var/log/hosting", name)
+	if err := os.RemoveAll(logDir); err != nil {
+		return status.Errorf(codes.Internal, "remove log dir %s: %v", logDir, err)
 	}
 
 	return nil

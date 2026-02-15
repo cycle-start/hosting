@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { Breadcrumb } from '@/components/shared/breadcrumb'
 import { LogViewer } from '@/components/shared/log-viewer'
+import { TenantLogViewer } from '@/components/shared/tenant-log-viewer'
 import { CopyButton } from '@/components/shared/copy-button'
 import { formatDate } from '@/lib/utils'
 import { rules, validateField } from '@/lib/validation'
@@ -26,7 +27,7 @@ import {
 } from '@/lib/hooks'
 import type { Certificate, EmailAccount } from '@/lib/types'
 
-const fqdnTabs = ['certificates', 'email', 'logs']
+const fqdnTabs = ['certificates', 'email', 'access-logs', 'platform-logs']
 function getFQDNTabFromHash() {
   const hash = window.location.hash.slice(1)
   return fqdnTabs.includes(hash) ? hash : 'certificates'
@@ -154,7 +155,8 @@ export function FQDNDetailPage() {
         <TabsList>
           <TabsTrigger value="certificates">Certificates ({certsData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="email">Email Accounts ({emailsData?.items?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="logs"><ScrollText className="mr-1.5 h-4 w-4" /> Logs</TabsTrigger>
+          <TabsTrigger value="access-logs"><ScrollText className="mr-1.5 h-4 w-4" /> Access Logs</TabsTrigger>
+          <TabsTrigger value="platform-logs"><ScrollText className="mr-1.5 h-4 w-4" /> Platform Logs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="certificates">
@@ -184,7 +186,11 @@ export function FQDNDetailPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="logs">
+        <TabsContent value="access-logs">
+          <TenantLogViewer tenantId={tenantId} webrootId={fqdn.webroot_id} />
+        </TabsContent>
+
+        <TabsContent value="platform-logs">
           <LogViewer query={`{app=~"core-api|worker|node-agent"} |= "${fqdnId}"`} />
         </TabsContent>
       </Tabs>

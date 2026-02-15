@@ -969,6 +969,28 @@ export function useLogs(query: string, range: string = '1h', enabled = true) {
   })
 }
 
+export function useTenantLogs(
+  tenantId: string,
+  logType?: string,
+  webrootId?: string,
+  range: string = '1h',
+  enabled = true,
+) {
+  const params = new URLSearchParams({ start: range, limit: '500' })
+  if (logType && logType !== 'all') params.set('log_type', logType)
+  if (webrootId && webrootId !== 'all') params.set('webroot_id', webrootId)
+
+  return useQuery({
+    queryKey: ['tenant-logs', tenantId, logType, webrootId, range],
+    queryFn: () =>
+      api.get<LogQueryResponse>(
+        `/tenants/${tenantId}/logs?${params.toString()}`
+      ),
+    enabled,
+    refetchInterval: 10000,
+  })
+}
+
 // Search
 export interface SearchResult {
   type: 'brand' | 'tenant' | 'zone' | 'fqdn' | 'webroot' | 'database' | 'email_account' | 'valkey_instance' | 's3_bucket'

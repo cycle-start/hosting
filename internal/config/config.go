@@ -44,7 +44,8 @@ type Config struct {
 	ServiceName string // SERVICE_NAME
 	MetricsAddr string // METRICS_ADDR — listen addr for /metrics (worker + node-agent)
 
-	LokiURL string // LOKI_URL — Loki query endpoint (default: http://127.0.0.1:3100)
+	LokiURL       string // LOKI_URL — Loki query endpoint for platform logs (default: http://127.0.0.1:3100)
+	TenantLokiURL string // TENANT_LOKI_URL — Loki query endpoint for tenant logs (default: http://127.0.0.1:3101)
 }
 
 func Load() (*Config, error) {
@@ -75,7 +76,8 @@ func Load() (*Config, error) {
 		ServiceName: getEnv("SERVICE_NAME", ""),
 		MetricsAddr: getEnv("METRICS_ADDR", ""),
 
-		LokiURL: getEnv("LOKI_URL", "http://127.0.0.1:3100"),
+		LokiURL:       getEnv("LOKI_URL", "http://127.0.0.1:3100"),
+		TenantLokiURL: getEnv("TENANT_LOKI_URL", "http://127.0.0.1:3101"),
 	}
 
 	return cfg, nil

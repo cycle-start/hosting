@@ -28,6 +28,7 @@ func TestGenerateConfig_PHPRuntime(t *testing.T) {
 	mgr := newTestNginxManager(t)
 
 	webroot := &runtime.WebrootInfo{
+		ID:             "wr-001",
 		TenantName:     "tenant1",
 		Name:           "mysite",
 		Runtime:        "php",
@@ -61,9 +62,9 @@ func TestGenerateConfig_PHPRuntime(t *testing.T) {
 	assert.Contains(t, config, "location ~ /\\.ht")
 	assert.Contains(t, config, "deny all")
 
-	// Verify log paths on CephFS.
-	assert.Contains(t, config, "access_log /var/www/storage/tenant1/logs/mysite-access.log")
-	assert.Contains(t, config, "error_log  /var/www/storage/tenant1/logs/mysite-error.log")
+	// Verify log paths on local SSD.
+	assert.Contains(t, config, "access_log /var/log/hosting/tenant1/wr-001-access.log hosting_json")
+	assert.Contains(t, config, "error_log  /var/log/hosting/tenant1/wr-001-error.log warn")
 
 	// Verify node identification headers.
 	assert.Contains(t, config, "add_header X-Served-By $hostname always")

@@ -48,8 +48,8 @@ server {
     root {{ .DocumentRoot }};
     index index.html index.htm{{ if eq .Runtime "php" }} index.php{{ end }};
 
-    access_log /var/www/storage/{{ .TenantName }}/logs/{{ .WebrootName }}-access.log;
-    error_log  /var/www/storage/{{ .TenantName }}/logs/{{ .WebrootName }}-error.log;
+    access_log /var/log/hosting/{{ .TenantID }}/{{ .WebrootID }}-access.log hosting_json;
+    error_log  /var/log/hosting/{{ .TenantID }}/{{ .WebrootID }}-error.log warn;
 
     # Node identification headers for load balancer debugging.
     add_header X-Served-By $hostname always;
@@ -129,7 +129,9 @@ func (m *NginxManager) SetShardName(name string) {
 
 type nginxTemplateData struct {
 	TenantName     string
+	TenantID       string
 	WebrootName    string
+	WebrootID      string
 	ShardName      string
 	ServerNames    string
 	DocumentRoot   string
@@ -213,7 +215,9 @@ func (m *NginxManager) GenerateConfig(webroot *runtime.WebrootInfo, fqdns []*FQD
 
 	data := nginxTemplateData{
 		TenantName:     tenantName,
+		TenantID:       tenantName,
 		WebrootName:    webrootName,
+		WebrootID:      webroot.ID,
 		ShardName:      m.shardName,
 		ServerNames:    strings.Join(serverNames, " "),
 		DocumentRoot:   docRoot,

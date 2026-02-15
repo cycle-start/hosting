@@ -1,42 +1,142 @@
 # Additional Vector sources for web nodes.
+# Collects per-tenant logs and ships to tenant Loki (port 3101).
 
-[sources.nginx_access]
+# Per-tenant nginx access logs (JSON format)
+[sources.tenant_access_logs]
 type = "file"
-include = ["/var/log/nginx/access.log"]
+include = ["/var/log/hosting/**/*-access.log"]
 read_from = "end"
+glob_minimum_cooldown_ms = 5000
 
-[sources.nginx_error]
-type = "file"
-include = ["/var/log/nginx/error.log"]
-read_from = "end"
-
-[transforms.label_nginx_access]
+[transforms.parse_tenant_access]
 type = "remap"
-inputs = ["nginx_access"]
+inputs = ["tenant_access_logs"]
 source = '''
-.service = "nginx"
-.level = "info"
+# Extract tenant_id and webroot_id from file path
+# Path: /var/log/hosting/{tenant_id}/{webroot_id}-access.log
+parts = split(to_string(.file) ?? "", "/")
+if length(parts) >= 6 {
+  .tenant_id = parts[4]
+  filename = parts[5] ?? ""
+  .webroot_id = replace(filename, r'-access\.log$', "")
+}
 .log_type = "access"
+.job = "nginx"
+
+# Parse the JSON access log line
+parsed, err = parse_json(.message)
+if err == null {
+  .message = to_string(parsed.method ?? "") + " " +
+             to_string(parsed.uri ?? "") + " " +
+             to_string(parsed.status ?? "")
+  .structured = parsed
+}
 '''
 
-[transforms.label_nginx_error]
+# Per-tenant nginx error logs
+[sources.tenant_error_logs]
+type = "file"
+include = ["/var/log/hosting/**/*-error.log"]
+read_from = "end"
+glob_minimum_cooldown_ms = 5000
+
+[transforms.parse_tenant_error]
 type = "remap"
-inputs = ["nginx_error"]
+inputs = ["tenant_error_logs"]
 source = '''
-.service = "nginx"
-.level = "error"
+parts = split(to_string(.file) ?? "", "/")
+if length(parts) >= 6 {
+  .tenant_id = parts[4]
+  filename = parts[5] ?? ""
+  .webroot_id = replace(filename, r'-error\.log$', "")
+}
 .log_type = "error"
+.job = "nginx"
+.level = "error"
 '''
 
-[sinks.loki_web]
+# PHP-FPM error logs
+[sources.tenant_php_logs]
+type = "file"
+include = ["/var/log/hosting/*/php-error.log"]
+read_from = "end"
+glob_minimum_cooldown_ms = 5000
+
+[transforms.parse_tenant_php]
+type = "remap"
+inputs = ["tenant_php_logs"]
+source = '''
+parts = split(to_string(.file) ?? "", "/")
+if length(parts) >= 5 {
+  .tenant_id = parts[4]
+}
+.log_type = "php-error"
+.job = "php-fpm"
+.level = "error"
+'''
+
+# PHP-FPM slow logs
+[sources.tenant_php_slow]
+type = "file"
+include = ["/var/log/hosting/*/php-slow.log"]
+read_from = "end"
+glob_minimum_cooldown_ms = 5000
+multiline.mode = "halt_before"
+multiline.start_pattern = '^\[.+\] \[pool '
+multiline.condition_pattern = '^\[.+\] \[pool '
+multiline.timeout_ms = 1000
+
+[transforms.parse_tenant_php_slow]
+type = "remap"
+inputs = ["tenant_php_slow"]
+source = '''
+parts = split(to_string(.file) ?? "", "/")
+if length(parts) >= 5 {
+  .tenant_id = parts[4]
+}
+.log_type = "php-slow"
+.job = "php-fpm"
+.level = "warn"
+'''
+
+# Runtime application logs (Node.js, Python, Ruby stdout/stderr)
+[sources.tenant_app_logs]
+type = "file"
+include = ["/var/log/hosting/**/*-app.log"]
+read_from = "end"
+glob_minimum_cooldown_ms = 5000
+
+[transforms.parse_tenant_app]
+type = "remap"
+inputs = ["tenant_app_logs"]
+source = '''
+parts = split(to_string(.file) ?? "", "/")
+if length(parts) >= 6 {
+  .tenant_id = parts[4]
+  filename = parts[5] ?? ""
+  .webroot_id = replace(filename, r'-app\.log$', "")
+}
+.log_type = "app"
+.job = "runtime"
+'''
+
+# Ship all tenant logs to TENANT Loki (port 3101, NOT platform Loki 3100)
+[sinks.loki_tenant]
 type = "loki"
-inputs = ["label_nginx_access", "label_nginx_error"]
-endpoint = "http://10.10.10.2:3100"
+inputs = [
+  "parse_tenant_access",
+  "parse_tenant_error",
+  "parse_tenant_php",
+  "parse_tenant_php_slow",
+  "parse_tenant_app",
+]
+endpoint = "http://10.10.10.2:3101"
 encoding.codec = "text"
 
-[sinks.loki_web.labels]
-service = "{{ service }}"
+[sinks.loki_tenant.labels]
+job = "{{ job }}"
+tenant_id = "{{ tenant_id }}"
+webroot_id = "{{ webroot_id }}"
+log_type = "{{ log_type }}"
 hostname = "{{ host }}"
 level = "{{ level }}"
-log_type = "{{ log_type }}"
-job = "nginx"

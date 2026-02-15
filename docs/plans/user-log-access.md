@@ -36,17 +36,53 @@ This creates several problems:
    of log lines. Moving to local disk makes the node-local nature explicit and
    eliminates contention.
 
+## Architecture: Two Loki Instances
+
+The platform uses **two separate Loki instances** to cleanly separate concerns:
+
+| Instance | Purpose | Data Sources | Shipped By | Retention |
+|---|---|---|---|---|
+| **Platform Loki** (existing) | Operational logs | core-api, worker, node-agent | Alloy (k3s DaemonSet) | 30 days |
+| **Tenant Loki** (new) | Tenant-facing logs | nginx access/error, PHP-FPM, cron/worker output | Vector (web node VMs) | 7 days |
+
+**Why separate instances:**
+
+- **Isolation.** A high-traffic tenant generating millions of access log entries
+  per day should never degrade the query performance of operational logs used
+  for debugging the platform itself.
+- **Different retention.** Platform logs need longer retention (30 days) for
+  incident investigation. Tenant access logs are high-volume, low-value
+  after a few days — 7-day retention keeps storage costs manageable.
+- **Different cardinality.** Platform logs have low cardinality (a handful of
+  services). Tenant logs have high cardinality (`tenant_id` x `webroot_id` x
+  `log_type` x `hostname`). Separate instances allow independent tuning of
+  Loki limits.
+- **Security boundary.** Tenant log queries always go through the tenant-scoped
+  API endpoint, which enforces brand access. Platform log queries require
+  `audit_logs:read` scope. Separate Loki instances make it impossible for a
+  bug in one query path to leak data from the other.
+
+**Application logs** (code written by tenants — e.g., `error_log()` in PHP,
+`console.log()` in Node.js, Python logging to files) stay on CephFS as files.
+These are the tenant's responsibility and are accessible via SFTP/SSH. We do
+**not** ship application log files to Loki because:
+
+- We can't control whether tenants write to files, stdout, syslog, or all three.
+- Application log formats are unparseable without per-tenant knowledge.
+- Shipping arbitrary tenant file content to our Loki is a security/abuse risk.
+
 ## Log Types
 
-| Type | Source | Current Location | Content |
-|---|---|---|---|
-| Nginx access log | nginx per-webroot | CephFS `logs/{webroot}-access.log` | Request method, path, status, duration, bytes, user agent |
-| Nginx error log | nginx per-webroot | CephFS `logs/{webroot}-error.log` | PHP fatal errors, upstream timeouts, permission errors |
-| PHP-FPM error log | php-fpm per-tenant | CephFS `logs/php-error.log` | PHP errors, warnings, notices (runtime) |
-| PHP-FPM slow log | php-fpm per-tenant | Not configured | Stack traces for requests exceeding threshold |
-| Runtime stdout/stderr | Node.js / Python / Ruby | Not captured | Application console output, crash traces |
-| Cron output | Future: scheduled tasks | Not implemented | stdout/stderr from cron job executions |
-| Worker output | Future: background workers | Not implemented | supervisord-captured stdout/stderr |
+| Type | Source | Current Location | New Location | Ships to Tenant Loki |
+|---|---|---|---|---|
+| Nginx access log | nginx per-webroot | CephFS `logs/{webroot}-access.log` | Local SSD `/var/log/hosting/{tenantID}/{webrootID}-access.log` | Yes |
+| Nginx error log | nginx per-webroot | CephFS `logs/{webroot}-error.log` | Local SSD `/var/log/hosting/{tenantID}/{webrootID}-error.log` | Yes |
+| PHP-FPM error log | php-fpm per-tenant | CephFS `logs/php-error.log` | Local SSD `/var/log/hosting/{tenantID}/php-error.log` | Yes |
+| PHP-FPM slow log | php-fpm per-tenant | Not configured | Local SSD `/var/log/hosting/{tenantID}/php-slow.log` | Yes |
+| Runtime stdout/stderr | Node.js / Python / Ruby | Not captured | Local SSD `/var/log/hosting/{tenantID}/{webrootID}-app.log` | Yes |
+| Cron output | Future: scheduled tasks | Not implemented | Local SSD `/var/log/hosting/{tenantID}/cron-{jobID}.log` | Yes |
+| Worker output | Future: background workers | Not implemented | Local SSD `/var/log/hosting/{tenantID}/worker-{webrootID}.log` | Yes |
+| Application logs | Tenant code (files) | CephFS | CephFS (unchanged) | No — user's responsibility |
 
 ## Design
 
@@ -73,7 +109,7 @@ renamed. The webroot ID is also a UUID. This matches the Loki label scheme
 
 **Code changes:**
 
-1. **`internal/agent/nginx.go`** -- Change the nginx template log paths:
+1. **`internal/agent/nginx.go`** — Change the nginx template log paths:
 
    ```
    # Before
@@ -89,7 +125,7 @@ renamed. The webroot ID is also a UUID. This matches the Loki label scheme
    main nginx config (see Structured Logging section below). Template data
    struct needs `TenantID` and `WebrootID` fields added.
 
-2. **`internal/agent/runtime/php.go`** -- Change the PHP-FPM pool template:
+2. **`internal/agent/runtime/php.go`** — Change the PHP-FPM pool template:
 
    ```
    # Before
@@ -103,7 +139,7 @@ renamed. The webroot ID is also a UUID. This matches the Loki label scheme
 
    Template data struct needs `TenantID` field added.
 
-3. **`internal/agent/tenant.go`** -- Create the local log directory during
+3. **`internal/agent/tenant.go`** — Create the local log directory during
    tenant provisioning (in addition to existing CephFS dirs):
 
    ```go
@@ -117,12 +153,12 @@ renamed. The webroot ID is also a UUID. This matches the Loki label scheme
 
    On tenant deletion, remove `/var/log/hosting/{tenantID}/`.
 
-4. **`internal/agent/tenant.go`** -- Remove the CephFS `logs/` directory from
+4. **`internal/agent/tenant.go`** — Remove the CephFS `logs/` directory from
    the tenant directory layout. The `webroots/`, `home/`, and `tmp/`
    directories remain on CephFS. The `logs/` directory is no longer created
    on CephFS.
 
-5. **Nginx main config (Terraform/cloud-init)** -- Add the `log_format`
+5. **Nginx main config (Terraform/cloud-init)** — Add the `log_format`
    directive. This goes in the `http {}` block in `/etc/nginx/nginx.conf`:
 
    ```nginx
@@ -143,14 +179,43 @@ renamed. The webroot ID is also a UUID. This matches the Loki label scheme
      '}';
    ```
 
-   This produces one JSON object per line -- no regex parsing needed downstream.
+   This produces one JSON object per line — no regex parsing needed downstream.
 
-### Phase 2: Ship Logs to Loki via Vector
+### Phase 2: Deploy Tenant Loki Instance
+
+Deploy a second Loki instance in k3s dedicated to tenant logs.
+
+**New file: `deploy/k3s/loki-tenant.yaml`**
+
+Runs alongside the existing platform Loki (`deploy/k3s/loki.yaml`) on a
+different port:
+
+```yaml
+# StatefulSet running Loki on port 3101 (platform Loki uses 3100)
+# Config differences from platform Loki:
+#   - retention_period: 168h (7 days, vs 720h for platform)
+#   - max_streams_per_user: 100000 (higher for tenant cardinality)
+#   - ingestion_rate_mb: 20 (higher for access log volume)
+#   - PVC: 10Gi (larger for access log volume)
+#   - Separate TSDB/chunks storage path
+```
+
+Key configuration:
+
+| Setting | Platform Loki | Tenant Loki |
+|---|---|---|
+| Port | 3100 | 3101 |
+| Retention | 720h (30 days) | 168h (7 days) |
+| PVC size | 5Gi | 10Gi |
+| max_streams_per_user | 10000 | 100000 |
+| ingestion_rate_mb | 10 | 20 |
+
+### Phase 3: Ship Logs to Tenant Loki via Vector
 
 Web nodes already run Vector with the base config (`deploy/vector/base.toml`)
 and the web overlay (`deploy/vector/web.toml`). The web overlay currently ships
 the global nginx access.log and error.log. Replace this with per-tenant file
-discovery.
+discovery shipping to the **tenant Loki instance** (port 3101).
 
 **Updated `deploy/vector/web.toml`:**
 
@@ -278,7 +343,7 @@ if length(parts) >= 5 {
 .job = "runtime"
 '''
 
-# Ship all tenant logs to Loki.
+# Ship all tenant logs to TENANT Loki (port 3101, NOT platform Loki 3100).
 [sinks.loki_tenant]
 type = "loki"
 inputs = [
@@ -288,7 +353,7 @@ inputs = [
   "parse_tenant_php_slow",
   "parse_tenant_app",
 ]
-endpoint = "http://10.10.10.2:3100"
+endpoint = "http://10.10.10.2:3101"
 encoding.codec = "text"
 
 [sinks.loki_tenant.labels]
@@ -300,7 +365,7 @@ hostname = "{{ host }}"
 level = "{{ level }}"
 ```
 
-**Label design for Loki:**
+**Label design for Tenant Loki:**
 
 | Label | Values | Purpose |
 |---|---|---|
@@ -319,7 +384,7 @@ labels for tenant_id and webroot_id. The current Loki deployment already has
 `allow_structured_metadata: true` enabled (see `deploy/k3s/loki.yaml` line 48),
 so a future migration to structured metadata is straightforward.
 
-### Phase 3: Log Rotation
+### Phase 4: Log Rotation
 
 Deploy logrotate configuration via Terraform cloud-init on web nodes.
 
@@ -340,27 +405,37 @@ Deploy logrotate configuration via Terraform cloud-init on web nodes.
 
 Key decisions:
 
-- **`copytruncate`** instead of `create` -- avoids needing to signal nginx/php-fpm
+- **`copytruncate`** instead of `create` — avoids needing to signal nginx/php-fpm
   to reopen log files. Vector handles file truncation correctly (it detects the
   file shrinking and re-reads from the beginning). This means no log lines are
   lost during rotation.
-- **`rotate 2`** -- keep 2 days. Vector ships logs in near-real-time (seconds of
+- **`rotate 2`** — keep 2 days. Vector ships logs in near-real-time (seconds of
   delay), so local retention is only a safety buffer.
-- **`maxsize 100M`** -- rotate mid-day if a single log file exceeds 100 MB.
+- **`maxsize 100M`** — rotate mid-day if a single log file exceeds 100 MB.
   Protects against traffic spikes filling the local SSD.
-- **`daily`** -- normal rotation cadence.
-- **`compress` / `delaycompress`** -- compress the previous rotation (not the
+- **`daily`** — normal rotation cadence.
+- **`compress` / `delaycompress`** — compress the previous rotation (not the
   current one, since Vector may still be reading it).
 
-### Phase 4: Tenant-Scoped Log Query API
+### Phase 5: Config and Helm Chart
 
-Extend the existing Loki proxy endpoint to support tenant-scoped queries.
+**`internal/config/config.go`** — Add `TenantLokiURL` field:
 
-**Current state:** `GET /logs` (see `internal/api/handler/logs.go`) accepts an
-arbitrary LogQL query string and proxies it to Loki. It is protected by the
-`audit_logs:read` API key scope. This is an admin-only endpoint.
+```go
+TenantLokiURL string // TENANT_LOKI_URL — Tenant Loki query endpoint (default: http://127.0.0.1:3101)
+```
 
-**New endpoint:** Add a tenant-scoped log endpoint:
+Load with `getEnv("TENANT_LOKI_URL", "http://127.0.0.1:3101")`.
+
+The existing `LokiURL` remains unchanged (points to platform Loki on 3100).
+
+**`deploy/helm/hosting/templates/configmap.yaml`** — Add `TENANT_LOKI_URL`.
+
+**`deploy/helm/hosting/values.yaml`** — Add `tenantLokiUrl: "http://127.0.0.1:3101"`.
+
+### Phase 6: Tenant-Scoped Log Query API
+
+Add a tenant-scoped log endpoint that queries the **tenant Loki** instance:
 
 ```
 GET /tenants/{tenantID}/logs?log_type=access&webroot_id=xxx&start=1h&limit=500
@@ -373,15 +448,24 @@ see their own logs. The handler:
 2. Validates brand scope (same as all other tenant-scoped endpoints).
 3. Builds a LogQL query: `{tenant_id="{tenantID}"}` with optional filters for
    `log_type` and `webroot_id`.
-4. Proxies to Loki via the same mechanism as the existing `logs.Query` handler.
+4. Queries **tenant Loki** (not platform Loki) via the same proxy mechanism.
 
-**Handler implementation sketch:**
+**Handler — extend `internal/api/handler/logs.go`:**
 
 ```go
+// Logs now holds both Loki URLs.
+type Logs struct {
+    lokiURL       string       // platform Loki
+    tenantLokiURL string       // tenant Loki
+    client        *http.Client
+}
+
+func NewLogs(lokiURL, tenantLokiURL string) *Logs
+
 // TenantLogs godoc
 //
 //  @Summary     Query tenant logs
-//  @Description Query logs for a specific tenant (access, error, PHP, app)
+//  @Description Query access, error, and application logs for a specific tenant
 //  @Tags        Tenants
 //  @Security    ApiKeyAuth
 //  @Param       tenantID   path  string true  "Tenant ID"
@@ -406,10 +490,12 @@ func (h *Logs) TenantLogs(w http.ResponseWriter, r *http.Request) {
 
     query := fmt.Sprintf("{%s}", strings.Join(selectors, ", "))
 
-    // Reuse existing Loki proxy logic with the constructed query.
-    // ...
+    // Query TENANT Loki (h.tenantLokiURL), not platform Loki.
+    h.queryLoki(w, r, h.tenantLokiURL, query)
 }
 ```
+
+Refactor the existing `Query` method to share a common `queryLoki(w, r, lokiURL, query)` helper.
 
 **Route registration in `internal/api/server.go`:**
 
@@ -420,70 +506,78 @@ r.Route("/tenants/{tenantID}", func(r chi.Router) {
 })
 ```
 
-**API key scope:** This endpoint should require a new `tenant_logs:read` scope
-(or reuse the existing `tenants:read` scope since it is tenant-scoped data).
+**API key scope:** Require `tenants:read` scope (same as other tenant-scoped
+read endpoints). Brand access is enforced via `checkTenantBrandAccess`.
 
-### Phase 5: Admin UI Integration
+### Phase 7: Admin UI Integration
 
-The existing `LogViewer` component (see
-`web/admin/src/components/shared/log-viewer.tsx`) already handles Loki log
-display with time range selection, auto-refresh, service filtering, and
-expandable JSON details. It queries `GET /logs?query=...`.
+The admin UI shows tenant logs from the **tenant Loki** instance and platform
+logs from the **platform Loki** instance. Both are available on different
+detail pages.
 
-**Changes needed:**
+**1. New `useTenantLogs` hook** in `web/admin/src/lib/hooks.ts`:
 
-1. **New `useTenantLogs` hook** in `web/admin/src/lib/hooks.ts`:
+```typescript
+export function useTenantLogs(
+  tenantId: string,
+  logType?: string,
+  webrootId?: string,
+  range: string = '1h',
+  enabled = true,
+) {
+  const params = new URLSearchParams({ start: range, limit: '500' })
+  if (logType) params.set('log_type', logType)
+  if (webrootId) params.set('webroot_id', webrootId)
 
-   ```typescript
-   export function useTenantLogs(
-     tenantId: string,
-     logType?: string,
-     webrootId?: string,
-     range: string = '1h',
-     enabled = true,
-   ) {
-     const params = new URLSearchParams({ start: range, limit: '500' })
-     if (logType) params.set('log_type', logType)
-     if (webrootId) params.set('webroot_id', webrootId)
+  return useQuery({
+    queryKey: ['tenant-logs', tenantId, logType, webrootId, range],
+    queryFn: () =>
+      api.get<LogQueryResponse>(
+        `/tenants/${tenantId}/logs?${params.toString()}`
+      ),
+    enabled,
+    refetchInterval: 10000,
+  })
+}
+```
 
-     return useQuery({
-       queryKey: ['tenant-logs', tenantId, logType, webrootId, range],
-       queryFn: () =>
-         api.get<LogQueryResponse>(
-           `/tenants/${tenantId}/logs?${params.toString()}`
-         ),
-       enabled,
-       refetchInterval: 10000,
-     })
-   }
-   ```
+**2. New `TenantLogViewer` component** — `web/admin/src/components/shared/tenant-log-viewer.tsx`
 
-2. **New `TenantLogViewer` component** -- wraps `LogViewer` with a log type
-   selector dropdown (Access, Error, PHP Error, PHP Slow, Application) and an
-   optional webroot filter dropdown. This component calls the tenant-scoped
-   API endpoint instead of the raw LogQL endpoint.
+Wraps the same visual design as `LogViewer` but with tenant-specific controls:
 
-3. **Update detail pages:**
+- **Log type selector:** Dropdown with options: All, Access, Error, PHP Error,
+  PHP Slow, Application. Defaults to "All".
+- **Webroot filter:** Dropdown populated from the tenant's webroots. Defaults to
+  "All webroots".
+- **Time range, pause/resume, entry count** — same as `LogViewer`.
+- **Grafana link** — Opens tenant Loki in Grafana Explore with the same query.
 
-   - **`tenant-detail.tsx`** -- Replace the current `LogViewer` (which queries
-     platform logs mentioning the tenant ID) with `TenantLogViewer` showing
-     actual tenant application logs. Keep a separate "Platform Logs" tab for
-     admins to see core-api/worker/node-agent logs related to this tenant.
+**Log entry display:** For access log entries (`log_type=access`), the summary
+line shows `METHOD URI STATUS` parsed from the JSON message. For error entries,
+shows the raw error text. For PHP slow log entries, shows the function trace.
+Same expandable JSON detail on click.
 
-   - **`webroot-detail.tsx`** -- Replace the current `LogViewer` with
-     `TenantLogViewer` filtered to the specific webroot ID. Show access logs
-     by default.
+**3. Update detail pages:**
 
-   - **`fqdn-detail.tsx`** -- Show access logs filtered by the FQDN's webroot.
+- **`tenant-detail.tsx`** — Two log tabs:
+  - **"Access Logs" tab:** `TenantLogViewer` with all log types for this tenant.
+    Shows nginx access/error, PHP errors, and runtime output.
+  - **"Platform Logs" tab (existing):** The current `LogViewer` querying platform
+    Loki for `|= "{tenantID}"`. Shows core-api/worker/node-agent operational
+    logs about this tenant.
 
-4. **Log type display formatting:** The `LogEntryRow` component currently
-   parses JSON logs from zerolog. Tenant access logs are also JSON (from the
-   nginx `hosting_json` format), so the existing expand-to-see-JSON behavior
-   works. The summary line should show `method uri status` for access logs
-   and the raw message for error logs. Detect by the `log_type` label in the
-   entry.
+- **`webroot-detail.tsx`** — Add `TenantLogViewer` filtered to specific webroot.
+  Shows access logs by default.
 
-### Phase 6: Future -- Customer Portal Access
+- **`fqdn-detail.tsx`** — Add `TenantLogViewer` filtered to the FQDN's webroot.
+  Shows access logs by default.
+
+- **`database-detail.tsx`**, **`zone-detail.tsx`**, **`valkey-detail.tsx`**,
+  **`s3-bucket-detail.tsx`** — These resources don't generate tenant Loki logs
+  (no nginx/PHP involved). Keep only the existing platform `LogViewer` for
+  operational logs about these resources.
+
+### Phase 8: Future — Customer Portal Access
 
 When an OIDC-authenticated customer portal is implemented, tenants access their
 own logs through it. The architecture is:
@@ -493,7 +587,7 @@ Customer Portal (SPA)
   -> Customer API (Go, OIDC-authenticated)
     -> GET /my/logs?log_type=access&webroot_id=xxx
       -> Core API GET /tenants/{tenantID}/logs (internal, API-key-authenticated)
-        -> Loki
+        -> Tenant Loki
 ```
 
 The customer API resolves the authenticated user's tenant ID from the OIDC token
@@ -501,8 +595,53 @@ and calls the core API tenant-scoped log endpoint. The core API does not need
 to know about OIDC. This is the same pattern used for all other customer-facing
 resources.
 
-No additional work is needed in the core platform for this -- the tenant-scoped
-log endpoint from Phase 4 is the foundation.
+No additional work is needed in the core platform for this — the tenant-scoped
+log endpoint from Phase 6 is the foundation.
+
+## Log Deletion for Abuse/DDoS Scenarios
+
+When a tenant is targeted by a DDoS attack, millions of access log entries can
+flood tenant Loki. We need the ability to delete logs for a specific tenant to
+reclaim storage.
+
+**Loki Compactor with retention and deletion:**
+
+Tenant Loki must be configured with the Compactor component and deletion API
+enabled:
+
+```yaml
+compactor:
+  working_directory: /loki/compactor
+  retention_enabled: true
+  delete_request_store: filesystem
+limits_config:
+  allow_deletes: true
+```
+
+This enables the `DELETE /loki/api/v1/delete` API endpoint, which accepts a
+label selector and time range:
+
+```
+POST /loki/api/v1/delete?query={tenant_id="abc123"}&start=...&end=...
+```
+
+**Core API endpoint:**
+
+```
+DELETE /tenants/{tenantID}/logs?start=...&end=...
+```
+
+The handler proxies to tenant Loki's delete API with the tenant_id label
+selector. Requires `tenants:write` scope. Optional `start`/`end` params allow
+deleting a specific time window (e.g., the attack window). If omitted, deletes
+all logs for the tenant.
+
+Deletion in Loki is async — the compactor processes delete requests during its
+next compaction cycle. The API returns 204 immediately. A subsequent query will
+show progressively fewer results as compaction runs.
+
+**Admin UI:** Add a "Purge Logs" button on the tenant Access Logs tab with a
+confirmation dialog. Shows the time range being purged (defaults to "all").
 
 ## Alternative Considered: Skip Disk, Ship Directly to Syslog
 
@@ -516,7 +655,7 @@ php-fpm could write to syslog, and Vector could listen on a local syslog socket.
 
 **Cons:**
 - Syslog loses logs if Vector is restarting or down. File-based tailing with
-  Vector positions tracking is more resilient -- Vector picks up where it left
+  Vector positions tracking is more resilient — Vector picks up where it left
   off.
 - PHP-FPM error_log does not support syslog well (it can write to syslog, but
   multiline stack traces get split across syslog messages).
@@ -537,9 +676,21 @@ The control plane uses Alloy (Grafana's agent) in k3s to ship pod logs to Loki
   `deploy/vector/base.toml` and `deploy/vector/web.toml`).
 - Vector's file source handles glob discovery, log rotation, and position
   tracking well.
-- Mixing Alloy (k3s) and Vector (VMs) is fine -- they serve different
+- Mixing Alloy (k3s) and Vector (VMs) is fine — they serve different
   environments. Alloy uses Kubernetes service discovery; Vector uses file
   discovery. No reason to switch.
+
+## Alternative Considered: Single Loki with Multi-Tenancy
+
+Loki supports multi-tenancy via the `X-Scope-OrgID` header. We could use a
+single Loki instance with separate org IDs for "platform" and "tenant" logs.
+
+**Why separate instances instead:**
+- Simpler operational model — each instance has its own retention, limits, PVC.
+- No risk of one workload's misconfiguration affecting the other.
+- Tenant Loki can be independently scaled (or replaced with Loki SimpleScalable)
+  when log volume grows.
+- Easier to reason about storage capacity and costs per instance.
 
 ## Performance Considerations
 
@@ -547,12 +698,12 @@ The control plane uses Alloy (Grafana's agent) in k3s to ship pod logs to Loki
 |---|---|
 | Local SSD write throughput | NVMe SSDs handle 100K+ sequential writes/sec. Even the busiest tenant will not saturate this. |
 | Vector CPU/memory on web nodes | Vector is lightweight. File tailing is inotify-based, not polling. Memory usage is bounded by batch size (default 1 MB). |
-| Loki ingestion rate | Loki single-node handles ~10 GB/day. At scale, move to Loki SimpleScalable or microservices mode. |
+| Tenant Loki ingestion rate | Single-node Loki handles ~10 GB/day. Access logs are ~200 bytes each; 50M requests/day = 10 GB. At that scale, move to SimpleScalable mode. |
 | Loki label cardinality | `tenant_id` x `webroot_id` x `log_type` x `hostname`. At 10K tenants x 3 webroots x 5 types x 3 nodes = 450K streams. This is within Loki's comfort zone for SimpleScalable deployment. At millions of tenants, migrate to structured metadata. |
 | CephFS relief | Removing log writes eliminates the most write-heavy I/O pattern on CephFS. Remaining CephFS I/O is file serving (reads) and deployments (occasional writes). |
 | Query latency | Loki queries by label are O(1) lookup + sequential scan of matching chunks. Tenant-scoped queries touch only that tenant's streams. Sub-second for typical queries. |
 
-## Migration Path
+## Implementation Order
 
 ### Phase 1 (immediate)
 - Change nginx log paths in `internal/agent/nginx.go` template.
@@ -565,26 +716,37 @@ The control plane uses Alloy (Grafana's agent) in k3s to ship pod logs to Loki
   shard convergence cycle, moving logs to local disk automatically.
 
 ### Phase 2 (same sprint)
-- Update `deploy/vector/web.toml` with per-tenant file sources and transforms.
-- Redeploy Vector on web nodes (Terraform apply or rolling restart).
-- Verify logs appear in Loki with correct labels via Grafana Explore.
+- Deploy `deploy/k3s/loki-tenant.yaml` — second Loki instance on port 3101.
+- Verify it's running and accepting pushes.
 
 ### Phase 3 (same sprint)
+- Update `deploy/vector/web.toml` with per-tenant file sources and transforms.
+- Change Vector sink to point to tenant Loki (`http://10.10.10.2:3101`).
+- Redeploy Vector on web nodes (Terraform apply or rolling restart).
+- Verify logs appear in tenant Loki via Grafana Explore.
+
+### Phase 4 (same sprint)
 - Add logrotate config to web node cloud-init (Terraform).
 - Verify rotation works with Vector (no log loss).
 
-### Phase 4 (next sprint)
-- Implement `GET /tenants/{tenantID}/logs` handler.
-- Register route in `internal/api/server.go`.
-- Add API key scope for tenant log access.
-- Add tests for the handler (similar to existing `logs_test.go` pattern).
+### Phase 5 (same sprint)
+- Add `TenantLokiURL` to config, Helm chart.
+- Update `NewLogs` constructor to accept both Loki URLs.
+- Refactor `Logs.Query` to use shared `queryLoki` helper.
 
-### Phase 5 (next sprint)
-- Add `useTenantLogs` hook and `TenantLogViewer` component.
-- Update tenant, webroot, and FQDN detail pages.
+### Phase 6 (next sprint)
+- Implement `GET /tenants/{tenantID}/logs` handler (`TenantLogs`).
+- Register route in `internal/api/server.go`.
+- Add tests for the handler.
+
+### Phase 7 (next sprint)
+- Add `useTenantLogs` hook.
+- Create `TenantLogViewer` component.
+- Update tenant, webroot, and FQDN detail pages with access log tabs.
+- Keep existing platform `LogViewer` on all detail pages for operational logs.
 - Rebuild admin UI (`just vm-deploy`).
 
-### Phase 6 (future)
+### Phase 8 (future)
 - Customer portal integration (depends on OIDC/customer API work).
 
 ## Files to Modify
@@ -596,13 +758,36 @@ The control plane uses Alloy (Grafana's agent) in k3s to ship pod logs to Loki
 | `internal/agent/runtime/php.go` | Change error_log path, add slowlog directive, add `TenantID` to template data |
 | `internal/agent/runtime/php_test.go` | Update expected output in tests |
 | `internal/agent/tenant.go` | Create `/var/log/hosting/{tenantID}/` on provision, remove on delete, stop creating CephFS `logs/` dir |
-| `internal/api/handler/logs.go` | Add `TenantLogs` handler method |
-| `internal/api/server.go` | Register `GET /tenants/{tenantID}/logs` route |
-| `deploy/vector/web.toml` | Replace global nginx sources with per-tenant file discovery and Loki labels |
+| `internal/config/config.go` | Add `TenantLokiURL` field |
+| `internal/api/handler/logs.go` | Add `tenantLokiURL` field, `TenantLogs` handler, `DeleteTenantLogs` handler, refactor `queryLoki` helper |
+| `internal/api/server.go` | Register `GET /tenants/{tenantID}/logs` and `DELETE /tenants/{tenantID}/logs` routes, pass `tenantLokiURL` to `NewLogs` |
+| `deploy/k3s/loki-tenant.yaml` | **New** — Second Loki StatefulSet on port 3101 |
+| `deploy/vector/web.toml` | Replace global nginx sources with per-tenant file discovery, ship to tenant Loki |
 | `terraform/modules/web-node/` | Add `log_format hosting_json` to nginx.conf, add logrotate config |
+| `deploy/helm/hosting/templates/configmap.yaml` | Add `TENANT_LOKI_URL` |
+| `deploy/helm/hosting/values.yaml` | Add `tenantLokiUrl` default |
 | `web/admin/src/lib/hooks.ts` | Add `useTenantLogs` hook |
 | `web/admin/src/lib/types.ts` | Add tenant log query params type if needed |
-| `web/admin/src/components/shared/` | Add `TenantLogViewer` component |
-| `web/admin/src/pages/tenant-detail.tsx` | Use `TenantLogViewer` for application logs |
-| `web/admin/src/pages/webroot-detail.tsx` | Use `TenantLogViewer` filtered by webroot |
-| `web/admin/src/pages/fqdn-detail.tsx` | Use `TenantLogViewer` filtered by webroot |
+| `web/admin/src/components/shared/tenant-log-viewer.tsx` | **New** — Tenant log viewer with log type/webroot filters |
+| `web/admin/src/pages/tenant-detail.tsx` | Add "Access Logs" tab with `TenantLogViewer` |
+| `web/admin/src/pages/webroot-detail.tsx` | Add `TenantLogViewer` filtered by webroot |
+| `web/admin/src/pages/fqdn-detail.tsx` | Add `TenantLogViewer` filtered by webroot |
+
+## Verification
+
+1. Deploy tenant Loki, verify it's running on port 3101.
+2. Deploy updated Vector on web nodes, generate traffic, verify logs appear in
+   tenant Loki via Grafana Explore (`{job="nginx"}`).
+3. Verify platform Loki still only has core-api/worker/node-agent logs (no
+   tenant access logs leaked in).
+4. Query `GET /api/v1/tenants/{id}/logs?log_type=access&start=1h&limit=10` —
+   should return nginx access log entries.
+5. Navigate to tenant detail → Access Logs tab in admin UI — verify entries.
+6. Filter by webroot — verify only that webroot's logs show.
+7. Navigate to webroot detail — verify access logs show for that webroot.
+8. Navigate to tenant detail → Platform Logs tab — verify core-api/worker logs
+   still show (from platform Loki).
+9. Verify logrotate works: generate 100MB+ of logs, confirm rotation and no
+   log loss in Loki.
+10. Click "View in Grafana" — verify Grafana opens with correct query against
+    tenant Loki datasource.

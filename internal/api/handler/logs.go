@@ -11,19 +11,22 @@ import (
 	"time"
 
 	"github.com/edvin/hosting/internal/api/response"
+	"github.com/go-chi/chi/v5"
 )
 
 // Logs proxies log queries to Loki.
 type Logs struct {
-	lokiURL string
-	client  *http.Client
+	lokiURL       string
+	tenantLokiURL string
+	client        *http.Client
 }
 
 // NewLogs creates a new Logs handler.
-func NewLogs(lokiURL string) *Logs {
+func NewLogs(lokiURL, tenantLokiURL string) *Logs {
 	return &Logs{
-		lokiURL: strings.TrimRight(lokiURL, "/"),
-		client:  &http.Client{Timeout: 30 * time.Second},
+		lokiURL:       strings.TrimRight(lokiURL, "/"),
+		tenantLokiURL: strings.TrimRight(tenantLokiURL, "/"),
+		client:        &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
@@ -60,6 +63,129 @@ func (h *Logs) Query(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.queryLoki(w, r, h.lokiURL, query)
+}
+
+// TenantLogs godoc
+//
+//	@Summary		Query tenant logs
+//	@Description	Query access, error, and application logs for a specific tenant from the tenant Loki instance
+//	@Tags			Tenants
+//	@Security		ApiKeyAuth
+//	@Param			tenantID   path  string true  "Tenant ID"
+//	@Param			log_type   query string false "Log type filter (access, error, php-error, php-slow, app)"
+//	@Param			webroot_id query string false "Filter by webroot ID"
+//	@Param			start      query string false "Start time (RFC3339 or relative like '1h')"
+//	@Param			end        query string false "End time (RFC3339, default now)"
+//	@Param			limit      query int    false "Max entries (default 500, max 5000)"
+//	@Success		200 {object} LogQueryResponse
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		502 {object} response.ErrorResponse
+//	@Router			/tenants/{tenantID}/logs [get]
+func (h *Logs) TenantLogs(w http.ResponseWriter, r *http.Request) {
+	tenantID := chi.URLParam(r, "tenantID")
+	if tenantID == "" {
+		response.WriteError(w, http.StatusBadRequest, "tenantID is required")
+		return
+	}
+
+	// Validate log_type if provided
+	logType := r.URL.Query().Get("log_type")
+	if logType != "" {
+		validTypes := map[string]bool{
+			"access":    true,
+			"error":     true,
+			"php-error": true,
+			"php-slow":  true,
+			"app":       true,
+		}
+		if !validTypes[logType] {
+			response.WriteError(w, http.StatusBadRequest, "invalid log_type: must be one of access, error, php-error, php-slow, app")
+			return
+		}
+	}
+
+	// Build LogQL query
+	query := fmt.Sprintf(`{tenant_id="%s"`, tenantID)
+	if logType != "" {
+		query += fmt.Sprintf(`, log_type="%s"`, logType)
+	}
+	if webrootID := r.URL.Query().Get("webroot_id"); webrootID != "" {
+		query += fmt.Sprintf(`, webroot_id="%s"`, webrootID)
+	}
+	query += "}"
+
+	h.queryLoki(w, r, h.tenantLokiURL, query)
+}
+
+// DeleteTenantLogs godoc
+//
+//	@Summary		Delete tenant logs
+//	@Description	Delete all logs for a specific tenant from the tenant Loki instance
+//	@Tags			Tenants
+//	@Security		ApiKeyAuth
+//	@Param			tenantID path  string true  "Tenant ID"
+//	@Param			start    query string false "Start time (RFC3339, default 0)"
+//	@Param			end      query string false "End time (RFC3339, default now)"
+//	@Success		204
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		502 {object} response.ErrorResponse
+//	@Router			/tenants/{tenantID}/logs [delete]
+func (h *Logs) DeleteTenantLogs(w http.ResponseWriter, r *http.Request) {
+	tenantID := chi.URLParam(r, "tenantID")
+	if tenantID == "" {
+		response.WriteError(w, http.StatusBadRequest, "tenantID is required")
+		return
+	}
+
+	query := fmt.Sprintf(`{tenant_id="%s"}`, tenantID)
+
+	now := time.Now()
+	start := "0"
+	end := fmt.Sprintf("%d", now.UnixNano())
+
+	if s := r.URL.Query().Get("start"); s != "" {
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
+			start = fmt.Sprintf("%d", t.UnixNano())
+		}
+	}
+	if e := r.URL.Query().Get("end"); e != "" {
+		if t, err := time.Parse(time.RFC3339, e); err == nil {
+			end = fmt.Sprintf("%d", t.UnixNano())
+		}
+	}
+
+	deleteURL := fmt.Sprintf("%s/loki/api/v1/delete?query=%s&start=%s&end=%s",
+		h.tenantLokiURL,
+		urlEncode(query),
+		start,
+		end,
+	)
+
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, deleteURL, nil)
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "failed to create loki delete request")
+		return
+	}
+
+	resp, err := h.client.Do(req)
+	if err != nil {
+		response.WriteError(w, http.StatusBadGateway, "failed to delete logs from loki: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		response.WriteError(w, http.StatusBadGateway, fmt.Sprintf("loki delete returned %d: %s", resp.StatusCode, string(body)))
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// queryLoki executes a LogQL query_range request against the given Loki URL and writes the response.
+func (h *Logs) queryLoki(w http.ResponseWriter, r *http.Request, lokiBaseURL, query string) {
 	limit := 500
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil {
@@ -89,7 +215,7 @@ func (h *Logs) Query(w http.ResponseWriter, r *http.Request) {
 	}
 
 	lokiURL := fmt.Sprintf("%s/loki/api/v1/query_range?query=%s&start=%d&end=%d&limit=%d&direction=backward",
-		h.lokiURL,
+		lokiBaseURL,
 		urlEncode(query),
 		start.UnixNano(),
 		end.UnixNano(),

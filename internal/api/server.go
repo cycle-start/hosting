@@ -94,7 +94,7 @@ func (s *Server) setupRoutes() {
 		// Initialize handlers
 		dashboard := handler.NewDashboard(s.services.Dashboard)
 		audit := handler.NewAudit(s.corePool)
-		logs := handler.NewLogs(s.cfg.LokiURL)
+		logs := handler.NewLogs(s.cfg.LokiURL, s.cfg.TenantLokiURL)
 		platformCfg := handler.NewPlatformConfig(s.services.PlatformConfig)
 		brand := handler.NewBrand(s.services.Brand)
 		region := handler.NewRegion(s.services.Region)
@@ -277,6 +277,7 @@ func (s *Server) setupRoutes() {
 			r.Get("/tenants", tenant.List)
 			r.Get("/tenants/{id}", tenant.Get)
 			r.Get("/tenants/{id}/resource-summary", tenant.ResourceSummary)
+			r.Get("/tenants/{tenantID}/logs", logs.TenantLogs)
 		})
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireScope("tenants", "write"))
@@ -288,6 +289,7 @@ func (s *Server) setupRoutes() {
 			r.Post("/tenants/{id}/retry", tenant.Retry)
 			r.Post("/tenants/{id}/retry-failed", tenant.RetryFailed)
 			r.Post("/tenants/{id}/login-sessions", oidcLogin.CreateLoginSession)
+			r.Delete("/tenants/{tenantID}/logs", logs.DeleteTenantLogs)
 		})
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireScope("tenants", "delete"))

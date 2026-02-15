@@ -40,9 +40,10 @@ import { S3BucketFields } from '@/components/forms/s3-bucket-fields'
 import { SSHKeyFields } from '@/components/forms/ssh-key-fields'
 import { ZoneFields } from '@/components/forms/zone-fields'
 import { LogViewer } from '@/components/shared/log-viewer'
+import { TenantLogViewer } from '@/components/shared/tenant-log-viewer'
 
 const defaultTab = 'webroots'
-const validTabs = ['webroots', 'databases', 'zones', 'valkey', 's3', 'sftp', 'backups', 'logs']
+const validTabs = ['webroots', 'databases', 'zones', 'valkey', 's3', 'sftp', 'backups', 'access-logs', 'platform-logs']
 
 function getTabFromHash() {
   const hash = window.location.hash.slice(1)
@@ -682,7 +683,8 @@ export function TenantDetailPage() {
           <TabsTrigger value="s3">S3 Buckets ({s3Data?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="sftp">SSH Keys ({sftpData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="backups">Backups ({backupsData?.items?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="logs"><ScrollText className="mr-1.5 h-4 w-4" /> Logs</TabsTrigger>
+          <TabsTrigger value="access-logs"><ScrollText className="mr-1.5 h-4 w-4" /> Access Logs</TabsTrigger>
+          <TabsTrigger value="platform-logs"><ScrollText className="mr-1.5 h-4 w-4" /> Platform Logs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="webroots">
@@ -781,7 +783,11 @@ export function TenantDetailPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="logs">
+        <TabsContent value="access-logs">
+          <TenantLogViewer tenantId={id} />
+        </TabsContent>
+
+        <TabsContent value="platform-logs">
           <LogViewer query={`{app=~"core-api|worker|node-agent"} |= "${id}"`} />
         </TabsContent>
       </Tabs>

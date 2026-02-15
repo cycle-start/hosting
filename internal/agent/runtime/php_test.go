@@ -13,6 +13,7 @@ func TestPHP_PoolConfigTemplate(t *testing.T) {
 	// Test the PHP-FPM pool config template rendering directly.
 	data := phpPoolData{
 		TenantName: "tenant1",
+		TenantID:   "tenant1",
 		Version:    "8.2",
 	}
 
@@ -45,8 +46,10 @@ func TestPHP_PoolConfigTemplate(t *testing.T) {
 	assert.Contains(t, config, "pm.max_spare_servers = 3")
 	assert.Contains(t, config, "pm.max_requests = 500")
 
-	// Verify error log path on CephFS.
-	assert.Contains(t, config, "php_admin_value[error_log] = /var/www/storage/tenant1/logs/php-error.log")
+	// Verify error log and slow log paths on local SSD.
+	assert.Contains(t, config, "php_admin_value[error_log] = /var/log/hosting/tenant1/php-error.log")
+	assert.Contains(t, config, "php_admin_value[slowlog] = /var/log/hosting/tenant1/php-slow.log")
+	assert.Contains(t, config, "php_admin_value[request_slowlog_timeout] = 5s")
 	assert.Contains(t, config, "php_admin_flag[log_errors] = on")
 
 	// Verify open_basedir restriction.
@@ -56,6 +59,7 @@ func TestPHP_PoolConfigTemplate(t *testing.T) {
 func TestPHP_PoolConfigTemplate_DifferentVersion(t *testing.T) {
 	data := phpPoolData{
 		TenantName: "user2",
+		TenantID:   "user2",
 		Version:    "8.3",
 	}
 

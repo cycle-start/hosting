@@ -18,6 +18,7 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { Breadcrumb } from '@/components/shared/breadcrumb'
 import { CopyButton } from '@/components/shared/copy-button'
 import { LogViewer } from '@/components/shared/log-viewer'
+import { TenantLogViewer } from '@/components/shared/tenant-log-viewer'
 import { formatDate } from '@/lib/utils'
 import { rules, validateField } from '@/lib/validation'
 import {
@@ -151,7 +152,8 @@ export function WebrootDetailPage() {
       </div>
 
       {/* Logs */}
-      <LogViewer query={`{app=~"core-api|worker|node-agent"} |= "${webrootId}"`} title="Logs" />
+      <TenantLogViewer tenantId={tenantId} webrootId={webrootId} title="Access Logs" />
+      <LogViewer query={`{app=~"core-api|worker|node-agent"} |= "${webrootId}"`} title="Platform Logs" />
 
       {/* Edit Webroot */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

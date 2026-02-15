@@ -27,7 +27,9 @@ pm.min_spare_servers = 1
 pm.max_spare_servers = 3
 pm.max_requests = 500
 
-php_admin_value[error_log] = /var/www/storage/{{ .TenantName }}/logs/php-error.log
+php_admin_value[error_log] = /var/log/hosting/{{ .TenantID }}/php-error.log
+php_admin_value[slowlog] = /var/log/hosting/{{ .TenantID }}/php-slow.log
+php_admin_value[request_slowlog_timeout] = 5s
 php_admin_flag[log_errors] = on
 php_admin_value[open_basedir] = /var/www/storage/{{ .TenantName }}/:/tmp/
 `
@@ -50,6 +52,7 @@ func NewPHP(logger zerolog.Logger, svcMgr ServiceManager) *PHP {
 
 type phpPoolData struct {
 	TenantName string
+	TenantID   string
 	Version    string
 }
 
@@ -78,6 +81,7 @@ func (p *PHP) Configure(ctx context.Context, webroot *WebrootInfo) error {
 
 	data := phpPoolData{
 		TenantName: webroot.TenantName,
+		TenantID:   webroot.TenantName,
 		Version:    version,
 	}
 
