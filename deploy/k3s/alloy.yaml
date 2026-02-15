@@ -54,7 +54,56 @@ data:
     // Tail pod logs
     loki.source.kubernetes "pods" {
       targets    = discovery.relabel.pods.output
+      forward_to = [loki.process.json_extract.receiver]
+    }
+
+    // Parse JSON logs and extract structured fields
+    loki.process "json_extract" {
       forward_to = [loki.write.default.receiver]
+
+      // Parse the JSON body
+      stage.json {
+        expressions = {
+          level     = "level",
+          service   = "service",
+          component = "component",
+          region    = "region",
+          cluster   = "cluster",
+          shard     = "shard",
+          node_id   = "node_id",
+          node_role = "node_role",
+        }
+      }
+
+      // Promote key fields to Loki stream labels (low cardinality only)
+      stage.labels {
+        values = {
+          level     = "",
+          service   = "",
+          node_role = "",
+        }
+      }
+
+      // Store resource identifiers as structured metadata (high cardinality)
+      stage.structured_metadata {
+        values = {
+          component  = "",
+          region     = "",
+          cluster    = "",
+          shard      = "",
+          node_id    = "",
+          tenant     = "",
+          webroot    = "",
+          database   = "",
+          fqdn       = "",
+          bucket     = "",
+          zone       = "",
+          request_id = "",
+          method     = "",
+          path       = "",
+          status     = "",
+        }
+      }
     }
 
     // Ship logs to Loki

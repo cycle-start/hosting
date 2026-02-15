@@ -9,14 +9,150 @@
   "links": [],
   "panels": [
     {
-      "title": "Log Volume by Service",
-      "type": "timeseries",
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
+      "title": "Total Log Volume",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "id": 1,
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "sum(count_over_time({job=~\".+\"} [$__interval])) by (service)",
+          "expr": "sum(count_over_time({service=~\"$service\", level=~\"$level\"} [$__range]))",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
+      }
+    },
+    {
+      "title": "Error Count",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service=~\"$service\", level=~\"error|fatal\"} [$__range]))",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "red", "mode": "fixed" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
+      }
+    },
+    {
+      "title": "Services Logging",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "count(count by (service) (count_over_time({service=~\".+\"} [5m])))",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      }
+    },
+    {
+      "title": "Warn Count",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({service=~\"$service\", level=\"warn\"} [$__range]))",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "orange", "mode": "fixed" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "orange", "value": null }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
+      }
+    },
+    {
+      "title": "Log Volume by Service",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "id": 5,
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum by (service) (count_over_time({service=~\"$service\", level=~\"$level\"} [$__auto]))",
           "legendFormat": "{{ service }}",
           "refId": "A"
         }
@@ -26,48 +162,148 @@
           "color": { "mode": "palette-classic" },
           "custom": {
             "drawStyle": "bars",
-            "fillOpacity": 50,
-            "stacking": { "mode": "normal" }
+            "fillOpacity": 80,
+            "stacking": { "mode": "normal", "group": "A" },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
           }
         },
         "overrides": []
       },
       "options": {
-        "tooltip": { "mode": "multi" },
+        "tooltip": { "mode": "multi", "sort": "desc" },
         "legend": { "displayMode": "list", "placement": "bottom" }
       }
     },
     {
-      "title": "Error Logs",
-      "type": "logs",
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 6 },
-      "id": 2,
+      "title": "Log Level Distribution",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "id": 6,
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "{job=~\".+\"} |~ \"(?i)error|fail|fatal|panic\"",
+          "expr": "sum by (level) (count_over_time({service=~\"$service\", level=~\"$level\"} [$__auto]))",
+          "legendFormat": "{{ level }}",
           "refId": "A"
         }
       ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "stacking": { "mode": "normal", "group": "A" },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "error" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "fatal" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "dark-red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "warn" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "info" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "debug" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "trace" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }]
+          }
+        ]
+      },
       "options": {
-        "showTime": true,
-        "showLabels": true,
-        "showCommonLabels": false,
-        "wrapLogMessage": true,
-        "sortOrder": "Descending",
-        "dedupStrategy": "none",
-        "enableLogDetails": true
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
       }
     },
     {
-      "title": "All Logs",
-      "type": "logs",
-      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 18 },
-      "id": 3,
+      "title": "Error Rate Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "id": 7,
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "{job=~\".+\", service=~\"$service\", region=~\"$region\", cluster=~\"$cluster\", shard=~\"$shard\", node_role=~\"$node_role\", hostname=~\"$hostname\"}",
+          "expr": "sum(count_over_time({service=~\"$service\", level=~\"error|fatal\"} [$__auto]))",
+          "legendFormat": "Errors + Fatal",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "red", "mode": "fixed" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      }
+    },
+    {
+      "title": "Errors by Component",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "id": 8,
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "sum by (component) (count_over_time({service=~\"$service\", level=~\"error|fatal\"} [$__auto]))",
+          "legendFormat": "{{ component }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "tooltip": { "mode": "single", "sort": "none" }
+      }
+    },
+    {
+      "title": "Filtered Logs",
+      "type": "logs",
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 20 },
+      "id": 9,
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "{service=~\"$service\", level=~\"$level\", node_role=~\"$node_role\"} | tenant =~ `${tenant:pipe}` | fqdn =~ `${fqdn:pipe}` | webroot =~ `${webroot:pipe}` | database =~ `${database:pipe}` | zone =~ `${zone:pipe}` | request_id =~ `${request_id:pipe}` |~ `$resource_id`",
           "refId": "A"
         }
       ],
@@ -82,10 +318,13 @@
       }
     }
   ],
+  "schemaVersion": 39,
+  "tags": ["logs", "hosting"],
   "templating": {
     "list": [
       {
         "name": "service",
+        "label": "Service",
         "type": "query",
         "datasource": { "type": "loki", "uid": "loki" },
         "query": "label_values(service)",
@@ -93,43 +332,22 @@
         "includeAll": true,
         "allValue": ".+",
         "multi": true,
-        "refresh": 2
+        "refresh": 2,
+        "sort": 1
       },
       {
-        "name": "region",
-        "type": "query",
-        "datasource": { "type": "loki", "uid": "loki" },
-        "query": "label_values(region)",
+        "name": "level",
+        "label": "Level",
+        "type": "custom",
+        "query": "trace,debug,info,warn,error,fatal",
         "current": { "text": "All", "value": "$__all" },
         "includeAll": true,
         "allValue": ".+",
-        "multi": true,
-        "refresh": 2
-      },
-      {
-        "name": "cluster",
-        "type": "query",
-        "datasource": { "type": "loki", "uid": "loki" },
-        "query": "label_values(cluster)",
-        "current": { "text": "All", "value": "$__all" },
-        "includeAll": true,
-        "allValue": ".+",
-        "multi": true,
-        "refresh": 2
-      },
-      {
-        "name": "shard",
-        "type": "query",
-        "datasource": { "type": "loki", "uid": "loki" },
-        "query": "label_values(shard)",
-        "current": { "text": "All", "value": "$__all" },
-        "includeAll": true,
-        "allValue": ".+",
-        "multi": true,
-        "refresh": 2
+        "multi": true
       },
       {
         "name": "node_role",
+        "label": "Node Role",
         "type": "query",
         "datasource": { "type": "loki", "uid": "loki" },
         "query": "label_values(node_role)",
@@ -137,18 +355,50 @@
         "includeAll": true,
         "allValue": ".+",
         "multi": true,
-        "refresh": 2
+        "refresh": 2,
+        "sort": 1
       },
       {
-        "name": "hostname",
-        "type": "query",
-        "datasource": { "type": "loki", "uid": "loki" },
-        "query": "label_values(hostname)",
-        "current": { "text": "All", "value": "$__all" },
-        "includeAll": true,
-        "allValue": ".+",
-        "multi": true,
-        "refresh": 2
+        "name": "tenant",
+        "label": "Tenant ID",
+        "type": "textbox",
+        "current": { "value": "" }
+      },
+      {
+        "name": "fqdn",
+        "label": "FQDN",
+        "type": "textbox",
+        "current": { "value": "" }
+      },
+      {
+        "name": "webroot",
+        "label": "Webroot",
+        "type": "textbox",
+        "current": { "value": "" }
+      },
+      {
+        "name": "database",
+        "label": "Database",
+        "type": "textbox",
+        "current": { "value": "" }
+      },
+      {
+        "name": "zone",
+        "label": "Zone",
+        "type": "textbox",
+        "current": { "value": "" }
+      },
+      {
+        "name": "resource_id",
+        "label": "Resource ID (UUID)",
+        "type": "textbox",
+        "current": { "value": "" }
+      },
+      {
+        "name": "request_id",
+        "label": "Request ID",
+        "type": "textbox",
+        "current": { "value": "" }
       }
     ]
   },
@@ -160,5 +410,6 @@
   "timezone": "browser",
   "title": "Log Explorer",
   "uid": "log-explorer",
-  "version": 1
+  "version": 1,
+  "refresh": "30s"
 }

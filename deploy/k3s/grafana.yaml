@@ -33,6 +33,12 @@ data:
         access: proxy
         url: http://127.0.0.1:3100
         editable: false
+      - name: Tenant Loki
+        type: loki
+        uid: tenant-loki
+        access: proxy
+        url: http://127.0.0.1:3101
+        editable: false
   dashboards.yaml: |
     apiVersion: 1
     providers:
