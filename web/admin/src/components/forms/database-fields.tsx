@@ -1,5 +1,3 @@
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { ShardSelect } from './shard-select'
 import { ArraySection } from './array-section'
 import { DatabaseUserFields } from './database-user-fields'
@@ -10,10 +8,6 @@ interface Props { value: DatabaseFormData; onChange: (v: DatabaseFormData) => vo
 export function DatabaseFields({ value, onChange, clusterId }: Props) {
   return (
     <div className="space-y-3">
-      <div className="space-y-2">
-        <Label>Name</Label>
-        <Input placeholder="my-database" value={value.name} onChange={(e) => onChange({ ...value, name: e.target.value })} />
-      </div>
       <ShardSelect clusterId={clusterId} role="database" value={value.shard_id} onChange={(shard_id) => onChange({ ...value, shard_id })} />
       <ArraySection<DatabaseUserFormData>
         title="Users"

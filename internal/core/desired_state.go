@@ -62,7 +62,7 @@ func (s *DesiredStateService) GetForNode(ctx context.Context, nodeID string) (*m
 func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, ds *model.DesiredState) error {
 	// Get active/suspended tenants assigned to this shard
 	rows, err := s.db.Query(ctx, `
-		SELECT t.id, t.uid, t.sftp_enabled, t.ssh_enabled, t.status
+		SELECT t.id, t.name, t.uid, t.sftp_enabled, t.ssh_enabled, t.status
 		FROM tenants t
 		WHERE t.shard_id = $1 AND t.status IN ('active', 'suspended')
 		ORDER BY t.id`, shardID)
@@ -73,10 +73,9 @@ func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, 
 
 	for rows.Next() {
 		var t model.DesiredTenant
-		if err := rows.Scan(&t.ID, &t.UID, &t.SFTPEnabled, &t.SSHEnabled, &t.Status); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.UID, &t.SFTPEnabled, &t.SSHEnabled, &t.Status); err != nil {
 			return fmt.Errorf("scan tenant: %w", err)
 		}
-		t.Name = t.ID
 
 		// Load webroots for this tenant
 		wrRows, err := s.db.Query(ctx, `
@@ -112,6 +111,26 @@ func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, 
 				wr.FQDNs = append(wr.FQDNs, f)
 			}
 			fqdnRows.Close()
+
+			// Load cron jobs for this webroot
+			cronRows, err := s.db.Query(ctx, `
+				SELECT id, name, enabled FROM cron_jobs
+				WHERE webroot_id = $1 AND status IN ('active', 'auto_disabled')
+				ORDER BY id`, wr.ID)
+			if err != nil {
+				wrRows.Close()
+				return fmt.Errorf("query cron jobs for webroot %s: %w", wr.ID, err)
+			}
+			for cronRows.Next() {
+				var cj model.DesiredCronJob
+				if err := cronRows.Scan(&cj.ID, &cj.Name, &cj.Enabled); err != nil {
+					cronRows.Close()
+					wrRows.Close()
+					return fmt.Errorf("scan cron job: %w", err)
+				}
+				wr.CronJobs = append(wr.CronJobs, cj)
+			}
+			cronRows.Close()
 
 			t.Webroots = append(t.Webroots, wr)
 		}

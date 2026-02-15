@@ -162,8 +162,28 @@ packer-role role: build-node-agent
 # Create VMs with Terraform and register them with the platform
 # (Requires golden images — run `just packer-all` first)
 vm-up:
+    @if ! sudo virsh net-info hosting 2>/dev/null | grep -q 'Active:.*yes'; then \
+        echo "Starting libvirt network 'hosting'..."; \
+        sudo virsh net-start hosting; \
+    fi
     cd terraform && terraform apply -auto-approve
+    @echo "Waiting for control plane API ({{cp}}:8090)..."
+    @for i in $(seq 1 60); do \
+        if curl -sf -o /dev/null http://{{cp}}:8090/healthz 2>/dev/null; then \
+            echo "Control plane ready."; \
+            break; \
+        fi; \
+        if [ "$i" -eq 60 ]; then echo "Timed out waiting for control plane" && exit 1; fi; \
+        sleep 5; \
+    done
     go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml
+
+# Rebuild everything: new golden images, recreate VMs, deploy control plane
+vm-rebuild:
+    just packer-all
+    just vm-down
+    just vm-up
+    just vm-deploy
 
 # Destroy VMs
 vm-down:

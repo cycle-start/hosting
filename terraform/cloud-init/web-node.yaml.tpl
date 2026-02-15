@@ -24,6 +24,8 @@ write_files:
       NODE_ROLE=web
       SERVICE_NAME=node-agent
       METRICS_ADDR=:9100
+      CORE_API_URL=${core_api_url}
+      CORE_API_TOKEN=${core_api_token}
 
   - path: /etc/ceph/ceph.conf
     content: |
@@ -50,6 +52,41 @@ write_files:
 
       [Install]
       WantedBy=multi-user.target
+
+  - path: /usr/local/bin/cron-outcome
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      # Called by ExecStopPost=+ (as root) after every cron job execution.
+      # Reports success/failure to core-api for auto-disable tracking.
+      # Exit code 75 = flock lock contention (job skipped) — don't report.
+      [ "$EXIT_STATUS" = "75" ] && exit 0
+      source /etc/default/node-agent 2>/dev/null
+      [ -z "$CORE_API_URL" ] && exit 0
+      if [ "$SERVICE_RESULT" = "success" ]; then
+        SUCCESS="true"
+      else
+        SUCCESS="false"
+      fi
+      curl -sf -X POST \
+        -H "Authorization: Bearer $CORE_API_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{\"success\":$SUCCESS}" \
+        "$CORE_API_URL/internal/v1/cron-jobs/$CRON_JOB_ID/outcome" \
+        >/dev/null 2>&1 || true
+
+  - path: /etc/logrotate.d/hosting-tenant-logs
+    content: |
+      /var/log/hosting/*/*.log {
+          daily
+          rotate 2
+          compress
+          delaycompress
+          missingok
+          notifempty
+          copytruncate
+          maxsize 100M
+      }
 
 runcmd:
   # Fetch the CephFS client keyring from the storage node (retry up to 5 minutes).

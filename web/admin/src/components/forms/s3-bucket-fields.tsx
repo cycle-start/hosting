@@ -9,10 +9,6 @@ interface Props { value: S3BucketFormData; onChange: (v: S3BucketFormData) => vo
 export function S3BucketFields({ value, onChange, clusterId }: Props) {
   return (
     <div className="space-y-3">
-      <div className="space-y-2">
-        <Label>Name</Label>
-        <Input placeholder="my-bucket" value={value.name} onChange={(e) => onChange({ ...value, name: e.target.value })} />
-      </div>
       <ShardSelect clusterId={clusterId} role="s3" value={value.shard_id} onChange={(shard_id) => onChange({ ...value, shard_id })} />
       <div className="flex items-center gap-2">
         <Switch checked={value.public ?? false} onCheckedChange={(pub) => onChange({ ...value, public: pub })} />

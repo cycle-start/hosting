@@ -40,7 +40,6 @@ func TestDatabaseCreate_EmptyTenantID(t *testing.T) {
 	h := newDatabaseHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants//databases", map[string]any{
-		"name":     "mydb",
 		"shard_id": validID,
 	})
 	r = withChiURLParam(r, "tenantID", "")
@@ -76,7 +75,7 @@ func TestDatabaseCreate_EmptyBody(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
-func TestDatabaseCreate_MissingRequiredFields(t *testing.T) {
+func TestDatabaseCreate_MissingShardID(t *testing.T) {
 	h := newDatabaseHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants/"+validID+"/databases", map[string]any{})
@@ -89,70 +88,11 @@ func TestDatabaseCreate_MissingRequiredFields(t *testing.T) {
 	assert.Contains(t, body["error"], "validation error")
 }
 
-func TestDatabaseCreate_MissingName(t *testing.T) {
-	h := newDatabaseHandler()
-	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/tenants/"+validID+"/databases", map[string]any{
-		"shard_id": validID,
-	})
-	r = withChiURLParam(r, "tenantID", validID)
-
-	h.Create(rec, r)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	body := decodeErrorResponse(rec)
-	assert.Contains(t, body["error"], "validation error")
-}
-
-func TestDatabaseCreate_MissingShardID(t *testing.T) {
-	h := newDatabaseHandler()
-	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/tenants/"+validID+"/databases", map[string]any{
-		"name": "mydb",
-	})
-	r = withChiURLParam(r, "tenantID", validID)
-
-	h.Create(rec, r)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	body := decodeErrorResponse(rec)
-	assert.Contains(t, body["error"], "validation error")
-}
-
-func TestDatabaseCreate_InvalidSlugName(t *testing.T) {
-	tests := []struct {
-		name string
-		slug string
-	}{
-		{"uppercase", "MyDatabase"},
-		{"spaces", "my database"},
-		{"special chars", "my@db"},
-		{"starts with digit", "1database"},
-		{"hyphens", "my-database"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := newDatabaseHandler()
-			rec := httptest.NewRecorder()
-			r := newRequest(http.MethodPost, "/tenants/"+validID+"/databases", map[string]any{
-				"name":     tt.slug,
-				"shard_id": validID,
-			})
-			r = withChiURLParam(r, "tenantID", validID)
-
-			h.Create(rec, r)
-
-			assert.Equal(t, http.StatusBadRequest, rec.Code)
-		})
-	}
-}
-
 func TestDatabaseCreate_ValidBody(t *testing.T) {
 	h := newDatabaseHandler()
 	rec := httptest.NewRecorder()
 	tid := "test-tenant-1"
 	r := newRequest(http.MethodPost, "/tenants/"+tid+"/databases", map[string]any{
-		"name":     "mydb",
 		"shard_id": "test-shard-1",
 	})
 	r = withChiURLParam(r, "tenantID", tid)
@@ -172,16 +112,15 @@ func TestDatabaseCreate_WithNestedUsers_ValidationPasses(t *testing.T) {
 	rec := httptest.NewRecorder()
 	tid := "test-tenant-1"
 	r := newRequest(http.MethodPost, "/tenants/"+tid+"/databases", map[string]any{
-		"name":     "mydb",
 		"shard_id": "test-shard-1",
 		"users": []map[string]any{
 			{
-				"username":   "admin",
+				"username":   "db_placeholder_admin",
 				"password":   "securepassword123",
 				"privileges": []string{"ALL"},
 			},
 			{
-				"username":   "readonly",
+				"username":   "db_placeholder_readonly",
 				"password":   "anotherpassword1",
 				"privileges": []string{"SELECT"},
 			},
@@ -202,7 +141,6 @@ func TestDatabaseCreate_WithInvalidNestedUser_ValidationFails(t *testing.T) {
 	rec := httptest.NewRecorder()
 	tid := "test-tenant-1"
 	r := newRequest(http.MethodPost, "/tenants/"+tid+"/databases", map[string]any{
-		"name":     "mydb",
 		"shard_id": "test-shard-1",
 		"users": []map[string]any{
 			{
@@ -226,7 +164,6 @@ func TestDatabaseCreate_WithNestedUserMissingPrivileges_ValidationFails(t *testi
 	rec := httptest.NewRecorder()
 	tid := "test-tenant-1"
 	r := newRequest(http.MethodPost, "/tenants/"+tid+"/databases", map[string]any{
-		"name":     "mydb",
 		"shard_id": "test-shard-1",
 		"users": []map[string]any{
 			{

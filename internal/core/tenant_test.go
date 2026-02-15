@@ -205,21 +205,22 @@ func TestTenantService_GetByID_Success(t *testing.T) {
 	shardName := "Test Shard"
 	row := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = tenantID
-		*(dest[1].(*string)) = "test-brand"
-		*(dest[2].(*string)) = regionID
-		*(dest[3].(*string)) = clusterID
-		*(dest[4].(**string)) = &shardID
-		*(dest[5].(*int)) = 5001
-		*(dest[6].(*bool)) = true
-		*(dest[7].(*bool)) = false
-		*(dest[8].(*int64)) = int64(1073741824)
-		*(dest[9].(*string)) = model.StatusActive
-		*(dest[10].(**string)) = nil // status_message
-		*(dest[11].(*time.Time)) = now
+		*(dest[1].(*string)) = "t_abc1234567" // name
+		*(dest[2].(*string)) = "test-brand"
+		*(dest[3].(*string)) = regionID
+		*(dest[4].(*string)) = clusterID
+		*(dest[5].(**string)) = &shardID
+		*(dest[6].(*int)) = 5001
+		*(dest[7].(*bool)) = true
+		*(dest[8].(*bool)) = false
+		*(dest[9].(*int64)) = int64(1073741824)
+		*(dest[10].(*string)) = model.StatusActive
+		*(dest[11].(**string)) = nil // status_message
 		*(dest[12].(*time.Time)) = now
-		*(dest[13].(*string)) = regionName
-		*(dest[14].(*string)) = clusterName
-		*(dest[15].(**string)) = &shardName
+		*(dest[13].(*time.Time)) = now
+		*(dest[14].(*string)) = regionName
+		*(dest[15].(*string)) = clusterName
+		*(dest[16].(**string)) = &shardName
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -228,6 +229,7 @@ func TestTenantService_GetByID_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, tenantID, result.ID)
+	assert.Equal(t, "t_abc1234567", result.Name)
 	assert.Equal(t, regionID, result.RegionID)
 	assert.Equal(t, clusterID, result.ClusterID)
 	assert.Equal(t, &shardID, result.ShardID)
@@ -284,40 +286,42 @@ func TestTenantService_List_Success(t *testing.T) {
 	rows := newMockRows(
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
-			*(dest[1].(*string)) = "test-brand"
-			*(dest[2].(*string)) = regionID
-			*(dest[3].(*string)) = clusterID
-			*(dest[4].(**string)) = &shardID
-			*(dest[5].(*int)) = 5001
-			*(dest[6].(*bool)) = false
+			*(dest[1].(*string)) = "t_tenant00001" // name
+			*(dest[2].(*string)) = "test-brand"
+			*(dest[3].(*string)) = regionID
+			*(dest[4].(*string)) = clusterID
+			*(dest[5].(**string)) = &shardID
+			*(dest[6].(*int)) = 5001
 			*(dest[7].(*bool)) = false
-			*(dest[8].(*int64)) = int64(0)
-			*(dest[9].(*string)) = model.StatusActive
-			*(dest[10].(**string)) = nil // status_message
-			*(dest[11].(*time.Time)) = now
+			*(dest[8].(*bool)) = false
+			*(dest[9].(*int64)) = int64(0)
+			*(dest[10].(*string)) = model.StatusActive
+			*(dest[11].(**string)) = nil // status_message
 			*(dest[12].(*time.Time)) = now
-			*(dest[13].(*string)) = regionName
-			*(dest[14].(*string)) = clusterName
-			*(dest[15].(**string)) = &shardName
+			*(dest[13].(*time.Time)) = now
+			*(dest[14].(*string)) = regionName
+			*(dest[15].(*string)) = clusterName
+			*(dest[16].(**string)) = &shardName
 			return nil
 		},
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id2
-			*(dest[1].(*string)) = "test-brand"
-			*(dest[2].(*string)) = regionID
-			*(dest[3].(*string)) = clusterID
-			*(dest[4].(**string)) = &shardID
-			*(dest[5].(*int)) = 5002
-			*(dest[6].(*bool)) = true
-			*(dest[7].(*bool)) = false
-			*(dest[8].(*int64)) = int64(0)
-			*(dest[9].(*string)) = model.StatusPending
-			*(dest[10].(**string)) = nil // status_message
-			*(dest[11].(*time.Time)) = now
+			*(dest[1].(*string)) = "t_tenant00002" // name
+			*(dest[2].(*string)) = "test-brand"
+			*(dest[3].(*string)) = regionID
+			*(dest[4].(*string)) = clusterID
+			*(dest[5].(**string)) = &shardID
+			*(dest[6].(*int)) = 5002
+			*(dest[7].(*bool)) = true
+			*(dest[8].(*bool)) = false
+			*(dest[9].(*int64)) = int64(0)
+			*(dest[10].(*string)) = model.StatusPending
+			*(dest[11].(**string)) = nil // status_message
 			*(dest[12].(*time.Time)) = now
-			*(dest[13].(*string)) = regionName
-			*(dest[14].(*string)) = clusterName
-			*(dest[15].(**string)) = &shardName
+			*(dest[13].(*time.Time)) = now
+			*(dest[14].(*string)) = regionName
+			*(dest[15].(*string)) = clusterName
+			*(dest[16].(**string)) = &shardName
 			return nil
 		},
 	)
@@ -581,40 +585,42 @@ func TestTenantService_ListByShard_Success(t *testing.T) {
 	rows := newMockRows(
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
-			*(dest[1].(*string)) = "test-brand"
-			*(dest[2].(*string)) = regionID
-			*(dest[3].(*string)) = clusterID
-			*(dest[4].(**string)) = &shardID
-			*(dest[5].(*int)) = 5001
-			*(dest[6].(*bool)) = false
+			*(dest[1].(*string)) = "t_tenant00001" // name
+			*(dest[2].(*string)) = "test-brand"
+			*(dest[3].(*string)) = regionID
+			*(dest[4].(*string)) = clusterID
+			*(dest[5].(**string)) = &shardID
+			*(dest[6].(*int)) = 5001
 			*(dest[7].(*bool)) = false
-			*(dest[8].(*int64)) = int64(0)
-			*(dest[9].(*string)) = model.StatusActive
-			*(dest[10].(**string)) = nil // status_message
-			*(dest[11].(*time.Time)) = now
+			*(dest[8].(*bool)) = false
+			*(dest[9].(*int64)) = int64(0)
+			*(dest[10].(*string)) = model.StatusActive
+			*(dest[11].(**string)) = nil // status_message
 			*(dest[12].(*time.Time)) = now
-			*(dest[13].(*string)) = regionName
-			*(dest[14].(*string)) = clusterName
-			*(dest[15].(**string)) = &shardName
+			*(dest[13].(*time.Time)) = now
+			*(dest[14].(*string)) = regionName
+			*(dest[15].(*string)) = clusterName
+			*(dest[16].(**string)) = &shardName
 			return nil
 		},
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id2
-			*(dest[1].(*string)) = "test-brand"
-			*(dest[2].(*string)) = regionID
-			*(dest[3].(*string)) = clusterID
-			*(dest[4].(**string)) = &shardID
-			*(dest[5].(*int)) = 5002
-			*(dest[6].(*bool)) = true
-			*(dest[7].(*bool)) = false
-			*(dest[8].(*int64)) = int64(0)
-			*(dest[9].(*string)) = model.StatusPending
-			*(dest[10].(**string)) = nil // status_message
-			*(dest[11].(*time.Time)) = now
+			*(dest[1].(*string)) = "t_tenant00002" // name
+			*(dest[2].(*string)) = "test-brand"
+			*(dest[3].(*string)) = regionID
+			*(dest[4].(*string)) = clusterID
+			*(dest[5].(**string)) = &shardID
+			*(dest[6].(*int)) = 5002
+			*(dest[7].(*bool)) = true
+			*(dest[8].(*bool)) = false
+			*(dest[9].(*int64)) = int64(0)
+			*(dest[10].(*string)) = model.StatusPending
+			*(dest[11].(**string)) = nil // status_message
 			*(dest[12].(*time.Time)) = now
-			*(dest[13].(*string)) = regionName
-			*(dest[14].(*string)) = clusterName
-			*(dest[15].(**string)) = &shardName
+			*(dest[13].(*time.Time)) = now
+			*(dest[14].(*string)) = regionName
+			*(dest[15].(*string)) = clusterName
+			*(dest[16].(**string)) = &shardName
 			return nil
 		},
 	)

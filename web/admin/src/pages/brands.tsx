@@ -23,7 +23,6 @@ export function BrandsPage() {
   const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Brand | null>(null)
-  const [formId, setFormId] = useState('')
   const [formName, setFormName] = useState('')
   const [formBaseHostname, setFormBaseHostname] = useState('')
   const [formPrimaryNS, setFormPrimaryNS] = useState('')
@@ -72,7 +71,6 @@ export function BrandsPage() {
   const handleCreate = async () => {
     try {
       await createMutation.mutateAsync({
-        id: formId,
         name: formName,
         base_hostname: formBaseHostname,
         primary_ns: formPrimaryNS,
@@ -81,7 +79,7 @@ export function BrandsPage() {
       })
       toast.success('Brand created')
       setCreateOpen(false)
-      setFormId(''); setFormName(''); setFormBaseHostname('')
+      setFormName(''); setFormBaseHostname('')
       setFormPrimaryNS(''); setFormSecondaryNS(''); setFormHostmaster('')
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Failed to create brand')
@@ -99,7 +97,7 @@ export function BrandsPage() {
     }
   }
 
-  const canCreate = formId && formName && formBaseHostname && formPrimaryNS && formSecondaryNS && formHostmaster && !createMutation.isPending
+  const canCreate = formName && formBaseHostname && formPrimaryNS && formSecondaryNS && formHostmaster && !createMutation.isPending
 
   return (
     <div className="space-y-6">
@@ -135,10 +133,6 @@ export function BrandsPage() {
         <DialogContent>
           <DialogHeader><DialogTitle>Create Brand</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>ID</Label>
-              <Input placeholder="e.g. acme" value={formId} onChange={(e) => setFormId(e.target.value)} />
-            </div>
             <div className="space-y-2">
               <Label>Name</Label>
               <Input placeholder="e.g. Acme Hosting" value={formName} onChange={(e) => setFormName(e.target.value)} />

@@ -23,7 +23,6 @@ func TestValkeyInstanceCreate_WithNestedUsers_ValidationPasses(t *testing.T) {
 	rec := httptest.NewRecorder()
 	tid := "test-tenant-1"
 	r := newRequest(http.MethodPost, "/tenants/"+tid+"/valkey-instances", map[string]any{
-		"name":     "my-cache",
 		"shard_id": "test-shard-1",
 		"users": []map[string]any{
 			{
@@ -54,7 +53,6 @@ func TestValkeyInstanceCreate_WithInvalidNestedUser_ValidationFails(t *testing.T
 	rec := httptest.NewRecorder()
 	tid := "test-tenant-1"
 	r := newRequest(http.MethodPost, "/tenants/"+tid+"/valkey-instances", map[string]any{
-		"name":     "my-cache",
 		"shard_id": "test-shard-1",
 		"users": []map[string]any{
 			{
@@ -78,7 +76,6 @@ func TestValkeyInstanceCreate_WithNestedUserShortPassword_ValidationFails(t *tes
 	rec := httptest.NewRecorder()
 	tid := "test-tenant-1"
 	r := newRequest(http.MethodPost, "/tenants/"+tid+"/valkey-instances", map[string]any{
-		"name":     "my-cache",
 		"shard_id": "test-shard-1",
 		"users": []map[string]any{
 			{

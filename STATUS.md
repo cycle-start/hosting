@@ -176,49 +176,99 @@ React SPA (TypeScript, Vite, Tailwind, shadcn/ui) served by Go binary on port 30
 - **Image delivery:** `docker build` -> `docker save` -> SSH pipe -> `k3s ctr images import`
 - **Networking:** `*.hosting.test` domain via Traefik ingress, WSL2 -> libvirt routing via `just forward`
 
+### Resource Naming
+
+All resources use UUID primary keys and auto-generated prefixed short names for system-level identifiers:
+
+| Resource | Prefix | System Use |
+|---|---|---|
+| Tenant | `t_` | Linux user, CephFS paths, S3 RGW user |
+| Webroot | `web_` | File paths, nginx configs |
+| Database | `db_` | MySQL database name |
+| Valkey | `kv_` | systemd unit, config, data dir |
+| S3 Bucket | `s3_` | RGW bucket (with tenant prefix) |
+| Cron Job | `cron_` | systemd timer/service |
+
+Names are `{prefix}{10-char-random}`, globally unique, auto-generated on creation. Database and valkey usernames must start with the parent resource name (e.g., `db_abc123_admin`). See `docs/resource-naming.md` for details.
+
 ### Tests
 
 - **Unit tests:** workflows (mock activities, state transitions), handlers (HTTP req/res, validation), activities (mock DB/TCP), agent managers (mock exec), runtime managers, request/response/config/model packages
 - **E2E tests:** tenant lifecycle, webroot, database, DNS, S3, backup, platform config (require `HOSTING_E2E=1` and running cluster)
 
+### MySQL Replication
+
+- GTID-based async replication for DB shard primary-replica pairs
+- Explicit primary election via shard config (`primary_node_id` in config JSON)
+- Convergence routes writes to primary, sets up replication to replicas automatically
+- Periodic health check workflow detects replication lag/breakage
+- Manual failover workflow (API-triggered) promotes replica and updates shard config
+
+### CephFS Integration
+
+- Deterministic Ceph FSID via Terraform (no runtime config distribution)
+- Systemd mount units on web nodes with proper dependencies
+- Node-agent mount verification via syscall + periodic write probes
+- Per-tenant CephFS quotas via extended attributes
+
+### Cron Jobs
+
+- Systemd timer + service units per cron job (`OnCalendar=` from cron syntax)
+- Distributed locking via CephFS `flock` — timers fire on all nodes, only one executes
+- Instant failover: surviving nodes acquire the lock on next timer fire
+- Auto-disable after configurable consecutive failures (default 5), status `auto_disabled`
+- Outcome reporting via `ExecStopPost=+/usr/local/bin/cron-outcome` (systemd-native, no polling)
+- Runs as tenant user with systemd security hardening (ProtectSystem, MemoryMax, CPUQuota)
+- Output captured in journald, shipped to Tenant Loki via Vector with `log_type=cron` label
+- Queryable via `GET /tenants/{id}/logs?log_type=cron&cron_job_id={id}`
+
+### Worker Runtime
+
+- Generic "worker" runtime type for long-lived background processes (e.g., Laravel queue workers)
+- Supervisord-based process management with configurable `numprocs` (1-8)
+- No nginx config generation for worker runtimes
+- Versioned PHP binary, systemd security hardening (NoNewPrivileges, ProtectSystem, PrivateTmp)
+
+### Tenant Log Access
+
+- Two Loki instances: Platform Loki (30-day, core services) + Tenant Loki (7-day, nginx/PHP-FPM/cron/worker)
+- Logs on local SSD (`/var/log/hosting/{tenantID}/`), shipped by Vector with structured metadata
+- Tenant-scoped `GET /tenants/{id}/logs` proxies to Tenant Loki with tenant/webroot/log_type filtering
+
+### Alerting
+
+- Grafana Unified Alerting (no separate Alertmanager) with severity-based routing
+- 15+ core alerts: NodeDown, CoreApiDown, HighDiskUsage, HighCpuUsage, 5xxRate, HAProxyBackendDown, etc.
+- Every alert links to a runbook in `docs/runbooks/`
+- Repeat intervals: critical 1h, warning 4h, info 12h
+
+### Grafana Dashboards
+
+- Alloy JSON extraction pipeline for structured metadata (tenant, webroot, status, method, path)
+- Enhanced dashboards: Log Explorer, API Overview, Infrastructure
+- New dashboards: Tenant activity, Workflow stats, Database, DNS
+
+### Extended E2E Tests
+
+- 14 test files covering 50+ scenarios: Valkey, Email, SSH Key, Certificate, Brand isolation, API Key scopes
+- Full-stack FQDN binding: zone → webroot → FQDN → DNS → HAProxy → nginx → HTTP verification
+- Cross-shard migration tests (tenant, database, valkey)
+- Backup/restore with data verification, retry on failed resources, DNS propagation via dig
+
 ---
 
-## What's Missing
+## What's Next
 
-### Priority 1: MySQL Replication Management
+### Production Hardening
 
-DB shards use replication pairs, but there's no automation for:
-- Setting up replication between nodes in a shard
-- Monitoring replication lag
-- Handling failover (ProxySQL VIP switching)
-- Promoting a replica to primary
+- **MySQL auto-failover:** Phase 2 of replication — automatic failover via ProxySQL VIP switching (manual failover works today)
+- **CephFS HA:** MDS standby for high availability (single MDS today)
+- **Service exporters:** mysqld_exporter, PowerDNS exporter, nginx-exporter, redis_exporter for deeper Grafana metrics
+- **TLS everywhere:** HTTPS on control plane services, mTLS between nodes
 
-### Priority 2: CephFS Integration
+### Platform Features
 
-Web nodes need CephFS mounted at `/var/www/storage` for shared tenant files:
-- Ceph client configuration distribution
-- Mount management in node-agent
-- Health monitoring of Ceph mounts
-
-### Priority 3: Agent-Side Reconciliation
-
-The agent has no autonomous self-healing:
-- Startup self-check (query core DB, converge local state)
-- Periodic drift detection
-- Health status reporting back to core
-
-### Priority 4: Extended E2E Tests
-
-Current E2E coverage is partial. Still needed:
-- Valkey shard e2e
-- Email account e2e (Stalwart integration)
-- Cross-shard migration e2e
-- DNS record propagation verification
-
-### Priority 5: Alerting
-
-Prometheus and Grafana are deployed but no alerts configured:
-- Node health degradation
-- Workflow failure rates
-- Resource provisioning timeouts
-- Disk/memory/CPU thresholds
+- **Per-brand DNS isolation:** Separate PowerDNS databases per brand (currently shared)
+- **Resource metering/billing:** Usage tracking, quotas enforcement, billing integration
+- **Rate limiting:** API rate limiting per API key/brand
+- **Multi-region:** Cross-region failover and data replication

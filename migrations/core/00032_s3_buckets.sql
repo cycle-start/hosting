@@ -10,7 +10,7 @@ CREATE TABLE s3_buckets (
     status_message TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE(tenant_id, name)
+    UNIQUE(name)
 );
 
 -- +goose Down

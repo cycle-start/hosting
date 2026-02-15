@@ -89,6 +89,13 @@ variable "web_shard_name" {
   default     = "web-1"
 }
 
+variable "core_api_token" {
+  description = "Bearer token for node-agent to call core-api internal endpoints (cron outcome reporting)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 # --- DB nodes ---
 
 variable "db_nodes" {

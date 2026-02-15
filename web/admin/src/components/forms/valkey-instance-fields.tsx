@@ -10,15 +10,9 @@ interface Props { value: ValkeyInstanceFormData; onChange: (v: ValkeyInstanceFor
 export function ValkeyInstanceFields({ value, onChange, clusterId }: Props) {
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Name</Label>
-          <Input placeholder="my-cache" value={value.name} onChange={(e) => onChange({ ...value, name: e.target.value })} />
-        </div>
-        <div className="space-y-2">
-          <Label>Max Memory (MB)</Label>
-          <Input type="number" value={value.max_memory_mb ?? 64} onChange={(e) => onChange({ ...value, max_memory_mb: parseInt(e.target.value) || 64 })} />
-        </div>
+      <div className="space-y-2">
+        <Label>Max Memory (MB)</Label>
+        <Input type="number" value={value.max_memory_mb ?? 64} onChange={(e) => onChange({ ...value, max_memory_mb: parseInt(e.target.value) || 64 })} />
       </div>
       <ShardSelect clusterId={clusterId} role="valkey" value={value.shard_id} onChange={(shard_id) => onChange({ ...value, shard_id })} />
       <ArraySection<ValkeyUserFormData>

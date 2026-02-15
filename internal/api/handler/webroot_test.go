@@ -36,7 +36,6 @@ func TestWebrootCreate_EmptyTenantID(t *testing.T) {
 	h := newWebrootHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants//webroots", map[string]any{
-		"name":            "my-webroot",
 		"runtime":         "php",
 		"runtime_version": "8.3",
 	})
@@ -86,27 +85,10 @@ func TestWebrootCreate_MissingRequiredFields(t *testing.T) {
 	assert.Contains(t, body["error"], "validation error")
 }
 
-func TestWebrootCreate_MissingName(t *testing.T) {
-	h := newWebrootHandler()
-	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/tenants/"+validID+"/webroots", map[string]any{
-		"runtime":         "php",
-		"runtime_version": "8.3",
-	})
-	r = withChiURLParam(r, "tenantID", validID)
-
-	h.Create(rec, r)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	body := decodeErrorResponse(rec)
-	assert.Contains(t, body["error"], "validation error")
-}
-
 func TestWebrootCreate_MissingRuntime(t *testing.T) {
 	h := newWebrootHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants/"+validID+"/webroots", map[string]any{
-		"name":            "my-webroot",
 		"runtime_version": "8.3",
 	})
 	r = withChiURLParam(r, "tenantID", validID)
@@ -122,7 +104,6 @@ func TestWebrootCreate_MissingRuntimeVersion(t *testing.T) {
 	h := newWebrootHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants/"+validID+"/webroots", map[string]any{
-		"name":    "my-webroot",
 		"runtime": "php",
 	})
 	r = withChiURLParam(r, "tenantID", validID)
@@ -141,8 +122,7 @@ func TestWebrootCreate_InvalidRuntime(t *testing.T) {
 			h := newWebrootHandler()
 			rec := httptest.NewRecorder()
 			r := newRequest(http.MethodPost, "/tenants/"+validID+"/webroots", map[string]any{
-				"name":            "my-webroot",
-				"runtime":         runtime,
+					"runtime":         runtime,
 				"runtime_version": "1.0",
 			})
 			r = withChiURLParam(r, "tenantID", validID)
@@ -161,8 +141,7 @@ func TestWebrootCreate_ValidRuntimes(t *testing.T) {
 			h := newWebrootHandler()
 			rec := httptest.NewRecorder()
 			r := newRequest(http.MethodPost, "/tenants/"+validID+"/webroots", map[string]any{
-				"name":            "my-webroot",
-				"runtime":         runtime,
+					"runtime":         runtime,
 				"runtime_version": "1.0",
 			})
 			r = withChiURLParam(r, "tenantID", validID)
@@ -178,28 +157,10 @@ func TestWebrootCreate_ValidRuntimes(t *testing.T) {
 	}
 }
 
-func TestWebrootCreate_InvalidSlugName(t *testing.T) {
-	h := newWebrootHandler()
-	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/tenants/"+validID+"/webroots", map[string]any{
-		"name":            "Invalid Name!",
-		"runtime":         "php",
-		"runtime_version": "8.3",
-	})
-	r = withChiURLParam(r, "tenantID", validID)
-
-	h.Create(rec, r)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	body := decodeErrorResponse(rec)
-	assert.Contains(t, body["error"], "validation error")
-}
-
 func TestWebrootCreate_ValidBody(t *testing.T) {
 	h := newWebrootHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants/"+validID+"/webroots", map[string]any{
-		"name":            "my-webroot",
 		"runtime":         "php",
 		"runtime_version": "8.3",
 		"public_folder":   "public",
@@ -221,7 +182,6 @@ func TestWebrootCreate_WithNestedFQDNs_ValidationPasses(t *testing.T) {
 	h := newWebrootHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants/"+validID+"/webroots", map[string]any{
-		"name":            "my-webroot",
 		"runtime":         "php",
 		"runtime_version": "8.5",
 		"fqdns": []map[string]any{
@@ -243,7 +203,6 @@ func TestWebrootCreate_WithInvalidNestedFQDN_ValidationFails(t *testing.T) {
 	h := newWebrootHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants/"+validID+"/webroots", map[string]any{
-		"name":            "my-webroot",
 		"runtime":         "php",
 		"runtime_version": "8.5",
 		"fqdns": []map[string]any{
@@ -263,7 +222,6 @@ func TestWebrootCreate_WithNestedFQDNAndEmail_ValidationPasses(t *testing.T) {
 	h := newWebrootHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants/"+validID+"/webroots", map[string]any{
-		"name":            "my-webroot",
 		"runtime":         "php",
 		"runtime_version": "8.5",
 		"fqdns": []map[string]any{
@@ -387,7 +345,6 @@ func TestWebrootCreate_OptionalFieldsOmitted(t *testing.T) {
 	rec := httptest.NewRecorder()
 	tid := "test-tenant-1"
 	r := newRequest(http.MethodPost, "/tenants/"+tid+"/webroots", map[string]any{
-		"name":            "my-webroot",
 		"runtime":         "php",
 		"runtime_version": "8.3",
 	})

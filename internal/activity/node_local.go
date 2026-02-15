@@ -100,7 +100,7 @@ func (a *NodeLocal) CreateTenant(ctx context.Context, params CreateTenantParams)
 	a.logger.Info().Str("tenant", params.ID).Msg("CreateTenant")
 	return asNonRetryable(a.tenant.Create(ctx, &agent.TenantInfo{
 		ID:             params.ID,
-		Name:           params.ID,
+		Name:           params.Name,
 		UID:            int32(params.UID),
 		SFTPEnabled:    params.SFTPEnabled,
 		SSHEnabled:     params.SSHEnabled,
@@ -113,7 +113,7 @@ func (a *NodeLocal) UpdateTenant(ctx context.Context, params UpdateTenantParams)
 	a.logger.Info().Str("tenant", params.ID).Msg("UpdateTenant")
 	return asNonRetryable(a.tenant.Update(ctx, &agent.TenantInfo{
 		ID:          params.ID,
-		Name:        params.ID,
+		Name:        params.Name,
 		UID:         int32(params.UID),
 		SFTPEnabled: params.SFTPEnabled,
 		SSHEnabled:  params.SSHEnabled,
@@ -666,10 +666,10 @@ func (a *NodeLocal) UpdateS3BucketPolicy(ctx context.Context, params UpdateS3Buc
 
 // CreateCronJobUnits writes systemd timer+service units for a cron job on this node.
 func (a *NodeLocal) CreateCronJobUnits(ctx context.Context, params CreateCronJobParams) error {
-	a.logger.Info().Str("cron_job", params.ID).Str("tenant", params.TenantID).Msg("CreateCronJobUnits")
+	a.logger.Info().Str("cron_job", params.ID).Str("tenant", params.TenantName).Msg("CreateCronJobUnits")
 	return a.cron.CreateUnits(ctx, &agent.CronJobInfo{
 		ID:               params.ID,
-		TenantID:         params.TenantID,
+		TenantName:       params.TenantName,
 		WebrootName:      params.WebrootName,
 		Name:             params.Name,
 		Schedule:         params.Schedule,
@@ -682,10 +682,10 @@ func (a *NodeLocal) CreateCronJobUnits(ctx context.Context, params CreateCronJob
 
 // UpdateCronJobUnits rewrites systemd units for a cron job on this node.
 func (a *NodeLocal) UpdateCronJobUnits(ctx context.Context, params UpdateCronJobParams) error {
-	a.logger.Info().Str("cron_job", params.ID).Str("tenant", params.TenantID).Msg("UpdateCronJobUnits")
+	a.logger.Info().Str("cron_job", params.ID).Str("tenant", params.TenantName).Msg("UpdateCronJobUnits")
 	return a.cron.UpdateUnits(ctx, &agent.CronJobInfo{
 		ID:               params.ID,
-		TenantID:         params.TenantID,
+		TenantName:       params.TenantName,
 		WebrootName:      params.WebrootName,
 		Name:             params.Name,
 		Schedule:         params.Schedule,
@@ -698,27 +698,27 @@ func (a *NodeLocal) UpdateCronJobUnits(ctx context.Context, params UpdateCronJob
 
 // DeleteCronJobUnits stops, disables, and removes systemd units on this node.
 func (a *NodeLocal) DeleteCronJobUnits(ctx context.Context, params DeleteCronJobParams) error {
-	a.logger.Info().Str("cron_job", params.ID).Str("tenant", params.TenantID).Msg("DeleteCronJobUnits")
+	a.logger.Info().Str("cron_job", params.ID).Str("tenant", params.TenantName).Msg("DeleteCronJobUnits")
 	return a.cron.DeleteUnits(ctx, &agent.CronJobInfo{
-		ID:       params.ID,
-		TenantID: params.TenantID,
+		ID:         params.ID,
+		TenantName: params.TenantName,
 	})
 }
 
 // EnableCronJobTimer starts the systemd timer on this node.
 func (a *NodeLocal) EnableCronJobTimer(ctx context.Context, params CronJobTimerParams) error {
-	a.logger.Info().Str("cron_job", params.ID).Str("tenant", params.TenantID).Msg("EnableCronJobTimer")
+	a.logger.Info().Str("cron_job", params.ID).Str("tenant", params.TenantName).Msg("EnableCronJobTimer")
 	return a.cron.EnableTimer(ctx, &agent.CronJobInfo{
-		ID:       params.ID,
-		TenantID: params.TenantID,
+		ID:         params.ID,
+		TenantName: params.TenantName,
 	})
 }
 
 // DisableCronJobTimer stops the systemd timer on this node.
 func (a *NodeLocal) DisableCronJobTimer(ctx context.Context, params CronJobTimerParams) error {
-	a.logger.Info().Str("cron_job", params.ID).Str("tenant", params.TenantID).Msg("DisableCronJobTimer")
+	a.logger.Info().Str("cron_job", params.ID).Str("tenant", params.TenantName).Msg("DisableCronJobTimer")
 	return a.cron.DisableTimer(ctx, &agent.CronJobInfo{
-		ID:       params.ID,
-		TenantID: params.TenantID,
+		ID:         params.ID,
+		TenantName: params.TenantName,
 	})
 }

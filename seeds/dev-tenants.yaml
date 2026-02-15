@@ -5,8 +5,7 @@ region: dev
 cluster: vm-cluster-1
 
 brands:
-  - id: acme-brand
-    name: "Acme Hosting"
+  - name: "Acme Hosting"
     base_hostname: "acme-hosting.test"
     primary_ns: "ns1.acme-hosting.test"
     secondary_ns: "ns2.acme-hosting.test"
@@ -16,7 +15,7 @@ brands:
 
 zones:
   - name: hosting.test
-    brand: acme-brand
+    brand: "Acme Hosting"
     tenant: acme-corp
 
 oidc_clients:
@@ -28,13 +27,12 @@ oidc_clients:
 
 tenants:
   - name: acme-corp
-    brand: acme-brand
+    brand: "Acme Hosting"
     shard: web-1
     sftp_enabled: true
     ssh_enabled: true
     webroots:
-      - name: main-site
-        runtime: php
+      - runtime: php
         runtime_version: "8.5"
         public_folder: public
         fqdns:
@@ -43,15 +41,13 @@ tenants:
           - fqdn: www.acme.hosting.test
             ssl_enabled: false
     databases:
-      - name: acme_db
-        shard: db-1
+      - shard: db-1
         users:
           - username: acme_user
             password: dev-password-123
             privileges: [ALL]
     valkey_instances:
-      - name: acme_cache
-        shard: valkey-1
+      - shard: valkey-1
         max_memory_mb: 128
         users:
           - username: acme_app
@@ -59,8 +55,7 @@ tenants:
             privileges: ["+@all"]
             key_pattern: "~*"
     s3_buckets:
-      - name: media-uploads
-        shard: storage-1
+      - shard: storage-1
         public: true
         quota_bytes: 10737418240
     email_accounts:

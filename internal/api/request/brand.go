@@ -1,7 +1,6 @@
 package request
 
 type CreateBrand struct {
-	ID               string `json:"id" validate:"required,slug"`
 	Name             string `json:"name" validate:"required"`
 	BaseHostname     string `json:"base_hostname" validate:"required"`
 	PrimaryNS        string `json:"primary_ns" validate:"required"`

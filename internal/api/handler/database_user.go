@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/edvin/hosting/internal/api/response"
@@ -13,11 +15,12 @@ import (
 )
 
 type DatabaseUser struct {
-	svc *core.DatabaseUserService
+	svc   *core.DatabaseUserService
+	dbSvc *core.DatabaseService
 }
 
-func NewDatabaseUser(svc *core.DatabaseUserService) *DatabaseUser {
-	return &DatabaseUser{svc: svc}
+func NewDatabaseUser(svc *core.DatabaseUserService, dbSvc *core.DatabaseService) *DatabaseUser {
+	return &DatabaseUser{svc: svc, dbSvc: dbSvc}
 }
 
 // ListByDatabase godoc
@@ -80,6 +83,17 @@ func (h *DatabaseUser) Create(w http.ResponseWriter, r *http.Request) {
 	var req request.CreateDatabaseUser
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Validate username starts with parent database name.
+	db, err := h.dbSvc.GetByID(r.Context(), databaseID)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if !strings.HasPrefix(req.Username, db.Name) {
+		response.WriteError(w, http.StatusBadRequest, fmt.Sprintf("username %q must start with database name %q", req.Username, db.Name))
 		return
 	}
 

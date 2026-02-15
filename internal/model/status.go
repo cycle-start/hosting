@@ -10,4 +10,5 @@ const (
 	StatusSuspended    = "suspended"
 	StatusDeleting     = "deleting"
 	StatusDeleted      = "deleted"
+	StatusAutoDisabled = "auto_disabled"
 )

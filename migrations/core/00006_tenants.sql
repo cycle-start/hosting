@@ -1,6 +1,7 @@
 -- +goose Up
 CREATE TABLE tenants (
     id           TEXT PRIMARY KEY,
+    name         TEXT NOT NULL UNIQUE,
     brand_id     TEXT NOT NULL REFERENCES brands(id),
     region_id    TEXT NOT NULL REFERENCES regions(id),
     cluster_id   TEXT NOT NULL REFERENCES clusters(id),

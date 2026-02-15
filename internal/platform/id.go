@@ -13,7 +13,7 @@ func NewID() string {
 	return uuid.New().String()
 }
 
-func NewShortID() string {
+func NewName(prefix string) string {
 	b := make([]byte, shortIDLength)
 	if _, err := rand.Read(b); err != nil {
 		panic("crypto/rand: " + err.Error())
@@ -21,5 +21,5 @@ func NewShortID() string {
 	for i := range b {
 		b[i] = shortIDAlphabet[b[i]%byte(len(shortIDAlphabet))]
 	}
-	return string(b)
+	return prefix + string(b)
 }

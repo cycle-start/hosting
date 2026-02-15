@@ -7,7 +7,6 @@ import (
 )
 
 type CreateWebroot struct {
-	Name           string          `json:"name" validate:"required,slug"`
 	Runtime        string          `json:"runtime" validate:"required,oneof=php php-worker node python ruby static"`
 	RuntimeVersion string          `json:"runtime_version" validate:"required"`
 	RuntimeConfig  json.RawMessage `json:"runtime_config"`

@@ -12,10 +12,6 @@ interface Props { value: WebrootFormData; onChange: (v: WebrootFormData) => void
 export function WebrootFields({ value, onChange }: Props) {
   return (
     <div className="space-y-3">
-      <div className="space-y-2">
-        <Label>Name</Label>
-        <Input placeholder="my-site" value={value.name} onChange={(e) => onChange({ ...value, name: e.target.value })} />
-      </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Runtime</Label>

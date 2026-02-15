@@ -46,7 +46,7 @@ export function useBrand(id: string) {
 export function useCreateBrand() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { id: string; name: string; base_hostname: string; primary_ns: string; secondary_ns: string; hostmaster_email: string }) =>
+    mutationFn: (data: { name: string; base_hostname: string; primary_ns: string; secondary_ns: string; hostmaster_email: string }) =>
       api.post<Brand>('/brands', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['brands'] }),
   })
@@ -265,7 +265,7 @@ export function useWebroot(id: string) {
 export function useCreateWebroot() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { tenant_id: string; name: string; runtime: string; runtime_version: string; runtime_config?: Record<string, unknown>; public_folder?: string; fqdns?: FQDNFormData[] }) =>
+    mutationFn: (data: { tenant_id: string; runtime: string; runtime_version: string; runtime_config?: Record<string, unknown>; public_folder?: string; fqdns?: FQDNFormData[] }) =>
       api.post<Webroot>(`/tenants/${data.tenant_id}/webroots`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['webroots'] }),
   })
@@ -546,7 +546,7 @@ export function useDatabase(id: string) {
 export function useCreateDatabase() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { tenant_id: string; name: string; shard_id: string; users?: DatabaseUserFormData[] }) =>
+    mutationFn: (data: { tenant_id: string; shard_id: string; users?: DatabaseUserFormData[] }) =>
       api.post<Database>(`/tenants/${data.tenant_id}/databases`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['databases'] }),
   })
@@ -623,7 +623,7 @@ export function useValkeyInstance(id: string) {
 export function useCreateValkeyInstance() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { tenant_id: string; name: string; shard_id: string; max_memory_mb?: number; users?: ValkeyUserFormData[] }) =>
+    mutationFn: (data: { tenant_id: string; shard_id: string; max_memory_mb?: number; users?: ValkeyUserFormData[] }) =>
       api.post<ValkeyInstance>(`/tenants/${data.tenant_id}/valkey-instances`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['valkey-instances'] }),
   })
@@ -692,7 +692,7 @@ export function useS3Bucket(id: string) {
 export function useCreateS3Bucket() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { tenant_id: string; name: string; shard_id: string; public?: boolean; quota_bytes?: number }) =>
+    mutationFn: (data: { tenant_id: string; shard_id: string; public?: boolean; quota_bytes?: number }) =>
       api.post<S3Bucket>(`/tenants/${data.tenant_id}/s3-buckets`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['s3-buckets'] }),
   })

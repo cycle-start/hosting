@@ -19,7 +19,6 @@ type OIDCClientDef struct {
 }
 
 type BrandDef struct {
-	ID              string   `yaml:"id"`
 	Name            string   `yaml:"name"`
 	BaseHostname    string   `yaml:"base_hostname"`
 	PrimaryNS       string   `yaml:"primary_ns"`
@@ -48,7 +47,6 @@ type TenantDef struct {
 }
 
 type WebrootDef struct {
-	Name           string         `yaml:"name"`
 	Runtime        string         `yaml:"runtime"`
 	RuntimeVersion string         `yaml:"runtime_version"`
 	RuntimeConfig  map[string]any `yaml:"runtime_config"`
@@ -62,8 +60,7 @@ type FQDNDef struct {
 }
 
 type DatabaseDef struct {
-	Name  string          `yaml:"name"`
-	Shard string          `yaml:"shard"`
+	Shard string            `yaml:"shard"`
 	Users []DatabaseUserDef `yaml:"users"`
 }
 
@@ -74,7 +71,6 @@ type DatabaseUserDef struct {
 }
 
 type ValkeyInstanceDef struct {
-	Name        string          `yaml:"name"`
 	Shard       string          `yaml:"shard"`
 	MaxMemoryMB int             `yaml:"max_memory_mb"`
 	Users       []ValkeyUserDef `yaml:"users"`
@@ -88,7 +84,6 @@ type ValkeyUserDef struct {
 }
 
 type S3BucketDef struct {
-	Name       string `yaml:"name"`
 	Shard      string `yaml:"shard"`
 	Public     *bool  `yaml:"public"`
 	QuotaBytes *int64 `yaml:"quota_bytes"`

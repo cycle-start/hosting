@@ -5,6 +5,7 @@ import "encoding/json"
 // CreateTenantParams holds parameters for creating a tenant on a node.
 type CreateTenantParams struct {
 	ID             string
+	Name           string
 	UID            int
 	SFTPEnabled    bool
 	SSHEnabled     bool
@@ -14,6 +15,7 @@ type CreateTenantParams struct {
 // UpdateTenantParams holds parameters for updating a tenant on a node.
 type UpdateTenantParams struct {
 	ID          string
+	Name        string
 	UID         int
 	SFTPEnabled bool
 	SSHEnabled  bool
@@ -238,7 +240,7 @@ type CleanOrphanedConfigsResult struct {
 // CreateCronJobParams holds parameters for creating a cron job on a node.
 type CreateCronJobParams struct {
 	ID               string
-	TenantID         string
+	TenantName       string
 	WebrootName      string
 	Name             string
 	Schedule         string
@@ -253,14 +255,14 @@ type UpdateCronJobParams = CreateCronJobParams
 
 // DeleteCronJobParams holds parameters for deleting a cron job on a node.
 type DeleteCronJobParams struct {
-	ID       string
-	TenantID string
+	ID         string
+	TenantName string
 }
 
 // CronJobTimerParams holds parameters for enabling/disabling a cron job timer on a node.
 type CronJobTimerParams struct {
-	ID       string
-	TenantID string
+	ID         string
+	TenantName string
 }
 
 // BackupResult holds the result of a backup operation.

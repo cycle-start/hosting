@@ -36,14 +36,22 @@ type DesiredTenant struct {
 
 // DesiredWebroot is a webroot in the desired state.
 type DesiredWebroot struct {
-	ID             string        `json:"id"`
-	Name           string        `json:"name"`
-	Runtime        string        `json:"runtime"`
-	RuntimeVersion string        `json:"runtime_version"`
-	RuntimeConfig  string        `json:"runtime_config"`
-	PublicFolder   string        `json:"public_folder"`
-	Status         string        `json:"status"`
-	FQDNs          []DesiredFQDN `json:"fqdns,omitempty"`
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	Runtime        string           `json:"runtime"`
+	RuntimeVersion string           `json:"runtime_version"`
+	RuntimeConfig  string           `json:"runtime_config"`
+	PublicFolder   string           `json:"public_folder"`
+	Status         string           `json:"status"`
+	FQDNs          []DesiredFQDN    `json:"fqdns,omitempty"`
+	CronJobs       []DesiredCronJob `json:"cron_jobs,omitempty"`
+}
+
+// DesiredCronJob is a cron job in the desired state.
+type DesiredCronJob struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Enabled bool   `json:"enabled"`
 }
 
 // DesiredFQDN is an FQDN in the desired state.

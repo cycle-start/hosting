@@ -2,8 +2,6 @@ package workflow
 
 import (
 	"fmt"
-	"hash/fnv"
-	"sort"
 	"strings"
 	"time"
 
@@ -13,24 +11,6 @@ import (
 	"github.com/edvin/hosting/internal/activity"
 	"github.com/edvin/hosting/internal/model"
 )
-
-// designatedNode returns the node ID responsible for executing a given cron job.
-// It uses consistent hashing so that the same cron job always maps to the same
-// node as long as the node set is stable.
-func designatedNode(cronJobID string, nodes []model.Node) string {
-	if len(nodes) == 0 {
-		return ""
-	}
-	sorted := make([]model.Node, len(nodes))
-	copy(sorted, nodes)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].ID < sorted[j].ID
-	})
-	h := fnv.New32a()
-	h.Write([]byte(cronJobID))
-	idx := int(h.Sum32()) % len(sorted)
-	return sorted[idx].ID
-}
 
 // CreateCronJobWorkflow provisions a cron job on all nodes in the tenant's shard.
 func CreateCronJobWorkflow(ctx workflow.Context, cronJobID string) error {
@@ -68,7 +48,7 @@ func CreateCronJobWorkflow(ctx workflow.Context, cronJobID string) error {
 
 	createParams := activity.CreateCronJobParams{
 		ID:               cronCtx.CronJob.ID,
-		TenantID:         cronCtx.Tenant.ID,
+		TenantName:       cronCtx.Tenant.Name,
 		WebrootName:      cronCtx.Webroot.Name,
 		Name:             cronCtx.CronJob.Name,
 		Schedule:         cronCtx.CronJob.Schedule,
@@ -87,17 +67,17 @@ func CreateCronJobWorkflow(ctx workflow.Context, cronJobID string) error {
 		}
 	}
 
-	// Enable timer on designated node if the job is enabled.
+	// Enable timer on all nodes — distributed locking via CephFS flock
+	// ensures only one node executes the job at a time.
 	if cronCtx.CronJob.Enabled {
-		designated := designatedNode(cronCtx.CronJob.ID, cronCtx.Nodes)
-		if designated != "" {
-			timerParams := activity.CronJobTimerParams{
-				ID:       cronCtx.CronJob.ID,
-				TenantID: cronCtx.Tenant.ID,
-			}
-			nodeCtx := nodeActivityCtx(ctx, designated)
+		timerParams := activity.CronJobTimerParams{
+			ID:         cronCtx.CronJob.ID,
+			TenantName: cronCtx.Tenant.Name,
+		}
+		for _, node := range cronCtx.Nodes {
+			nodeCtx := nodeActivityCtx(ctx, node.ID)
 			if err := workflow.ExecuteActivity(nodeCtx, "EnableCronJobTimer", timerParams).Get(ctx, nil); err != nil {
-				errs = append(errs, fmt.Sprintf("enable timer on %s: %v", designated, err))
+				errs = append(errs, fmt.Sprintf("node %s: enable timer: %v", node.ID, err))
 			}
 		}
 	}
@@ -159,7 +139,7 @@ func UpdateCronJobWorkflow(ctx workflow.Context, cronJobID string) error {
 
 	updateParams := activity.CreateCronJobParams{
 		ID:               cronCtx.CronJob.ID,
-		TenantID:         cronCtx.Tenant.ID,
+		TenantName:       cronCtx.Tenant.Name,
 		WebrootName:      cronCtx.Webroot.Name,
 		Name:             cronCtx.CronJob.Name,
 		Schedule:         cronCtx.CronJob.Schedule,
@@ -177,26 +157,18 @@ func UpdateCronJobWorkflow(ctx workflow.Context, cronJobID string) error {
 		}
 	}
 
-	// Manage timer state: enable on designated node if enabled, disable on all if not.
-	if cronCtx.CronJob.Enabled {
-		designated := designatedNode(cronCtx.CronJob.ID, cronCtx.Nodes)
-		if designated != "" {
-			timerParams := activity.CronJobTimerParams{
-				ID:       cronCtx.CronJob.ID,
-				TenantID: cronCtx.Tenant.ID,
-			}
-			nodeCtx := nodeActivityCtx(ctx, designated)
+	// Manage timer state on all nodes — flock ensures single execution.
+	timerParams := activity.CronJobTimerParams{
+		ID:         cronCtx.CronJob.ID,
+		TenantName: cronCtx.Tenant.Name,
+	}
+	for _, node := range cronCtx.Nodes {
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		if cronCtx.CronJob.Enabled {
 			if err := workflow.ExecuteActivity(nodeCtx, "EnableCronJobTimer", timerParams).Get(ctx, nil); err != nil {
-				errs = append(errs, fmt.Sprintf("enable timer on %s: %v", designated, err))
+				errs = append(errs, fmt.Sprintf("node %s: enable timer: %v", node.ID, err))
 			}
-		}
-	} else {
-		timerParams := activity.CronJobTimerParams{
-			ID:       cronCtx.CronJob.ID,
-			TenantID: cronCtx.Tenant.ID,
-		}
-		for _, node := range cronCtx.Nodes {
-			nodeCtx := nodeActivityCtx(ctx, node.ID)
+		} else {
 			if err := workflow.ExecuteActivity(nodeCtx, "DisableCronJobTimer", timerParams).Get(ctx, nil); err != nil {
 				errs = append(errs, fmt.Sprintf("node %s: disable timer: %v", node.ID, err))
 			}
@@ -260,7 +232,7 @@ func DeleteCronJobWorkflow(ctx workflow.Context, cronJobID string) error {
 
 	deleteParams := activity.DeleteCronJobParams{
 		ID:       cronCtx.CronJob.ID,
-		TenantID: cronCtx.Tenant.ID,
+		TenantName: cronCtx.Tenant.Name,
 	}
 
 	var errs []string
@@ -326,21 +298,28 @@ func EnableCronJobWorkflow(ctx workflow.Context, cronJobID string) error {
 		return noShardErr
 	}
 
-	designated := designatedNode(cronCtx.CronJob.ID, cronCtx.Nodes)
-	if designated == "" {
+	if len(cronCtx.Nodes) == 0 {
 		noNodeErr := fmt.Errorf("no nodes available in shard for tenant %s", cronCtx.CronJob.TenantID)
 		_ = setResourceFailed(ctx, "cron_jobs", cronJobID, noNodeErr)
 		return noNodeErr
 	}
 
 	timerParams := activity.CronJobTimerParams{
-		ID:       cronCtx.CronJob.ID,
-		TenantID: cronCtx.Tenant.ID,
+		ID:         cronCtx.CronJob.ID,
+		TenantName: cronCtx.Tenant.Name,
 	}
-	nodeCtx := nodeActivityCtx(ctx, designated)
-	if err := workflow.ExecuteActivity(nodeCtx, "EnableCronJobTimer", timerParams).Get(ctx, nil); err != nil {
-		_ = setResourceFailed(ctx, "cron_jobs", cronJobID, err)
-		return err
+	var errs []string
+	for _, node := range cronCtx.Nodes {
+		nodeCtx := nodeActivityCtx(ctx, node.ID)
+		if err := workflow.ExecuteActivity(nodeCtx, "EnableCronJobTimer", timerParams).Get(ctx, nil); err != nil {
+			errs = append(errs, fmt.Sprintf("node %s: %v", node.ID, err))
+		}
+	}
+
+	if len(errs) > 0 {
+		msg := strings.Join(errs, "; ")
+		_ = setResourceFailed(ctx, "cron_jobs", cronJobID, fmt.Errorf("%s", msg))
+		return fmt.Errorf("enable cron job failed: %s", msg)
 	}
 
 	// Set status to active.
@@ -386,7 +365,7 @@ func DisableCronJobWorkflow(ctx workflow.Context, cronJobID string) error {
 
 	timerParams := activity.CronJobTimerParams{
 		ID:       cronCtx.CronJob.ID,
-		TenantID: cronCtx.Tenant.ID,
+		TenantName: cronCtx.Tenant.Name,
 	}
 
 	var errs []string

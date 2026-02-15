@@ -8,7 +8,8 @@ CREATE TABLE brands (
     hostmaster_email TEXT NOT NULL,
     status           TEXT NOT NULL DEFAULT 'active',
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(name)
 );
 
 CREATE TABLE brand_clusters (

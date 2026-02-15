@@ -116,7 +116,7 @@ export function CreateTenantPage() {
         title="Webroots"
         items={webroots}
         onChange={setWebroots}
-        defaultItem={() => ({ name: '', runtime: 'php', runtime_version: '8.5', public_folder: 'public' })}
+        defaultItem={() => ({ runtime: 'php', runtime_version: '8.5', public_folder: 'public' })}
         renderItem={(item, _, onChange) => <WebrootFields value={item} onChange={onChange} />}
       />
 
@@ -124,7 +124,7 @@ export function CreateTenantPage() {
         title="Databases"
         items={databases}
         onChange={setDatabases}
-        defaultItem={() => ({ name: '', shard_id: '' })}
+        defaultItem={() => ({ shard_id: '' })}
         renderItem={(item, _, onChange) => <DatabaseFields value={item} onChange={onChange} clusterId={clusterId} />}
       />
 
@@ -132,7 +132,7 @@ export function CreateTenantPage() {
         title="Valkey Instances"
         items={valkeyInstances}
         onChange={setValkeyInstances}
-        defaultItem={() => ({ name: '', shard_id: '', max_memory_mb: 64 })}
+        defaultItem={() => ({ shard_id: '', max_memory_mb: 64 })}
         renderItem={(item, _, onChange) => <ValkeyInstanceFields value={item} onChange={onChange} clusterId={clusterId} />}
       />
 
@@ -140,7 +140,7 @@ export function CreateTenantPage() {
         title="S3 Buckets"
         items={s3Buckets}
         onChange={setS3Buckets}
-        defaultItem={() => ({ name: '', shard_id: '' })}
+        defaultItem={() => ({ shard_id: '' })}
         renderItem={(item, _, onChange) => <S3BucketFields value={item} onChange={onChange} clusterId={clusterId} />}
       />
 

@@ -11,7 +11,7 @@ import (
 )
 
 func newDatabaseUserHandler() *DatabaseUser {
-	return NewDatabaseUser(nil)
+	return NewDatabaseUser(nil, nil)
 }
 
 // --- ListByDatabase ---

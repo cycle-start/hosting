@@ -76,10 +76,10 @@ export function TenantDetailPage() {
   const [deleteZoneTarget, setDeleteZoneTarget] = useState<Zone | null>(null)
 
   // Form state
-  const defaultWebroot: WebrootFormData = { name: '', runtime: 'php', runtime_version: '8.5', public_folder: 'public' }
-  const defaultDatabase: DatabaseFormData = { name: '', shard_id: '' }
-  const defaultValkey: ValkeyInstanceFormData = { name: '', shard_id: '', max_memory_mb: 64 }
-  const defaultS3: S3BucketFormData = { name: '', shard_id: '' }
+  const defaultWebroot: WebrootFormData = { runtime: 'php', runtime_version: '8.5', public_folder: 'public' }
+  const defaultDatabase: DatabaseFormData = { shard_id: '' }
+  const defaultValkey: ValkeyInstanceFormData = { shard_id: '', max_memory_mb: 64 }
+  const defaultS3: S3BucketFormData = { shard_id: '' }
   const defaultSftp: SSHKeyFormData = { name: '', public_key: '' }
   const defaultZone: ZoneFormData = { name: '' }
 
@@ -191,10 +191,10 @@ export function TenantDetailPage() {
   }
 
   const handleCreateWebroot = async () => {
-    if (!wrForm.name || !wrForm.runtime || !wrForm.runtime_version) return
+    if (!wrForm.runtime || !wrForm.runtime_version) return
     try {
       await createWebrootMut.mutateAsync({
-        tenant_id: id, name: wrForm.name, runtime: wrForm.runtime,
+        tenant_id: id, runtime: wrForm.runtime,
         runtime_version: wrForm.runtime_version, public_folder: wrForm.public_folder || undefined,
         fqdns: wrForm.fqdns?.length ? wrForm.fqdns : undefined,
       })
@@ -203,10 +203,10 @@ export function TenantDetailPage() {
   }
 
   const handleCreateDb = async () => {
-    if (!dbForm.name || !dbForm.shard_id) return
+    if (!dbForm.shard_id) return
     try {
       await createDbMut.mutateAsync({
-        tenant_id: id, name: dbForm.name, shard_id: dbForm.shard_id,
+        tenant_id: id, shard_id: dbForm.shard_id,
         users: dbForm.users?.length ? dbForm.users : undefined,
       })
       toast.success('Database created'); setCreateDbOpen(false); resetForm()
@@ -214,10 +214,10 @@ export function TenantDetailPage() {
   }
 
   const handleCreateValkey = async () => {
-    if (!vkForm.name || !vkForm.shard_id) return
+    if (!vkForm.shard_id) return
     try {
       await createValkeyMut.mutateAsync({
-        tenant_id: id, name: vkForm.name, shard_id: vkForm.shard_id,
+        tenant_id: id, shard_id: vkForm.shard_id,
         max_memory_mb: vkForm.max_memory_mb || 64,
         users: vkForm.users?.length ? vkForm.users : undefined,
       })
@@ -226,10 +226,10 @@ export function TenantDetailPage() {
   }
 
   const handleCreateS3 = async () => {
-    if (!s3Form.name || !s3Form.shard_id) return
+    if (!s3Form.shard_id) return
     try {
       await createS3Mut.mutateAsync({
-        tenant_id: id, name: s3Form.name, shard_id: s3Form.shard_id,
+        tenant_id: id, shard_id: s3Form.shard_id,
         public: s3Form.public, quota_bytes: s3Form.quota_bytes,
       })
       toast.success('S3 bucket created'); setCreateS3Open(false); resetForm()
@@ -852,7 +852,7 @@ export function TenantDetailPage() {
           <WebrootFields value={wrForm} onChange={setWrForm} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateWebrootOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateWebroot} disabled={createWebrootMut.isPending || !wrForm.name || !wrForm.runtime}>
+            <Button onClick={handleCreateWebroot} disabled={createWebrootMut.isPending || !wrForm.runtime}>
               {createWebrootMut.isPending ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>
@@ -866,7 +866,7 @@ export function TenantDetailPage() {
           <DatabaseFields value={dbForm} onChange={setDbForm} clusterId={tenant.cluster_id} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateDbOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateDb} disabled={createDbMut.isPending || !dbForm.name || !dbForm.shard_id}>
+            <Button onClick={handleCreateDb} disabled={createDbMut.isPending || !dbForm.shard_id}>
               {createDbMut.isPending ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>
@@ -880,7 +880,7 @@ export function TenantDetailPage() {
           <ValkeyInstanceFields value={vkForm} onChange={setVkForm} clusterId={tenant.cluster_id} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateValkeyOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateValkey} disabled={createValkeyMut.isPending || !vkForm.name || !vkForm.shard_id}>
+            <Button onClick={handleCreateValkey} disabled={createValkeyMut.isPending || !vkForm.shard_id}>
               {createValkeyMut.isPending ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>
@@ -894,7 +894,7 @@ export function TenantDetailPage() {
           <S3BucketFields value={s3Form} onChange={setS3Form} clusterId={tenant.cluster_id} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateS3Open(false)}>Cancel</Button>
-            <Button onClick={handleCreateS3} disabled={createS3Mut.isPending || !s3Form.name || !s3Form.shard_id}>
+            <Button onClick={handleCreateS3} disabled={createS3Mut.isPending || !s3Form.shard_id}>
               {createS3Mut.isPending ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>

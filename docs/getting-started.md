@@ -13,28 +13,31 @@
 
 ## Quick Start
 
-### 1. Build golden images
+### 1. Build golden images and create VMs
 
 ```bash
 just packer-all
-```
-
-This builds QEMU/KVM golden images for all VM roles (controlplane, web, db, dns, valkey, storage, dbadmin) using Packer. Each image is a minimal Ubuntu with role-specific software pre-installed.
-
-### 2. Create VMs and deploy the control plane
-
-```bash
 just dev-k3s
 ```
 
-This runs the full bootstrap:
+`packer-all` builds QEMU/KVM golden images for all VM roles (controlplane, web, db, dns, valkey, storage, dbadmin, lb, s3). Each image is a minimal Ubuntu with role-specific software and the node-agent binary pre-installed.
+
+`dev-k3s` runs the full bootstrap:
 1. Creates all VMs via Terraform/libvirt (controlplane + node agents)
 2. Fetches the k3s kubeconfig
 3. Builds Docker images and imports them into k3s
-4. Deploys infrastructure (PostgreSQL, Temporal, HAProxy, Valkey, registry) and the platform (core-api, worker, admin-ui) to k3s
+4. Deploys infrastructure (PostgreSQL, Temporal, Loki, Grafana, Prometheus) and the platform (core-api, worker, admin-ui, MCP server) to k3s
 5. Registers the cluster and nodes with the platform via `hostctl cluster apply`
 
-### 3. Enable Windows access
+### 2. Run database migrations
+
+```bash
+just migrate
+```
+
+This runs goose migrations for both the core database and the PowerDNS database. Required after every fresh VM creation or database reset.
+
+### 3. Enable Windows access (WSL2 only)
 
 The VMs run on a libvirt network (`10.10.10.0/24`) inside WSL2. Windows needs IP forwarding rules and a route to reach them.
 
@@ -64,11 +67,10 @@ After this, all services are accessible from the Windows browser. See [Local Net
 ### 4. Create an API key
 
 ```bash
-KUBECONFIG=~/.kube/k3s-config kubectl exec deploy/hosting-core-api -- \
-  /core-api create-api-key --name admin
+just create-api-key admin
 ```
 
-This creates a hashed API key in the database and prints the plaintext key once. Save it — you'll need it for the admin UI and API requests.
+This creates a hashed API key in the database and prints the plaintext key once. Save it in `.env` as `HOSTING_API_KEY=hst_...` — it's used by `hostctl` commands, the admin UI, and API requests.
 
 ### 5. Seed test data
 
@@ -77,14 +79,15 @@ go run ./cmd/hostctl seed -f seeds/dev-tenants.yaml
 ```
 
 This creates:
-- A brand (`acme-brand`) with DNS nameservers under `hosting.test`
+- A brand ("Acme Hosting") with DNS nameservers under `hosting.test`
 - A DNS zone (`hosting.test`)
-- A tenant (`acme-corp`) on the web shard
-- A webroot with PHP 8.5 runtime
-- FQDNs (`acme.hosting.test`, `www.acme.hosting.test`)
+- A tenant on the web shard (auto-generated name like `t_a7k3m9x2p1`)
+- A webroot with PHP 8.5 runtime and FQDNs (`acme.hosting.test`, `www.acme.hosting.test`)
 - A MySQL database with a user
 - A Valkey (Redis) instance with a user
-- S3 bucket and email accounts
+- An S3 bucket and email accounts
+
+All resource names are auto-generated with prefixes (`t_`, `web_`, `db_`, `kv_`, `s3_`). See [Resource Naming](resource-naming.md) for details.
 
 ### 6. Verify
 
@@ -120,22 +123,49 @@ just forward-stop
 
 ## Resetting the database
 
-If migrations have changed since your database was created (e.g. columns added to existing migration files), reset and re-migrate. The easiest way is to delete the controlplane VM's persistent volumes:
+If migrations have changed since your database was created (e.g. columns added to existing migration files), reset and re-migrate:
 
 ```bash
-KUBECONFIG=~/.kube/k3s-config kubectl delete pvc --all
-KUBECONFIG=~/.kube/k3s-config kubectl rollout restart statefulset
+just reset-db
+just migrate
+just create-api-key admin
+# Update .env with new key, then re-seed:
+go run ./cmd/hostctl seed -f seeds/dev-tenants.yaml
 ```
 
-Wait for pods to restart, then re-seed.
+If VMs are in a bad state and `reset-db` fails, do a full rebuild instead (see below).
 
 ## Rebuilding after code changes
+
+**Control plane changes** (API, worker, admin UI):
 
 ```bash
 just vm-deploy
 ```
 
 This rebuilds all Docker images, imports them into k3s, and restarts the deployments.
+
+**Node agent changes** (anything under `internal/agent/`, `internal/activity/`):
+
+Node agents are baked into golden images. Either rebuild images and recreate VMs:
+
+```bash
+just vm-rebuild
+just migrate
+just create-api-key admin
+# Update .env, then re-seed
+```
+
+Or for a quick update without rebuilding images:
+
+```bash
+just build-node-agent
+# SCP to each node VM and restart:
+for ip in 10.10.10.{10,11,20,30,40,50}; do
+  scp bin/node-agent ubuntu@$ip:/tmp/node-agent
+  ssh ubuntu@$ip "sudo mv /tmp/node-agent /usr/local/bin/node-agent && sudo systemctl restart node-agent"
+done
+```
 
 ## Project layout
 

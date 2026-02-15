@@ -657,7 +657,7 @@ Combined, this means: if a worker process crashes within 10 seconds of starting,
 
 ### Agent detection of FATAL state
 
-The node-agent should periodically check for FATAL workers and report them. This fits naturally into the agent reconciliation plan (see `docs/plans/agent-reconciliation.md`):
+The node-agent should detect FATAL workers during convergence and report them:
 
 ```go
 // CheckWorkerStatus checks supervisord for FATAL worker processes
@@ -672,7 +672,7 @@ func (w *PHPWorker) CheckStatus(ctx context.Context, webroot *WebrootInfo) (stri
 }
 ```
 
-When the reconciliation loop detects a FATAL worker, it should:
+When convergence detects a FATAL worker, it should:
 
 1. Set the webroot's status to `failed` with `status_message` describing the FATAL state.
 2. NOT attempt to restart -- the process has already exhausted its retries. Human intervention is needed (fix the command, fix the code, etc.).
@@ -734,7 +734,7 @@ Collection method: parse `supervisorctl status` output, which returns one line p
 
 ### Health check integration
 
-The agent reconciliation health report (see `docs/plans/agent-reconciliation.md`) should include a `supervisor` section:
+The node health report should include a `supervisor` section:
 
 ```json
 {
@@ -922,12 +922,11 @@ Add to `tests/e2e/`:
 2. Add E2E tests.
 3. Verify full lifecycle: create, update, delete, anti-thrash, convergence.
 
-### Phase 6: Monitoring + Reconciliation
+### Phase 6: Monitoring
 
-1. Add supervisor health check to agent health report.
-2. Add Prometheus metrics for worker processes.
-3. Add FATAL state detection and status reporting.
-4. Integrate with agent reconciliation loop (auto-fix for missing supervisor configs, report-only for FATAL state).
+1. Add Prometheus metrics for worker processes.
+2. Add FATAL state detection during convergence and status reporting.
+3. Add supervisor health check to node health report.
 
 ---
 

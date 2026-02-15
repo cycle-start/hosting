@@ -48,6 +48,7 @@ func (s *BindFQDNWorkflowTestSuite) TestSuccess_NoSSL() {
 	}
 	tenant := model.Tenant{
 		ID:        tenantID,
+		Name:      "t_test123456",
 		BrandID:   "test-brand",
 		ClusterID: clusterID,
 		ShardID:   &shardID,
@@ -112,6 +113,7 @@ func (s *BindFQDNWorkflowTestSuite) TestSuccess_WithSSL() {
 	}
 	tenant := model.Tenant{
 		ID:        tenantID,
+		Name:      "t_test123456",
 		BrandID:   "test-brand",
 		ClusterID: clusterID,
 		ShardID:   &shardID,
@@ -179,6 +181,7 @@ func (s *BindFQDNWorkflowTestSuite) TestSuccess_SSLChildWorkflowFails_StillSucce
 	}
 	tenant := model.Tenant{
 		ID:        tenantID,
+		Name:      "t_test123456",
 		BrandID:   "test-brand",
 		ClusterID: clusterID,
 		ShardID:   &shardID,
@@ -241,6 +244,7 @@ func (s *BindFQDNWorkflowTestSuite) TestAutoCreateDNSFails_SetsStatusFailed() {
 	}
 	tenant := model.Tenant{
 		ID:        tenantID,
+		Name:      "t_test123456",
 		BrandID:   "test-brand",
 		ClusterID: clusterID,
 		ShardID:   &shardID,
@@ -307,6 +311,7 @@ func (s *BindFQDNWorkflowTestSuite) TestSetLBMapEntryFails_SetsStatusFailed() {
 	}
 	tenant := model.Tenant{
 		ID:        tenantID,
+		Name:      "t_test123456",
 		BrandID:   "test-brand",
 		ClusterID: clusterID,
 		ShardID:   &shardID,
@@ -360,7 +365,7 @@ func (s *BindFQDNWorkflowTestSuite) TestReloadNginxFails_SetsStatusFailed() {
 		SSLEnabled: false,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ClusterID: clusterID, ShardID: &shardID}
+	tenant := model.Tenant{ID: tenantID, Name: "t_test123456", BrandID: "test-brand", ClusterID: clusterID, ShardID: &shardID}
 	lbAddresses := []model.ClusterLBAddress{
 		{ID: "test-lb-1", ClusterID: clusterID, Address: "10.0.0.1", Family: 4, Label: "primary"},
 		{ID: "test-lb-2", ClusterID: clusterID, Address: "::1", Family: 6, Label: "primary"},
@@ -419,7 +424,7 @@ func (s *UnbindFQDNWorkflowTestSuite) TestSuccess() {
 		WebrootID: webrootID,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ClusterID: clusterID, ShardID: &shardID}
+	tenant := model.Tenant{ID: tenantID, Name: "t_test123456", BrandID: "test-brand", ClusterID: clusterID, ShardID: &shardID}
 	shard := model.Shard{ID: shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 	lbNodes := []model.Node{{ID: "lb-node-1"}}
@@ -459,7 +464,7 @@ func (s *UnbindFQDNWorkflowTestSuite) TestAutoDeleteDNSFails_SetsStatusFailed() 
 		WebrootID: webrootID,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand"}
+	tenant := model.Tenant{ID: tenantID, Name: "t_test123456", BrandID: "test-brand"}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "fqdns", ID: fqdnID, Status: model.StatusDeleting,
@@ -501,7 +506,7 @@ func (s *UnbindFQDNWorkflowTestSuite) TestReloadNginxFails_SetsStatusFailed() {
 		WebrootID: webrootID,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ClusterID: "test-cluster-4", ShardID: &shardID}
+	tenant := model.Tenant{ID: tenantID, Name: "t_test123456", BrandID: "test-brand", ClusterID: "test-cluster-4", ShardID: &shardID}
 	shard := model.Shard{ID: shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 	lbNodes := []model.Node{{ID: "lb-node-1"}}

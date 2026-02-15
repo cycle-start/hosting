@@ -14,10 +14,11 @@ import (
 type InternalNode struct {
 	desiredStateSvc *core.DesiredStateService
 	healthSvc       *core.NodeHealthService
+	cronJobSvc      *core.CronJobService
 }
 
-func NewInternalNode(ds *core.DesiredStateService, hs *core.NodeHealthService) *InternalNode {
-	return &InternalNode{desiredStateSvc: ds, healthSvc: hs}
+func NewInternalNode(ds *core.DesiredStateService, hs *core.NodeHealthService, cs *core.CronJobService) *InternalNode {
+	return &InternalNode{desiredStateSvc: ds, healthSvc: hs, cronJobSvc: cs}
 }
 
 // GetDesiredState returns the full desired state for a node.
@@ -100,6 +101,30 @@ func (h *InternalNode) ReportDriftEvents(w http.ResponseWriter, r *http.Request)
 
 	if err := h.healthSvc.CreateDriftEvents(r.Context(), req.Events); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "failed to store drift events")
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// ReportCronOutcome records the outcome of a cron job execution.
+func (h *InternalNode) ReportCronOutcome(w http.ResponseWriter, r *http.Request) {
+	cronJobID := chi.URLParam(r, "cronJobID")
+	if cronJobID == "" {
+		response.WriteError(w, http.StatusBadRequest, "missing cron job ID")
+		return
+	}
+
+	var req struct {
+		Success bool `json:"success"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := h.cronJobSvc.ReportCronOutcome(r.Context(), cronJobID, req.Success); err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "failed to report cron outcome")
 		return
 	}
 

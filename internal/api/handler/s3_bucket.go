@@ -100,7 +100,7 @@ func (h *S3Bucket) Create(w http.ResponseWriter, r *http.Request) {
 	bucket := &model.S3Bucket{
 		ID:        platform.NewID(),
 		TenantID:  &tenantID,
-		Name:      req.Name,
+		Name:      platform.NewName("s3_"),
 		ShardID:   &shardID,
 		Status:    model.StatusPending,
 		CreatedAt: now,
@@ -283,7 +283,7 @@ func (h *S3Bucket) CreateNested(w http.ResponseWriter, r *http.Request, tenantID
 		bucket := &model.S3Bucket{
 			ID:        platform.NewID(),
 			TenantID:  &tenantID,
-			Name:      br.Name,
+			Name:      platform.NewName("s3_"),
 			ShardID:   &shardID,
 			Status:    model.StatusPending,
 			CreatedAt: now,
@@ -297,7 +297,7 @@ func (h *S3Bucket) CreateNested(w http.ResponseWriter, r *http.Request, tenantID
 		}
 
 		if err := h.svc.Create(r.Context(), bucket); err != nil {
-			return fmt.Errorf("create s3 bucket %s: %w", br.Name, err)
+			return fmt.Errorf("create s3 bucket: %w", err)
 		}
 	}
 	return nil

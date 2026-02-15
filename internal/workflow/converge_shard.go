@@ -164,7 +164,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 
 			// Only web-facing webroots have nginx configs.
 			if webroot.Runtime != "php-worker" {
-				confName := fmt.Sprintf("%s_%s.conf", tenant.ID, webroot.Name)
+				confName := fmt.Sprintf("%s_%s.conf", tenant.Name, webroot.Name)
 				expectedConfigs[confName] = true
 			}
 
@@ -223,6 +223,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 			nodeCtx := nodeActivityCtx(ctx, node.ID)
 			err = workflow.ExecuteActivity(nodeCtx, "CreateTenant", activity.CreateTenantParams{
 				ID:             tenant.ID,
+				Name:           tenant.Name,
 				UID:            tenant.UID,
 				SFTPEnabled:    tenant.SFTPEnabled,
 				SSHEnabled:     tenant.SSHEnabled,
@@ -235,7 +236,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 
 			// Sync SSH/SFTP config on the node.
 			err = workflow.ExecuteActivity(nodeCtx, "SyncSSHConfig", activity.SyncSSHConfigParams{
-				TenantName:  tenant.ID,
+				TenantName:  tenant.Name,
 				SSHEnabled:  tenant.SSHEnabled,
 				SFTPEnabled: tenant.SFTPEnabled,
 			}).Get(ctx, nil)
@@ -251,7 +252,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 			nodeCtx := nodeActivityCtx(ctx, node.ID)
 			err = workflow.ExecuteActivity(nodeCtx, "CreateWebroot", activity.CreateWebrootParams{
 				ID:             entry.webroot.ID,
-				TenantName:     entry.tenant.ID,
+				TenantName:     entry.tenant.Name,
 				Name:           entry.webroot.Name,
 				Runtime:        entry.webroot.Runtime,
 				RuntimeVersion: entry.webroot.RuntimeVersion,
@@ -281,7 +282,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 
 			createParams := activity.CreateCronJobParams{
 				ID:               job.ID,
-				TenantID:         entry.tenant.ID,
+				TenantName:       entry.tenant.Name,
 				WebrootName:      entry.webroot.Name,
 				Name:             job.Name,
 				Schedule:         job.Schedule,
@@ -300,18 +301,17 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				}
 			}
 
-			// Enable timer on designated node if the job is enabled.
+			// Enable timer on all nodes — flock ensures single execution.
 			if job.Enabled {
-				designated := designatedNode(job.ID, nodes)
-				if designated != "" {
-					timerParams := activity.CronJobTimerParams{
-						ID:       job.ID,
-						TenantID: entry.tenant.ID,
-					}
-					nodeCtx := nodeActivityCtx(ctx, designated)
+				timerParams := activity.CronJobTimerParams{
+					ID:         job.ID,
+					TenantName: entry.tenant.Name,
+				}
+				for _, node := range nodes {
+					nodeCtx := nodeActivityCtx(ctx, node.ID)
 					err = workflow.ExecuteActivity(nodeCtx, "EnableCronJobTimer", timerParams).Get(ctx, nil)
 					if err != nil {
-						errs = append(errs, fmt.Sprintf("enable cron timer %s on node %s: %v", job.ID, designated, err))
+						errs = append(errs, fmt.Sprintf("enable cron timer %s on node %s: %v", job.ID, node.ID, err))
 					}
 				}
 			}

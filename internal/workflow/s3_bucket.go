@@ -45,15 +45,18 @@ func CreateS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 		return noShardErr
 	}
 
-	// Look up the tenant for the tenant ID used by RGW.
-	var tenantID string
-	if bucket.TenantID != nil {
-		tenantID = *bucket.TenantID
-	}
-	if tenantID == "" {
+	// Look up the tenant for the name used by RGW.
+	if bucket.TenantID == nil || *bucket.TenantID == "" {
 		noTenantErr := fmt.Errorf("s3 bucket %s has no tenant assigned", bucketID)
 		_ = setResourceFailed(ctx, "s3_buckets", bucketID, noTenantErr)
 		return noTenantErr
+	}
+
+	var tenant model.Tenant
+	err = workflow.ExecuteActivity(ctx, "GetTenantByID", *bucket.TenantID).Get(ctx, &tenant)
+	if err != nil {
+		_ = setResourceFailed(ctx, "s3_buckets", bucketID, err)
+		return err
 	}
 
 	// Look up nodes in the S3 shard.
@@ -71,11 +74,11 @@ func CreateS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 	}
 
 	// RGW is cluster-wide, so we only need to execute on the first node.
-	internalName := tenantID + "--" + bucket.Name
+	internalName := tenant.Name + "--" + bucket.Name
 	nodeCtx := nodeActivityCtx(ctx, nodes[0].ID)
 
 	err = workflow.ExecuteActivity(nodeCtx, "CreateS3Bucket", activity.CreateS3BucketParams{
-		TenantID:   tenantID,
+		TenantID:   tenant.Name,
 		Name:       internalName,
 		QuotaBytes: bucket.QuotaBytes,
 	}).Get(ctx, nil)
@@ -87,7 +90,7 @@ func CreateS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 	// If public, set bucket policy.
 	if bucket.Public {
 		err = workflow.ExecuteActivity(nodeCtx, "UpdateS3BucketPolicy", activity.UpdateS3BucketPolicyParams{
-			TenantID: tenantID,
+			TenantID: tenant.Name,
 			Name:     internalName,
 			Public:   true,
 		}).Get(ctx, nil)
@@ -138,9 +141,12 @@ func UpdateS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 		return fmt.Errorf("s3 bucket %s has no shard assigned", bucketID)
 	}
 
-	var tenantID string
+	var tenant model.Tenant
 	if bucket.TenantID != nil {
-		tenantID = *bucket.TenantID
+		err = workflow.ExecuteActivity(ctx, "GetTenantByID", *bucket.TenantID).Get(ctx, &tenant)
+		if err != nil {
+			return err
+		}
 	}
 
 	var nodes []model.Node
@@ -153,11 +159,11 @@ func UpdateS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 		return fmt.Errorf("no nodes found in S3 shard %s", *bucket.ShardID)
 	}
 
-	internalName := tenantID + "--" + bucket.Name
+	internalName := tenant.Name + "--" + bucket.Name
 	nodeCtx := nodeActivityCtx(ctx, nodes[0].ID)
 
 	err = workflow.ExecuteActivity(nodeCtx, "UpdateS3BucketPolicy", activity.UpdateS3BucketPolicyParams{
-		TenantID: tenantID,
+		TenantID: tenant.Name,
 		Name:     internalName,
 		Public:   bucket.Public,
 	}).Get(ctx, nil)
@@ -202,9 +208,13 @@ func DeleteS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 		return noShardErr
 	}
 
-	var tenantID string
+	var tenant model.Tenant
 	if bucket.TenantID != nil {
-		tenantID = *bucket.TenantID
+		err = workflow.ExecuteActivity(ctx, "GetTenantByID", *bucket.TenantID).Get(ctx, &tenant)
+		if err != nil {
+			_ = setResourceFailed(ctx, "s3_buckets", bucketID, err)
+			return err
+		}
 	}
 
 	var nodes []model.Node
@@ -220,11 +230,11 @@ func DeleteS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 		return noNodesErr
 	}
 
-	internalName := tenantID + "--" + bucket.Name
+	internalName := tenant.Name + "--" + bucket.Name
 	nodeCtx := nodeActivityCtx(ctx, nodes[0].ID)
 
 	err = workflow.ExecuteActivity(nodeCtx, "DeleteS3Bucket", activity.DeleteS3BucketParams{
-		TenantID: tenantID,
+		TenantID: tenant.Name,
 		Name:     internalName,
 	}).Get(ctx, nil)
 	if err != nil {

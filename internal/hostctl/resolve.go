@@ -26,6 +26,10 @@ func (c *Client) FindTenantByName(name string) (string, error) {
 	return c.findByName("/tenants", name)
 }
 
+func (c *Client) FindBrandByName(name string) (string, error) {
+	return c.findByName("/brands", name)
+}
+
 func (c *Client) findByName(path, name string) (string, error) {
 	resp, err := c.Get(path)
 	if err != nil {

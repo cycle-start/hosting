@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/edvin/hosting/internal/api/request"
@@ -97,10 +98,11 @@ func (h *Database) Create(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	shardID := req.ShardID
+	dbName := platform.NewName("db_")
 	database := &model.Database{
 		ID:        platform.NewID(),
 		TenantID:  &tenantID,
-		Name:      req.Name,
+		Name:      dbName,
 		ShardID:   &shardID,
 		Status:    model.StatusPending,
 		CreatedAt: now,
@@ -114,6 +116,10 @@ func (h *Database) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Nested user creation
 	for _, ur := range req.Users {
+		if !strings.HasPrefix(ur.Username, dbName) {
+			response.WriteError(w, http.StatusBadRequest, fmt.Sprintf("username %q must start with database name %q", ur.Username, dbName))
+			return
+		}
 		now2 := time.Now()
 		user := &model.DatabaseUser{
 			ID:         platform.NewID(),

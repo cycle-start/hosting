@@ -117,7 +117,8 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	shardID := req.ShardID
 	tenant := &model.Tenant{
-		ID:        platform.NewShortID(),
+		ID:        platform.NewID(),
+		Name:      platform.NewName("t_"),
 		BrandID:   req.BrandID,
 		RegionID:  req.RegionID,
 		ClusterID: req.ClusterID,
@@ -168,9 +169,9 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 			runtimeConfig = json.RawMessage(`{}`)
 		}
 		webroot := &model.Webroot{
-			ID:             platform.NewShortID(),
+			ID:             platform.NewID(),
 			TenantID:       tenant.ID,
-			Name:           wr.Name,
+			Name:           platform.NewName("web_"),
 			Runtime:        wr.Runtime,
 			RuntimeVersion: wr.RuntimeVersion,
 			RuntimeConfig:  runtimeConfig,
@@ -180,7 +181,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 			UpdatedAt:      now2,
 		}
 		if err := h.services.Webroot.Create(r.Context(), webroot); err != nil {
-			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create webroot %s: %s", wr.Name, err.Error()))
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create webroot: %s", err.Error()))
 			return
 		}
 		if err := createNestedFQDNs(r.Context(), h.services, webroot.ID, wr.FQDNs); err != nil {
@@ -194,17 +195,18 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 		now2 := time.Now()
 		tenantID := tenant.ID
 		dbShardID := dr.ShardID
+		dbName := platform.NewName("db_")
 		database := &model.Database{
 			ID:        platform.NewID(),
 			TenantID:  &tenantID,
-			Name:      dr.Name,
+			Name:      dbName,
 			ShardID:   &dbShardID,
 			Status:    model.StatusPending,
 			CreatedAt: now2,
 			UpdatedAt: now2,
 		}
 		if err := h.services.Database.Create(r.Context(), database); err != nil {
-			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create database %s: %s", dr.Name, err.Error()))
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create database %s: %s", dbName, err.Error()))
 			return
 		}
 		for _, ur := range dr.Users {
@@ -238,7 +240,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 		instance := &model.ValkeyInstance{
 			ID:          platform.NewID(),
 			TenantID:    &tenantID,
-			Name:        vr.Name,
+			Name:        platform.NewName("kv_"),
 			ShardID:     &vShardID,
 			MaxMemoryMB: maxMemoryMB,
 			Password:    generatePassword(),
@@ -247,7 +249,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 			UpdatedAt:   now2,
 		}
 		if err := h.services.ValkeyInstance.Create(r.Context(), instance); err != nil {
-			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create valkey instance %s: %s", vr.Name, err.Error()))
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create valkey instance: %s", err.Error()))
 			return
 		}
 		for _, ur := range vr.Users {
@@ -282,7 +284,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 		bucket := &model.S3Bucket{
 			ID:        platform.NewID(),
 			TenantID:  &tenantID,
-			Name:      br.Name,
+			Name:      platform.NewName("s3_"),
 			ShardID:   &s3ShardID,
 			Status:    model.StatusPending,
 			CreatedAt: now2,
@@ -295,7 +297,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 			bucket.QuotaBytes = *br.QuotaBytes
 		}
 		if err := h.services.S3Bucket.Create(r.Context(), bucket); err != nil {
-			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create s3 bucket %s: %s", br.Name, err.Error()))
+			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create s3 bucket: %s", err.Error()))
 			return
 		}
 	}

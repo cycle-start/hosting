@@ -12,7 +12,7 @@ CREATE TABLE valkey_instances (
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE(shard_id, port),
-    UNIQUE(shard_id, name)
+    UNIQUE(name)
 );
 
 -- +goose Down

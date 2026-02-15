@@ -79,7 +79,7 @@ func UpdateServiceHostnamesWorkflow(ctx workflow.Context, tenantID string) error
 	// Create DNS records for service hostnames.
 	err = workflow.ExecuteActivity(ctx, "CreateServiceHostnameRecords", activity.ServiceHostnameParams{
 		BaseHostname: baseHostname,
-		TenantName:   tenant.ID,
+		TenantName:   tenant.Name,
 		Services:     entries,
 	}).Get(ctx, nil)
 	if err != nil {

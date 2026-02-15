@@ -8,7 +8,7 @@ CREATE TABLE databases (
     status_message TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE(node_id, name)
+    UNIQUE(name)
 );
 
 -- +goose Down

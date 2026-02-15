@@ -23,18 +23,30 @@ func TestNewID_ReturnsUniqueValues(t *testing.T) {
 	assert.Len(t, seen, 100)
 }
 
-func TestNewShortID_Format(t *testing.T) {
-	id := NewShortID()
-	assert.Len(t, id, 10)
-	assert.Regexp(t, regexp.MustCompile(`^[a-z0-9]{10}$`), id)
+func TestNewName_Format(t *testing.T) {
+	tests := []struct {
+		prefix   string
+		expected *regexp.Regexp
+	}{
+		{"t_", regexp.MustCompile(`^t_[a-z0-9]{10}$`)},
+		{"db_", regexp.MustCompile(`^db_[a-z0-9]{10}$`)},
+		{"kv_", regexp.MustCompile(`^kv_[a-z0-9]{10}$`)},
+		{"s3_", regexp.MustCompile(`^s3_[a-z0-9]{10}$`)},
+		{"web_", regexp.MustCompile(`^web_[a-z0-9]{10}$`)},
+		{"cron_", regexp.MustCompile(`^cron_[a-z0-9]{10}$`)},
+	}
+	for _, tt := range tests {
+		name := NewName(tt.prefix)
+		assert.Regexp(t, tt.expected, name, "prefix=%s", tt.prefix)
+	}
 }
 
-func TestNewShortID_ReturnsUniqueValues(t *testing.T) {
+func TestNewName_ReturnsUniqueValues(t *testing.T) {
 	seen := make(map[string]bool, 100)
 	for i := 0; i < 100; i++ {
-		id := NewShortID()
-		assert.False(t, seen[id], "duplicate short ID generated: %s", id)
-		seen[id] = true
+		name := NewName("t_")
+		assert.False(t, seen[name], "duplicate name generated: %s", name)
+		seen[name] = true
 	}
 	assert.Len(t, seen, 100)
 }

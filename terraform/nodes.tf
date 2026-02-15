@@ -120,6 +120,8 @@ resource "libvirt_cloudinit_disk" "web_node" {
     region_id        = var.region_id
     cluster_id       = var.cluster_id
     ceph_fsid        = random_uuid.ceph_fsid.result
+    core_api_url     = "http://${var.controlplane_ip}:8090/api/v1"
+    core_api_token   = var.core_api_token
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.web_nodes[count.index].ip
@@ -133,6 +135,10 @@ resource "libvirt_volume" "web_node_seed" {
   pool  = libvirt_pool.hosting.name
   create = {
     content = { url = libvirt_cloudinit_disk.web_node[count.index].path }
+  }
+  lifecycle {
+    replace_triggered_by = [libvirt_cloudinit_disk.web_node[count.index]]
+    ignore_changes       = [create]
   }
 }
 
@@ -167,6 +173,10 @@ resource "libvirt_volume" "db_node_seed" {
   create = {
     content = { url = libvirt_cloudinit_disk.db_node[count.index].path }
   }
+  lifecycle {
+    replace_triggered_by = [libvirt_cloudinit_disk.db_node[count.index]]
+    ignore_changes       = [create]
+  }
 }
 
 resource "libvirt_cloudinit_disk" "dns_node" {
@@ -198,6 +208,10 @@ resource "libvirt_volume" "dns_node_seed" {
   create = {
     content = { url = libvirt_cloudinit_disk.dns_node[count.index].path }
   }
+  lifecycle {
+    replace_triggered_by = [libvirt_cloudinit_disk.dns_node[count.index]]
+    ignore_changes       = [create]
+  }
 }
 
 resource "libvirt_cloudinit_disk" "valkey_node" {
@@ -228,6 +242,10 @@ resource "libvirt_volume" "valkey_node_seed" {
   pool  = libvirt_pool.hosting.name
   create = {
     content = { url = libvirt_cloudinit_disk.valkey_node[count.index].path }
+  }
+  lifecycle {
+    replace_triggered_by = [libvirt_cloudinit_disk.valkey_node[count.index]]
+    ignore_changes       = [create]
   }
 }
 
@@ -263,6 +281,10 @@ resource "libvirt_volume" "storage_node_seed" {
   pool  = libvirt_pool.hosting.name
   create = {
     content = { url = libvirt_cloudinit_disk.storage_node[count.index].path }
+  }
+  lifecycle {
+    replace_triggered_by = [libvirt_cloudinit_disk.storage_node[count.index]]
+    ignore_changes       = [create]
   }
 }
 
@@ -307,6 +329,10 @@ resource "libvirt_volume" "dbadmin_node_seed" {
   pool  = libvirt_pool.hosting.name
   create = {
     content = { url = libvirt_cloudinit_disk.dbadmin_node[count.index].path }
+  }
+  lifecycle {
+    replace_triggered_by = [libvirt_cloudinit_disk.dbadmin_node[count.index]]
+    ignore_changes       = [create]
   }
 }
 
@@ -659,6 +685,10 @@ resource "libvirt_volume" "lb_node_seed" {
   create = {
     content = { url = libvirt_cloudinit_disk.lb_node[count.index].path }
   }
+  lifecycle {
+    replace_triggered_by = [libvirt_cloudinit_disk.lb_node[count.index]]
+    ignore_changes       = [create]
+  }
 }
 
 resource "libvirt_domain" "lb_node" {
@@ -747,6 +777,10 @@ resource "libvirt_volume" "controlplane_node_seed" {
   pool  = libvirt_pool.hosting.name
   create = {
     content = { url = libvirt_cloudinit_disk.controlplane_node[count.index].path }
+  }
+  lifecycle {
+    replace_triggered_by = [libvirt_cloudinit_disk.controlplane_node[count.index]]
+    ignore_changes       = [create]
   }
 }
 

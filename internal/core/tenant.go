@@ -26,9 +26,9 @@ func (s *TenantService) Create(ctx context.Context, tenant *model.Tenant) error 
 	tenant.UID = uid
 
 	_, err = s.db.Exec(ctx,
-		`INSERT INTO tenants (id, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, ssh_enabled, disk_quota_bytes, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-		tenant.ID, tenant.BrandID, tenant.RegionID, tenant.ClusterID, tenant.ShardID, tenant.UID,
+		`INSERT INTO tenants (id, name, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, ssh_enabled, disk_quota_bytes, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+		tenant.ID, tenant.Name, tenant.BrandID, tenant.RegionID, tenant.ClusterID, tenant.ShardID, tenant.UID,
 		tenant.SFTPEnabled, tenant.SSHEnabled, tenant.DiskQuotaBytes, tenant.Status, tenant.CreatedAt, tenant.UpdatedAt,
 	)
 	if err != nil {
@@ -51,14 +51,14 @@ func (s *TenantService) Create(ctx context.Context, tenant *model.Tenant) error 
 func (s *TenantService) GetByID(ctx context.Context, id string) (*model.Tenant, error) {
 	var t model.Tenant
 	err := s.db.QueryRow(ctx,
-		`SELECT t.id, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.created_at, t.updated_at,
+		`SELECT t.id, t.name, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.created_at, t.updated_at,
 		        r.name, c.name, s.name
 		 FROM tenants t
 		 JOIN regions r ON r.id = t.region_id
 		 JOIN clusters c ON c.id = t.cluster_id
 		 LEFT JOIN shards s ON s.id = t.shard_id
 		 WHERE t.id = $1`, id,
-	).Scan(&t.ID, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID,
+	).Scan(&t.ID, &t.Name, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID,
 		&t.SFTPEnabled, &t.SSHEnabled, &t.DiskQuotaBytes, &t.Status, &t.StatusMessage, &t.CreatedAt, &t.UpdatedAt,
 		&t.RegionName, &t.ClusterName, &t.ShardName)
 	if err != nil {
@@ -68,12 +68,12 @@ func (s *TenantService) GetByID(ctx context.Context, id string) (*model.Tenant, 
 }
 
 func (s *TenantService) List(ctx context.Context, params request.ListParams) ([]model.Tenant, bool, error) {
-	query := `SELECT t.id, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.created_at, t.updated_at, r.name, c.name, s.name FROM tenants t JOIN regions r ON r.id = t.region_id JOIN clusters c ON c.id = t.cluster_id LEFT JOIN shards s ON s.id = t.shard_id WHERE t.status != 'deleted'`
+	query := `SELECT t.id, t.name, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.created_at, t.updated_at, r.name, c.name, s.name FROM tenants t JOIN regions r ON r.id = t.region_id JOIN clusters c ON c.id = t.cluster_id LEFT JOIN shards s ON s.id = t.shard_id WHERE t.status != 'deleted'`
 	args := []any{}
 	argIdx := 1
 
 	if params.Search != "" {
-		query += fmt.Sprintf(` AND t.id ILIKE $%d`, argIdx)
+		query += fmt.Sprintf(` AND (t.id ILIKE $%d OR t.name ILIKE $%d)`, argIdx, argIdx)
 		args = append(args, "%"+params.Search+"%")
 		argIdx++
 	}
@@ -117,7 +117,7 @@ func (s *TenantService) List(ctx context.Context, params request.ListParams) ([]
 	var tenants []model.Tenant
 	for rows.Next() {
 		var t model.Tenant
-		if err := rows.Scan(&t.ID, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID,
+		if err := rows.Scan(&t.ID, &t.Name, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID,
 			&t.SFTPEnabled, &t.SSHEnabled, &t.DiskQuotaBytes, &t.Status, &t.StatusMessage, &t.CreatedAt, &t.UpdatedAt,
 			&t.RegionName, &t.ClusterName, &t.ShardName); err != nil {
 			return nil, false, fmt.Errorf("scan tenant: %w", err)
@@ -136,7 +136,7 @@ func (s *TenantService) List(ctx context.Context, params request.ListParams) ([]
 }
 
 func (s *TenantService) ListByShard(ctx context.Context, shardID string, limit int, cursor string) ([]model.Tenant, bool, error) {
-	query := `SELECT t.id, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.created_at, t.updated_at, r.name, c.name, s.name FROM tenants t JOIN regions r ON r.id = t.region_id JOIN clusters c ON c.id = t.cluster_id LEFT JOIN shards s ON s.id = t.shard_id WHERE t.shard_id = $1`
+	query := `SELECT t.id, t.name, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.created_at, t.updated_at, r.name, c.name, s.name FROM tenants t JOIN regions r ON r.id = t.region_id JOIN clusters c ON c.id = t.cluster_id LEFT JOIN shards s ON s.id = t.shard_id WHERE t.shard_id = $1`
 	args := []any{shardID}
 	argIdx := 2
 
@@ -159,7 +159,7 @@ func (s *TenantService) ListByShard(ctx context.Context, shardID string, limit i
 	var tenants []model.Tenant
 	for rows.Next() {
 		var t model.Tenant
-		if err := rows.Scan(&t.ID, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID,
+		if err := rows.Scan(&t.ID, &t.Name, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID,
 			&t.SFTPEnabled, &t.SSHEnabled, &t.DiskQuotaBytes, &t.Status, &t.StatusMessage, &t.CreatedAt, &t.UpdatedAt,
 			&t.RegionName, &t.ClusterName, &t.ShardName); err != nil {
 			return nil, false, fmt.Errorf("scan tenant: %w", err)

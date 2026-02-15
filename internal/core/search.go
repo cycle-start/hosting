@@ -46,8 +46,8 @@ func (s *SearchService) Search(ctx context.Context, query string, limit int) ([]
 			args: []any{pattern, limit},
 		},
 		{
-			sql: `SELECT 'tenant', id, id, '', status FROM tenants
-				WHERE status != 'deleted' AND id ILIKE $1
+			sql: `SELECT 'tenant', id, name, '', status FROM tenants
+				WHERE status != 'deleted' AND (id ILIKE $1 OR name ILIKE $1)
 				LIMIT $2`,
 			args: []any{pattern, limit},
 		},

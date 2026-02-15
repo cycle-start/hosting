@@ -1,7 +1,6 @@
 package request
 
 type CreateCronJob struct {
-	Name             string `json:"name" validate:"required,slug"`
 	Schedule         string `json:"schedule" validate:"required"`
 	Command          string `json:"command" validate:"required,max=4096"`
 	WorkingDirectory string `json:"working_directory" validate:"omitempty,max=255"`

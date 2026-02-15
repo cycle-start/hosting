@@ -108,9 +108,9 @@ func (h *Webroot) Create(w http.ResponseWriter, r *http.Request) {
 		runtimeConfig = json.RawMessage(`{}`)
 	}
 	webroot := &model.Webroot{
-		ID:             platform.NewShortID(),
+		ID:             platform.NewID(),
 		TenantID:       tenantID,
-		Name:           req.Name,
+		Name:           platform.NewName("web_"),
 		Runtime:        req.Runtime,
 		RuntimeVersion: req.RuntimeVersion,
 		RuntimeConfig:  runtimeConfig,

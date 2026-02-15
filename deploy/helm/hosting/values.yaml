@@ -58,15 +58,6 @@ config:
   lokiUrl: "http://127.0.0.1:3100"
   tenantLokiUrl: "http://127.0.0.1:3101"
 
-# Agent reconciliation
-reconcile:
-  enabled: true
-  interval: "60s"
-  startupTimeout: "5m"
-  maxFixes: 50
-  circuitThreshold: 100
-healthReportInterval: "30s"
-
 # Secrets — either inline or reference an existing K8s Secret
 secrets:
   # If set, use this existing secret instead of creating one

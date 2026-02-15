@@ -10,17 +10,13 @@ import { ClustersPage } from './pages/clusters'
 import { TenantsPage } from './pages/tenants'
 import { CreateTenantPage } from './pages/create-tenant'
 import { TenantDetailPage } from './pages/tenant-detail'
-import { WebrootsPage } from './pages/webroots'
 import { WebrootDetailPage } from './pages/webroot-detail'
 import { FQDNDetailPage } from './pages/fqdn-detail'
 import { EmailAccountDetailPage } from './pages/email-account-detail'
-import { DatabasesPage } from './pages/databases'
 import { DatabaseDetailPage } from './pages/database-detail'
 import { ZonesPage } from './pages/zones'
 import { ZoneDetailPage } from './pages/zone-detail'
-import { ValkeyPage } from './pages/valkey'
 import { ValkeyDetailPage } from './pages/valkey-detail'
-import { S3BucketsPage } from './pages/s3-buckets'
 import { S3BucketDetailPage } from './pages/s3-bucket-detail'
 import { PlatformConfigPage } from './pages/platform-config'
 import { APIKeysPage } from './pages/api-keys'
@@ -132,18 +128,6 @@ const s3BucketDetailRoute = createRoute({
   component: S3BucketDetailPage,
 })
 
-const webrootsRoute = createRoute({
-  getParentRoute: () => authLayout,
-  path: '/webroots',
-  component: WebrootsPage,
-})
-
-const databasesRoute = createRoute({
-  getParentRoute: () => authLayout,
-  path: '/databases',
-  component: DatabasesPage,
-})
-
 const zonesRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/zones',
@@ -154,18 +138,6 @@ const zoneDetailRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/zones/$id',
   component: ZoneDetailPage,
-})
-
-const valkeyRoute = createRoute({
-  getParentRoute: () => authLayout,
-  path: '/valkey',
-  component: ValkeyPage,
-})
-
-const s3BucketsRoute = createRoute({
-  getParentRoute: () => authLayout,
-  path: '/s3-buckets',
-  component: S3BucketsPage,
 })
 
 const platformConfigRoute = createRoute({
@@ -209,12 +181,8 @@ const routeTree = rootRoute.addChildren([
     databaseDetailRoute,
     valkeyDetailRoute,
     s3BucketDetailRoute,
-    webrootsRoute,
-    databasesRoute,
     zonesRoute,
     zoneDetailRoute,
-    valkeyRoute,
-    s3BucketsRoute,
     platformConfigRoute,
     apiKeysRoute,
     apiKeyDetailRoute,

@@ -408,7 +408,7 @@ export interface AuditListParams extends ListParams {
 
 export interface ZoneFormData { name: string }
 export interface WebrootFormData {
-  name: string; runtime: string; runtime_version: string
+  runtime: string; runtime_version: string
   public_folder: string; fqdns?: FQDNFormData[]
 }
 export interface FQDNFormData {
@@ -422,14 +422,14 @@ export interface EmailAccountFormData {
   autoreply?: { subject: string; body: string; enabled: boolean }
 }
 export interface DatabaseFormData {
-  name: string; shard_id: string
+  shard_id: string
   users?: DatabaseUserFormData[]
 }
 export interface DatabaseUserFormData {
   username: string; password: string; privileges: string[]
 }
 export interface ValkeyInstanceFormData {
-  name: string; shard_id: string; max_memory_mb?: number
+  shard_id: string; max_memory_mb?: number
   users?: ValkeyUserFormData[]
 }
 export interface ValkeyUserFormData {
@@ -437,7 +437,7 @@ export interface ValkeyUserFormData {
   key_pattern?: string
 }
 export interface S3BucketFormData {
-  name: string; shard_id: string; public?: boolean; quota_bytes?: number
+  shard_id: string; public?: boolean; quota_bytes?: number
 }
 
 export interface SSHKeyFormData { name: string; public_key: string }

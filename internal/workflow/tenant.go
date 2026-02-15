@@ -58,6 +58,7 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "CreateTenant", activity.CreateTenantParams{
 			ID:             tenant.ID,
+			Name:           tenant.Name,
 			UID:            tenant.UID,
 			SFTPEnabled:    tenant.SFTPEnabled,
 			SSHEnabled:     tenant.SSHEnabled,
@@ -70,7 +71,7 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 
 		// Sync SSH/SFTP config on the node.
 		err = workflow.ExecuteActivity(nodeCtx, "SyncSSHConfig", activity.SyncSSHConfigParams{
-			TenantName:  tenant.ID,
+			TenantName:  tenant.Name,
 			SSHEnabled:  tenant.SSHEnabled,
 			SFTPEnabled: tenant.SFTPEnabled,
 		}).Get(ctx, nil)
@@ -134,6 +135,7 @@ func UpdateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "UpdateTenant", activity.UpdateTenantParams{
 			ID:          tenant.ID,
+			Name:        tenant.Name,
 			UID:         tenant.UID,
 			SFTPEnabled: tenant.SFTPEnabled,
 			SSHEnabled:  tenant.SSHEnabled,
@@ -145,7 +147,7 @@ func UpdateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 
 		// Sync SSH/SFTP config on the node.
 		err = workflow.ExecuteActivity(nodeCtx, "SyncSSHConfig", activity.SyncSSHConfigParams{
-			TenantName:  tenant.ID,
+			TenantName:  tenant.Name,
 			SSHEnabled:  tenant.SSHEnabled,
 			SFTPEnabled: tenant.SFTPEnabled,
 		}).Get(ctx, nil)
@@ -196,7 +198,7 @@ func SuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	// Suspend tenant on each node in the shard.
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "SuspendTenant", tenant.ID).Get(ctx, nil)
+		err = workflow.ExecuteActivity(nodeCtx, "SuspendTenant", tenant.Name).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "tenants", tenantID, err)
 			return err
@@ -255,7 +257,7 @@ func UnsuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	// Unsuspend tenant on each node in the shard.
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "UnsuspendTenant", tenant.ID).Get(ctx, nil)
+		err = workflow.ExecuteActivity(nodeCtx, "UnsuspendTenant", tenant.Name).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "tenants", tenantID, err)
 			return err
@@ -316,13 +318,13 @@ func DeleteTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 
 		// Remove SSH config before deleting the tenant.
-		err = workflow.ExecuteActivity(nodeCtx, "RemoveSSHConfig", tenant.ID).Get(ctx, nil)
+		err = workflow.ExecuteActivity(nodeCtx, "RemoveSSHConfig", tenant.Name).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "tenants", tenantID, err)
 			return err
 		}
 
-		err = workflow.ExecuteActivity(nodeCtx, "DeleteTenant", tenant.ID).Get(ctx, nil)
+		err = workflow.ExecuteActivity(nodeCtx, "DeleteTenant", tenant.Name).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "tenants", tenantID, err)
 			return err

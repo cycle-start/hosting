@@ -111,7 +111,7 @@ func (s *Server) setupRoutes() {
 		zone := handler.NewZone(s.services)
 		zoneRecord := handler.NewZoneRecord(s.services.ZoneRecord)
 		database := handler.NewDatabase(s.services.Database, s.services.DatabaseUser, s.services.Tenant)
-		dbUser := handler.NewDatabaseUser(s.services.DatabaseUser)
+		dbUser := handler.NewDatabaseUser(s.services.DatabaseUser, s.services.Database)
 		valkeyInstance := handler.NewValkeyInstance(s.services.ValkeyInstance, s.services.ValkeyUser, s.services.Tenant)
 		valkeyUser := handler.NewValkeyUser(s.services.ValkeyUser)
 		s3Bucket := handler.NewS3Bucket(s.services.S3Bucket, s.services.S3AccessKey, s.services.Tenant)
@@ -124,7 +124,7 @@ func (s *Server) setupRoutes() {
 		backup := handler.NewBackup(s.services.Backup, s.services.Webroot, s.services.Database, s.services.Tenant)
 		search := handler.NewSearch(s.services.Search)
 		apiKey := handler.NewAPIKey(s.services.APIKey)
-		internalNode := handler.NewInternalNode(s.services.DesiredState, s.services.NodeHealth)
+		internalNode := handler.NewInternalNode(s.services.DesiredState, s.services.NodeHealth, s.services.CronJob)
 
 		// Platform-admin-only endpoints (require brands: ["*"])
 		r.Group(func(r chi.Router) {
@@ -252,7 +252,7 @@ func (s *Server) setupRoutes() {
 				r.Delete("/nodes/{id}", node.Delete)
 			})
 
-			// Internal API (node-agent reconciliation)
+			// Internal API (node agent, cron outcome reporting)
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequireScope("nodes", "read"))
 				r.Get("/internal/v1/nodes/{nodeID}/desired-state", internalNode.GetDesiredState)
@@ -263,6 +263,7 @@ func (s *Server) setupRoutes() {
 				r.Use(mw.RequireScope("nodes", "write"))
 				r.Post("/internal/v1/nodes/{nodeID}/health", internalNode.ReportHealth)
 				r.Post("/internal/v1/nodes/{nodeID}/drift-events", internalNode.ReportDriftEvents)
+				r.Post("/internal/v1/cron-jobs/{cronJobID}/outcome", internalNode.ReportCronOutcome)
 			})
 		})
 

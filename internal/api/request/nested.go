@@ -11,7 +11,6 @@ type CreateZoneNested struct {
 }
 
 type CreateWebrootNested struct {
-	Name           string             `json:"name" validate:"required,slug"`
 	Runtime        string             `json:"runtime" validate:"required,oneof=php node python ruby static"`
 	RuntimeVersion string             `json:"runtime_version" validate:"required"`
 	RuntimeConfig  json.RawMessage    `json:"runtime_config"`
@@ -52,7 +51,6 @@ type CreateEmailAutoReplyNested struct {
 }
 
 type CreateDatabaseNested struct {
-	Name    string                     `json:"name" validate:"required,mysql_name"`
 	ShardID string                     `json:"shard_id" validate:"required"`
 	Users   []CreateDatabaseUserNested `json:"users" validate:"omitempty,dive"`
 }
@@ -64,7 +62,6 @@ type CreateDatabaseUserNested struct {
 }
 
 type CreateValkeyInstanceNested struct {
-	Name        string                   `json:"name" validate:"required,slug"`
 	ShardID     string                   `json:"shard_id" validate:"required"`
 	MaxMemoryMB int                      `json:"max_memory_mb" validate:"omitempty,min=1"`
 	Users       []CreateValkeyUserNested `json:"users" validate:"omitempty,dive"`
@@ -78,7 +75,6 @@ type CreateValkeyUserNested struct {
 }
 
 type CreateS3BucketNested struct {
-	Name       string `json:"name" validate:"required,slug"`
 	ShardID    string `json:"shard_id" validate:"required"`
 	Public     *bool  `json:"public"`
 	QuotaBytes *int64 `json:"quota_bytes"`

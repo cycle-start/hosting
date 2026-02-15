@@ -1,6 +1,7 @@
 package hostctl
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -46,6 +47,7 @@ func Seed(configPath string, timeout time.Duration) error {
 	zoneMap := map[string]string{}   // zone name -> ID
 	tenantMap := map[string]string{} // tenant name -> ID
 	shardMap := map[string]string{}  // shard name -> ID
+	brandMap := map[string]string{}  // brand name -> ID
 
 	// Resolve shard names to IDs (needed for tenant creation)
 	resolveShardID := func(shardName string) (string, error) {
@@ -62,14 +64,14 @@ func Seed(configPath string, timeout time.Duration) error {
 
 	// 1. Create brands and set allowed clusters
 	for _, b := range cfg.Brands {
-		// Check if brand already exists.
-		_, err := client.Get(fmt.Sprintf("/brands/%s", b.ID))
+		// Check if brand already exists by name.
+		brandID, err := client.FindBrandByName(b.Name)
 		if err == nil {
-			fmt.Printf("Brand %q: exists (skipping)\n", b.ID)
+			fmt.Printf("Brand %q: exists (%s, skipping)\n", b.Name, brandID)
+			brandMap[b.Name] = brandID
 		} else {
-			fmt.Printf("Creating brand %q...\n", b.ID)
-			_, err = client.Post("/brands", map[string]any{
-				"id":               b.ID,
+			fmt.Printf("Creating brand %q...\n", b.Name)
+			resp, err := client.Post("/brands", map[string]any{
 				"name":             b.Name,
 				"base_hostname":    b.BaseHostname,
 				"primary_ns":       b.PrimaryNS,
@@ -77,9 +79,14 @@ func Seed(configPath string, timeout time.Duration) error {
 				"hostmaster_email": b.HostmasterEmail,
 			})
 			if err != nil {
-				return fmt.Errorf("create brand %q: %w", b.ID, err)
+				return fmt.Errorf("create brand %q: %w", b.Name, err)
 			}
-			fmt.Printf("  Brand %q: created\n", b.ID)
+			brandID, err = extractID(resp)
+			if err != nil {
+				return fmt.Errorf("parse brand ID: %w", err)
+			}
+			brandMap[b.Name] = brandID
+			fmt.Printf("  Brand %q: %s created\n", b.Name, brandID)
 		}
 
 		// Set allowed clusters (resolve names to IDs).
@@ -88,17 +95,17 @@ func Seed(configPath string, timeout time.Duration) error {
 			for _, cName := range b.AllowedClusters {
 				cID, err := client.FindClusterByName(regionID, cName)
 				if err != nil {
-					return fmt.Errorf("resolve cluster %q for brand %q: %w", cName, b.ID, err)
+					return fmt.Errorf("resolve cluster %q for brand %q: %w", cName, b.Name, err)
 				}
 				clusterIDs = append(clusterIDs, cID)
 			}
-			_, err := client.Put(fmt.Sprintf("/brands/%s/clusters", b.ID), map[string]any{
+			_, err := client.Put(fmt.Sprintf("/brands/%s/clusters", brandID), map[string]any{
 				"cluster_ids": clusterIDs,
 			})
 			if err != nil {
-				return fmt.Errorf("set brand %q clusters: %w", b.ID, err)
+				return fmt.Errorf("set brand %q clusters: %w", b.Name, err)
 			}
-			fmt.Printf("  Brand %q: allowed clusters set (%v)\n", b.ID, b.AllowedClusters)
+			fmt.Printf("  Brand %q: allowed clusters set (%v)\n", b.Name, b.AllowedClusters)
 		}
 	}
 
@@ -110,7 +117,11 @@ func Seed(configPath string, timeout time.Duration) error {
 			"region_id": regionID,
 		}
 		if z.Brand != "" {
-			zoneBody["brand_id"] = z.Brand
+			brandID, ok := brandMap[z.Brand]
+			if !ok {
+				return fmt.Errorf("zone %q: brand %q not found (must be defined in brands section)", z.Name, z.Brand)
+			}
+			zoneBody["brand_id"] = brandID
 		}
 		resp, err := client.Post("/zones", zoneBody)
 		if err != nil {
@@ -145,7 +156,11 @@ func Seed(configPath string, timeout time.Duration) error {
 			"ssh_enabled":  t.SSHEnabled,
 		}
 		if t.Brand != "" {
-			tenantBody["brand_id"] = t.Brand
+			brandID, ok := brandMap[t.Brand]
+			if !ok {
+				return fmt.Errorf("tenant %q: brand %q not found (must be defined in brands section)", t.Name, t.Brand)
+			}
+			tenantBody["brand_id"] = brandID
 		}
 		resp, err := client.Post("/tenants", tenantBody)
 		if err != nil {
@@ -179,42 +194,42 @@ func Seed(configPath string, timeout time.Duration) error {
 		}
 
 		// Create webroots
-		for _, w := range t.Webroots {
+		for i, w := range t.Webroots {
 			if err := seedWebroot(client, tenantID, w, fqdnMap, timeout); err != nil {
-				return fmt.Errorf("webroot %q for tenant %q: %w", w.Name, t.Name, err)
+				return fmt.Errorf("webroot #%d for tenant %q: %w", i+1, t.Name, err)
 			}
 		}
 
 		// Create databases
-		for _, d := range t.Databases {
+		for i, d := range t.Databases {
 			dbShardID, err := resolveShardID(d.Shard)
 			if err != nil {
 				return err
 			}
 			if err := seedDatabase(client, tenantID, d, dbShardID, timeout); err != nil {
-				return fmt.Errorf("database %q for tenant %q: %w", d.Name, t.Name, err)
+				return fmt.Errorf("database #%d for tenant %q: %w", i+1, t.Name, err)
 			}
 		}
 
 		// Create valkey instances
-		for _, v := range t.ValkeyInstances {
+		for i, v := range t.ValkeyInstances {
 			vkShardID, err := resolveShardID(v.Shard)
 			if err != nil {
 				return err
 			}
 			if err := seedValkeyInstance(client, tenantID, v, vkShardID, timeout); err != nil {
-				return fmt.Errorf("valkey instance %q for tenant %q: %w", v.Name, t.Name, err)
+				return fmt.Errorf("valkey instance #%d for tenant %q: %w", i+1, t.Name, err)
 			}
 		}
 
 		// Create S3 buckets
-		for _, s := range t.S3Buckets {
+		for i, s := range t.S3Buckets {
 			s3ShardID, err := resolveShardID(s.Shard)
 			if err != nil {
 				return err
 			}
 			if err := seedS3Bucket(client, tenantID, s, s3ShardID, timeout); err != nil {
-				return fmt.Errorf("s3 bucket %q for tenant %q: %w", s.Name, t.Name, err)
+				return fmt.Errorf("s3 bucket #%d for tenant %q: %w", i+1, t.Name, err)
 			}
 		}
 
@@ -253,7 +268,6 @@ func Seed(configPath string, timeout time.Duration) error {
 
 func seedWebroot(client *Client, tenantID string, def WebrootDef, fqdnMap map[string]string, timeout time.Duration) error {
 	body := map[string]any{
-		"name":            def.Name,
 		"runtime":         def.Runtime,
 		"runtime_version": def.RuntimeVersion,
 	}
@@ -264,7 +278,7 @@ func seedWebroot(client *Client, tenantID string, def WebrootDef, fqdnMap map[st
 		body["runtime_config"] = def.RuntimeConfig
 	}
 
-	fmt.Printf("  Creating webroot %q...\n", def.Name)
+	fmt.Printf("  Creating webroot (%s %s)...\n", def.Runtime, def.RuntimeVersion)
 	resp, err := client.Post(fmt.Sprintf("/tenants/%s/webroots", tenantID), body)
 	if err != nil {
 		return fmt.Errorf("create: %w", err)
@@ -274,12 +288,13 @@ func seedWebroot(client *Client, tenantID string, def WebrootDef, fqdnMap map[st
 	if err != nil {
 		return err
 	}
+	webrootName := extractNameFromResp(resp)
 
-	fmt.Printf("    Webroot %q: %s, waiting for active...\n", def.Name, webrootID)
+	fmt.Printf("    Webroot %s: %s, waiting for active...\n", webrootName, webrootID)
 	if err := client.WaitForStatus(fmt.Sprintf("/webroots/%s", webrootID), "active", timeout); err != nil {
 		return fmt.Errorf("wait: %w", err)
 	}
-	fmt.Printf("    Webroot %q: active\n", def.Name)
+	fmt.Printf("    Webroot %s: active\n", webrootName)
 
 	// Create FQDNs
 	for _, f := range def.FQDNs {
@@ -309,9 +324,8 @@ func seedWebroot(client *Client, tenantID string, def WebrootDef, fqdnMap map[st
 }
 
 func seedDatabase(client *Client, tenantID string, def DatabaseDef, shardID string, timeout time.Duration) error {
-	fmt.Printf("  Creating database %q...\n", def.Name)
+	fmt.Printf("  Creating database on shard %q...\n", def.Shard)
 	resp, err := client.Post(fmt.Sprintf("/tenants/%s/databases", tenantID), map[string]any{
-		"name":     def.Name,
 		"shard_id": shardID,
 	})
 	if err != nil {
@@ -322,12 +336,13 @@ func seedDatabase(client *Client, tenantID string, def DatabaseDef, shardID stri
 	if err != nil {
 		return err
 	}
+	dbName := extractNameFromResp(resp)
 
-	fmt.Printf("    Database %q: %s, waiting for active...\n", def.Name, dbID)
+	fmt.Printf("    Database %s: %s, waiting for active...\n", dbName, dbID)
 	if err := client.WaitForStatus(fmt.Sprintf("/databases/%s", dbID), "active", timeout); err != nil {
 		return fmt.Errorf("wait: %w", err)
 	}
-	fmt.Printf("    Database %q: active\n", def.Name)
+	fmt.Printf("    Database %s: active\n", dbName)
 
 	// Create users
 	for _, u := range def.Users {
@@ -358,14 +373,13 @@ func seedDatabase(client *Client, tenantID string, def DatabaseDef, shardID stri
 
 func seedValkeyInstance(client *Client, tenantID string, def ValkeyInstanceDef, shardID string, timeout time.Duration) error {
 	body := map[string]any{
-		"name":     def.Name,
 		"shard_id": shardID,
 	}
 	if def.MaxMemoryMB > 0 {
 		body["max_memory_mb"] = def.MaxMemoryMB
 	}
 
-	fmt.Printf("  Creating valkey instance %q...\n", def.Name)
+	fmt.Printf("  Creating valkey instance on shard %q...\n", def.Shard)
 	resp, err := client.Post(fmt.Sprintf("/tenants/%s/valkey-instances", tenantID), body)
 	if err != nil {
 		return fmt.Errorf("create: %w", err)
@@ -375,12 +389,13 @@ func seedValkeyInstance(client *Client, tenantID string, def ValkeyInstanceDef, 
 	if err != nil {
 		return err
 	}
+	instanceName := extractNameFromResp(resp)
 
-	fmt.Printf("    Valkey %q: %s, waiting for active...\n", def.Name, instanceID)
+	fmt.Printf("    Valkey %s: %s, waiting for active...\n", instanceName, instanceID)
 	if err := client.WaitForStatus(fmt.Sprintf("/valkey-instances/%s", instanceID), "active", timeout); err != nil {
 		return fmt.Errorf("wait: %w", err)
 	}
-	fmt.Printf("    Valkey %q: active\n", def.Name)
+	fmt.Printf("    Valkey %s: active\n", instanceName)
 
 	// Create users
 	for _, u := range def.Users {
@@ -416,7 +431,6 @@ func seedValkeyInstance(client *Client, tenantID string, def ValkeyInstanceDef, 
 
 func seedS3Bucket(client *Client, tenantID string, def S3BucketDef, shardID string, timeout time.Duration) error {
 	body := map[string]any{
-		"name":     def.Name,
 		"shard_id": shardID,
 	}
 	if def.Public != nil {
@@ -426,7 +440,7 @@ func seedS3Bucket(client *Client, tenantID string, def S3BucketDef, shardID stri
 		body["quota_bytes"] = *def.QuotaBytes
 	}
 
-	fmt.Printf("  Creating S3 bucket %q...\n", def.Name)
+	fmt.Printf("  Creating S3 bucket on shard %q...\n", def.Shard)
 	resp, err := client.Post(fmt.Sprintf("/tenants/%s/s3-buckets", tenantID), body)
 	if err != nil {
 		return fmt.Errorf("create: %w", err)
@@ -436,12 +450,13 @@ func seedS3Bucket(client *Client, tenantID string, def S3BucketDef, shardID stri
 	if err != nil {
 		return err
 	}
+	bucketName := extractNameFromResp(resp)
 
-	fmt.Printf("    S3 bucket %q: %s, waiting for active...\n", def.Name, bucketID)
+	fmt.Printf("    S3 bucket %s: %s, waiting for active...\n", bucketName, bucketID)
 	if err := client.WaitForStatus(fmt.Sprintf("/s3-buckets/%s", bucketID), "active", timeout); err != nil {
 		return fmt.Errorf("wait: %w", err)
 	}
-	fmt.Printf("    S3 bucket %q: active\n", def.Name)
+	fmt.Printf("    S3 bucket %s: active\n", bucketName)
 
 	return nil
 }
@@ -552,6 +567,16 @@ func seedEmailForward(client *Client, emailAccountID string, def EmailForwardDef
 	fmt.Printf("      Forward to %q: active\n", def.Destination)
 
 	return nil
+}
+
+func extractNameFromResp(resp *Response) string {
+	var resource struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(resp.Body, &resource); err != nil {
+		return "(unknown)"
+	}
+	return resource.Name
 }
 
 func seedEmailAutoReply(client *Client, emailAccountID string, def EmailAutoReplyDef) error {

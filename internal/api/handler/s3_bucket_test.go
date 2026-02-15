@@ -34,7 +34,6 @@ func TestS3BucketCreate_EmptyTenantID(t *testing.T) {
 	h := newS3BucketHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants//s3-buckets", map[string]any{
-		"name":     "mybucket",
 		"shard_id": validID,
 	})
 	r = withChiURLParam(r, "tenantID", "")
@@ -70,7 +69,7 @@ func TestS3BucketCreate_EmptyBody(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
-func TestS3BucketCreate_MissingRequiredFields(t *testing.T) {
+func TestS3BucketCreate_MissingShardID(t *testing.T) {
 	h := newS3BucketHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants/"+validID+"/s3-buckets", map[string]any{})
@@ -83,69 +82,11 @@ func TestS3BucketCreate_MissingRequiredFields(t *testing.T) {
 	assert.Contains(t, body["error"], "validation error")
 }
 
-func TestS3BucketCreate_MissingName(t *testing.T) {
-	h := newS3BucketHandler()
-	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/tenants/"+validID+"/s3-buckets", map[string]any{
-		"shard_id": validID,
-	})
-	r = withChiURLParam(r, "tenantID", validID)
-
-	h.Create(rec, r)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	body := decodeErrorResponse(rec)
-	assert.Contains(t, body["error"], "validation error")
-}
-
-func TestS3BucketCreate_MissingShardID(t *testing.T) {
-	h := newS3BucketHandler()
-	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/tenants/"+validID+"/s3-buckets", map[string]any{
-		"name": "mybucket",
-	})
-	r = withChiURLParam(r, "tenantID", validID)
-
-	h.Create(rec, r)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	body := decodeErrorResponse(rec)
-	assert.Contains(t, body["error"], "validation error")
-}
-
-func TestS3BucketCreate_InvalidSlugName(t *testing.T) {
-	tests := []struct {
-		name string
-		slug string
-	}{
-		{"uppercase", "MyBucket"},
-		{"spaces", "my bucket"},
-		{"special chars", "my@bucket"},
-		{"starts with digit", "1bucket"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := newS3BucketHandler()
-			rec := httptest.NewRecorder()
-			r := newRequest(http.MethodPost, "/tenants/"+validID+"/s3-buckets", map[string]any{
-				"name":     tt.slug,
-				"shard_id": validID,
-			})
-			r = withChiURLParam(r, "tenantID", validID)
-
-			h.Create(rec, r)
-
-			assert.Equal(t, http.StatusBadRequest, rec.Code)
-		})
-	}
-}
-
 func TestS3BucketCreate_ValidBody(t *testing.T) {
 	h := newS3BucketHandler()
 	rec := httptest.NewRecorder()
 	tid := "test-tenant-1"
 	r := newRequest(http.MethodPost, "/tenants/"+tid+"/s3-buckets", map[string]any{
-		"name":     "mybucket",
 		"shard_id": "test-shard-1",
 	})
 	r = withChiURLParam(r, "tenantID", tid)
@@ -163,7 +104,6 @@ func TestS3BucketCreate_WithOptionalFields(t *testing.T) {
 	rec := httptest.NewRecorder()
 	tid := "test-tenant-1"
 	r := newRequest(http.MethodPost, "/tenants/"+tid+"/s3-buckets", map[string]any{
-		"name":        "mybucket",
 		"shard_id":    "test-shard-1",
 		"public":      true,
 		"quota_bytes": 1073741824,

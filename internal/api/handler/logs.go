@@ -73,8 +73,9 @@ func (h *Logs) Query(w http.ResponseWriter, r *http.Request) {
 //	@Tags			Tenants
 //	@Security		ApiKeyAuth
 //	@Param			tenantID   path  string true  "Tenant ID"
-//	@Param			log_type   query string false "Log type filter (access, error, php-error, php-slow, app)"
-//	@Param			webroot_id query string false "Filter by webroot ID"
+//	@Param			log_type   query string false "Log type filter (access, error, php-error, php-slow, app, cron)"
+//	@Param			webroot_id  query string false "Filter by webroot ID"
+//	@Param			cron_job_id query string false "Filter by cron job ID (for log_type=cron)"
 //	@Param			start      query string false "Start time (RFC3339 or relative like '1h')"
 //	@Param			end        query string false "End time (RFC3339, default now)"
 //	@Param			limit      query int    false "Max entries (default 500, max 5000)"
@@ -98,9 +99,10 @@ func (h *Logs) TenantLogs(w http.ResponseWriter, r *http.Request) {
 			"php-error": true,
 			"php-slow":  true,
 			"app":       true,
+			"cron":      true,
 		}
 		if !validTypes[logType] {
-			response.WriteError(w, http.StatusBadRequest, "invalid log_type: must be one of access, error, php-error, php-slow, app")
+			response.WriteError(w, http.StatusBadRequest, "invalid log_type: must be one of access, error, php-error, php-slow, app, cron")
 			return
 		}
 	}
@@ -112,6 +114,9 @@ func (h *Logs) TenantLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	if webrootID := r.URL.Query().Get("webroot_id"); webrootID != "" {
 		query += fmt.Sprintf(`, webroot_id="%s"`, webrootID)
+	}
+	if cronJobID := r.URL.Query().Get("cron_job_id"); cronJobID != "" {
+		query += fmt.Sprintf(`, cron_job_id="%s"`, cronJobID)
 	}
 	query += "}"
 

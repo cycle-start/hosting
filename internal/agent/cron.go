@@ -15,7 +15,7 @@ import (
 // CronJobInfo holds the information needed to manage a cron job on a node.
 type CronJobInfo struct {
 	ID               string
-	TenantID         string
+	TenantName       string
 	WebrootName      string
 	Name             string
 	Schedule         string
@@ -42,7 +42,7 @@ func NewCronManager(logger zerolog.Logger, cfg Config) *CronManager {
 }
 
 func (m *CronManager) timerName(info *CronJobInfo) string {
-	return fmt.Sprintf("cron-%s-%s", info.TenantID, info.ID)
+	return fmt.Sprintf("cron-%s-%s", info.TenantName, info.ID)
 }
 
 func (m *CronManager) servicePath(info *CronJobInfo) string {
@@ -54,7 +54,7 @@ func (m *CronManager) timerPath(info *CronJobInfo) string {
 }
 
 func (m *CronManager) workDir(info *CronJobInfo) string {
-	base := filepath.Join(m.webStorageDir, info.TenantID, "webroots", info.WebrootName)
+	base := filepath.Join(m.webStorageDir, info.TenantName, "webroots", info.WebrootName)
 	if info.WorkingDirectory != "" {
 		return filepath.Join(base, info.WorkingDirectory)
 	}
@@ -65,7 +65,7 @@ func (m *CronManager) workDir(info *CronJobInfo) string {
 func (m *CronManager) CreateUnits(ctx context.Context, info *CronJobInfo) error {
 	m.logger.Info().
 		Str("cron_job", info.ID).
-		Str("tenant", info.TenantID).
+		Str("tenant", info.TenantName).
 		Str("name", info.Name).
 		Msg("creating cron job units")
 
@@ -150,30 +150,34 @@ func (m *CronManager) daemonReload(ctx context.Context) error {
 }
 
 var serviceTemplate = template.Must(template.New("service").Parse(`[Unit]
-Description=Cron job: {{ .Name }} for tenant {{ .TenantID }}
+Description=Cron job: {{ .Name }} for tenant {{ .TenantName }}
 After=network.target
 
 [Service]
 Type=oneshot
-User={{ .TenantID }}
-Group={{ .TenantID }}
+User={{ .TenantName }}
+Group={{ .TenantName }}
 WorkingDirectory={{ .WorkDir }}
-ExecStart=/bin/bash -c {{ .Command }}
+Environment=CRON_JOB_ID={{ .ID }}
+ExecStartPre=/bin/mkdir -p {{ .LockDir }}
+ExecStart=/usr/bin/flock --nonblock --conflict-exit-code 75 {{ .LockFile }} /bin/bash -c {{ .Command }}
+ExecStopPost=+/usr/local/bin/cron-outcome
+SuccessExitStatus=75
 TimeoutStopSec={{ .TimeoutSeconds }}
 MemoryMax={{ .MaxMemoryMB }}M
 CPUQuota=100%
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=cron-{{ .TenantID }}-{{ .ID }}
+SyslogIdentifier=cron-{{ .TenantName }}-{{ .ID }}
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths={{ .WebrootPath }}
+ReadWritePaths={{ .WebrootPath }} {{ .LockDir }}
 PrivateTmp=yes
 `))
 
 var timerTemplate = template.Must(template.New("timer").Parse(`[Unit]
-Description=Timer for cron job: {{ .Name }} for tenant {{ .TenantID }}
+Description=Timer for cron job: {{ .Name }} for tenant {{ .TenantName }}
 
 [Timer]
 OnCalendar={{ .Calendar }}
@@ -188,6 +192,8 @@ type serviceData struct {
 	CronJobInfo
 	WorkDir     string
 	WebrootPath string
+	LockDir     string
+	LockFile    string
 }
 
 type timerData struct {
@@ -195,11 +201,21 @@ type timerData struct {
 	Calendar string
 }
 
+func (m *CronManager) lockDir(info *CronJobInfo) string {
+	return filepath.Join(m.webStorageDir, info.TenantName, ".locks")
+}
+
+func (m *CronManager) lockFile(info *CronJobInfo) string {
+	return filepath.Join(m.lockDir(info), fmt.Sprintf("cron-%s.lock", info.ID))
+}
+
 func (m *CronManager) renderService(info *CronJobInfo) (string, error) {
 	data := serviceData{
 		CronJobInfo: *info,
 		WorkDir:     m.workDir(info),
-		WebrootPath: filepath.Join(m.webStorageDir, info.TenantID, "webroots", info.WebrootName),
+		WebrootPath: filepath.Join(m.webStorageDir, info.TenantName, "webroots", info.WebrootName),
+		LockDir:     m.lockDir(info),
+		LockFile:    m.lockFile(info),
 	}
 	var buf strings.Builder
 	if err := serviceTemplate.Execute(&buf, data); err != nil {

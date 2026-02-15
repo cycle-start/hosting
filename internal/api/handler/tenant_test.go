@@ -373,7 +373,6 @@ func TestTenantCreate_WithNestedWebroots_ValidationPasses(t *testing.T) {
 	body := validTenantBody()
 	body["webroots"] = []map[string]any{
 		{
-			"name":            "my-site",
 			"runtime":         "php",
 			"runtime_version": "8.5",
 			"fqdns": []map[string]any{
@@ -397,7 +396,6 @@ func TestTenantCreate_WithNestedDatabases_ValidationPasses(t *testing.T) {
 	body := validTenantBody()
 	body["databases"] = []map[string]any{
 		{
-			"name":     "mydb",
 			"shard_id": "test-db-shard",
 			"users": []map[string]any{
 				{
@@ -424,7 +422,6 @@ func TestTenantCreate_WithNestedValkeyInstances_ValidationPasses(t *testing.T) {
 	body := validTenantBody()
 	body["valkey_instances"] = []map[string]any{
 		{
-			"name":     "my-cache",
 			"shard_id": "test-valkey-shard",
 			"users": []map[string]any{
 				{
@@ -506,7 +503,6 @@ func TestTenantCreate_WithInvalidNestedWebroot_ValidationFails(t *testing.T) {
 	body := validTenantBody()
 	body["webroots"] = []map[string]any{
 		{
-			"name":            "my-site",
 			"runtime_version": "8.5",
 			// missing runtime
 		},
@@ -526,7 +522,6 @@ func TestTenantCreate_WithInvalidNestedDatabase_ValidationFails(t *testing.T) {
 	body := validTenantBody()
 	body["databases"] = []map[string]any{
 		{
-			"name": "mydb",
 			// missing shard_id
 		},
 	}
@@ -545,7 +540,6 @@ func TestTenantCreate_WithInvalidNestedDatabaseUser_ValidationFails(t *testing.T
 	body := validTenantBody()
 	body["databases"] = []map[string]any{
 		{
-			"name":     "mydb",
 			"shard_id": "test-shard",
 			"users": []map[string]any{
 				{
@@ -571,7 +565,6 @@ func TestTenantCreate_WithInvalidNestedValkeyUser_ValidationFails(t *testing.T) 
 	body := validTenantBody()
 	body["valkey_instances"] = []map[string]any{
 		{
-			"name":     "my-cache",
 			"shard_id": "test-shard",
 			"users": []map[string]any{
 				{
@@ -616,7 +609,6 @@ func TestTenantCreate_WithInvalidNestedFQDN_ValidationFails(t *testing.T) {
 	body := validTenantBody()
 	body["webroots"] = []map[string]any{
 		{
-			"name":            "my-site",
 			"runtime":         "php",
 			"runtime_version": "8.5",
 			"fqdns": []map[string]any{
@@ -639,7 +631,6 @@ func TestTenantCreate_WithInvalidNestedEmailAccount_ValidationFails(t *testing.T
 	body := validTenantBody()
 	body["webroots"] = []map[string]any{
 		{
-			"name":            "my-site",
 			"runtime":         "php",
 			"runtime_version": "8.5",
 			"fqdns": []map[string]any{
@@ -670,7 +661,6 @@ func TestTenantCreate_FullNested_ValidationPasses(t *testing.T) {
 	}
 	body["webroots"] = []map[string]any{
 		{
-			"name":            "my-site",
 			"runtime":         "php",
 			"runtime_version": "8.5",
 			"public_folder":   "public",
@@ -702,7 +692,6 @@ func TestTenantCreate_FullNested_ValidationPasses(t *testing.T) {
 	}
 	body["databases"] = []map[string]any{
 		{
-			"name":     "mydb",
 			"shard_id": "test-db-shard",
 			"users": []map[string]any{
 				{
@@ -715,7 +704,6 @@ func TestTenantCreate_FullNested_ValidationPasses(t *testing.T) {
 	}
 	body["valkey_instances"] = []map[string]any{
 		{
-			"name":          "my-cache",
 			"shard_id":      "test-valkey-shard",
 			"max_memory_mb": 128,
 			"users": []map[string]any{

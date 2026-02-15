@@ -120,6 +120,37 @@ if length(parts) >= 6 {
 .job = "runtime"
 '''
 
+# Cron job logs from journald (SyslogIdentifier = cron-{tenantName}-{cronJobID})
+[sources.tenant_cron_logs]
+type = "journald"
+include_units = []
+include_matches._SYSTEMD_UNIT = "cron-*.service"
+
+[transforms.parse_tenant_cron]
+type = "remap"
+inputs = ["tenant_cron_logs"]
+source = '''
+# Extract tenant name and cron job ID from SYSLOG_IDENTIFIER: cron-{tenantName}-{cronJobID}
+ident = to_string(.SYSLOG_IDENTIFIER) ?? ""
+parts = split(ident, "-")
+if length(parts) >= 3 {
+  .tenant_id = parts[1]
+  .cron_job_id = join!(slice!(parts, 2))
+}
+.log_type = "cron"
+.job = "cron"
+
+# Map systemd priority to level
+priority = to_int(.PRIORITY) ?? 6
+if priority <= 3 {
+  .level = "error"
+} else if priority <= 4 {
+  .level = "warn"
+} else {
+  .level = "info"
+}
+'''
+
 # Ship all tenant logs to TENANT Loki (port 3101, NOT platform Loki 3100)
 [sinks.loki_tenant]
 type = "loki"
@@ -129,6 +160,7 @@ inputs = [
   "parse_tenant_php",
   "parse_tenant_php_slow",
   "parse_tenant_app",
+  "parse_tenant_cron",
 ]
 endpoint = "http://10.10.10.2:3101"
 encoding.codec = "text"
@@ -137,6 +169,7 @@ encoding.codec = "text"
 job = "{{ job }}"
 tenant_id = "{{ tenant_id }}"
 webroot_id = "{{ webroot_id }}"
+cron_job_id = "{{ cron_job_id }}"
 log_type = "{{ log_type }}"
 hostname = "{{ host }}"
 level = "{{ level }}"
