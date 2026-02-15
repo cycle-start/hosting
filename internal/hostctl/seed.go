@@ -1,13 +1,29 @@
 package hostctl
 
 import (
+	"crypto/rand"
+	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
+	"sort"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
 )
+
+// tenantSeedCtx tracks created resources per tenant for fixture template resolution.
+type tenantSeedCtx struct {
+	dbHost     string
+	dbName     string
+	dbUsername string
+	dbPassword string
+	fqdn       string
+}
 
 func Seed(configPath string, timeout time.Duration) error {
 	data, err := os.ReadFile(configPath)
@@ -141,6 +157,28 @@ func Seed(configPath string, timeout time.Duration) error {
 		fmt.Printf("  Zone %q: active\n", z.Name)
 	}
 
+	// Discover web node IPs once (needed for fixture deployment).
+	var webNodeIPs []string
+	needsFixture := false
+	for _, t := range cfg.Tenants {
+		for _, w := range t.Webroots {
+			if w.Fixture != nil {
+				needsFixture = true
+				break
+			}
+		}
+		if needsFixture {
+			break
+		}
+	}
+	if needsFixture {
+		webNodeIPs, err = findNodeIPsByRole(client, clusterID, "web")
+		if err != nil {
+			return fmt.Errorf("find web node IPs: %w", err)
+		}
+		fmt.Printf("Web nodes: %v\n", webNodeIPs)
+	}
+
 	// 3. Create tenants and their resources
 	for _, t := range cfg.Tenants {
 		fmt.Printf("Creating tenant %q...\n", t.Name)
@@ -172,8 +210,9 @@ func Seed(configPath string, timeout time.Duration) error {
 			return fmt.Errorf("parse tenant ID: %w", err)
 		}
 		tenantMap[t.Name] = tenantID
+		tenantName := extractNameFromResp(resp)
 
-		fmt.Printf("  Tenant %q: %s, waiting for active...\n", t.Name, tenantID)
+		fmt.Printf("  Tenant %q: %s (name=%s), waiting for active...\n", t.Name, tenantID, tenantName)
 		if err := client.WaitForStatus(fmt.Sprintf("/tenants/%s", tenantID), "active", timeout); err != nil {
 			return fmt.Errorf("wait for tenant %q: %w", t.Name, err)
 		}
@@ -193,21 +232,44 @@ func Seed(configPath string, timeout time.Duration) error {
 			}
 		}
 
-		// Create webroots
-		for i, w := range t.Webroots {
-			if err := seedWebroot(client, tenantID, w, fqdnMap, timeout); err != nil {
-				return fmt.Errorf("webroot #%d for tenant %q: %w", i+1, t.Name, err)
+		// Create SSH keys
+		for i, sk := range t.SSHKeys {
+			if err := seedSSHKey(client, tenantID, sk, timeout); err != nil {
+				return fmt.Errorf("ssh key #%d for tenant %q: %w", i+1, t.Name, err)
 			}
 		}
 
-		// Create databases
+		// Create databases (before webroots so DB info is available for fixture .env)
+		ctx := &tenantSeedCtx{}
 		for i, d := range t.Databases {
 			dbShardID, err := resolveShardID(d.Shard)
 			if err != nil {
 				return err
 			}
-			if err := seedDatabase(client, tenantID, d, dbShardID, timeout); err != nil {
+			if err := seedDatabase(client, tenantID, d, dbShardID, ctx, clusterID, timeout); err != nil {
 				return fmt.Errorf("database #%d for tenant %q: %w", i+1, t.Name, err)
+			}
+		}
+
+		// Create webroots
+		for i, w := range t.Webroots {
+			webrootID, webrootName, err := seedWebroot(client, tenantID, w, fqdnMap, ctx, timeout)
+			if err != nil {
+				return fmt.Errorf("webroot #%d for tenant %q: %w", i+1, t.Name, err)
+			}
+
+			// Deploy fixture if defined
+			if w.Fixture != nil {
+				if err := seedFixture(client, clusterID, tenantName, webrootName, w.Fixture, ctx, cfg.LBTrafficURL, ctx.fqdn, webNodeIPs, timeout); err != nil {
+					return fmt.Errorf("fixture for webroot #%d of tenant %q: %w", i+1, t.Name, err)
+				}
+			}
+
+			// Create daemons if defined
+			if len(w.Daemons) > 0 {
+				if err := seedDaemons(client, webrootID, w.Daemons, timeout); err != nil {
+					return fmt.Errorf("daemons for webroot #%d of tenant %q: %w", i+1, t.Name, err)
+				}
 			}
 		}
 
@@ -266,7 +328,39 @@ func Seed(configPath string, timeout time.Duration) error {
 	return nil
 }
 
-func seedWebroot(client *Client, tenantID string, def WebrootDef, fqdnMap map[string]string, timeout time.Duration) error {
+func seedSSHKey(client *Client, tenantID string, def SSHKeyDef, timeout time.Duration) error {
+	publicKey := def.PublicKey
+	if publicKey == "${SSH_PUBLIC_KEY}" {
+		var err error
+		publicKey, err = sshPublicKeyContent()
+		if err != nil {
+			return fmt.Errorf("resolve SSH public key: %w", err)
+		}
+	}
+
+	fmt.Printf("  Creating SSH key %q...\n", def.Name)
+	resp, err := client.Post(fmt.Sprintf("/tenants/%s/ssh-keys", tenantID), map[string]any{
+		"name":       def.Name,
+		"public_key": publicKey,
+	})
+	if err != nil {
+		return fmt.Errorf("create: %w", err)
+	}
+
+	keyID, err := extractID(resp)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("    SSH key %q: %s, waiting for active...\n", def.Name, keyID)
+	if err := client.WaitForStatus(fmt.Sprintf("/ssh-keys/%s", keyID), "active", timeout); err != nil {
+		return fmt.Errorf("wait: %w", err)
+	}
+	fmt.Printf("    SSH key %q: active\n", def.Name)
+	return nil
+}
+
+func seedWebroot(client *Client, tenantID string, def WebrootDef, fqdnMap map[string]string, ctx *tenantSeedCtx, timeout time.Duration) (string, string, error) {
 	body := map[string]any{
 		"runtime":         def.Runtime,
 		"runtime_version": def.RuntimeVersion,
@@ -281,18 +375,18 @@ func seedWebroot(client *Client, tenantID string, def WebrootDef, fqdnMap map[st
 	fmt.Printf("  Creating webroot (%s %s)...\n", def.Runtime, def.RuntimeVersion)
 	resp, err := client.Post(fmt.Sprintf("/tenants/%s/webroots", tenantID), body)
 	if err != nil {
-		return fmt.Errorf("create: %w", err)
+		return "", "", fmt.Errorf("create: %w", err)
 	}
 
 	webrootID, err := extractID(resp)
 	if err != nil {
-		return err
+		return "", "", err
 	}
 	webrootName := extractNameFromResp(resp)
 
 	fmt.Printf("    Webroot %s: %s, waiting for active...\n", webrootName, webrootID)
 	if err := client.WaitForStatus(fmt.Sprintf("/webroots/%s", webrootID), "active", timeout); err != nil {
-		return fmt.Errorf("wait: %w", err)
+		return "", "", fmt.Errorf("wait: %w", err)
 	}
 	fmt.Printf("    Webroot %s: active\n", webrootName)
 
@@ -304,26 +398,31 @@ func seedWebroot(client *Client, tenantID string, def WebrootDef, fqdnMap map[st
 			"ssl_enabled": f.SSLEnabled,
 		})
 		if err != nil {
-			return fmt.Errorf("create FQDN %q: %w", f.FQDN, err)
+			return "", "", fmt.Errorf("create FQDN %q: %w", f.FQDN, err)
 		}
 
 		fqdnID, err := extractID(fqdnResp)
 		if err != nil {
-			return err
+			return "", "", err
 		}
 		fqdnMap[f.FQDN] = fqdnID
 
+		// Track the first FQDN for fixture template resolution.
+		if ctx.fqdn == "" {
+			ctx.fqdn = f.FQDN
+		}
+
 		fmt.Printf("      FQDN %q: %s, waiting for active...\n", f.FQDN, fqdnID)
 		if err := client.WaitForStatus(fmt.Sprintf("/fqdns/%s", fqdnID), "active", timeout); err != nil {
-			return fmt.Errorf("wait for FQDN %q: %w", f.FQDN, err)
+			return "", "", fmt.Errorf("wait for FQDN %q: %w", f.FQDN, err)
 		}
 		fmt.Printf("      FQDN %q: active\n", f.FQDN)
 	}
 
-	return nil
+	return webrootID, webrootName, nil
 }
 
-func seedDatabase(client *Client, tenantID string, def DatabaseDef, shardID string, timeout time.Duration) error {
+func seedDatabase(client *Client, tenantID string, def DatabaseDef, shardID string, ctx *tenantSeedCtx, clusterID string, timeout time.Duration) error {
 	fmt.Printf("  Creating database on shard %q...\n", def.Shard)
 	resp, err := client.Post(fmt.Sprintf("/tenants/%s/databases", tenantID), map[string]any{
 		"shard_id": shardID,
@@ -344,16 +443,27 @@ func seedDatabase(client *Client, tenantID string, def DatabaseDef, shardID stri
 	}
 	fmt.Printf("    Database %s: active\n", dbName)
 
+	// Populate seed context with DB info.
+	ctx.dbName = dbName
+
+	// Find DB host (first database node IP).
+	dbNodeIPs, err := findNodeIPsByRole(client, clusterID, "database")
+	if err != nil {
+		return fmt.Errorf("find database node IPs: %w", err)
+	}
+	ctx.dbHost = dbNodeIPs[0]
+
 	// Create users
 	for _, u := range def.Users {
-		fmt.Printf("    Creating database user %q...\n", u.Username)
+		username := dbName + u.Suffix
+		fmt.Printf("    Creating database user %q...\n", username)
 		userResp, err := client.Post(fmt.Sprintf("/databases/%s/users", dbID), map[string]any{
-			"username":   u.Username,
+			"username":   username,
 			"password":   u.Password,
 			"privileges": u.Privileges,
 		})
 		if err != nil {
-			return fmt.Errorf("create user %q: %w", u.Username, err)
+			return fmt.Errorf("create user %q: %w", username, err)
 		}
 
 		userID, err := extractID(userResp)
@@ -361,13 +471,199 @@ func seedDatabase(client *Client, tenantID string, def DatabaseDef, shardID stri
 			return err
 		}
 
-		fmt.Printf("      User %q: %s, waiting for active...\n", u.Username, userID)
-		if err := client.WaitForStatus(fmt.Sprintf("/database-users/%s", userID), "active", timeout); err != nil {
-			return fmt.Errorf("wait for user %q: %w", u.Username, err)
+		// Track first user credentials for fixture.
+		if ctx.dbUsername == "" {
+			ctx.dbUsername = username
+			ctx.dbPassword = u.Password
 		}
-		fmt.Printf("      User %q: active\n", u.Username)
+
+		fmt.Printf("      User %q: %s, waiting for active...\n", username, userID)
+		if err := client.WaitForStatus(fmt.Sprintf("/database-users/%s", userID), "active", timeout); err != nil {
+			return fmt.Errorf("wait for user %q: %w", username, err)
+		}
+		fmt.Printf("      User %q: active\n", username)
 	}
 
+	return nil
+}
+
+func seedFixture(_ *Client, _ string, tenantName, webrootName string, def *FixtureDef, ctx *tenantSeedCtx, lbURL, fqdn string, webNodeIPs []string, timeout time.Duration) error {
+	// Verify tarball exists.
+	if _, err := os.Stat(def.Tarball); err != nil {
+		return fmt.Errorf("fixture tarball %q: %w", def.Tarball, err)
+	}
+
+	webrootPath := fmt.Sprintf("/var/www/storage/%s/webroots/%s", tenantName, webrootName)
+
+	// Upload and extract tarball on each web node.
+	for _, ip := range webNodeIPs {
+		fmt.Printf("    Uploading fixture to %s:%s...\n", ip, webrootPath)
+		if err := scpFile(ip, def.Tarball, "/tmp/seed-fixture.tar.gz"); err != nil {
+			return fmt.Errorf("scp to %s: %w", ip, err)
+		}
+		if _, err := sshExec(ip, fmt.Sprintf(
+			"sudo tar -xzf /tmp/seed-fixture.tar.gz -C %s && sudo chown -R %s:%s %s && sudo chmod -R 775 %s/storage %s/bootstrap/cache && rm -f /tmp/seed-fixture.tar.gz",
+			webrootPath, tenantName, tenantName, webrootPath,
+			webrootPath, webrootPath,
+		)); err != nil {
+			return fmt.Errorf("extract on %s: %w", ip, err)
+		}
+		fmt.Printf("    Fixture extracted on %s\n", ip)
+	}
+
+	// Generate APP_KEY if needed.
+	appKey := ""
+	keyBytes := make([]byte, 32)
+	if _, err := rand.Read(keyBytes); err != nil {
+		return fmt.Errorf("generate app key: %w", err)
+	}
+	appKey = "base64:" + base64.StdEncoding.EncodeToString(keyBytes)
+
+	// Resolve template vars in env_vars.
+	resolved := make(map[string]string, len(def.EnvVars))
+	for k, v := range def.EnvVars {
+		v = strings.ReplaceAll(v, "${APP_KEY}", appKey)
+		v = strings.ReplaceAll(v, "${DB_HOST}", ctx.dbHost)
+		v = strings.ReplaceAll(v, "${DB_NAME}", ctx.dbName)
+		v = strings.ReplaceAll(v, "${DB_USER}", ctx.dbUsername)
+		v = strings.ReplaceAll(v, "${DB_PASS}", ctx.dbPassword)
+		v = strings.ReplaceAll(v, "${FQDN}", fqdn)
+		resolved[k] = v
+	}
+
+	// Write .env to each web node.
+	envContent := buildEnvContent(resolved)
+	for _, ip := range webNodeIPs {
+		fmt.Printf("    Writing .env on %s...\n", ip)
+		if _, err := sshExec(ip, fmt.Sprintf(
+			"cat <<'ENVEOF' | sudo tee %s/.env > /dev/null\n%sENVEOF",
+			webrootPath, envContent,
+		)); err != nil {
+			return fmt.Errorf("write .env on %s: %w", ip, err)
+		}
+		if _, err := sshExec(ip, fmt.Sprintf("sudo chown %s:%s %s/.env", tenantName, tenantName, webrootPath)); err != nil {
+			return fmt.Errorf("chown .env on %s: %w", ip, err)
+		}
+	}
+
+	// Add /etc/hosts entry if requested.
+	if def.HostsEntry && fqdn != "" {
+		for _, ip := range webNodeIPs {
+			fmt.Printf("    Adding /etc/hosts entry for %s on %s...\n", fqdn, ip)
+			if _, err := sshExec(ip, fmt.Sprintf("echo '127.0.0.1 %s' | sudo tee -a /etc/hosts > /dev/null", fqdn)); err != nil {
+				return fmt.Errorf("hosts entry on %s: %w", ip, err)
+			}
+		}
+	}
+
+	// Run setup/migrations if setup_path is defined.
+	if def.SetupPath != "" && lbURL != "" {
+		setupURL := lbURL + def.SetupPath
+		fmt.Printf("    Running setup at %s (Host: %s)...\n", setupURL, fqdn)
+		if err := retrySetup(setupURL, fqdn, timeout); err != nil {
+			return fmt.Errorf("setup: %w", err)
+		}
+		fmt.Printf("    Setup complete\n")
+	}
+
+	return nil
+}
+
+func buildEnvContent(vars map[string]string) string {
+	keys := make([]string, 0, len(vars))
+	for k := range vars {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var lines []string
+	for _, k := range keys {
+		lines = append(lines, fmt.Sprintf("%s=%s", k, vars[k]))
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func retrySetup(url, host string, timeout time.Duration) error {
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
+	deadline := time.Now().Add(timeout)
+	var lastErr error
+	for time.Now().Before(deadline) {
+		req, err := http.NewRequest(http.MethodPost, url, nil)
+		if err != nil {
+			return fmt.Errorf("create request: %w", err)
+		}
+		req.Host = host
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			lastErr = err
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if resp.StatusCode == 200 {
+			fmt.Printf("    Migration response: %s\n", string(body))
+			return nil
+		}
+		lastErr = fmt.Errorf("status %d: %s", resp.StatusCode, string(body))
+		time.Sleep(3 * time.Second)
+	}
+	return fmt.Errorf("timed out: %w", lastErr)
+}
+
+func seedDaemons(client *Client, webrootID string, daemons []DaemonDef, timeout time.Duration) error {
+	for i, d := range daemons {
+		body := map[string]any{
+			"command": d.Command,
+		}
+		if d.ProxyPath != "" {
+			body["proxy_path"] = d.ProxyPath
+		}
+		if d.NumProcs > 0 {
+			body["num_procs"] = d.NumProcs
+		}
+		if d.StopSignal != "" {
+			body["stop_signal"] = d.StopSignal
+		}
+		if d.StopWaitSecs > 0 {
+			body["stop_wait_secs"] = d.StopWaitSecs
+		}
+		if d.MaxMemoryMB > 0 {
+			body["max_memory_mb"] = d.MaxMemoryMB
+		}
+		if len(d.Environment) > 0 {
+			body["environment"] = d.Environment
+		}
+
+		label := d.Command
+		if len(label) > 60 {
+			label = label[:60] + "..."
+		}
+		fmt.Printf("    Creating daemon #%d: %s\n", i+1, label)
+
+		resp, err := client.Post(fmt.Sprintf("/webroots/%s/daemons", webrootID), body)
+		if err != nil {
+			return fmt.Errorf("create daemon #%d: %w", i+1, err)
+		}
+
+		daemonID, err := extractID(resp)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("      Daemon %s, waiting for active...\n", daemonID)
+		if err := client.WaitForStatus(fmt.Sprintf("/daemons/%s", daemonID), "active", timeout); err != nil {
+			return fmt.Errorf("wait for daemon #%d: %w", i+1, err)
+		}
+		fmt.Printf("      Daemon %s: active\n", daemonID)
+	}
 	return nil
 }
 

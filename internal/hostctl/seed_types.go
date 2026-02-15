@@ -1,14 +1,15 @@
 package hostctl
 
 type SeedConfig struct {
-	APIURL      string          `yaml:"api_url"`
-	APIKey      string          `yaml:"api_key"`
-	Region      string          `yaml:"region"`
-	Cluster     string          `yaml:"cluster"`
-	Brands      []BrandDef      `yaml:"brands"`
-	Zones       []ZoneDef       `yaml:"zones"`
-	Tenants     []TenantDef     `yaml:"tenants"`
-	OIDCClients []OIDCClientDef `yaml:"oidc_clients"`
+	APIURL       string          `yaml:"api_url"`
+	APIKey       string          `yaml:"api_key"`
+	LBTrafficURL string          `yaml:"lb_traffic_url"`
+	Region       string          `yaml:"region"`
+	Cluster      string          `yaml:"cluster"`
+	Brands       []BrandDef      `yaml:"brands"`
+	Zones        []ZoneDef       `yaml:"zones"`
+	Tenants      []TenantDef     `yaml:"tenants"`
+	OIDCClients  []OIDCClientDef `yaml:"oidc_clients"`
 }
 
 type OIDCClientDef struct {
@@ -34,16 +35,22 @@ type ZoneDef struct {
 }
 
 type TenantDef struct {
-	Name             string              `yaml:"name"`
-	Brand            string              `yaml:"brand"`
-	Shard            string              `yaml:"shard"`
-	SFTPEnabled      bool                `yaml:"sftp_enabled"`
-	SSHEnabled       bool                `yaml:"ssh_enabled"`
-	Webroots         []WebrootDef        `yaml:"webroots"`
-	Databases        []DatabaseDef       `yaml:"databases"`
-	ValkeyInstances  []ValkeyInstanceDef `yaml:"valkey_instances"`
-	S3Buckets        []S3BucketDef       `yaml:"s3_buckets"`
-	EmailAccounts    []EmailAcctDef      `yaml:"email_accounts"`
+	Name            string              `yaml:"name"`
+	Brand           string              `yaml:"brand"`
+	Shard           string              `yaml:"shard"`
+	SFTPEnabled     bool                `yaml:"sftp_enabled"`
+	SSHEnabled      bool                `yaml:"ssh_enabled"`
+	SSHKeys         []SSHKeyDef         `yaml:"ssh_keys"`
+	Webroots        []WebrootDef        `yaml:"webroots"`
+	Databases       []DatabaseDef       `yaml:"databases"`
+	ValkeyInstances []ValkeyInstanceDef `yaml:"valkey_instances"`
+	S3Buckets       []S3BucketDef       `yaml:"s3_buckets"`
+	EmailAccounts   []EmailAcctDef      `yaml:"email_accounts"`
+}
+
+type SSHKeyDef struct {
+	Name      string `yaml:"name"`
+	PublicKey string `yaml:"public_key"` // Supports "${SSH_PUBLIC_KEY}" → reads SSH_PUBLIC_KEY env var or ~/.ssh/id_rsa.pub
 }
 
 type WebrootDef struct {
@@ -52,11 +59,30 @@ type WebrootDef struct {
 	RuntimeConfig  map[string]any `yaml:"runtime_config"`
 	PublicFolder   string         `yaml:"public_folder"`
 	FQDNs          []FQDNDef      `yaml:"fqdns"`
+	Fixture        *FixtureDef    `yaml:"fixture"`
+	Daemons        []DaemonDef    `yaml:"daemons"`
 }
 
 type FQDNDef struct {
 	FQDN       string `yaml:"fqdn"`
 	SSLEnabled bool   `yaml:"ssl_enabled"`
+}
+
+type FixtureDef struct {
+	Tarball    string            `yaml:"tarball"`       // Path to .tar.gz
+	EnvVars    map[string]string `yaml:"env_vars"`      // .env key=value (supports ${VAR} templates)
+	SetupPath  string            `yaml:"setup_path"`    // POST here for migrations (e.g., "/api/setup")
+	HostsEntry bool              `yaml:"hosts_entry"`   // Add 127.0.0.1 FQDN to /etc/hosts on web nodes
+}
+
+type DaemonDef struct {
+	Command      string            `yaml:"command"`
+	ProxyPath    string            `yaml:"proxy_path,omitempty"`
+	NumProcs     int               `yaml:"num_procs,omitempty"`
+	StopSignal   string            `yaml:"stop_signal,omitempty"`
+	StopWaitSecs int               `yaml:"stop_wait_secs,omitempty"`
+	MaxMemoryMB  int               `yaml:"max_memory_mb,omitempty"`
+	Environment  map[string]string `yaml:"environment,omitempty"`
 }
 
 type DatabaseDef struct {
@@ -65,7 +91,7 @@ type DatabaseDef struct {
 }
 
 type DatabaseUserDef struct {
-	Username   string   `yaml:"username"`
+	Suffix     string   `yaml:"suffix"`
 	Password   string   `yaml:"password"`
 	Privileges []string `yaml:"privileges"`
 }

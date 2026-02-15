@@ -1,5 +1,6 @@
 api_url: http://10.10.10.2:8090/api/v1
 # API key loaded from HOSTING_API_KEY env var
+lb_traffic_url: https://10.10.10.70
 
 region: dev
 cluster: vm-cluster-1
@@ -31,6 +32,9 @@ tenants:
     shard: web-1
     sftp_enabled: true
     ssh_enabled: true
+    ssh_keys:
+      - name: dev-key
+        public_key: "${SSH_PUBLIC_KEY}"
     webroots:
       - runtime: php
         runtime_version: "8.5"
@@ -38,12 +42,39 @@ tenants:
         fqdns:
           - fqdn: acme.hosting.test
             ssl_enabled: false
-          - fqdn: www.acme.hosting.test
-            ssl_enabled: false
+        fixture:
+          tarball: .build/laravel-reverb.tar.gz
+          env_vars:
+            APP_NAME: AcmeApp
+            APP_ENV: local
+            APP_DEBUG: "true"
+            APP_KEY: "${APP_KEY}"
+            APP_URL: "http://${FQDN}"
+            DB_CONNECTION: mysql
+            DB_HOST: "${DB_HOST}"
+            DB_PORT: "3306"
+            DB_DATABASE: "${DB_NAME}"
+            DB_USERNAME: "${DB_USER}"
+            DB_PASSWORD: "${DB_PASS}"
+            BROADCAST_CONNECTION: reverb
+            QUEUE_CONNECTION: database
+            CACHE_STORE: file
+            REVERB_APP_ID: acme-reverb
+            REVERB_APP_KEY: acme-reverb-key
+            REVERB_APP_SECRET: acme-reverb-secret
+            REVERB_HOST: "${FQDN}"
+            REVERB_PORT: "80"
+            REVERB_SCHEME: http
+          setup_path: /api/setup
+          hosts_entry: true
+        daemons:
+          - command: 'bash -c ''exec php artisan reverb:start --host="[$HOST]" --port="$PORT"'''
+            proxy_path: /app
+          - command: "php artisan queue:work --sleep=1 --tries=3 --timeout=30"
     databases:
       - shard: db-1
         users:
-          - username: acme_user
+          - suffix: _app
             password: dev-password-123
             privileges: [ALL]
     valkey_instances:

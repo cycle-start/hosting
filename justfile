@@ -357,3 +357,7 @@ build-laravel-fixture:
     echo "Creating tarball..."
     tar -czf .build/laravel-reverb.tar.gz -C .build/laravel-reverb .
     echo "Done: .build/laravel-reverb.tar.gz"
+
+# Seed dev tenants (builds fixture if needed)
+seed: build-laravel-fixture
+    go run ./cmd/hostctl seed -f seeds/dev-tenants.yaml -timeout 5m
