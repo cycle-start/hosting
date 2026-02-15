@@ -3,9 +3,11 @@ package runtime
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"text/template"
 
 	"github.com/rs/zerolog"
@@ -21,20 +23,118 @@ listen.group = www-data
 listen.mode = 0660
 
 pm = dynamic
-pm.max_children = 5
-pm.start_servers = 2
-pm.min_spare_servers = 1
-pm.max_spare_servers = 3
-pm.max_requests = 500
+pm.max_children = {{ .MaxChildren }}
+pm.start_servers = {{ .StartServers }}
+pm.min_spare_servers = {{ .MinSpareServers }}
+pm.max_spare_servers = {{ .MaxSpareServers }}
+pm.max_requests = {{ .MaxRequests }}
 
 php_admin_value[error_log] = /var/log/hosting/{{ .TenantID }}/php-error.log
 php_admin_value[slowlog] = /var/log/hosting/{{ .TenantID }}/php-slow.log
 php_admin_value[request_slowlog_timeout] = 5s
 php_admin_flag[log_errors] = on
 php_admin_value[open_basedir] = /var/www/storage/{{ .TenantName }}/:/tmp/
-`
+{{ range .PHPValues }}php_value[{{ .Key }}] = {{ .Value }}
+{{ end }}{{ range .PHPAdminValues }}php_admin_value[{{ .Key }}] = {{ .Value }}
+{{ end }}{{ range .EnvVars }}env[{{ .Key }}] = {{ .Value }}
+{{ end }}`
 
 var phpPoolTmpl = template.Must(template.New("phppool").Parse(phpPoolTemplate))
+
+// phpBlocklistedAdminKeys are php_admin_value keys that cannot be overridden
+// because they are managed by the platform for security.
+var phpBlocklistedAdminKeys = map[string]bool{
+	"open_basedir":      true,
+	"error_log":         true,
+	"slowlog":           true,
+	"disable_functions": true,
+	"doc_root":          true,
+}
+
+// PHPRuntimeConfig represents the parsed runtime_config JSON for PHP webroots.
+type PHPRuntimeConfig struct {
+	PM             *PHPPMConfig      `json:"pm,omitempty"`
+	PHPValues      map[string]string `json:"php_values,omitempty"`
+	PHPAdminValues map[string]string `json:"php_admin_values,omitempty"`
+}
+
+// PHPPMConfig holds PHP-FPM process manager settings.
+type PHPPMConfig struct {
+	MaxChildren    *int `json:"max_children,omitempty"`
+	StartServers   *int `json:"start_servers,omitempty"`
+	MinSpareServers *int `json:"min_spare_servers,omitempty"`
+	MaxSpareServers *int `json:"max_spare_servers,omitempty"`
+	MaxRequests    *int `json:"max_requests,omitempty"`
+}
+
+// ValidatePHPRuntimeConfig parses and validates runtime_config for a PHP webroot.
+// Returns a non-nil error if validation fails.
+func ValidatePHPRuntimeConfig(raw json.RawMessage) error {
+	if len(raw) == 0 || string(raw) == "{}" || string(raw) == "null" {
+		return nil
+	}
+
+	var cfg PHPRuntimeConfig
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		return fmt.Errorf("invalid php runtime_config: %w", err)
+	}
+
+	if cfg.PM != nil {
+		if err := validatePMRange("max_children", cfg.PM.MaxChildren, 1, 200); err != nil {
+			return err
+		}
+		if err := validatePMRange("start_servers", cfg.PM.StartServers, 1, 200); err != nil {
+			return err
+		}
+		if err := validatePMRange("min_spare_servers", cfg.PM.MinSpareServers, 1, 200); err != nil {
+			return err
+		}
+		if err := validatePMRange("max_spare_servers", cfg.PM.MaxSpareServers, 1, 200); err != nil {
+			return err
+		}
+		if err := validatePMRange("max_requests", cfg.PM.MaxRequests, 0, 100000); err != nil {
+			return err
+		}
+	}
+
+	for key := range cfg.PHPAdminValues {
+		if phpBlocklistedAdminKeys[key] {
+			return fmt.Errorf("php_admin_values key %q is managed by the platform and cannot be overridden", key)
+		}
+	}
+
+	return nil
+}
+
+func validatePMRange(name string, val *int, min, max int) error {
+	if val == nil {
+		return nil
+	}
+	if *val < min || *val > max {
+		return fmt.Errorf("pm.%s must be between %d and %d, got %d", name, min, max, *val)
+	}
+	return nil
+}
+
+// kvPair is used to pass sorted key-value pairs into the template.
+type kvPair struct {
+	Key   string
+	Value string
+}
+
+type phpPoolData struct {
+	TenantName      string
+	TenantID        string
+	Version         string
+	MaxChildren     int
+	StartServers    int
+	MinSpareServers int
+	MaxSpareServers int
+	MaxRequests     int
+	PHPValues       []kvPair
+	PHPAdminValues  []kvPair
+	EnvVars         []kvPair
+}
 
 // PHP manages PHP-FPM pool configuration and lifecycle.
 type PHP struct {
@@ -48,12 +148,6 @@ func NewPHP(logger zerolog.Logger, svcMgr ServiceManager) *PHP {
 		logger: logger.With().Str("runtime", "php").Logger(),
 		svcMgr: svcMgr,
 	}
-}
-
-type phpPoolData struct {
-	TenantName string
-	TenantID   string
-	Version    string
 }
 
 func (p *PHP) poolConfigPath(webroot *WebrootInfo) string {
@@ -79,10 +173,26 @@ func (p *PHP) Configure(ctx context.Context, webroot *WebrootInfo) error {
 		version = "8.5"
 	}
 
+	// Parse runtime config.
+	var cfg PHPRuntimeConfig
+	if webroot.RuntimeConfig != "" && webroot.RuntimeConfig != "{}" {
+		if err := json.Unmarshal([]byte(webroot.RuntimeConfig), &cfg); err != nil {
+			return fmt.Errorf("parse php runtime config: %w", err)
+		}
+	}
+
 	data := phpPoolData{
-		TenantName: webroot.TenantName,
-		TenantID:   webroot.TenantName,
-		Version:    version,
+		TenantName:      webroot.TenantName,
+		TenantID:        webroot.TenantName,
+		Version:         version,
+		MaxChildren:     intOrDefault(cfg.PM, func(pm *PHPPMConfig) *int { return pm.MaxChildren }, 5),
+		StartServers:    intOrDefault(cfg.PM, func(pm *PHPPMConfig) *int { return pm.StartServers }, 2),
+		MinSpareServers: intOrDefault(cfg.PM, func(pm *PHPPMConfig) *int { return pm.MinSpareServers }, 1),
+		MaxSpareServers: intOrDefault(cfg.PM, func(pm *PHPPMConfig) *int { return pm.MaxSpareServers }, 3),
+		MaxRequests:     intOrDefault(cfg.PM, func(pm *PHPPMConfig) *int { return pm.MaxRequests }, 500),
+		PHPValues:       sortedKVPairs(cfg.PHPValues),
+		PHPAdminValues:  sortedKVPairs(cfg.PHPAdminValues),
+		EnvVars:         sortedKVPairs(webroot.EnvVars),
 	}
 
 	var buf bytes.Buffer
@@ -152,4 +262,27 @@ func (p *PHP) Reload(ctx context.Context, webroot *WebrootInfo) error {
 // Remove removes the pool configuration and reloads PHP-FPM.
 func (p *PHP) Remove(ctx context.Context, webroot *WebrootInfo) error {
 	return p.Stop(ctx, webroot)
+}
+
+func intOrDefault(pm *PHPPMConfig, getter func(*PHPPMConfig) *int, def int) int {
+	if pm == nil {
+		return def
+	}
+	v := getter(pm)
+	if v == nil {
+		return def
+	}
+	return *v
+}
+
+func sortedKVPairs(m map[string]string) []kvPair {
+	if len(m) == 0 {
+		return nil
+	}
+	pairs := make([]kvPair, 0, len(m))
+	for k, v := range m {
+		pairs = append(pairs, kvPair{Key: k, Value: v})
+	}
+	sort.Slice(pairs, func(i, j int) bool { return pairs[i].Key < pairs[j].Key })
+	return pairs
 }

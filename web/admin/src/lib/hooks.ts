@@ -8,7 +8,7 @@ import type {
   SSHKey, CronJob, Daemon, Backup, Brand,
   APIKey, APIKeyCreateResponse, AuditLogEntry, DashboardStats,
   PlatformConfig, ListParams, AuditListParams, TenantResourceSummary,
-  CreateTenantRequest,
+  CreateTenantRequest, WebrootEnvVar,
   FQDNFormData, DatabaseUserFormData, ValkeyUserFormData,
   LogQueryResponse,
 } from './types'
@@ -274,7 +274,7 @@ export function useCreateWebroot() {
 export function useUpdateWebroot() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { id: string; runtime?: string; runtime_version?: string; runtime_config?: Record<string, unknown>; public_folder?: string }) =>
+    mutationFn: (data: { id: string; runtime?: string; runtime_version?: string; runtime_config?: Record<string, unknown>; public_folder?: string; env_file_name?: string; env_shell_source?: boolean }) =>
       api.put<Webroot>(`/webroots/${data.id}`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['webroots'] })
@@ -288,6 +288,33 @@ export function useDeleteWebroot() {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/webroots/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['webroots'] }),
+  })
+}
+
+// Webroot Env Vars
+export function useEnvVars(webrootId: string) {
+  return useQuery({
+    queryKey: ['env-vars', webrootId],
+    queryFn: () => api.get<{ items: WebrootEnvVar[] }>(`/webroots/${webrootId}/env-vars`),
+    enabled: !!webrootId,
+  })
+}
+
+export function useSetEnvVars() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { webroot_id: string; vars: { name: string; value: string; secret: boolean }[] }) =>
+      api.put(`/webroots/${data.webroot_id}/env-vars`, { vars: data.vars }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['env-vars'] }),
+  })
+}
+
+export function useDeleteEnvVar() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { webroot_id: string; name: string }) =>
+      api.delete(`/webroots/${data.webroot_id}/env-vars/${data.name}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['env-vars'] }),
   })
 }
 

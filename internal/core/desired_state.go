@@ -79,7 +79,7 @@ func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, 
 
 		// Load webroots for this tenant
 		wrRows, err := s.db.Query(ctx, `
-			SELECT id, name, runtime, runtime_version, runtime_config::text, public_folder, status
+			SELECT id, name, runtime, runtime_version, runtime_config::text, public_folder, env_file_name, env_shell_source, status
 			FROM webroots WHERE tenant_id = $1 AND status = 'active'
 			ORDER BY name`, t.ID)
 		if err != nil {
@@ -87,9 +87,36 @@ func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, 
 		}
 		for wrRows.Next() {
 			var wr model.DesiredWebroot
-			if err := wrRows.Scan(&wr.ID, &wr.Name, &wr.Runtime, &wr.RuntimeVersion, &wr.RuntimeConfig, &wr.PublicFolder, &wr.Status); err != nil {
+			if err := wrRows.Scan(&wr.ID, &wr.Name, &wr.Runtime, &wr.RuntimeVersion, &wr.RuntimeConfig, &wr.PublicFolder, &wr.EnvFileName, &wr.EnvShellSource, &wr.Status); err != nil {
 				wrRows.Close()
 				return fmt.Errorf("scan webroot: %w", err)
+			}
+
+			// Load env vars for this webroot (plaintext — secrets stored encrypted in DB).
+			envRows, err := s.db.Query(ctx, `
+				SELECT name, value, is_secret
+				FROM webroot_env_vars WHERE webroot_id = $1
+				ORDER BY name`, wr.ID)
+			if err != nil {
+				wrRows.Close()
+				return fmt.Errorf("query env vars for webroot %s: %w", wr.ID, err)
+			}
+			envVars := make(map[string]string)
+			for envRows.Next() {
+				var name, value string
+				var isSecret bool
+				if err := envRows.Scan(&name, &value, &isSecret); err != nil {
+					envRows.Close()
+					wrRows.Close()
+					return fmt.Errorf("scan env var: %w", err)
+				}
+				// Note: secrets are stored encrypted; decryption happens at the
+				// service layer when building activity params, not here.
+				envVars[name] = value
+			}
+			envRows.Close()
+			if len(envVars) > 0 {
+				wr.EnvVars = envVars
 			}
 
 			// Load FQDNs for this webroot

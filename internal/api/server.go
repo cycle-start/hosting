@@ -34,7 +34,7 @@ type Server struct {
 }
 
 func NewServer(logger zerolog.Logger, coreDB *pgxpool.Pool, temporalClient temporalclient.Client, cfg *config.Config) *Server {
-	services := core.NewServices(coreDB, temporalClient, cfg.OIDCIssuerURL)
+	services := core.NewServices(coreDB, temporalClient, cfg.OIDCIssuerURL, cfg.SecretEncryptionKey)
 	auditLogger := mw.NewAuditLogger(coreDB, logger)
 
 	s := &Server{
@@ -326,6 +326,21 @@ func (s *Server) setupRoutes() {
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireScope("webroots", "delete"))
 			r.Delete("/webroots/{id}", webroot.Delete)
+		})
+
+		// Webroot env vars
+		envVar := handler.NewWebrootEnvVar(s.services)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("webroots", "read"))
+			r.Get("/webroots/{webrootID}/env-vars", envVar.List)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("webroots", "write"))
+			r.Put("/webroots/{webrootID}/env-vars", envVar.Set)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("webroots", "delete"))
+			r.Delete("/webroots/{webrootID}/env-vars/{name}", envVar.Delete)
 		})
 
 		// Daemons

@@ -54,13 +54,22 @@ type SSHKeyDef struct {
 }
 
 type WebrootDef struct {
-	Runtime        string         `yaml:"runtime"`
-	RuntimeVersion string         `yaml:"runtime_version"`
-	RuntimeConfig  map[string]any `yaml:"runtime_config"`
-	PublicFolder   string         `yaml:"public_folder"`
-	FQDNs          []FQDNDef      `yaml:"fqdns"`
-	Fixture        *FixtureDef    `yaml:"fixture"`
-	Daemons        []DaemonDef    `yaml:"daemons"`
+	Runtime        string            `yaml:"runtime"`
+	RuntimeVersion string            `yaml:"runtime_version"`
+	RuntimeConfig  map[string]any    `yaml:"runtime_config"`
+	PublicFolder   string            `yaml:"public_folder"`
+	EnvFileName    string            `yaml:"env_file_name"`
+	EnvShellSource *bool             `yaml:"env_shell_source"`
+	EnvVars        []EnvVarDef       `yaml:"env_vars"`
+	FQDNs          []FQDNDef         `yaml:"fqdns"`
+	Fixture        *FixtureDef       `yaml:"fixture"`
+	Daemons        []DaemonDef       `yaml:"daemons"`
+}
+
+type EnvVarDef struct {
+	Name   string `yaml:"name"`
+	Value  string `yaml:"value"`
+	Secret bool   `yaml:"secret"`
 }
 
 type FQDNDef struct {

@@ -5,8 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/edvin/hosting/internal/api/response"
+	"github.com/edvin/hosting/internal/agent/runtime"
 	"github.com/edvin/hosting/internal/api/request"
+	"github.com/edvin/hosting/internal/api/response"
 	"github.com/edvin/hosting/internal/core"
 	"github.com/edvin/hosting/internal/model"
 	"github.com/edvin/hosting/internal/platform"
@@ -95,6 +96,24 @@ func (h *Webroot) Create(w http.ResponseWriter, r *http.Request) {
 	if runtimeConfig == nil {
 		runtimeConfig = json.RawMessage(`{}`)
 	}
+
+	// Validate PHP runtime_config if applicable.
+	if req.Runtime == "php" {
+		if err := runtime.ValidatePHPRuntimeConfig(runtimeConfig); err != nil {
+			response.WriteError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+
+	envFileName := req.EnvFileName
+	if envFileName == "" {
+		envFileName = ".env.hosting"
+	}
+	envShellSource := false
+	if req.EnvShellSource != nil {
+		envShellSource = *req.EnvShellSource
+	}
+
 	webroot := &model.Webroot{
 		ID:             platform.NewID(),
 		TenantID:       tenantID,
@@ -103,6 +122,8 @@ func (h *Webroot) Create(w http.ResponseWriter, r *http.Request) {
 		RuntimeVersion: req.RuntimeVersion,
 		RuntimeConfig:  runtimeConfig,
 		PublicFolder:   req.PublicFolder,
+		EnvFileName:    envFileName,
+		EnvShellSource: envShellSource,
 		Status:         model.StatusPending,
 		CreatedAt:      now,
 		UpdatedAt:      now,
@@ -200,6 +221,21 @@ func (h *Webroot) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.PublicFolder != nil {
 		webroot.PublicFolder = *req.PublicFolder
+	}
+	if req.EnvFileName != nil {
+		webroot.EnvFileName = *req.EnvFileName
+	}
+	if req.EnvShellSource != nil {
+		webroot.EnvShellSource = *req.EnvShellSource
+	}
+
+	// Validate PHP runtime_config after merging.
+	effectiveRuntime := webroot.Runtime
+	if effectiveRuntime == "php" {
+		if err := runtime.ValidatePHPRuntimeConfig(webroot.RuntimeConfig); err != nil {
+			response.WriteError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 
 	if err := h.svc.Update(r.Context(), webroot); err != nil {

@@ -31,7 +31,7 @@ Designed for scale: millions of tenants across multiple regions, clusters, and b
 
 ## What It Does
 
-**Web Hosting** — PHP, Node.js, Python, Ruby, and static sites with nginx, per-tenant Linux users, CephFS shared storage, PHP-FPM socket activation, and long-running daemon processes via supervisord.
+**Web Hosting** — PHP, Node.js, Python, Ruby, and static sites with nginx, per-tenant Linux users, CephFS shared storage, PHP-FPM socket activation, long-running daemon processes via supervisord, environment variables with vaulted secrets, and configurable PHP-FPM pool settings.
 
 **DNS** — PowerDNS with brand-aware NS/SOA records, auto-created A/AAAA records on FQDN binding, and auto MX/SPF for email.
 
@@ -99,6 +99,7 @@ See [Getting Started](docs/getting-started.md) for the full walkthrough includin
 | [Valkey](docs/valkey.md) | Managed Redis, ACL users, migration |
 | [S3 Storage](docs/s3-storage.md) | Ceph RGW, buckets, access keys, quotas |
 | [Email](docs/email.md) | Stalwart, accounts, aliases, forwards |
+| [Env Vars & Secrets](docs/env-vars-secrets.md) | Environment variables, vaulted secrets, PHP runtime config |
 | [Cron Jobs](docs/cron-jobs.md) | Scheduled tasks, distributed locking, logging |
 | [Backups](docs/backups.md) | Web and database backups, restore |
 | [Load Balancing](docs/load-balancing.md) | HAProxy, runtime map, consistent hashing |

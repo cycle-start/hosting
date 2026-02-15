@@ -11,6 +11,7 @@ type WebrootInfo struct {
 	RuntimeVersion string
 	RuntimeConfig  string
 	PublicFolder   string
+	EnvVars        map[string]string
 }
 
 // Manager defines the interface for language-specific runtime management.

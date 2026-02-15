@@ -46,6 +46,8 @@ type Config struct {
 
 	LokiURL       string // LOKI_URL — Loki query endpoint for platform logs (default: http://127.0.0.1:3100)
 	TenantLokiURL string // TENANT_LOKI_URL — Loki query endpoint for tenant logs (default: http://127.0.0.1:3101)
+
+	SecretEncryptionKey string // SECRET_ENCRYPTION_KEY — 32-byte AES-256 key, hex-encoded
 }
 
 func Load() (*Config, error) {
@@ -78,6 +80,8 @@ func Load() (*Config, error) {
 
 		LokiURL:       getEnv("LOKI_URL", "http://127.0.0.1:3100"),
 		TenantLokiURL: getEnv("TENANT_LOKI_URL", "http://127.0.0.1:3101"),
+
+		SecretEncryptionKey: getEnv("SECRET_ENCRYPTION_KEY", ""),
 	}
 
 	return cfg, nil
@@ -98,6 +102,9 @@ func (c *Config) Validate(binary string) error {
 		if c.HTTPListenAddr == "" {
 			missing = append(missing, "HTTP_LISTEN_ADDR")
 		}
+		if c.SecretEncryptionKey == "" {
+			missing = append(missing, "SECRET_ENCRYPTION_KEY")
+		}
 	case "worker":
 		if c.CoreDatabaseURL == "" {
 			missing = append(missing, "CORE_DATABASE_URL")
@@ -107,6 +114,9 @@ func (c *Config) Validate(binary string) error {
 		}
 		if c.TemporalAddress == "" {
 			missing = append(missing, "TEMPORAL_ADDRESS")
+		}
+		if c.SecretEncryptionKey == "" {
+			missing = append(missing, "SECRET_ENCRYPTION_KEY")
 		}
 	case "node-agent":
 		if c.NodeID == "" {

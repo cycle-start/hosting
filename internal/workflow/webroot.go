@@ -65,6 +65,8 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 			RuntimeVersion: wctx.Webroot.RuntimeVersion,
 			RuntimeConfig:  string(wctx.Webroot.RuntimeConfig),
 			PublicFolder:   wctx.Webroot.PublicFolder,
+			EnvFileName:    wctx.Webroot.EnvFileName,
+			EnvShellSource: wctx.Webroot.EnvShellSource,
 			FQDNs:          fqdnParams,
 		}).Get(ctx, nil)
 		if err != nil {
@@ -135,6 +137,8 @@ func UpdateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 			RuntimeVersion: wctx.Webroot.RuntimeVersion,
 			RuntimeConfig:  string(wctx.Webroot.RuntimeConfig),
 			PublicFolder:   wctx.Webroot.PublicFolder,
+			EnvFileName:    wctx.Webroot.EnvFileName,
+			EnvShellSource: wctx.Webroot.EnvShellSource,
 			FQDNs:          fqdnParams,
 		}).Get(ctx, nil)
 		if err != nil {

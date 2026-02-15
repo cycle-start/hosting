@@ -37,6 +37,9 @@ type CreateWebrootParams struct {
 	RuntimeVersion string
 	RuntimeConfig  string
 	PublicFolder   string
+	EnvVars        map[string]string
+	EnvFileName    string
+	EnvShellSource bool
 	FQDNs          []FQDNParam
 	Daemons        []DaemonProxyInfo
 }
@@ -50,6 +53,9 @@ type UpdateWebrootParams struct {
 	RuntimeVersion string
 	RuntimeConfig  string
 	PublicFolder   string
+	EnvVars        map[string]string
+	EnvFileName    string
+	EnvShellSource bool
 	FQDNs          []FQDNParam
 	Daemons        []DaemonProxyInfo
 }
@@ -63,6 +69,7 @@ type ConfigureRuntimeParams struct {
 	RuntimeVersion string
 	RuntimeConfig  string
 	PublicFolder   string
+	EnvVars        map[string]string
 }
 
 // CreateDatabaseUserParams holds parameters for creating a database user on a node.

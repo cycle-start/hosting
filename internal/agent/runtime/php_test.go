@@ -12,9 +12,14 @@ import (
 func TestPHP_PoolConfigTemplate(t *testing.T) {
 	// Test the PHP-FPM pool config template rendering directly.
 	data := phpPoolData{
-		TenantName: "tenant1",
-		TenantID:   "tenant1",
-		Version:    "8.2",
+		TenantName:      "tenant1",
+		TenantID:        "tenant1",
+		Version:         "8.2",
+		MaxChildren:     5,
+		StartServers:    2,
+		MinSpareServers: 1,
+		MaxSpareServers: 3,
+		MaxRequests:     500,
 	}
 
 	var buf bytes.Buffer
@@ -58,9 +63,14 @@ func TestPHP_PoolConfigTemplate(t *testing.T) {
 
 func TestPHP_PoolConfigTemplate_DifferentVersion(t *testing.T) {
 	data := phpPoolData{
-		TenantName: "user2",
-		TenantID:   "user2",
-		Version:    "8.3",
+		TenantName:      "user2",
+		TenantID:        "user2",
+		Version:         "8.3",
+		MaxChildren:     5,
+		StartServers:    2,
+		MinSpareServers: 1,
+		MaxSpareServers: 3,
+		MaxRequests:     500,
 	}
 
 	var buf bytes.Buffer

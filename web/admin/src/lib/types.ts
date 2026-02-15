@@ -88,10 +88,18 @@ export interface Webroot {
   runtime_version: string
   runtime_config: Record<string, unknown> | null
   public_folder: string
+  env_file_name: string
+  env_shell_source: boolean
   status: string
   status_message?: string
   created_at: string
   updated_at: string
+}
+
+export interface WebrootEnvVar {
+  name: string
+  value: string
+  is_secret: boolean
 }
 
 export interface FQDN {

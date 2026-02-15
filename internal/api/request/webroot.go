@@ -9,6 +9,8 @@ type CreateWebroot struct {
 	RuntimeVersion string             `json:"runtime_version" validate:"required"`
 	RuntimeConfig  json.RawMessage    `json:"runtime_config"`
 	PublicFolder   string             `json:"public_folder"`
+	EnvFileName    string             `json:"env_file_name"`
+	EnvShellSource *bool              `json:"env_shell_source"`
 	FQDNs          []CreateFQDNNested `json:"fqdns" validate:"omitempty,dive"`
 }
 
@@ -17,4 +19,6 @@ type UpdateWebroot struct {
 	RuntimeVersion string          `json:"runtime_version"`
 	RuntimeConfig  json.RawMessage `json:"runtime_config"`
 	PublicFolder   *string         `json:"public_folder"`
+	EnvFileName    *string         `json:"env_file_name"`
+	EnvShellSource *bool           `json:"env_shell_source"`
 }

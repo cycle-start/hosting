@@ -352,6 +352,8 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				RuntimeVersion: entry.webroot.RuntimeVersion,
 				RuntimeConfig:  string(entry.webroot.RuntimeConfig),
 				PublicFolder:   entry.webroot.PublicFolder,
+				EnvFileName:    entry.webroot.EnvFileName,
+				EnvShellSource: entry.webroot.EnvShellSource,
 				FQDNs:          entry.fqdns,
 				Daemons:        daemonProxies,
 			}).Get(ctx, nil)

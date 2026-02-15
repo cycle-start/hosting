@@ -95,10 +95,11 @@ func TestValidate_NodeAgent_MissingFields(t *testing.T) {
 
 func TestValidate_TLS_MismatchedCertKey(t *testing.T) {
 	cfg := &Config{
-		CoreDatabaseURL: "postgres://localhost/db",
-		TemporalAddress: "localhost:7233",
-		HTTPListenAddr:  ":8090",
-		TemporalTLSCert: "/path/to/cert.pem",
+		CoreDatabaseURL:     "postgres://localhost/db",
+		TemporalAddress:     "localhost:7233",
+		HTTPListenAddr:      ":8090",
+		SecretEncryptionKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		TemporalTLSCert:     "/path/to/cert.pem",
 	}
 	err := cfg.Validate("core-api")
 	require.Error(t, err)
@@ -107,13 +108,14 @@ func TestValidate_TLS_MismatchedCertKey(t *testing.T) {
 
 func TestValidate_AllPresent(t *testing.T) {
 	cfg := &Config{
-		CoreDatabaseURL:    "postgres://localhost/db",
+		CoreDatabaseURL:     "postgres://localhost/db",
 		PowerDNSDatabaseURL: "postgres://localhost/svc",
-		TemporalAddress:    "localhost:7233",
-		HTTPListenAddr:     ":8090",
-		NodeID:             "node-1",
-		TemporalTLSCert:    "/path/to/cert.pem",
-		TemporalTLSKey:     "/path/to/key.pem",
+		TemporalAddress:     "localhost:7233",
+		HTTPListenAddr:      ":8090",
+		NodeID:              "node-1",
+		SecretEncryptionKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		TemporalTLSCert:     "/path/to/cert.pem",
+		TemporalTLSKey:      "/path/to/key.pem",
 	}
 
 	assert.NoError(t, cfg.Validate("core-api"))

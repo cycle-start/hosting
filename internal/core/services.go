@@ -15,6 +15,7 @@ type Services struct {
 	Node             *NodeService
 	Tenant           *TenantService
 	Webroot          *WebrootService
+	WebrootEnvVar    *WebrootEnvVarService
 	FQDN             *FQDNService
 	Certificate      *CertificateService
 	Zone             *ZoneService
@@ -40,7 +41,7 @@ type Services struct {
 	NodeHealth       *NodeHealthService
 }
 
-func NewServices(db DB, tc temporalclient.Client, oidcIssuerURL string) *Services {
+func NewServices(db DB, tc temporalclient.Client, oidcIssuerURL string, secretEncryptionKey string) *Services {
 	return &Services{
 		Dashboard:        NewDashboardService(db),
 		PlatformConfig:   NewPlatformConfigService(db),
@@ -52,6 +53,7 @@ func NewServices(db DB, tc temporalclient.Client, oidcIssuerURL string) *Service
 		Node:             NewNodeService(db),
 		Tenant:           NewTenantService(db, tc),
 		Webroot:          NewWebrootService(db, tc),
+		WebrootEnvVar:    NewWebrootEnvVarService(db, tc, secretEncryptionKey),
 		FQDN:             NewFQDNService(db, tc),
 		Certificate:      NewCertificateService(db, tc),
 		Zone:             NewZoneService(db, tc),

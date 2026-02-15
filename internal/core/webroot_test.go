@@ -114,10 +114,12 @@ func TestWebrootService_GetByID_Success(t *testing.T) {
 		*(dest[4].(*string)) = "8.2"
 		*(dest[5].(*json.RawMessage)) = cfg
 		*(dest[6].(*string)) = "/public"
-		*(dest[7].(*string)) = model.StatusActive
-		*(dest[8].(**string)) = nil // status_message
-		*(dest[9].(*time.Time)) = now
-		*(dest[10].(*time.Time)) = now
+		*(dest[7].(*string)) = ".env.hosting"
+		*(dest[8].(*bool)) = false
+		*(dest[9].(*string)) = model.StatusActive
+		*(dest[10].(**string)) = nil // status_message
+		*(dest[11].(*time.Time)) = now
+		*(dest[12].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -173,10 +175,12 @@ func TestWebrootService_ListByTenant_Success(t *testing.T) {
 			*(dest[4].(*string)) = "8.2"
 			*(dest[5].(*json.RawMessage)) = cfg
 			*(dest[6].(*string)) = "/public"
-			*(dest[7].(*string)) = model.StatusActive
-			*(dest[8].(**string)) = nil // status_message
-			*(dest[9].(*time.Time)) = now
-			*(dest[10].(*time.Time)) = now
+			*(dest[7].(*string)) = ".env.hosting"
+			*(dest[8].(*bool)) = false
+			*(dest[9].(*string)) = model.StatusActive
+			*(dest[10].(**string)) = nil // status_message
+			*(dest[11].(*time.Time)) = now
+			*(dest[12].(*time.Time)) = now
 			return nil
 		},
 	)

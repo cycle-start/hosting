@@ -50,6 +50,7 @@ Full CRUD REST API at `api.hosting.test/api/v1` with OpenAPI docs at `/docs`.
 | Email Aliases | CRUD `/email-accounts/{id}/aliases`, retry | Yes | |
 | Email Forwards | CRUD `/email-accounts/{id}/forwards`, retry | Yes | External forwarding with keep-copy |
 | Email Auto-Replies | GET/PUT/DELETE `/email-accounts/{id}/autoreply`, retry | Yes | Vacation/out-of-office |
+| Env Vars | GET/PUT/DELETE `/webroots/{id}/env-vars` | Yes | Webroot-scoped env vars, vaulted secrets |
 | Daemons | CRUD `/webroots/{id}/daemons`, enable/disable/retry | Yes | Supervisord processes, optional nginx proxy |
 | Backups | CRUD `/tenants/{id}/backups`, restore, retry | Yes | Web (tar.gz) and MySQL (.sql.gz) |
 | Logs | GET `/logs` | No | Loki proxy for platform log querying |
@@ -111,7 +112,7 @@ Runs on each VM node, connecting to Temporal via `node-{uuid}` task queue:
 - **DatabaseManager:** MySQL CREATE/DROP DATABASE/USER, GRANT, dump/import for migrations
 - **ValkeyManager:** Instance lifecycle (config + systemd units), ACL user management, RDB dump/import
 - **S3Manager:** Ceph RGW bucket/user management via `radosgw-admin`, tenant-scoped naming (`{tenantID}--{bucketName}`)
-- **Runtime managers:** PHP-FPM (socket activation), Node.js, Python (gunicorn), Ruby (puma), Static
+- **Runtime managers:** PHP-FPM (socket activation, configurable PM/php.ini via runtime_config), Node.js, Python (gunicorn), Ruby (puma), Static
 
 ### DNS (PowerDNS)
 
@@ -233,6 +234,16 @@ Names are `{prefix}{10-char-random}`, globally unique, auto-generated on creatio
 - Daemons without `proxy_path` run as pure background processes (no nginx integration)
 - Enable/disable lifecycle, convergence writes supervisord configs to all shard nodes
 - Nginx proxy locations support WebSocket connections (HTTP Upgrade headers + 24-hour timeout)
+
+### Environment Variables & Vaulted Secrets
+
+- Webroot-scoped environment variables available to PHP-FPM, cron jobs, daemons, and SSH sessions
+- Per-tenant envelope encryption: AES-256-GCM with platform master key (KEK) and per-tenant data encryption keys (DEK)
+- Secret values encrypted at rest, redacted in API responses (`***`)
+- Configurable env file name (`.env`, `.env.hosting`, etc.) and optional auto-sourcing in SSH sessions via `.bashrc`
+- Injection targets: PHP-FPM `env[KEY]=value`, dot-env file on disk, `EnvironmentFile=` for cron systemd units
+- PHP runtime config: configurable PM settings (max_children, start_servers, etc.), php_values, php_admin_values with blocklist
+- API: `GET/PUT /webroots/{id}/env-vars`, `DELETE /webroots/{id}/env-vars/{name}`
 
 ### Tenant Log Access
 

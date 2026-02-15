@@ -39,6 +39,30 @@ tenants:
       - runtime: php
         runtime_version: "8.5"
         public_folder: public
+        env_file_name: ".env"
+        env_shell_source: true
+        runtime_config:
+          pm:
+            max_children: 10
+            start_servers: 3
+            min_spare_servers: 2
+            max_spare_servers: 5
+            max_requests: 1000
+          php_values:
+            memory_limit: "256M"
+            max_execution_time: "60"
+            upload_max_filesize: "64M"
+            post_max_size: "64M"
+        env_vars:
+          - name: CACHE_STORE
+            value: file
+            secret: false
+          - name: QUEUE_CONNECTION
+            value: database
+            secret: false
+          - name: BROADCAST_CONNECTION
+            value: reverb
+            secret: false
         fqdns:
           - fqdn: acme.hosting.test
             ssl_enabled: false

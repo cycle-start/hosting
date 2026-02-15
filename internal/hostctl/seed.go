@@ -371,6 +371,12 @@ func seedWebroot(client *Client, tenantID string, def WebrootDef, fqdnMap map[st
 	if def.RuntimeConfig != nil {
 		body["runtime_config"] = def.RuntimeConfig
 	}
+	if def.EnvFileName != "" {
+		body["env_file_name"] = def.EnvFileName
+	}
+	if def.EnvShellSource != nil {
+		body["env_shell_source"] = *def.EnvShellSource
+	}
 
 	fmt.Printf("  Creating webroot (%s %s)...\n", def.Runtime, def.RuntimeVersion)
 	resp, err := client.Post(fmt.Sprintf("/tenants/%s/webroots", tenantID), body)
@@ -417,6 +423,25 @@ func seedWebroot(client *Client, tenantID string, def WebrootDef, fqdnMap map[st
 			return "", "", fmt.Errorf("wait for FQDN %q: %w", f.FQDN, err)
 		}
 		fmt.Printf("      FQDN %q: active\n", f.FQDN)
+	}
+
+	// Set env vars via API (if defined)
+	if len(def.EnvVars) > 0 {
+		vars := make([]map[string]any, 0, len(def.EnvVars))
+		for _, ev := range def.EnvVars {
+			vars = append(vars, map[string]any{
+				"name":   ev.Name,
+				"value":  ev.Value,
+				"secret": ev.Secret,
+			})
+		}
+		fmt.Printf("    Setting %d env vars...\n", len(vars))
+		if _, err := client.Put(fmt.Sprintf("/webroots/%s/env-vars", webrootID), map[string]any{
+			"vars": vars,
+		}); err != nil {
+			return "", "", fmt.Errorf("set env vars: %w", err)
+		}
+		fmt.Printf("    Env vars set\n")
 	}
 
 	return webrootID, webrootName, nil

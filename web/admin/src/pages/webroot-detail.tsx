@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Trash2, Pencil, Globe, Play, Pause, RotateCcw, Terminal, Clock } from 'lucide-react'
+import { Plus, Trash2, Pencil, Globe, Play, Pause, RotateCcw, Terminal, Clock, Key, Eye, EyeOff, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,8 +27,9 @@ import {
   useUpdateWebroot, useCreateFQDN, useDeleteFQDN,
   useCreateDaemon, useUpdateDaemon, useDeleteDaemon, useEnableDaemon, useDisableDaemon, useRetryDaemon,
   useCreateCronJob, useUpdateCronJob, useDeleteCronJob, useEnableCronJob, useDisableCronJob, useRetryCronJob,
+  useEnvVars, useSetEnvVars, useDeleteEnvVar,
 } from '@/lib/hooks'
-import type { FQDN, Daemon, CronJob } from '@/lib/types'
+import type { FQDN, Daemon, CronJob, WebrootEnvVar } from '@/lib/types'
 
 const runtimes = ['php', 'node', 'python', 'ruby', 'static']
 const stopSignals = ['TERM', 'INT', 'QUIT', 'KILL', 'HUP']
@@ -46,6 +47,8 @@ export function WebrootDetailPage() {
   const [editRuntime, setEditRuntime] = useState('')
   const [editVersion, setEditVersion] = useState('')
   const [editPublicFolder, setEditPublicFolder] = useState('')
+  const [editEnvFileName, setEditEnvFileName] = useState('')
+  const [editEnvShellSource, setEditEnvShellSource] = useState(false)
 
   // Create FQDN form
   const [fqdnValue, setFqdnValue] = useState('')
@@ -73,10 +76,19 @@ export function WebrootDetailPage() {
   const [cronTimeout, setCronTimeout] = useState('300')
   const [cronMaxMem, setCronMaxMem] = useState('512')
 
+  // Env var state
+  const [addEnvOpen, setAddEnvOpen] = useState(false)
+  const [envName, setEnvName] = useState('')
+  const [envValue, setEnvValue] = useState('')
+  const [envSecret, setEnvSecret] = useState(false)
+  const [deleteEnvVar, setDeleteEnvVar] = useState<WebrootEnvVar | null>(null)
+  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({})
+
   const { data: webroot, isLoading } = useWebroot(webrootId)
   const { data: fqdnsData, isLoading: fqdnsLoading } = useFQDNs(webrootId)
   const { data: daemonsData, isLoading: daemonsLoading } = useDaemons(webrootId)
   const { data: cronJobsData, isLoading: cronJobsLoading } = useCronJobs(webrootId)
+  const { data: envVarsData } = useEnvVars(webrootId)
   const updateMut = useUpdateWebroot()
   const createFqdnMut = useCreateFQDN()
   const deleteFqdnMut = useDeleteFQDN()
@@ -92,6 +104,8 @@ export function WebrootDetailPage() {
   const enableCronMut = useEnableCronJob()
   const disableCronMut = useDisableCronJob()
   const retryCronMut = useRetryCronJob()
+  const setEnvVarsMut = useSetEnvVars()
+  const deleteEnvVarMut = useDeleteEnvVar()
 
   if (isLoading || !webroot) {
     return <div className="space-y-6"><Skeleton className="h-10 w-64" /><Skeleton className="h-64 w-full" /></div>
@@ -104,13 +118,29 @@ export function WebrootDetailPage() {
     setEditRuntime(webroot.runtime)
     setEditVersion(webroot.runtime_version)
     setEditPublicFolder(webroot.public_folder)
+    setEditEnvFileName(webroot.env_file_name || '.env.hosting')
+    setEditEnvShellSource(webroot.env_shell_source || false)
     setEditOpen(true)
   }
 
   const handleUpdate = async () => {
     try {
-      await updateMut.mutateAsync({ id: webrootId, runtime: editRuntime, runtime_version: editVersion, public_folder: editPublicFolder })
+      await updateMut.mutateAsync({ id: webrootId, runtime: editRuntime, runtime_version: editVersion, public_folder: editPublicFolder, env_file_name: editEnvFileName, env_shell_source: editEnvShellSource })
       toast.success('Webroot updated'); setEditOpen(false)
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
+  }
+
+  const handleAddEnvVar = async () => {
+    setTouched({ envName: true })
+    if (!envName.trim()) return
+    const existing = envVarsData?.items ?? []
+    const newVars = [...existing.filter(v => v.name !== envName).map(v => ({
+      name: v.name, value: v.is_secret ? '' : v.value, secret: v.is_secret,
+    })), { name: envName, value: envValue, secret: envSecret }]
+    try {
+      await setEnvVarsMut.mutateAsync({ webroot_id: webrootId, vars: newVars })
+      toast.success('Env var added'); setAddEnvOpen(false)
+      setEnvName(''); setEnvValue(''); setEnvSecret(false); setTouched({})
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }
 
@@ -466,7 +496,7 @@ export function WebrootDetailPage() {
 
       <ResourceHeader
         title={webroot.name}
-        subtitle={`${webroot.runtime} ${webroot.runtime_version} | Public: ${webroot.public_folder}`}
+        subtitle={`${webroot.runtime} ${webroot.runtime_version} | Public: ${webroot.public_folder} | Env: ${webroot.env_file_name || '.env.hosting'}${webroot.env_shell_source ? ' (shell-sourced)' : ''}`}
         status={webroot.status}
         actions={
           <Button variant="outline" size="sm" onClick={openEdit}>
@@ -527,6 +557,56 @@ export function WebrootDetailPage() {
         )}
       </div>
 
+      {/* Environment Variables */}
+      <div>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Environment Variables</h2>
+          <Button size="sm" onClick={() => { setEnvName(''); setEnvValue(''); setEnvSecret(false); setTouched({}); setAddEnvOpen(true) }}>
+            <Plus className="mr-2 h-4 w-4" /> Add Variable
+          </Button>
+        </div>
+        {(envVarsData?.items?.length ?? 0) === 0 ? (
+          <EmptyState icon={Key} title="No Environment Variables" description="Add env vars for this webroot. Secrets are encrypted at rest." action={{ label: 'Add Variable', onClick: () => setAddEnvOpen(true) }} />
+        ) : (
+          <div className="rounded-md border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="px-4 py-2 text-left font-medium">Name</th>
+                  <th className="px-4 py-2 text-left font-medium">Value</th>
+                  <th className="px-4 py-2 text-left font-medium w-20">Secret</th>
+                  <th className="px-4 py-2 w-16"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {envVarsData?.items?.map((v) => (
+                  <tr key={v.name} className="border-b last:border-0">
+                    <td className="px-4 py-2 font-mono text-sm">{v.name}</td>
+                    <td className="px-4 py-2 font-mono text-xs">
+                      {v.is_secret ? (
+                        <span className="flex items-center gap-1 text-muted-foreground">
+                          <Lock className="h-3 w-3" /> ***
+                        </span>
+                      ) : (
+                        <span className="truncate max-w-[300px] block">{v.value}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {v.is_secret ? <span className="text-amber-600">Yes</span> : <span className="text-muted-foreground">No</span>}
+                    </td>
+                    <td className="px-4 py-2">
+                      <Button variant="ghost" size="icon" onClick={() => setDeleteEnvVar(v)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Logs */}
       <TenantLogViewer tenantId={tenantId} webrootId={webrootId} title="Access Logs" />
       <LogViewer query={`{app=~"core-api|worker|node-agent"} |= "${webrootId}"`} title="Platform Logs" />
@@ -554,6 +634,20 @@ export function WebrootDetailPage() {
             <div className="space-y-2">
               <Label>Public Folder</Label>
               <Input value={editPublicFolder} onChange={(e) => setEditPublicFolder(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Env File Name</Label>
+                <Input placeholder=".env.hosting" value={editEnvFileName} onChange={(e) => setEditEnvFileName(e.target.value)} />
+                <p className="text-xs text-muted-foreground">Filename for the env file in the webroot directory</p>
+              </div>
+              <div className="space-y-2 flex flex-col justify-center pt-4">
+                <div className="flex items-center gap-2">
+                  <Switch checked={editEnvShellSource} onCheckedChange={setEditEnvShellSource} />
+                  <Label>Auto-source in SSH</Label>
+                </div>
+                <p className="text-xs text-muted-foreground">Source env file in SSH shell sessions via .bashrc</p>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -662,6 +756,41 @@ export function WebrootDetailPage() {
         description={`Delete cron job "${deleteCron?.name}"? The timer will be stopped and removed from all nodes.`}
         confirmLabel="Delete" variant="destructive" loading={deleteCronMut.isPending}
         onConfirm={async () => { try { await deleteCronMut.mutateAsync(deleteCron!.id); toast.success('Cron job deleted'); setDeleteCron(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
+
+      {/* Add Env Var */}
+      <Dialog open={addEnvOpen} onOpenChange={setAddEnvOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add Environment Variable</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Name *</Label>
+              <Input placeholder="DATABASE_URL" value={envName} onChange={(e) => setEnvName(e.target.value.toUpperCase())} onBlur={() => touch('envName')} className="font-mono" />
+              {touched['envName'] && !envName.trim() && <p className="text-xs text-destructive">Required</p>}
+              <p className="text-xs text-muted-foreground">Letters, digits, underscores. Must start with letter or underscore.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Value</Label>
+              <Input placeholder="value" value={envValue} onChange={(e) => setEnvValue(e.target.value)} className="font-mono" type={envSecret ? 'password' : 'text'} />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={envSecret} onCheckedChange={setEnvSecret} />
+              <Label>Secret (encrypted at rest)</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddEnvOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddEnvVar} disabled={setEnvVarsMut.isPending}>
+              {setEnvVarsMut.isPending ? 'Adding...' : 'Add'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Env Var */}
+      <ConfirmDialog open={!!deleteEnvVar} onOpenChange={(o) => !o && setDeleteEnvVar(null)} title="Delete Environment Variable"
+        description={`Delete "${deleteEnvVar?.name}"? This will trigger a re-convergence.`}
+        confirmLabel="Delete" variant="destructive" loading={deleteEnvVarMut.isPending}
+        onConfirm={async () => { try { await deleteEnvVarMut.mutateAsync({ webroot_id: webrootId, name: deleteEnvVar!.name }); toast.success('Env var deleted'); setDeleteEnvVar(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
     </div>
   )
 }
