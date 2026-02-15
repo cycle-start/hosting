@@ -1,0 +1,12 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: default-webhook
+    receivers:
+      - uid: webhook-1
+        type: webhook
+        settings:
+          url: "http://10.10.10.2:9095/alerts"
+          httpMethod: POST
+        disableResolveMessage: false

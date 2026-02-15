@@ -199,6 +199,12 @@ vm-deploy:
       --from-file=workflow.json=docker/grafana/provisioning/dashboards/workflow.json \
       --from-file=database.json=docker/grafana/provisioning/dashboards/database.json \
       --from-file=dns.json=docker/grafana/provisioning/dashboards/dns.json
+    # Create Grafana alerting ConfigMap
+    kubectl --context hosting delete configmap grafana-alerting --ignore-not-found
+    kubectl --context hosting create configmap grafana-alerting \
+      --from-file=contact-points.yaml=docker/grafana/provisioning/alerting/contact-points.yaml \
+      --from-file=notification-policies.yaml=docker/grafana/provisioning/alerting/notification-policies.yaml \
+      --from-file=alert-rules.yaml=docker/grafana/provisioning/alerting/alert-rules.yaml
     # Install/upgrade Helm chart
     helm --kube-context hosting upgrade --install hosting \
       deploy/helm/hosting -f deploy/helm/hosting/values-dev.yaml

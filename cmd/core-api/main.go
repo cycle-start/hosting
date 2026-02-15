@@ -17,6 +17,7 @@ import (
 	"github.com/edvin/hosting/internal/core"
 	"github.com/edvin/hosting/internal/db"
 	"github.com/edvin/hosting/internal/logging"
+	"github.com/edvin/hosting/internal/metrics"
 )
 
 func main() {
@@ -57,6 +58,8 @@ func main() {
 		logger.Fatal().Err(err).Msg("failed to connect to core database")
 	}
 	defer corePool.Close()
+
+	metrics.RegisterPgxPoolMetrics(corePool)
 
 	tlsConfig, err := cfg.TemporalTLS()
 	if err != nil {

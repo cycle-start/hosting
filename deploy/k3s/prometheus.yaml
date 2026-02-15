@@ -22,6 +22,9 @@ data:
       scrape_interval: 15s
       evaluation_interval: 15s
 
+    rule_files:
+      - "/etc/prometheus/recording-rules.yml"
+
     scrape_configs:
       - job_name: core-api
         static_configs:
@@ -66,6 +69,25 @@ data:
       - job_name: node-lb
         static_configs:
           - targets: ["10.10.10.70:9100"]
+  recording-rules.yml: |
+    groups:
+      - name: hosting_recording_rules
+        interval: 30s
+        rules:
+          - record: job:http_requests_total:rate5m
+            expr: sum(rate(http_requests_total[5m])) by (job, method, status)
+          - record: job:http_request_duration_seconds:p99_5m
+            expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (job, le))
+          - record: job:http_request_duration_seconds:p95_5m
+            expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (job, le))
+          - record: instance:node_cpu_utilization:ratio_5m
+            expr: 1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))
+          - record: instance:node_memory_utilization:ratio
+            expr: 1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)
+          - record: instance:node_filesystem_utilization:ratio
+            expr: >-
+              (node_filesystem_size_bytes{fstype!~"tmpfs|overlay"} - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"})
+              / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

@@ -1,0 +1,444 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: infrastructure
+    folder: Alerts
+    interval: 1m
+    rules:
+      - uid: node-down
+        title: NodeDown
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up{job=~"node-.*"} == 0
+              instant: true
+              refId: A
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node {{ $labels.instance }} is down"
+          runbook_url: "docs/runbooks/NodeDown.md"
+
+      - uid: node-exporter-down
+        title: NodeExporterDown
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up{job=~"node-.*"} == 0
+              instant: true
+              refId: A
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node exporter on {{ $labels.instance }} is down"
+          runbook_url: "docs/runbooks/NodeExporterDown.md"
+
+      - uid: high-disk-usage
+        title: HighDiskUsage
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                ((node_filesystem_size_bytes{fstype!~"tmpfs|overlay"} - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"})
+                / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) * 100 > 80
+              instant: true
+              refId: A
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk usage on {{ $labels.instance }} {{ $labels.mountpoint }} is above 80%"
+          runbook_url: "docs/runbooks/HighDiskUsage.md"
+
+      - uid: high-disk-usage-critical
+        title: HighDiskUsageCritical
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                ((node_filesystem_size_bytes{fstype!~"tmpfs|overlay"} - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"})
+                / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) * 100 > 95
+              instant: true
+              refId: A
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Disk usage on {{ $labels.instance }} {{ $labels.mountpoint }} is above 95%"
+          runbook_url: "docs/runbooks/HighDiskUsageCritical.md"
+
+      - uid: high-memory-usage
+        title: HighMemoryUsage
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+              instant: true
+              refId: A
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memory usage on {{ $labels.instance }} is above 90%"
+          runbook_url: "docs/runbooks/HighMemoryUsage.md"
+
+      - uid: high-memory-usage-critical
+        title: HighMemoryUsageCritical
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 97
+              instant: true
+              refId: A
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Memory usage on {{ $labels.instance }} is above 97%"
+          runbook_url: "docs/runbooks/HighMemoryUsageCritical.md"
+
+      - uid: high-cpu-usage
+        title: HighCpuUsage
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                (1 - avg by (instance)(rate(node_cpu_seconds_total{mode="idle"}[5m]))) * 100 > 80
+              instant: true
+              refId: A
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU usage on {{ $labels.instance }} is above 80%"
+          runbook_url: "docs/runbooks/HighCpuUsage.md"
+
+      - uid: high-cpu-usage-critical
+        title: HighCpuUsageCritical
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                (1 - avg by (instance)(rate(node_cpu_seconds_total{mode="idle"}[5m]))) * 100 > 95
+              instant: true
+              refId: A
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CPU usage on {{ $labels.instance }} is above 95%"
+          runbook_url: "docs/runbooks/HighCpuUsageCritical.md"
+
+      - uid: disk-will-fill-in-4h
+        title: DiskWillFillIn4Hours
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} > 0
+                and predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}[1h], 4 * 3600) < 0)
+              instant: true
+              refId: A
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk on {{ $labels.instance }} {{ $labels.mountpoint }} will fill within 4 hours"
+          runbook_url: "docs/runbooks/DiskWillFillIn4Hours.md"
+
+  - orgId: 1
+    name: application
+    folder: Alerts
+    interval: 30s
+    rules:
+      - uid: core-api-down
+        title: CoreApiDown
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up{job="core-api"} == 0
+              instant: true
+              refId: A
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Core API is down"
+          runbook_url: "docs/runbooks/CoreApiDown.md"
+
+      - uid: worker-down
+        title: WorkerDown
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up{job="worker"} == 0
+              instant: true
+              refId: A
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Worker is down"
+          runbook_url: "docs/runbooks/WorkerDown.md"
+
+      - uid: core-api-5xx-rate
+        title: CoreApi5xxRate
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                (sum(rate(http_requests_total{job="core-api",status=~"5.."}[5m]))
+                / sum(rate(http_requests_total{job="core-api"}[5m]))) * 100 > 1
+              instant: true
+              refId: A
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Core API 5xx error rate is above 1%"
+          runbook_url: "docs/runbooks/CoreApi5xxRate.md"
+
+      - uid: core-api-5xx-rate-critical
+        title: CoreApi5xxRateCritical
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                (sum(rate(http_requests_total{job="core-api",status=~"5.."}[5m]))
+                / sum(rate(http_requests_total{job="core-api"}[5m]))) * 100 > 5
+              instant: true
+              refId: A
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Core API 5xx error rate is above 5%"
+          runbook_url: "docs/runbooks/CoreApi5xxRateCritical.md"
+
+      - uid: core-api-high-latency
+        title: CoreApiHighLatency
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job="core-api"}[5m])) by (le)) > 2
+              instant: true
+              refId: A
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Core API p99 latency is above 2 seconds"
+          runbook_url: "docs/runbooks/CoreApiHighLatency.md"
+
+      - uid: core-api-high-latency-critical
+        title: CoreApiHighLatencyCritical
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job="core-api"}[5m])) by (le)) > 5
+              instant: true
+              refId: A
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Core API p99 latency is above 5 seconds"
+          runbook_url: "docs/runbooks/CoreApiHighLatencyCritical.md"
+
+  - orgId: 1
+    name: temporal
+    folder: Alerts
+    interval: 1m
+    rules:
+      - uid: temporal-down
+        title: TemporalDown
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up{job="temporal"} == 0
+              instant: true
+              refId: A
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Temporal server is down"
+          runbook_url: "docs/runbooks/TemporalDown.md"
+
+  - orgId: 1
+    name: services
+    folder: Alerts
+    interval: 1m
+    rules:
+      - uid: haproxy-backend-down
+        title: HAProxyBackendDown
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: haproxy_backend_active_servers{job="haproxy"} == 0
+              instant: true
+              refId: A
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HAProxy backend {{ $labels.proxy }} has no active servers"
+          runbook_url: "docs/runbooks/HAProxyBackendDown.md"
+
+      - uid: haproxy-backend-degraded
+        title: HAProxyBackendDegraded
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                haproxy_backend_active_servers{job="haproxy"} < haproxy_backend_servers_total{job="haproxy"}
+                and haproxy_backend_active_servers{job="haproxy"} > 0
+              instant: true
+              refId: A
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HAProxy backend {{ $labels.proxy }} has degraded capacity"
+          runbook_url: "docs/runbooks/HAProxyBackendDegraded.md"
+
+      - uid: high-haproxy-error-rate
+        title: HighHAProxyErrorRate
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                (sum(rate(haproxy_frontend_http_responses_total{job="haproxy", code="5xx"}[5m]))
+                / sum(rate(haproxy_frontend_http_responses_total{job="haproxy"}[5m]))) * 100 > 5
+              instant: true
+              refId: A
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HAProxy 5xx error rate is above 5%"
+          runbook_url: "docs/runbooks/HighHAProxyErrorRate.md"
+
+      - uid: haproxy-high-connection-rate
+        title: HAProxyHighConnectionRate
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                haproxy_frontend_current_sessions{job="haproxy"}
+                / haproxy_frontend_limit_sessions{job="haproxy"} * 100 > 80
+              instant: true
+              refId: A
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HAProxy frontend {{ $labels.proxy }} connection usage is above 80%"
+          runbook_url: "docs/runbooks/HAProxyHighConnectionRate.md"
