@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -690,3 +691,136 @@ func digQuery(t *testing.T, nameserverIP, recordType, name string) string {
 }
 
 const migrationTimeout = 10 * time.Minute
+
+// httpPostWithHost performs an HTTP POST with a JSON body and custom Host header.
+// It routes through the LB (webTrafficURL), not the API.
+func httpPostWithHost(t *testing.T, url, host string, body interface{}) (*http.Response, string) {
+	t.Helper()
+	var reqBody io.Reader
+	if body != nil {
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			t.Fatalf("marshal POST body: %v", err)
+		}
+		reqBody = bytes.NewReader(jsonBody)
+	}
+	req, err := http.NewRequest(http.MethodPost, url, reqBody)
+	if err != nil {
+		t.Fatalf("create POST request %s: %v", url, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if host != "" {
+		req.Host = host
+	}
+	resp, err := noRedirectClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST %s (Host: %s): %v", url, host, err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp, string(b)
+}
+
+// httpGetWithHostErr performs an HTTP GET with a custom Host header.
+// Returns error instead of calling t.Fatal.
+func httpGetWithHostErr(url, host string) (*http.Response, string, error) {
+	return httpGetWithHost(url, host)
+}
+
+// createDatabaseUser creates a database user and waits for it to become active.
+// Returns the user ID.
+func createDatabaseUser(t *testing.T, dbID, username, password string) string {
+	t.Helper()
+	resp, body := httpPost(t, fmt.Sprintf("%s/databases/%s/users", coreAPIURL, dbID), map[string]interface{}{
+		"username":   username,
+		"password":   password,
+		"privileges": []string{"ALL"},
+	})
+	require.Equal(t, 202, resp.StatusCode, "create database user: %s", body)
+	user := parseJSON(t, body)
+	userID := user["id"].(string)
+	t.Cleanup(func() { httpDelete(t, coreAPIURL+"/database-users/"+userID) })
+	waitForStatus(t, coreAPIURL+"/database-users/"+userID, "active", provisionTimeout)
+	return userID
+}
+
+// createTestDaemon creates a daemon on a webroot and registers cleanup.
+// Returns the daemon ID and parsed response body.
+func createTestDaemon(t *testing.T, webrootID string, body map[string]interface{}) (string, map[string]interface{}) {
+	t.Helper()
+	resp, respBody := httpPost(t, fmt.Sprintf("%s/webroots/%s/daemons", coreAPIURL, webrootID), body)
+	require.Equal(t, 202, resp.StatusCode, "create daemon: %s", respBody)
+	daemon := parseJSON(t, respBody)
+	daemonID := daemon["id"].(string)
+	t.Cleanup(func() { httpDelete(t, coreAPIURL+"/daemons/"+daemonID) })
+	return daemonID, daemon
+}
+
+// findFixtureTarball locates the Laravel Reverb fixture tarball.
+// Skips the test if the tarball is not found.
+func findFixtureTarball(t *testing.T) string {
+	t.Helper()
+	path := "../../.build/laravel-reverb.tar.gz"
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		t.Skip("Laravel fixture tarball not found — run 'just build-laravel-fixture' first")
+	}
+	return path
+}
+
+// scpFile copies a local file to a remote VM via scp.
+func scpFile(t *testing.T, ip, localPath, remotePath string) {
+	t.Helper()
+	keyPath := os.Getenv("SSH_KEY_PATH")
+	if keyPath == "" {
+		keyPath = os.ExpandEnv("${HOME}/.ssh/id_rsa")
+	}
+	args := []string{
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "UserKnownHostsFile=/dev/null",
+		"-o", "ConnectTimeout=10",
+		"-i", keyPath,
+		localPath,
+		"ubuntu@" + ip + ":" + remotePath,
+	}
+	out, err := exec.Command("scp", args...).CombinedOutput()
+	if err != nil {
+		t.Fatalf("scp to %s:%s: %v\n%s", ip, remotePath, err, string(out))
+	}
+}
+
+// uploadFixture copies and extracts the Laravel fixture tarball to the webroot directory.
+func uploadFixture(t *testing.T, nodeIP, webrootPath, tarballPath, tenantName string) {
+	t.Helper()
+	// Copy tarball to /tmp on the node.
+	scpFile(t, nodeIP, tarballPath, "/tmp/laravel-reverb.tar.gz")
+	// Extract into the webroot directory.
+	sshExec(t, nodeIP, fmt.Sprintf(
+		"sudo tar -xzf /tmp/laravel-reverb.tar.gz -C %s && sudo chown -R %s:%s %s && sudo chmod -R 775 %s/storage %s/bootstrap/cache",
+		webrootPath, tenantName, tenantName, webrootPath,
+		webrootPath, webrootPath,
+	))
+	sshExec(t, nodeIP, "rm -f /tmp/laravel-reverb.tar.gz")
+}
+
+// generateLaravelEnv writes a .env file to the webroot directory on the node.
+func generateLaravelEnv(t *testing.T, nodeIP, webrootPath, tenantName string, envVars map[string]string) {
+	t.Helper()
+	var lines []string
+	// Sort keys for deterministic output.
+	keys := make([]string, 0, len(envVars))
+	for k := range envVars {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		lines = append(lines, fmt.Sprintf("%s=%s", k, envVars[k]))
+	}
+	content := strings.Join(lines, "\n") + "\n"
+
+	// Write via ssh, escaping the content.
+	sshExec(t, nodeIP, fmt.Sprintf(
+		"cat <<'ENVEOF' | sudo tee %s/.env > /dev/null\n%sENVEOF",
+		webrootPath, content,
+	))
+	sshExec(t, nodeIP, fmt.Sprintf("sudo chown %s:%s %s/.env", tenantName, tenantName, webrootPath))
+}

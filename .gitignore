@@ -47,3 +47,4 @@ packer/output/
 # Test/build artifacts
 coverage.out
 *.prof
+.build/

@@ -18,6 +18,11 @@ mkdir -p /var/www/storage /etc/ssl/hosting /etc/ceph /etc/ssh/sshd_config.d
 # SSH hardening config.
 cp /tmp/00-hosting-base.conf /etc/ssh/sshd_config.d/00-hosting-base.conf
 
+# Install Composer globally.
+php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php');"
+php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
+rm /tmp/composer-setup.php
+
 # Enable supervisord for php-worker runtime.
 systemctl enable supervisor
 

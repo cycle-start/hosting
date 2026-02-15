@@ -334,3 +334,26 @@ vm-prometheus:
 # Bootstrap Vector on all running VMs (Phase A — no Packer rebuild needed)
 vm-bootstrap-vector:
     bash scripts/bootstrap-vector.sh
+
+# --- Test Fixtures ---
+
+# Build the Laravel Reverb E2E test fixture (requires Docker)
+build-laravel-fixture:
+    #!/usr/bin/env bash
+    set -e
+    if [ -f .build/laravel-reverb.tar.gz ]; then
+      echo "Fixture already exists at .build/laravel-reverb.tar.gz — delete to rebuild"
+      exit 0
+    fi
+    mkdir -p .build/laravel-reverb
+    echo "Creating Laravel project..."
+    docker run --rm -v "$(pwd)/.build/laravel-reverb:/app" composer:2 \
+      create-project laravel/laravel . --prefer-dist --no-interaction
+    echo "Installing Laravel Reverb..."
+    docker run --rm -v "$(pwd)/.build/laravel-reverb:/app" composer:2 \
+      require laravel/reverb --no-interaction
+    echo "Applying overlay files..."
+    cp -r tests/e2e/fixtures/laravel-reverb/overlay/* .build/laravel-reverb/
+    echo "Creating tarball..."
+    tar -czf .build/laravel-reverb.tar.gz -C .build/laravel-reverb .
+    echo "Done: .build/laravel-reverb.tar.gz"
