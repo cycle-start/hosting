@@ -22,6 +22,7 @@ data:
 
     server:
       http_listen_port: 3101
+      grpc_listen_port: 9096
 
     common:
       path_prefix: /loki-tenant

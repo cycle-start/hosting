@@ -194,7 +194,11 @@ vm-deploy:
     kubectl --context hosting create configmap grafana-dashboards \
       --from-file=api-overview.json=docker/grafana/provisioning/dashboards/api-overview.json \
       --from-file=infrastructure.json=docker/grafana/provisioning/dashboards/infrastructure.json \
-      --from-file=log-explorer.json=docker/grafana/provisioning/dashboards/log-explorer.json
+      --from-file=log-explorer.json=docker/grafana/provisioning/dashboards/log-explorer.json \
+      --from-file=tenant.json=docker/grafana/provisioning/dashboards/tenant.json \
+      --from-file=workflow.json=docker/grafana/provisioning/dashboards/workflow.json \
+      --from-file=database.json=docker/grafana/provisioning/dashboards/database.json \
+      --from-file=dns.json=docker/grafana/provisioning/dashboards/dns.json
     # Install/upgrade Helm chart
     helm --kube-context hosting upgrade --install hosting \
       deploy/helm/hosting -f deploy/helm/hosting/values-dev.yaml
