@@ -124,6 +124,7 @@ func (s *Server) setupRoutes() {
 		backup := handler.NewBackup(s.services.Backup, s.services.Webroot, s.services.Database, s.services.Tenant)
 		search := handler.NewSearch(s.services.Search)
 		apiKey := handler.NewAPIKey(s.services.APIKey)
+		internalNode := handler.NewInternalNode(s.services.DesiredState, s.services.NodeHealth)
 
 		// Platform-admin-only endpoints (require brands: ["*"])
 		r.Group(func(r chi.Router) {
@@ -249,6 +250,19 @@ func (s *Server) setupRoutes() {
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequireScope("nodes", "delete"))
 				r.Delete("/nodes/{id}", node.Delete)
+			})
+
+			// Internal API (node-agent reconciliation)
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("nodes", "read"))
+				r.Get("/internal/v1/nodes/{nodeID}/desired-state", internalNode.GetDesiredState)
+				r.Get("/internal/v1/nodes/{nodeID}/health", internalNode.GetHealth)
+				r.Get("/internal/v1/nodes/{nodeID}/drift-events", internalNode.ListDriftEvents)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequireScope("nodes", "write"))
+				r.Post("/internal/v1/nodes/{nodeID}/health", internalNode.ReportHealth)
+				r.Post("/internal/v1/nodes/{nodeID}/drift-events", internalNode.ReportDriftEvents)
 			})
 		})
 

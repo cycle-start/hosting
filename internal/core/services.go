@@ -34,6 +34,8 @@ type Services struct {
 	APIKey           *APIKeyService
 	OIDC             *OIDCService
 	Search           *SearchService
+	DesiredState     *DesiredStateService
+	NodeHealth       *NodeHealthService
 }
 
 func NewServices(db DB, tc temporalclient.Client, oidcIssuerURL string) *Services {
@@ -67,5 +69,7 @@ func NewServices(db DB, tc temporalclient.Client, oidcIssuerURL string) *Service
 		APIKey:           NewAPIKeyService(db),
 		OIDC:             NewOIDCService(db, oidcIssuerURL),
 		Search:           NewSearchService(db),
+		DesiredState:     NewDesiredStateService(db),
+		NodeHealth:       NewNodeHealthService(db),
 	}
 }

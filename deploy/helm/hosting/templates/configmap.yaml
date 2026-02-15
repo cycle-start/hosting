@@ -17,3 +17,9 @@ data:
   CLUSTER_ID: {{ .Values.config.clusterId | quote }}
   LOKI_URL: {{ .Values.config.lokiUrl | quote }}
   TENANT_LOKI_URL: {{ .Values.config.tenantLokiUrl | quote }}
+  RECONCILE_ENABLED: {{ .Values.reconcile.enabled | quote }}
+  RECONCILE_INTERVAL: {{ .Values.reconcile.interval | quote }}
+  RECONCILE_STARTUP_TIMEOUT: {{ .Values.reconcile.startupTimeout | quote }}
+  RECONCILE_MAX_FIXES: {{ .Values.reconcile.maxFixes | toString | quote }}
+  RECONCILE_CIRCUIT_THRESHOLD: {{ .Values.reconcile.circuitThreshold | toString | quote }}
+  HEALTH_REPORT_INTERVAL: {{ .Values.healthReportInterval | quote }}

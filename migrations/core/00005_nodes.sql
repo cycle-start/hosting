@@ -8,6 +8,7 @@ CREATE TABLE nodes (
     roles       TEXT[] NOT NULL DEFAULT '{}',
     grpc_address TEXT NOT NULL DEFAULT '',
     status      TEXT NOT NULL DEFAULT 'active',
+    last_health_at TIMESTAMPTZ,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );

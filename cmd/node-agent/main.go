@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -103,6 +104,44 @@ func main() {
 				logger.Error().Err(err).Msg("metrics server failed")
 			}
 		}()
+	}
+
+	// Start reconciliation and health reporting (if core-api URL is configured).
+	if cfg.CoreAPIURL != "" && cfg.ReconcileEnabled {
+		apiClient := agent.NewAPIClient(cfg.CoreAPIURL, cfg.CoreAPIToken, logger)
+
+		reconciler := agent.NewReconciler(
+			logger, cfg.NodeID, cfg.NodeRole,
+			apiClient, srv,
+			cfg.ReconcileInterval,
+			cfg.ReconcileMaxFixes, cfg.ReconcileCircuitThreshold,
+		)
+
+		healthReporter := agent.NewHealthReporter(
+			logger, cfg.NodeID, cfg.NodeRole,
+			apiClient, srv,
+			cfg.HealthReportInterval,
+		)
+
+		// Startup reconciliation (blocking, with timeout).
+		startupCtx, startupCancel := context.WithTimeout(context.Background(), cfg.ReconcileStartupTimeout)
+		if err := reconciler.FullReconcile(startupCtx); err != nil {
+			logger.Error().Err(err).Msg("startup reconciliation failed, proceeding anyway")
+		}
+		startupCancel()
+
+		// Start background loops.
+		reconcileCtx, reconcileCancel := context.WithCancel(context.Background())
+		defer reconcileCancel()
+		go reconciler.RunLoop(reconcileCtx)
+		go healthReporter.RunLoop(reconcileCtx)
+
+		logger.Info().
+			Dur("reconcile_interval", cfg.ReconcileInterval).
+			Dur("health_interval", cfg.HealthReportInterval).
+			Msg("reconciliation and health reporting started")
+	} else {
+		logger.Info().Msg("reconciliation disabled (CORE_API_URL not set or RECONCILE_ENABLED=false)")
 	}
 
 	logger.Info().

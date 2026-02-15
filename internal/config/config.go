@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -46,6 +47,16 @@ type Config struct {
 
 	LokiURL       string // LOKI_URL — Loki query endpoint for platform logs (default: http://127.0.0.1:3100)
 	TenantLokiURL string // TENANT_LOKI_URL — Loki query endpoint for tenant logs (default: http://127.0.0.1:3101)
+
+	// Reconciliation (node-agent)
+	CoreAPIURL                string        // CORE_API_URL — base URL of core-api for reconciliation
+	CoreAPIToken              string        // CORE_API_TOKEN — bearer token for internal API auth
+	ReconcileEnabled          bool          // RECONCILE_ENABLED — enable/disable reconciliation (default true)
+	ReconcileInterval         time.Duration // RECONCILE_INTERVAL — interval between cycles (default 60s)
+	ReconcileStartupTimeout   time.Duration // RECONCILE_STARTUP_TIMEOUT — max wait at startup (default 5m)
+	HealthReportInterval      time.Duration // HEALTH_REPORT_INTERVAL — interval between health reports (default 30s)
+	ReconcileMaxFixes         int           // RECONCILE_MAX_FIXES — max auto-fixes per cycle (default 50)
+	ReconcileCircuitThreshold int           // RECONCILE_CIRCUIT_THRESHOLD — drift count for circuit breaker (default 100)
 }
 
 func Load() (*Config, error) {
@@ -78,6 +89,15 @@ func Load() (*Config, error) {
 
 		LokiURL:       getEnv("LOKI_URL", "http://127.0.0.1:3100"),
 		TenantLokiURL: getEnv("TENANT_LOKI_URL", "http://127.0.0.1:3101"),
+
+		CoreAPIURL:                getEnv("CORE_API_URL", ""),
+		CoreAPIToken:              getEnv("CORE_API_TOKEN", ""),
+		ReconcileEnabled:          getEnvBool("RECONCILE_ENABLED", true),
+		ReconcileInterval:         getEnvDuration("RECONCILE_INTERVAL", 60*time.Second),
+		ReconcileStartupTimeout:   getEnvDuration("RECONCILE_STARTUP_TIMEOUT", 5*time.Minute),
+		HealthReportInterval:      getEnvDuration("HEALTH_REPORT_INTERVAL", 30*time.Second),
+		ReconcileMaxFixes:         getEnvInt("RECONCILE_MAX_FIXES", 50),
+		ReconcileCircuitThreshold: getEnvInt("RECONCILE_CIRCUIT_THRESHOLD", 100),
 	}
 
 	return cfg, nil
@@ -140,6 +160,24 @@ func getEnvInt(key string, fallback int) int {
 	if v := os.Getenv(key); v != "" {
 		if i, err := strconv.Atoi(v); err == nil {
 			return i
+		}
+	}
+	return fallback
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	if v := os.Getenv(key); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
+		}
+	}
+	return fallback
+}
+
+func getEnvDuration(key string, fallback time.Duration) time.Duration {
+	if v := os.Getenv(key); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			return d
 		}
 	}
 	return fallback
