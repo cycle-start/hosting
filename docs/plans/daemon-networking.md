@@ -236,7 +236,9 @@ Recommend **Option A** for simplicity — ULAs are link-local to the cluster net
 - Added `tenant0` dummy interface to cloud-init for web nodes (systemd-networkd)
 - `TenantULAManager` in node-agent: manages ULA addrs on `tenant0` + nftables binding restrictions
 - `ConfigureTenantAddresses` / `RemoveTenantAddresses` activities wired into convergence, create, and delete workflows
-- nftables `ip6 tenant_binding` table with `allowed` set: `(addr, uid)` pairs, root exempt
+- nftables `ip6 tenant_binding` table with `allowed` set: `(addr, uid)` pairs, system users (UID < 1000) exempt
+- Cross-node ULA routing via transit addresses (`fd00:{hash}:0::{index}/64`) on primary interface
+- `ConfigureULARoutes` activity sets up routes during convergence so nginx can proxy to daemons on other nodes
 
 ### Phase 4: Single-Node Daemon Assignment ✅
 - Added `node_id` to daemon migration and model

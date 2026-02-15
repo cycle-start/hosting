@@ -220,8 +220,9 @@ func (m *DatabaseManager) CreateUser(ctx context.Context, dbName, username, pass
 		m.logger.Warn().Err(err).Str("username", username).Msg("drop existing user failed, continuing")
 	}
 
-	// Create the user.
-	createSQL := fmt.Sprintf("CREATE USER '%s'@'%%' IDENTIFIED BY '%s'", username, escapedPassword)
+	// Create the user with mysql_native_password for broad client compatibility
+	// (caching_sha2_password requires SSL for first remote connection).
+	createSQL := fmt.Sprintf("CREATE USER '%s'@'%%' IDENTIFIED WITH mysql_native_password BY '%s'", username, escapedPassword)
 	if err := m.execMySQL(ctx, createSQL); err != nil {
 		return err
 	}

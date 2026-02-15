@@ -42,7 +42,7 @@ func (m *TenantManager) WebStorageDir() string {
 //
 //	/var/www/storage/{tenant}/           root:root 0755 (ChrootDirectory)
 //	├── home/                            tenant:tenant 0700
-//	├── webroots/                        tenant:tenant 0750
+//	├── webroots/                        tenant:tenant 0751
 //	└── tmp/                             tenant:tenant 1777
 //
 // Local log directory:
@@ -93,7 +93,7 @@ func (m *TenantManager) Create(ctx context.Context, info *TenantInfo) error {
 	homeDir := filepath.Join(chrootDir, "home")
 	dirs := map[string]os.FileMode{
 		homeDir:                              0700,
-		filepath.Join(chrootDir, "webroots"): 0750,
+		filepath.Join(chrootDir, "webroots"): 0751,
 		filepath.Join(chrootDir, "tmp"):      os.ModeSticky | 0777,
 	}
 

@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 
 class TestBroadcastJob implements ShouldQueue
 {
@@ -19,10 +20,11 @@ class TestBroadcastJob implements ShouldQueue
 
     public function handle(): void
     {
-        // Write marker to file so the check-result endpoint can verify.
-        file_put_contents(
-            storage_path('app/test-broadcast-marker.txt'),
-            $this->marker,
+        // Write marker to database so the check-result endpoint can verify
+        // from any node (filesystem isn't shared in dev without CephFS).
+        DB::table('test_results')->updateOrInsert(
+            ['key' => 'marker'],
+            ['value' => $this->marker, 'updated_at' => now()],
         );
 
         // Broadcast the event via Reverb.

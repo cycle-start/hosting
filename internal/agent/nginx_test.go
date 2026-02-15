@@ -19,6 +19,7 @@ func newTestNginxManager(t *testing.T) *NginxManager {
 	tmpDir := t.TempDir()
 	cfg := Config{
 		NginxConfigDir: tmpDir,
+		NginxLogDir:    filepath.Join(tmpDir, "log"),
 		CertDir:        filepath.Join(tmpDir, "certs"),
 	}
 	return NewNginxManager(zerolog.Nop(), cfg)
@@ -579,7 +580,7 @@ func TestWriteConfig(t *testing.T) {
 
 func TestWriteConfig_CreatesDirectory(t *testing.T) {
 	tmpDir := t.TempDir()
-	cfg := Config{NginxConfigDir: tmpDir}
+	cfg := Config{NginxConfigDir: tmpDir, NginxLogDir: filepath.Join(tmpDir, "log")}
 	mgr := NewNginxManager(zerolog.Nop(), cfg)
 
 	err := mgr.WriteConfig("tenant1", "mysite", "config-data")

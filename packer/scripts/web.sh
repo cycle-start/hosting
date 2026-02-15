@@ -4,10 +4,15 @@ set -ex
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
+apt-get install -y software-properties-common
+add-apt-repository -y ppa:ondrej/php
+apt-get update
 apt-get install -y \
   nginx \
   php8.3-fpm php8.3-cli php8.3-mysql php8.3-curl \
   php8.3-mbstring php8.3-xml php8.3-zip \
+  php8.5-fpm php8.5-cli php8.5-mysql php8.5-curl \
+  php8.5-mbstring php8.5-xml php8.5-zip \
   supervisor \
   ceph-common \
   openssh-server

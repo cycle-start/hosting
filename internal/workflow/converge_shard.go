@@ -273,6 +273,32 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		}
 	}
 
+	// Configure cross-node ULA routes on each node so nginx can proxy to daemons
+	// running on other nodes in the shard.
+	for _, node := range nodes {
+		if node.ShardIndex == nil {
+			continue
+		}
+		var otherIndices []int
+		for _, other := range nodes {
+			if other.ID != node.ID && other.ShardIndex != nil {
+				otherIndices = append(otherIndices, *other.ShardIndex)
+			}
+		}
+		if len(otherIndices) > 0 {
+			nodeCtx := nodeActivityCtx(ctx, node.ID)
+			err = workflow.ExecuteActivity(nodeCtx, "ConfigureULARoutes",
+				activity.ConfigureULARoutesParams{
+					ClusterID:        clusterID,
+					ThisNodeIndex:    *node.ShardIndex,
+					OtherNodeIndices: otherIndices,
+				}).Get(ctx, nil)
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("configure ULA routes on %s: %v", node.ID, err))
+			}
+		}
+	}
+
 	// Fetch daemons per webroot for nginx proxy locations during convergence.
 	webrootDaemons := make(map[string][]model.Daemon) // keyed by webroot ID
 	for _, entry := range webrootEntries {

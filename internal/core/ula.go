@@ -6,13 +6,18 @@ import (
 	"strings"
 )
 
+// ComputeClusterHash computes the 16-bit cluster hash used in ULA addressing.
+func ComputeClusterHash(clusterID string) uint32 {
+	h := fnv.New32a()
+	h.Write([]byte(clusterID))
+	return h.Sum32() % 0xFFFF
+}
+
 // ComputeTenantULA computes the per-tenant per-node ULA IPv6 address.
 // Format: fd00:{cluster_hash}:{node_shard_index}::{tenant_uid_hex}
 // The cluster hash is the FNV-32a hash of the cluster ID modulo 0xFFFF.
 func ComputeTenantULA(clusterID string, nodeShardIndex int, tenantUID int) string {
-	h := fnv.New32a()
-	h.Write([]byte(clusterID))
-	clusterHash := h.Sum32() % 0xFFFF
+	clusterHash := ComputeClusterHash(clusterID)
 	return fmt.Sprintf("fd00:%x:%x::%x", clusterHash, nodeShardIndex, tenantUID)
 }
 

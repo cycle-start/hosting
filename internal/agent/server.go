@@ -10,6 +10,7 @@ import (
 type Config struct {
 	MySQLDSN        string
 	NginxConfigDir  string
+	NginxLogDir     string
 	WebStorageDir   string
 	CertDir         string
 	ValkeyConfigDir string

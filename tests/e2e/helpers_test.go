@@ -30,7 +30,7 @@ var coreAPIURL = "https://api.hosting.test/api/v1"
 
 // webTrafficURL is the base URL for testing web traffic through HAProxy.
 // Override with WEB_TRAFFIC_URL env var.
-var webTrafficURL = "https://10.10.10.2"
+var webTrafficURL = "https://10.10.10.70"
 
 // tlsTransport skips certificate verification for self-signed dev certs.
 var tlsTransport = &http.Transport{
@@ -118,7 +118,11 @@ func findNodeIPsByRole(t *testing.T, clusterID, role string) []string {
 	}
 
 	nodes := parsePaginatedItems(t, body)
-	var ips []string
+	type nodeEntry struct {
+		ip         string
+		shardIndex int
+	}
+	var entries []nodeEntry
 	for _, n := range nodes {
 		if sid, _ := n["shard_id"].(string); sid == shardID {
 			if ip, ok := n["ip_address"].(string); ok && ip != "" {
@@ -126,9 +130,23 @@ func findNodeIPsByRole(t *testing.T, clusterID, role string) []string {
 				if idx := strings.Index(ip, "/"); idx != -1 {
 					ip = ip[:idx]
 				}
-				ips = append(ips, ip)
+				si := 0
+				if v, ok := n["shard_index"].(float64); ok {
+					si = int(v)
+				}
+				entries = append(entries, nodeEntry{ip: ip, shardIndex: si})
 			}
 		}
+	}
+
+	// Sort by shard_index so the primary (index 1) is first.
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].shardIndex < entries[j].shardIndex
+	})
+
+	var ips []string
+	for _, e := range entries {
+		ips = append(ips, e.ip)
 	}
 
 	if len(ips) == 0 {
@@ -409,16 +427,19 @@ func findShardByRole(t *testing.T, clusterID, role string) map[string]interface{
 func findOrCreateBrand(t *testing.T) string {
 	t.Helper()
 
-	// Check if brand already exists.
-	resp, body := httpGet(t, coreAPIURL+"/brands/e2e-brand")
+	// Check if brand already exists by listing brands and matching by name.
+	resp, body := httpGet(t, coreAPIURL+"/brands")
 	if resp.StatusCode == 200 {
-		brand := parseJSON(t, body)
-		return brand["id"].(string)
+		brands := parsePaginatedItems(t, body)
+		for _, b := range brands {
+			if name, _ := b["name"].(string); name == "E2E Test Brand" {
+				return b["id"].(string)
+			}
+		}
 	}
 
 	// Create brand.
 	resp, body = httpPost(t, coreAPIURL+"/brands", map[string]interface{}{
-		"id":               "e2e-brand",
 		"name":             "E2E Test Brand",
 		"base_hostname":    "e2e.hosting.test",
 		"primary_ns":       "ns1.e2e.hosting.test",
@@ -563,7 +584,7 @@ func createTestZone(t *testing.T, tenantID, regionID, name string) string {
 }
 
 // createTestDatabase creates a database and waits for it to become active.
-func createTestDatabase(t *testing.T, tenantID, shardID, name string) string {
+func createTestDatabase(t *testing.T, tenantID, shardID, name string) (string, string) {
 	t.Helper()
 	resp, body := httpPost(t, fmt.Sprintf("%s/tenants/%s/databases", coreAPIURL, tenantID), map[string]interface{}{
 		"name":     name,
@@ -572,9 +593,10 @@ func createTestDatabase(t *testing.T, tenantID, shardID, name string) string {
 	require.Equal(t, 202, resp.StatusCode, "create database: %s", body)
 	db := parseJSON(t, body)
 	dbID := db["id"].(string)
+	dbName := db["name"].(string)
 	t.Cleanup(func() { httpDelete(t, coreAPIURL+"/databases/"+dbID) })
 	waitForStatus(t, coreAPIURL+"/databases/"+dbID, "active", provisionTimeout)
-	return dbID
+	return dbID, dbName
 }
 
 // createTestValkeyInstance creates a Valkey instance and waits for it to become active.

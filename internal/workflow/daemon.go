@@ -463,10 +463,12 @@ func regenerateWebrootNginxOnNodes(ctx workflow.Context, webroot model.Webroot, 
 		clusterID = nodes[0].ClusterID
 	}
 
-	// Build daemon proxy info for active daemons with proxy_path.
+	// Build daemon proxy info for active/provisioning daemons with proxy_path.
+	// Include provisioning daemons because this function is called during CreateDaemonWorkflow
+	// before the daemon's status is set to active.
 	var daemonProxies []activity.DaemonProxyInfo
 	for _, d := range daemons {
-		if d.Status == model.StatusActive && d.ProxyPath != nil && d.ProxyPort != nil {
+		if (d.Status == model.StatusActive || d.Status == model.StatusProvisioning) && d.ProxyPath != nil && d.ProxyPort != nil {
 			targetIP := "127.0.0.1"
 			if d.NodeID != nil {
 				if idx, ok := nodeShardIndex[*d.NodeID]; ok {

@@ -14,7 +14,5 @@ CREATE TABLE nodes (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX idx_nodes_shard_index ON nodes(shard_id, shard_index) WHERE shard_id IS NOT NULL AND shard_index IS NOT NULL;
-
 -- +goose Down
 DROP TABLE nodes;

@@ -129,15 +129,21 @@ var nginxTmpl = template.Must(template.New("nginx").Parse(nginxServerBlockTempla
 type NginxManager struct {
 	logger    zerolog.Logger
 	configDir string
+	logDir    string
 	certDir   string
 	shardName string
 }
 
 // NewNginxManager creates a new NginxManager.
 func NewNginxManager(logger zerolog.Logger, cfg Config) *NginxManager {
+	logDir := cfg.NginxLogDir
+	if logDir == "" {
+		logDir = "/var/log/hosting"
+	}
 	return &NginxManager{
 		logger:    logger.With().Str("component", "nginx-manager").Logger(),
 		configDir: cfg.NginxConfigDir,
+		logDir:    logDir,
 		certDir:   cfg.CertDir,
 	}
 }
@@ -188,11 +194,13 @@ func (m *NginxManager) GenerateConfig(webroot *runtime.WebrootInfo, fqdns []*FQD
 	var sslFQDN string
 
 	for _, f := range fqdns {
-		serverNames = append(serverNames, f.FQDN)
+		// Strip DNS trailing dot — nginx server_name matches against the Host header
+		// which never includes the trailing dot.
+		serverNames = append(serverNames, strings.TrimSuffix(f.FQDN, "."))
 		if f.SSLEnabled {
 			hasSSL = true
 			if sslFQDN == "" {
-				sslFQDN = f.FQDN
+				sslFQDN = strings.TrimSuffix(f.FQDN, ".")
 			}
 		}
 	}
@@ -274,6 +282,13 @@ func (m *NginxManager) WriteConfig(tenantName, webrootName, config string) error
 	sitesDir := filepath.Join(m.configDir, "sites-enabled")
 	if err := os.MkdirAll(sitesDir, 0755); err != nil {
 		return status.Errorf(codes.Internal, "mkdir sites-enabled: %v", err)
+	}
+
+	// Ensure the log directory exists — nginx refuses to load a server block
+	// if the access_log or error_log directory is missing.
+	logDir := filepath.Join(m.logDir, tenantName)
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return status.Errorf(codes.Internal, "mkdir log dir %s: %v", logDir, err)
 	}
 
 	confPath := filepath.Join(sitesDir, fmt.Sprintf("%s_%s.conf", tenantName, webrootName))

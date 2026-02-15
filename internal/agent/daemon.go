@@ -58,6 +58,7 @@ func (m *DaemonManager) Configure(ctx context.Context, info *DaemonInfo) error {
 		Str("daemon", info.ID).
 		Str("tenant", info.TenantName).
 		Str("name", info.Name).
+		Str("webStorageDir", m.webStorageDir).
 		Msg("configuring daemon")
 
 	workDir := filepath.Join(m.webStorageDir, info.TenantName, "webroots", info.WebrootName)
@@ -91,6 +92,18 @@ func (m *DaemonManager) Configure(ctx context.Context, info *DaemonInfo) error {
 	if err := daemonConfigTmpl.Execute(&buf, data); err != nil {
 		return fmt.Errorf("render daemon config template: %w", err)
 	}
+
+	// Ensure the tenant logs directory exists for supervisor log files.
+	logDir := filepath.Join(m.webStorageDir, info.TenantName, "logs")
+	m.logger.Info().Str("logDir", logDir).Str("webStorageDir", m.webStorageDir).Msg("creating tenant log dir")
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return fmt.Errorf("create tenant log dir %s: %w", logDir, err)
+	}
+	// Verify the directory actually exists after creation.
+	if _, err := os.Stat(logDir); err != nil {
+		return fmt.Errorf("log dir %s not found after MkdirAll: %w", logDir, err)
+	}
+	m.logger.Info().Str("logDir", logDir).Msg("tenant log dir verified")
 
 	configPath := m.configPath(info)
 

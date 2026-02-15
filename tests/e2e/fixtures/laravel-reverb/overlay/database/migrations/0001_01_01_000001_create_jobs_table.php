@@ -40,6 +40,12 @@ return new class extends Migration
             $table->longText('exception');
             $table->timestamp('failed_at')->useCurrent();
         });
+
+        Schema::create('test_results', function (Blueprint $table) {
+            $table->string('key')->primary();
+            $table->text('value');
+            $table->timestamp('updated_at')->nullable();
+        });
     }
 
     public function down(): void
@@ -47,5 +53,6 @@ return new class extends Migration
         Schema::dropIfExists('jobs');
         Schema::dropIfExists('job_batches');
         Schema::dropIfExists('failed_jobs');
+        Schema::dropIfExists('test_results');
     }
 };

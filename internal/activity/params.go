@@ -332,6 +332,13 @@ type ConfigureTenantAddressesParams struct {
 	NodeShardIdx int
 }
 
+// ConfigureULARoutesParams holds parameters for setting up cross-node ULA routes.
+type ConfigureULARoutesParams struct {
+	ClusterID        string
+	ThisNodeIndex    int
+	OtherNodeIndices []int
+}
+
 // UpdateShardConfigParams holds parameters for updating a shard's config JSON.
 type UpdateShardConfigParams struct {
 	ShardID string

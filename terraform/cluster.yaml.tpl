@@ -23,6 +23,7 @@ cluster:
 %{ if node.role == "web" && endswith(node.name, "node-0") ~}
       - name: ${node.shard_name}
         role: web
+        lb_backend: shard-${node.shard_name}
         node_count: ${length([for n in nodes : n if n.shard_name == node.shard_name])}
 %{ endif ~}
 %{ if node.role == "database" && endswith(node.name, "node-0") ~}

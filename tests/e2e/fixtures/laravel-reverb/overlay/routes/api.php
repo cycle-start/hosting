@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use App\Jobs\TestBroadcastJob;
 
@@ -8,7 +9,14 @@ Route::get('/health', function () {
 });
 
 Route::post('/setup', function () {
-    Artisan::call('migrate', ['--force' => true]);
+    try {
+        Artisan::call('migrate', ['--force' => true]);
+    } catch (\Throwable $e) {
+        // If tables already exist from a partial previous run, that's OK.
+        if (!str_contains($e->getMessage(), 'already exists')) {
+            throw $e;
+        }
+    }
     return response()->json(['status' => 'migrated']);
 });
 
@@ -19,12 +27,12 @@ Route::post('/dispatch-test', function () {
 });
 
 Route::get('/check-result', function () {
-    $path = storage_path('app/test-broadcast-marker.txt');
-    if (!file_exists($path)) {
+    $result = DB::table('test_results')->where('key', 'marker')->first();
+    if (!$result) {
         return response()->json(['status' => 'pending'], 202);
     }
     return response()->json([
         'status' => 'completed',
-        'marker' => trim(file_get_contents($path)),
+        'marker' => $result->value,
     ]);
 });

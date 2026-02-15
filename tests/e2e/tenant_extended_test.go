@@ -14,7 +14,7 @@ func TestTenantResourceSummary(t *testing.T) {
 	createTestWebroot(t, tenantID, "summary-site", "php", "8.5")
 
 	if dbShardID != "" {
-		createTestDatabase(t, tenantID, dbShardID, "e2e_summarydb")
+		_, _ = createTestDatabase(t, tenantID, dbShardID, "e2e_summarydb")
 	}
 
 	createTestZone(t, tenantID, regionID, "e2e-summary.example.com.")

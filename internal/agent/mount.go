@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"os"
 	"syscall"
 
 	"google.golang.org/grpc/codes"
@@ -14,7 +15,11 @@ const cephFSMagic = 0x00C36400
 // Returns nil if the path is a valid CephFS mount, or a gRPC Unavailable error otherwise.
 // This is called before any mutating webroot/tenant operation to guard against
 // operating on an unmounted or wrong filesystem.
+// Set SKIP_CEPHFS_CHECK=1 to bypass (for development without CephFS).
 func checkMount(path string) error {
+	if os.Getenv("SKIP_CEPHFS_CHECK") == "1" {
+		return nil
+	}
 	var stat syscall.Statfs_t
 	if err := syscall.Statfs(path, &stat); err != nil {
 		return status.Errorf(codes.Unavailable,

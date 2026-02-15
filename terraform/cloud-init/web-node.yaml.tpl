@@ -88,6 +88,24 @@ write_files:
       [Network]
       Description=Tenant ULA addresses
 
+  - path: /etc/nginx/conf.d/hosting-log-format.conf
+    content: |
+      log_format hosting_json escape=json
+        '{'
+          '"time":"$time_iso8601",'
+          '"remote_addr":"$remote_addr",'
+          '"method":"$request_method",'
+          '"uri":"$request_uri",'
+          '"status":$status,'
+          '"bytes_sent":$bytes_sent,'
+          '"request_time":$request_time,'
+          '"upstream_time":"$upstream_response_time",'
+          '"http_referer":"$http_referer",'
+          '"http_user_agent":"$http_user_agent",'
+          '"host":"$host",'
+          '"server_name":"$server_name"'
+        '}';
+
   - path: /etc/logrotate.d/hosting-tenant-logs
     content: |
       /var/log/hosting/*/*.log {

@@ -38,6 +38,7 @@ type ClusterSpecDef struct {
 type ShardSpecDef struct {
 	Name      string `yaml:"name"`
 	Role      string `yaml:"role"`
+	LBBackend string `yaml:"lb_backend"`
 	NodeCount int    `yaml:"node_count"`
 }
 

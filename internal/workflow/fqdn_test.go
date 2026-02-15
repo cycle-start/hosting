@@ -81,7 +81,8 @@ func (s *BindFQDNWorkflowTestSuite) TestSuccess_NoSSL() {
 		LBAddresses:  lbAddresses,
 		SourceFQDNID: fqdnID,
 	}).Return(nil)
-	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
+	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return([]model.FQDN{fqdn}, nil)
+	s.env.OnActivity("UpdateWebroot", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("SetLBMapEntry", mock.Anything, activity.SetLBMapEntryParams{
 		FQDN:      "example.com",
 		LBBackend: "backend-1.example.com",
@@ -146,7 +147,8 @@ func (s *BindFQDNWorkflowTestSuite) TestSuccess_WithSSL() {
 		LBAddresses:  lbAddresses,
 		SourceFQDNID: fqdnID,
 	}).Return(nil)
-	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
+	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return([]model.FQDN{fqdn}, nil)
+	s.env.OnActivity("UpdateWebroot", mock.Anything, mock.Anything).Return(nil)
 	// The child workflow for LE cert provisioning will be registered separately.
 	// Mock the child workflow to succeed.
 	s.env.OnWorkflow(ProvisionLECertWorkflow, mock.Anything, fqdnID).Return(nil)
@@ -210,7 +212,8 @@ func (s *BindFQDNWorkflowTestSuite) TestSuccess_SSLChildWorkflowFails_StillSucce
 		LBNodes:     lbNodes,
 	}, nil)
 	s.env.OnActivity("AutoCreateDNSRecords", mock.Anything, mock.Anything).Return(nil)
-	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
+	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return([]model.FQDN{fqdn}, nil)
+	s.env.OnActivity("UpdateWebroot", mock.Anything, mock.Anything).Return(nil)
 	// Child LE workflow fails -- but FQDN binding should still succeed.
 	s.env.OnWorkflow(ProvisionLECertWorkflow, mock.Anything, fqdnID).Return(fmt.Errorf("ACME failed"))
 	s.env.OnActivity("SetLBMapEntry", mock.Anything, activity.SetLBMapEntryParams{
@@ -340,7 +343,8 @@ func (s *BindFQDNWorkflowTestSuite) TestSetLBMapEntryFails_SetsStatusFailed() {
 		LBNodes:     lbNodes,
 	}, nil)
 	s.env.OnActivity("AutoCreateDNSRecords", mock.Anything, mock.Anything).Return(nil)
-	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
+	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return([]model.FQDN{fqdn}, nil)
+	s.env.OnActivity("UpdateWebroot", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("SetLBMapEntry", mock.Anything, activity.SetLBMapEntryParams{
 		FQDN:      "example.com",
 		LBBackend: "backend-1.example.com",
@@ -351,7 +355,7 @@ func (s *BindFQDNWorkflowTestSuite) TestSetLBMapEntryFails_SetsStatusFailed() {
 	s.Error(s.env.GetWorkflowError())
 }
 
-func (s *BindFQDNWorkflowTestSuite) TestReloadNginxFails_SetsStatusFailed() {
+func (s *BindFQDNWorkflowTestSuite) TestUpdateWebrootFails_SetsStatusFailed() {
 	fqdnID := "test-fqdn-7"
 	webrootID := "test-webroot-7"
 	tenantID := "test-tenant-7"
@@ -387,7 +391,8 @@ func (s *BindFQDNWorkflowTestSuite) TestReloadNginxFails_SetsStatusFailed() {
 		LBNodes:     lbNodes,
 	}, nil)
 	s.env.OnActivity("AutoCreateDNSRecords", mock.Anything, mock.Anything).Return(nil)
-	s.env.OnActivity("ReloadNginx", mock.Anything).Return(fmt.Errorf("nginx error"))
+	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return([]model.FQDN{fqdn}, nil)
+	s.env.OnActivity("UpdateWebroot", mock.Anything, mock.Anything).Return(fmt.Errorf("nginx error"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("fqdns", fqdnID)).Return(nil)
 	s.env.ExecuteWorkflow(BindFQDNWorkflow, fqdnID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -441,7 +446,10 @@ func (s *UnbindFQDNWorkflowTestSuite) TestSuccess() {
 		LBNodes: lbNodes,
 	}, nil)
 	s.env.OnActivity("AutoDeleteDNSRecords", mock.Anything, "example.com").Return(nil)
-	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
+	// GetFQDNsByWebrootID returns the FQDN being unbound + another remaining one.
+	otherFQDN := model.FQDN{ID: "other-fqdn", FQDN: "other.example.com", WebrootID: webrootID, SSLEnabled: false}
+	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return([]model.FQDN{fqdn, otherFQDN}, nil)
+	s.env.OnActivity("UpdateWebroot", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("DeleteLBMapEntry", mock.Anything, activity.DeleteLBMapEntryParams{
 		FQDN: "example.com",
 	}).Return(nil)
@@ -494,7 +502,7 @@ func (s *UnbindFQDNWorkflowTestSuite) TestGetFQDNContextFails_SetsStatusFailed()
 	s.Error(s.env.GetWorkflowError())
 }
 
-func (s *UnbindFQDNWorkflowTestSuite) TestReloadNginxFails_SetsStatusFailed() {
+func (s *UnbindFQDNWorkflowTestSuite) TestUpdateWebrootFails_SetsStatusFailed() {
 	fqdnID := "test-fqdn-4"
 	webrootID := "test-webroot-4"
 	tenantID := "test-tenant-4"
@@ -523,7 +531,8 @@ func (s *UnbindFQDNWorkflowTestSuite) TestReloadNginxFails_SetsStatusFailed() {
 		LBNodes: lbNodes,
 	}, nil)
 	s.env.OnActivity("AutoDeleteDNSRecords", mock.Anything, "example.com").Return(nil)
-	s.env.OnActivity("ReloadNginx", mock.Anything).Return(fmt.Errorf("nginx error"))
+	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return([]model.FQDN{fqdn}, nil)
+	s.env.OnActivity("UpdateWebroot", mock.Anything, mock.Anything).Return(fmt.Errorf("nginx error"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("fqdns", fqdnID)).Return(nil)
 	s.env.ExecuteWorkflow(UnbindFQDNWorkflow, fqdnID)
 	s.True(s.env.IsWorkflowCompleted())

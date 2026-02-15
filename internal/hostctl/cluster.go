@@ -58,10 +58,14 @@ func ClusterApply(configPath string, timeout time.Duration) error {
 
 		// 2c. Create shards from spec
 		for _, s := range cfg.Cluster.Spec.Shards {
-			_, err := client.Post(fmt.Sprintf("/clusters/%s/shards", clusterID), map[string]any{
+			body := map[string]any{
 				"name": s.Name,
 				"role": s.Role,
-			})
+			}
+			if s.LBBackend != "" {
+				body["lb_backend"] = s.LBBackend
+			}
+			_, err := client.Post(fmt.Sprintf("/clusters/%s/shards", clusterID), body)
 			if err != nil {
 				return fmt.Errorf("create shard %q: %w", s.Name, err)
 			}

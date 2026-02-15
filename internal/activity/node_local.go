@@ -843,3 +843,14 @@ func (a *NodeLocal) RemoveTenantAddresses(ctx context.Context, params ConfigureT
 	})
 }
 
+// ConfigureULARoutes sets up cross-node IPv6 transit addresses and routes so
+// nodes in a shard can reach each other's tenant ULA addresses.
+func (a *NodeLocal) ConfigureULARoutes(ctx context.Context, params ConfigureULARoutesParams) error {
+	a.logger.Info().Int("index", params.ThisNodeIndex).Ints("others", params.OtherNodeIndices).Msg("ConfigureULARoutes")
+	return a.tenantULA.ConfigureRoutes(ctx, &agent.ULARoutesInfo{
+		ClusterID:        params.ClusterID,
+		ThisNodeIndex:    params.ThisNodeIndex,
+		OtherNodeIndices: params.OtherNodeIndices,
+	})
+}
+

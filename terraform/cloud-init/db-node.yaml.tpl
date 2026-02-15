@@ -26,6 +26,7 @@ write_files:
     content: |
       [mysqld]
       server-id = ${server_id}
+      bind-address = 0.0.0.0
 
 runcmd:
   - systemctl restart mysql

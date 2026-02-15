@@ -2,6 +2,8 @@ package e2e
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -31,15 +33,14 @@ func TestLaravelReverbQueue(t *testing.T) {
 	require.Equal(t, 200, resp.StatusCode, "get tenant: %s", body)
 	tenant := parseJSON(t, body)
 	tenantName := tenant["name"].(string)
-	tenantUID := int(tenant["uid"].(float64))
-	t.Logf("tenant: name=%s uid=%d", tenantName, tenantUID)
+	t.Logf("tenant: name=%s", tenantName)
 
 	// Create database + user.
-	dbName := "e2e_reverb_db"
-	dbID := createTestDatabase(t, tenantID, dbShardID, dbName)
-	dbUserID := createDatabaseUser(t, dbID, "e2e_reverb", "ReverbT3st!Pass")
-	_ = dbUserID
-	t.Logf("database %s active, user created", dbID)
+	dbID, dbName := createTestDatabase(t, tenantID, dbShardID, "e2e_reverb_db")
+	dbUsername := dbName + "_app"
+	dbPassword := "ReverbT3stPass99"
+	createDatabaseUser(t, dbID, dbUsername, dbPassword)
+	t.Logf("database %s (name=%s) active, user created", dbID, dbName)
 
 	// Find DB node IP for MySQL host.
 	dbNodeIPs := findNodeIPsByRole(t, clusterID, "database")
@@ -47,9 +48,8 @@ func TestLaravelReverbQueue(t *testing.T) {
 	t.Logf("database host: %s", dbHost)
 
 	// Create webroot with public_folder.
-	webrootName := "reverb-app"
 	resp, body = httpPost(t, fmt.Sprintf("%s/tenants/%s/webroots", coreAPIURL, tenantID), map[string]interface{}{
-		"name":            webrootName,
+		"name":            "reverb-app",
 		"runtime":         "php",
 		"runtime_version": "8.5",
 		"public_folder":   "public",
@@ -57,129 +57,79 @@ func TestLaravelReverbQueue(t *testing.T) {
 	require.Equal(t, 202, resp.StatusCode, "create webroot: %s", body)
 	webroot := parseJSON(t, body)
 	webrootID := webroot["id"].(string)
+	webrootName := webroot["name"].(string)
 	t.Cleanup(func() { httpDelete(t, coreAPIURL+"/webroots/"+webrootID) })
 	waitForStatus(t, coreAPIURL+"/webroots/"+webrootID, "active", provisionTimeout)
 	t.Logf("webroot %s active", webrootID)
 
-	// Create FQDN.
-	fqdn := "reverb-e2e.hosting.test."
+	// Create FQDN (unique per run to avoid stale soft-deleted records).
+	fqdn := fmt.Sprintf("reverb-%d.hosting.test.", time.Now().UnixNano())
 	fqdnID := createTestFQDN(t, webrootID, fqdn)
 	t.Logf("fqdn %s active (id=%s)", fqdn, fqdnID)
-	fqdnHost := strings.TrimSuffix(fqdn, ".") // "reverb-e2e.hosting.test"
+	fqdnHost := strings.TrimSuffix(fqdn, ".")
 
 	// ---------------------------------------------------------------
-	// Phase 2: Upload Laravel project
+	// Phase 2: Upload Laravel project + .env + run migrations
 	// ---------------------------------------------------------------
 	webNodeIPs := findNodeIPsByRole(t, clusterID, "web")
-	webNodeIP := webNodeIPs[0]
 	webrootPath := fmt.Sprintf("/var/www/storage/%s/webroots/%s", tenantName, webrootName)
-	uploadFixture(t, webNodeIP, webrootPath, tarball, tenantName)
-	t.Logf("fixture uploaded to %s:%s", webNodeIP, webrootPath)
 
-	// ---------------------------------------------------------------
-	// Phase 3: Create Reverb daemon (get proxy_port)
-	// ---------------------------------------------------------------
-	proxyPath := "/app"
-	reverbDaemonID, reverbDaemon := createTestDaemon(t, webrootID, map[string]interface{}{
-		"command":    `bash -c 'exec php artisan reverb:start --host=:: --port=$PORT'`,
-		"proxy_path": proxyPath,
+	// Upload to all web nodes (CephFS not available in dev environment).
+	for _, ip := range webNodeIPs {
+		uploadFixture(t, ip, webrootPath, tarball, tenantName)
+		t.Logf("fixture uploaded to %s:%s", ip, webrootPath)
+	}
+
+	// Generate a random Laravel APP_KEY (32 bytes, base64-encoded).
+	keyBytes := make([]byte, 32)
+	_, err := rand.Read(keyBytes)
+	require.NoError(t, err, "generate app key")
+	appKey := "base64:" + base64.StdEncoding.EncodeToString(keyBytes)
+
+	// Add /etc/hosts entry on each web node so the PHP broadcasting client
+	// can reach the Reverb server through nginx (localhost). The Pusher SDK
+	// connects to REVERB_HOST:REVERB_PORT — by resolving the FQDN to 127.0.0.1,
+	// the request goes through nginx's `location /app` proxy to Reverb.
+	for _, ip := range webNodeIPs {
+		sshExec(t, ip, fmt.Sprintf("echo '127.0.0.1 %s' | sudo tee -a /etc/hosts > /dev/null", fqdnHost))
+	}
+	t.Cleanup(func() {
+		for _, ip := range webNodeIPs {
+			sshExec(t, ip, fmt.Sprintf("sudo sed -i '/%s/d' /etc/hosts", fqdnHost))
+		}
 	})
-	reverbPort := int(reverbDaemon["proxy_port"].(float64))
-	t.Logf("reverb daemon %s created, proxy_port=%d", reverbDaemonID, reverbPort)
 
-	// ---------------------------------------------------------------
-	// Phase 4: Configure .env
-	// ---------------------------------------------------------------
-	// ULA addresses are now configured automatically by convergence
-	// (ConfigureTenantAddresses activity on each web node).
-
-	// Get daemon's assigned node_id to find the node IP for SSH commands.
-	var daemonNodeID string
-	deadline := time.Now().Add(provisionTimeout)
-	for time.Now().Before(deadline) {
-		resp, body = httpGet(t, coreAPIURL+"/daemons/"+reverbDaemonID)
-		require.Equal(t, 200, resp.StatusCode, "get daemon: %s", body)
-		d := parseJSON(t, body)
-		if nid, ok := d["node_id"].(string); ok && nid != "" {
-			daemonNodeID = nid
-			break
-		}
-		time.Sleep(2 * time.Second)
-	}
-	require.NotEmpty(t, daemonNodeID, "daemon never got a node_id")
-
-	// Get daemon node IP for SSH commands (.env writing, artisan commands).
-	resp, body = httpGet(t, fmt.Sprintf("%s/clusters/%s/nodes", coreAPIURL, clusterID))
-	require.Equal(t, 200, resp.StatusCode, body)
-	nodes := parsePaginatedItems(t, body)
-	var daemonNodeIP string
-	for _, n := range nodes {
-		if nid, _ := n["id"].(string); nid == daemonNodeID {
-			if ip, ok := n["ip_address"].(string); ok && ip != "" {
-				daemonNodeIP = ip
-				if idx := strings.Index(daemonNodeIP, "/"); idx != -1 {
-					daemonNodeIP = daemonNodeIP[:idx]
-				}
-			}
-			break
-		}
-	}
-	require.NotEmpty(t, daemonNodeIP, "could not find daemon node IP")
-	t.Logf("daemon node: id=%s ip=%s", daemonNodeID, daemonNodeIP)
-
-	// Write .env.
-	generateLaravelEnv(t, daemonNodeIP, webrootPath, tenantName, map[string]string{
+	// Write .env to ALL web nodes before creating daemons.
+	// REVERB_HOST/PORT/SCHEME route the PHP broadcasting client through nginx
+	// on localhost, which proxies to the Reverb daemon via ULA.
+	envVars := map[string]string{
 		"APP_NAME":             "LaravelReverbE2E",
 		"APP_ENV":              "testing",
 		"APP_DEBUG":            "true",
+		"APP_KEY":              appKey,
 		"APP_URL":              fmt.Sprintf("https://%s", fqdnHost),
 		"DB_CONNECTION":        "mysql",
 		"DB_HOST":              dbHost,
 		"DB_PORT":              "3306",
 		"DB_DATABASE":          dbName,
-		"DB_USERNAME":          "e2e_reverb",
-		"DB_PASSWORD":          "ReverbT3st!Pass",
+		"DB_USERNAME":          dbUsername,
+		"DB_PASSWORD":          dbPassword,
 		"BROADCAST_CONNECTION": "reverb",
 		"QUEUE_CONNECTION":     "database",
+		"CACHE_STORE":          "file",
 		"REVERB_APP_ID":        "e2e-test",
 		"REVERB_APP_KEY":       "e2e-test-key",
 		"REVERB_APP_SECRET":    "e2e-test-secret",
-		"REVERB_HOST":          "127.0.0.1",
-		"REVERB_PORT":          fmt.Sprintf("%d", reverbPort),
+		"REVERB_HOST":          fqdnHost,
+		"REVERB_PORT":          "80",
 		"REVERB_SCHEME":        "http",
-	})
-	t.Logf(".env written")
+	}
+	for _, ip := range webNodeIPs {
+		generateLaravelEnv(t, ip, webrootPath, tenantName, envVars)
+	}
+	t.Logf(".env written to %d web nodes", len(webNodeIPs))
 
-	// Generate app key.
-	sshExec(t, daemonNodeIP, fmt.Sprintf(
-		"sudo -u %s php %s/artisan key:generate --force",
-		tenantName, webrootPath,
-	))
-	t.Logf("app key generated")
-
-	// If fixture was uploaded to only one node but there are multiple web nodes,
-	// CephFS shared storage means it's visible on all nodes.
-
-	// ---------------------------------------------------------------
-	// Phase 5: Create queue worker daemon, wait for both daemons
-	// ---------------------------------------------------------------
-	queueDaemonID, _ := createTestDaemon(t, webrootID, map[string]interface{}{
-		"command": "php artisan queue:work --sleep=1 --tries=3 --timeout=30",
-	})
-	t.Logf("queue worker daemon %s created", queueDaemonID)
-
-	// Wait for both daemons to become active.
-	waitForStatus(t, coreAPIURL+"/daemons/"+reverbDaemonID, "active", provisionTimeout)
-	t.Logf("reverb daemon active")
-	waitForStatus(t, coreAPIURL+"/daemons/"+queueDaemonID, "active", provisionTimeout)
-	t.Logf("queue worker daemon active")
-
-	// Give daemons a moment to stabilize (supervisord starts the process).
-	time.Sleep(5 * time.Second)
-
-	// ---------------------------------------------------------------
-	// Phase 6: Run migrations
-	// ---------------------------------------------------------------
+	// Run migrations BEFORE creating daemons (queue worker needs the jobs table).
 	setupURL := fmt.Sprintf("%s/api/setup", webTrafficURL)
 	var lastSetupErr string
 	setupDeadline := time.Now().Add(60 * time.Second)
@@ -195,12 +145,39 @@ func TestLaravelReverbQueue(t *testing.T) {
 	require.Equal(t, 200, resp.StatusCode, "setup failed: %s", lastSetupErr)
 
 	// ---------------------------------------------------------------
-	// Phase 7: Verification subtests
+	// Phase 3: Create daemons
+	// ---------------------------------------------------------------
+	// Reverb WebSocket daemon — uses [$HOST] for proper IPv6 URI formatting.
+	// ReactPHP requires IPv6 addresses in bracket notation within URIs.
+	proxyPath := "/app"
+	reverbDaemonID, _ := createTestDaemon(t, webrootID, map[string]interface{}{
+		"command":    `bash -c 'exec php artisan reverb:start --host="[$HOST]" --port="$PORT"'`,
+		"proxy_path": proxyPath,
+	})
+	t.Logf("reverb daemon %s created", reverbDaemonID)
+
+	// Queue worker daemon (no proxy_path — pure background worker).
+	queueDaemonID, _ := createTestDaemon(t, webrootID, map[string]interface{}{
+		"command": "php artisan queue:work --sleep=1 --tries=3 --timeout=30",
+	})
+	t.Logf("queue worker daemon %s created", queueDaemonID)
+
+	// Wait for both daemons to become active.
+	waitForStatus(t, coreAPIURL+"/daemons/"+reverbDaemonID, "active", provisionTimeout)
+	t.Logf("reverb daemon active")
+	waitForStatus(t, coreAPIURL+"/daemons/"+queueDaemonID, "active", provisionTimeout)
+	t.Logf("queue worker daemon active")
+
+	// Give daemons a moment to stabilize (supervisord starts the process).
+	time.Sleep(5 * time.Second)
+
+	// ---------------------------------------------------------------
+	// Phase 4: Verification subtests
 	// ---------------------------------------------------------------
 	reverbKey := "e2e-test-key"
 
 	t.Run("websocket_handshake", func(t *testing.T) {
-		wsURL := fmt.Sprintf("wss://10.10.10.2/app/%s?protocol=7", reverbKey)
+		wsURL := fmt.Sprintf("wss://10.10.10.70/app/%s?protocol=7", reverbKey)
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 
@@ -255,7 +232,7 @@ func TestLaravelReverbQueue(t *testing.T) {
 		marker := fmt.Sprintf("broadcast-test-%d", time.Now().UnixNano())
 
 		// Connect WebSocket.
-		wsURL := fmt.Sprintf("wss://10.10.10.2/app/%s?protocol=7", reverbKey)
+		wsURL := fmt.Sprintf("wss://10.10.10.70/app/%s?protocol=7", reverbKey)
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 

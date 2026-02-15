@@ -47,7 +47,7 @@ func TestDatabaseMigration(t *testing.T) {
 		t.Skip("no database shard found")
 	}
 
-	dbID := createTestDatabase(t, tenantID, dbShardID, "e2e_migratedb")
+	dbID, _ := createTestDatabase(t, tenantID, dbShardID, "e2e_migratedb")
 
 	// Find a second database shard.
 	resp, body := httpGet(t, fmt.Sprintf("%s/clusters/%s/shards", coreAPIURL, clusterID))

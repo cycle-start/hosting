@@ -51,16 +51,41 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 		return err
 	}
 
-	// Reload nginx on all nodes in the tenant's shard.
+	// Regenerate nginx config on all nodes to include the new FQDN in server_name.
 	if fctx.Tenant.ShardID == nil {
 		noShardErr := fmt.Errorf("tenant %s has no shard assigned", fctx.Webroot.TenantID)
 		_ = setResourceFailed(ctx, "fqdns", fqdnID, noShardErr)
 		return noShardErr
 	}
 
+	// Fetch all FQDNs for the webroot (including the one just being bound).
+	var allFQDNs []model.FQDN
+	err = workflow.ExecuteActivity(ctx, "GetFQDNsByWebrootID", fctx.Webroot.ID).Get(ctx, &allFQDNs)
+	if err != nil {
+		_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
+		return err
+	}
+	var fqdnParams []activity.FQDNParam
+	for _, f := range allFQDNs {
+		fqdnParams = append(fqdnParams, activity.FQDNParam{
+			FQDN:       f.FQDN,
+			WebrootID:  f.WebrootID,
+			SSLEnabled: f.SSLEnabled,
+		})
+	}
+
 	for _, node := range fctx.Nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "ReloadNginx").Get(ctx, nil)
+		err = workflow.ExecuteActivity(nodeCtx, "UpdateWebroot", activity.UpdateWebrootParams{
+			ID:             fctx.Webroot.ID,
+			TenantName:     fctx.Tenant.Name,
+			Name:           fctx.Webroot.Name,
+			Runtime:        fctx.Webroot.Runtime,
+			RuntimeVersion: fctx.Webroot.RuntimeVersion,
+			RuntimeConfig:  string(fctx.Webroot.RuntimeConfig),
+			PublicFolder:   fctx.Webroot.PublicFolder,
+			FQDNs:          fqdnParams,
+		}).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 			return err
@@ -136,11 +161,39 @@ func UnbindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 		return err
 	}
 
-	// Reload nginx on all nodes in the tenant's shard.
+	// Regenerate nginx config on all nodes to remove the FQDN from server_name.
 	if fctx.Tenant.ShardID != nil {
+		var remainingFQDNs []model.FQDN
+		err = workflow.ExecuteActivity(ctx, "GetFQDNsByWebrootID", fctx.Webroot.ID).Get(ctx, &remainingFQDNs)
+		if err != nil {
+			_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
+			return err
+		}
+		var fqdnParams []activity.FQDNParam
+		for _, f := range remainingFQDNs {
+			// Skip the FQDN being unbound (it's still in the DB as "deleting").
+			if f.ID == fqdnID {
+				continue
+			}
+			fqdnParams = append(fqdnParams, activity.FQDNParam{
+				FQDN:       f.FQDN,
+				WebrootID:  f.WebrootID,
+				SSLEnabled: f.SSLEnabled,
+			})
+		}
+
 		for _, node := range fctx.Nodes {
 			nodeCtx := nodeActivityCtx(ctx, node.ID)
-			err = workflow.ExecuteActivity(nodeCtx, "ReloadNginx").Get(ctx, nil)
+			err = workflow.ExecuteActivity(nodeCtx, "UpdateWebroot", activity.UpdateWebrootParams{
+				ID:             fctx.Webroot.ID,
+				TenantName:     fctx.Tenant.Name,
+				Name:           fctx.Webroot.Name,
+				Runtime:        fctx.Webroot.Runtime,
+				RuntimeVersion: fctx.Webroot.RuntimeVersion,
+				RuntimeConfig:  string(fctx.Webroot.RuntimeConfig),
+				PublicFolder:   fctx.Webroot.PublicFolder,
+				FQDNs:          fqdnParams,
+			}).Get(ctx, nil)
 			if err != nil {
 				_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
 				return err

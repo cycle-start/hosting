@@ -26,7 +26,7 @@ func TestDatabaseRetry(t *testing.T) {
 		t.Skip("no database shard found")
 	}
 
-	dbID := createTestDatabase(t, tenantID, dbShardID, "e2e_retrydb")
+	dbID, _ := createTestDatabase(t, tenantID, dbShardID, "e2e_retrydb")
 
 	resp, body := httpPost(t, coreAPIURL+"/databases/"+dbID+"/retry", nil)
 	require.True(t, resp.StatusCode == 202 || resp.StatusCode == 200,

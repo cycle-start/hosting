@@ -347,10 +347,10 @@ build-laravel-fixture:
     fi
     mkdir -p .build/laravel-reverb
     echo "Creating Laravel project..."
-    docker run --rm -v "$(pwd)/.build/laravel-reverb:/app" composer:2 \
+    docker run --rm --user "$(id -u):$(id -g)" -v "$(pwd)/.build/laravel-reverb:/app" composer:2 \
       create-project laravel/laravel . --prefer-dist --no-interaction
     echo "Installing Laravel Reverb..."
-    docker run --rm -v "$(pwd)/.build/laravel-reverb:/app" composer:2 \
+    docker run --rm --user "$(id -u):$(id -g)" -v "$(pwd)/.build/laravel-reverb:/app" composer:2 \
       require laravel/reverb --no-interaction
     echo "Applying overlay files..."
     cp -r tests/e2e/fixtures/laravel-reverb/overlay/* .build/laravel-reverb/

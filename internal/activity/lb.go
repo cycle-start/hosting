@@ -42,21 +42,27 @@ type DeleteLBMapEntryParams struct {
 // via the Runtime API. It uses "set map" to update existing entries, falling back
 // to "add map" for new entries.
 func (a *NodeLB) SetLBMapEntry(ctx context.Context, params SetLBMapEntryParams) error {
+	// Strip trailing dot from FQDN — HAProxy matches against the Host header
+	// which never includes the DNS trailing dot.
+	fqdn := strings.TrimSuffix(params.FQDN, ".")
+
+	a.logger.Info().Str("fqdn", fqdn).Str("backend", params.LBBackend).Msg("setting LB map entry")
+
 	// Try "set map" first (updates existing entry).
-	resp, err := haproxyCommand(haproxyRuntimeAddr, fmt.Sprintf("set map %s %s %s\n", haproxyMapPath, params.FQDN, params.LBBackend))
+	resp, err := haproxyCommand(haproxyRuntimeAddr, fmt.Sprintf("set map %s %s %s\n", haproxyMapPath, fqdn, params.LBBackend))
 	if err != nil {
-		return fmt.Errorf("set map entry %s -> %s: %w", params.FQDN, params.LBBackend, err)
+		return fmt.Errorf("set map entry %s -> %s: %w", fqdn, params.LBBackend, err)
 	}
 
 	if strings.Contains(strings.ToLower(resp), "not found") {
 		// Entry doesn't exist yet — use "add map" to create it.
-		resp, err = haproxyCommand(haproxyRuntimeAddr, fmt.Sprintf("add map %s %s %s\n", haproxyMapPath, params.FQDN, params.LBBackend))
+		resp, err = haproxyCommand(haproxyRuntimeAddr, fmt.Sprintf("add map %s %s %s\n", haproxyMapPath, fqdn, params.LBBackend))
 		if err != nil {
-			return fmt.Errorf("add map entry %s -> %s: %w", params.FQDN, params.LBBackend, err)
+			return fmt.Errorf("add map entry %s -> %s: %w", fqdn, params.LBBackend, err)
 		}
 		resp = strings.TrimSpace(resp)
 		if resp != "" && strings.Contains(strings.ToLower(resp), "err") {
-			return fmt.Errorf("add map entry %s -> %s: %s", params.FQDN, params.LBBackend, resp)
+			return fmt.Errorf("add map entry %s -> %s: %s", fqdn, params.LBBackend, resp)
 		}
 	}
 
@@ -66,15 +72,19 @@ func (a *NodeLB) SetLBMapEntry(ctx context.Context, params SetLBMapEntryParams) 
 // DeleteLBMapEntry removes an FQDN mapping from the HAProxy map file
 // via the Runtime API.
 func (a *NodeLB) DeleteLBMapEntry(ctx context.Context, params DeleteLBMapEntryParams) error {
-	resp, err := haproxyCommand(haproxyRuntimeAddr, fmt.Sprintf("del map %s %s\n", haproxyMapPath, params.FQDN))
+	fqdn := strings.TrimSuffix(params.FQDN, ".")
+
+	a.logger.Info().Str("fqdn", fqdn).Msg("deleting LB map entry")
+
+	resp, err := haproxyCommand(haproxyRuntimeAddr, fmt.Sprintf("del map %s %s\n", haproxyMapPath, fqdn))
 	if err != nil {
-		return fmt.Errorf("del map entry %s: %w", params.FQDN, err)
+		return fmt.Errorf("del map entry %s: %w", fqdn, err)
 	}
 
 	// Ignore "not found" — the entry may already be gone.
 	resp = strings.TrimSpace(resp)
 	if resp != "" && !strings.Contains(strings.ToLower(resp), "not found") && strings.Contains(strings.ToLower(resp), "err") {
-		return fmt.Errorf("del map entry %s: %s", params.FQDN, resp)
+		return fmt.Errorf("del map entry %s: %s", fqdn, resp)
 	}
 	return nil
 }
