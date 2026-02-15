@@ -5,7 +5,7 @@ import type {
   Zone, ZoneRecord, Database, DatabaseUser,
   ValkeyInstance, ValkeyUser, EmailAccount, EmailAlias, EmailForward, EmailAutoReply,
   S3Bucket, S3AccessKey,
-  SSHKey, Backup, Brand,
+  SSHKey, CronJob, Daemon, Backup, Brand,
   APIKey, APIKeyCreateResponse, AuditLogEntry, DashboardStats,
   PlatformConfig, ListParams, AuditListParams, TenantResourceSummary,
   CreateTenantRequest,
@@ -767,6 +767,124 @@ export function useDeleteSSHKey() {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/ssh-keys/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['ssh-keys'] }),
+  })
+}
+
+// Cron Jobs
+export function useCronJobs(webrootId: string) {
+  return useQuery({
+    queryKey: ['cron-jobs', webrootId],
+    queryFn: () => api.get<PaginatedResponse<CronJob>>(listPath(`/webroots/${webrootId}/cron-jobs`)),
+    enabled: !!webrootId,
+  })
+}
+
+export function useCreateCronJob() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { webroot_id: string; schedule: string; command: string; working_directory?: string; timeout_seconds?: number; max_memory_mb?: number }) =>
+      api.post<CronJob>(`/webroots/${data.webroot_id}/cron-jobs`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cron-jobs'] }),
+  })
+}
+
+export function useUpdateCronJob() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { id: string; schedule?: string; command?: string; working_directory?: string; timeout_seconds?: number; max_memory_mb?: number }) =>
+      api.put<CronJob>(`/cron-jobs/${data.id}`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cron-jobs'] }),
+  })
+}
+
+export function useDeleteCronJob() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/cron-jobs/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cron-jobs'] }),
+  })
+}
+
+export function useEnableCronJob() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/cron-jobs/${id}/enable`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cron-jobs'] }),
+  })
+}
+
+export function useDisableCronJob() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/cron-jobs/${id}/disable`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cron-jobs'] }),
+  })
+}
+
+export function useRetryCronJob() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/cron-jobs/${id}/retry`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cron-jobs'] }),
+  })
+}
+
+// Daemons
+export function useDaemons(webrootId: string) {
+  return useQuery({
+    queryKey: ['daemons', webrootId],
+    queryFn: () => api.get<PaginatedResponse<Daemon>>(listPath(`/webroots/${webrootId}/daemons`)),
+    enabled: !!webrootId,
+  })
+}
+
+export function useCreateDaemon() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { webroot_id: string; command: string; proxy_path?: string; num_procs?: number; stop_signal?: string; stop_wait_secs?: number; max_memory_mb?: number; environment?: Record<string, string> }) =>
+      api.post<Daemon>(`/webroots/${data.webroot_id}/daemons`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['daemons'] }),
+  })
+}
+
+export function useUpdateDaemon() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { id: string; command?: string; proxy_path?: string; num_procs?: number; stop_signal?: string; stop_wait_secs?: number; max_memory_mb?: number; environment?: Record<string, string> }) =>
+      api.put<Daemon>(`/daemons/${data.id}`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['daemons'] }),
+  })
+}
+
+export function useDeleteDaemon() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/daemons/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['daemons'] }),
+  })
+}
+
+export function useEnableDaemon() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/daemons/${id}/enable`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['daemons'] }),
+  })
+}
+
+export function useDisableDaemon() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/daemons/${id}/disable`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['daemons'] }),
+  })
+}
+
+export function useRetryDaemon() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/daemons/${id}/retry`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['daemons'] }),
   })
 }
 

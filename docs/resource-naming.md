@@ -12,6 +12,7 @@ All resources use UUID primary keys for database identity and API references. Re
 | Valkey Instance | UUID | `kv_` | systemd unit, config file, data dir |
 | S3 Bucket | UUID | `s3_` | RGW bucket naming |
 | Cron Job | UUID | `cron_` | systemd timer/service unit names |
+| Daemon | UUID | `daemon_` | supervisord program config |
 | Brand | UUID | _(none)_ | User-supplied `name` for display |
 
 ## Name Format
@@ -24,6 +25,7 @@ Names are generated as `{prefix}{10-char-random}`, using the character set `abcd
 - S3 Bucket: `s3_b3g7l1v5d9`
 - Webroot: `web_c8m2p6s0x4`
 - Cron Job: `cron_k5n9r3w7a1`
+- Daemon: `daemon_h2q6v0z4b8`
 
 Names are globally unique per resource type (enforced by `UNIQUE(name)` constraint in the database).
 
@@ -61,6 +63,12 @@ Names are globally unique per resource type (enforced by `UNIQUE(name)` constrai
 
 - **systemd timer:** `cron-t_a7k3m9x2p1-cron_k5n9r3w7a1.timer`
 - **systemd service:** `cron-t_a7k3m9x2p1-cron_k5n9r3w7a1.service`
+
+### Daemon (`daemon_xxx`)
+
+- **supervisord config:** `/etc/supervisor/conf.d/daemon-t_a7k3m9x2p1-daemon_h2q6v0z4b8.conf`
+- **supervisord program:** `daemon-t_a7k3m9x2p1-daemon_h2q6v0z4b8`
+- **Working directory:** Inherits from parent webroot
 
 ## Database/Valkey User Naming
 

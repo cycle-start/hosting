@@ -328,6 +328,26 @@ func (s *Server) setupRoutes() {
 			r.Delete("/webroots/{id}", webroot.Delete)
 		})
 
+		// Daemons
+		daemon := handler.NewDaemon(s.services)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("daemons", "read"))
+			r.Get("/webroots/{webrootID}/daemons", daemon.ListByWebroot)
+			r.Get("/daemons/{id}", daemon.Get)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("daemons", "write"))
+			r.Post("/webroots/{webrootID}/daemons", daemon.Create)
+			r.Put("/daemons/{id}", daemon.Update)
+			r.Post("/daemons/{id}/enable", daemon.Enable)
+			r.Post("/daemons/{id}/disable", daemon.Disable)
+			r.Post("/daemons/{id}/retry", daemon.Retry)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("daemons", "delete"))
+			r.Delete("/daemons/{id}", daemon.Delete)
+		})
+
 		// Cron jobs
 		cronJob := handler.NewCronJob(s.services)
 		r.Group(func(r chi.Router) {

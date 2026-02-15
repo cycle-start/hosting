@@ -38,6 +38,7 @@ type CreateWebrootParams struct {
 	RuntimeConfig  string
 	PublicFolder   string
 	FQDNs          []FQDNParam
+	Daemons        []DaemonProxyInfo
 }
 
 // UpdateWebrootParams holds parameters for updating a webroot on a node.
@@ -50,6 +51,7 @@ type UpdateWebrootParams struct {
 	RuntimeConfig  string
 	PublicFolder   string
 	FQDNs          []FQDNParam
+	Daemons        []DaemonProxyInfo
 }
 
 // ConfigureRuntimeParams holds parameters for configuring a runtime on a node.
@@ -263,6 +265,46 @@ type DeleteCronJobParams struct {
 type CronJobTimerParams struct {
 	ID         string
 	TenantName string
+}
+
+// CreateDaemonParams holds parameters for creating a daemon on a node.
+type CreateDaemonParams struct {
+	ID           string
+	TenantName   string
+	WebrootName  string
+	Name         string
+	Command      string
+	ProxyPort    *int
+	NumProcs     int
+	StopSignal   string
+	StopWaitSecs int
+	MaxMemoryMB  int
+	Environment  map[string]string
+}
+
+// UpdateDaemonParams holds parameters for updating a daemon on a node.
+type UpdateDaemonParams = CreateDaemonParams
+
+// DeleteDaemonParams holds parameters for deleting a daemon on a node.
+type DeleteDaemonParams struct {
+	ID          string
+	TenantName  string
+	WebrootName string
+	Name        string
+}
+
+// DaemonEnableParams holds parameters for enabling/disabling a daemon on a node.
+type DaemonEnableParams struct {
+	ID          string
+	TenantName  string
+	WebrootName string
+	Name        string
+}
+
+// DaemonProxyInfo holds proxy info for a daemon needed during nginx config generation.
+type DaemonProxyInfo struct {
+	ProxyPath string
+	Port      int
 }
 
 // BackupResult holds the result of a backup operation.

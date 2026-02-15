@@ -79,6 +79,7 @@ func main() {
 		s3Mgr,
 		srv.SSHManager(),
 		srv.CronManager(),
+		srv.DaemonManager(),
 		srv.Runtimes(),
 	)
 	w.RegisterActivity(nodeActs)

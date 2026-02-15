@@ -32,6 +32,7 @@ type Services struct {
 	SSHKey           *SSHKeyService
 	Backup           *BackupService
 	CronJob          *CronJobService
+	Daemon           *DaemonService
 	APIKey           *APIKeyService
 	OIDC             *OIDCService
 	Search           *SearchService
@@ -68,6 +69,7 @@ func NewServices(db DB, tc temporalclient.Client, oidcIssuerURL string) *Service
 		SSHKey:           NewSSHKeyService(db, tc),
 		Backup:           NewBackupService(db, tc),
 		CronJob:          NewCronJobService(db, tc),
+		Daemon:           NewDaemonService(db, tc),
 		APIKey:           NewAPIKeyService(db),
 		OIDC:             NewOIDCService(db, oidcIssuerURL),
 		Search:           NewSearchService(db),

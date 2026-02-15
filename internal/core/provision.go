@@ -268,6 +268,15 @@ func resolveTenantIDFromCronJob(ctx context.Context, db DB, cronJobID string) (s
 	return tenantID, nil
 }
 
+func resolveTenantIDFromDaemon(ctx context.Context, db DB, daemonID string) (string, error) {
+	var tenantID string
+	err := db.QueryRow(ctx, "SELECT tenant_id FROM daemons WHERE id = $1", daemonID).Scan(&tenantID)
+	if err != nil {
+		return "", fmt.Errorf("resolve tenant from daemon %s: %w", daemonID, err)
+	}
+	return tenantID, nil
+}
+
 func resolveTenantIDFromS3AccessKey(ctx context.Context, db DB, keyID string) (string, error) {
 	var tenantID *string
 	err := db.QueryRow(ctx,

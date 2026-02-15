@@ -1238,6 +1238,119 @@ func (a *CoreDB) UpdateShardConfig(ctx context.Context, params UpdateShardConfig
 	return err
 }
 
+// GetDaemonContext fetches a daemon and its related webroot, tenant, and nodes.
+func (a *CoreDB) GetDaemonContext(ctx context.Context, daemonID string) (*DaemonContext, error) {
+	var dc DaemonContext
+	var envJSON []byte
+
+	// JOIN daemons -> webroots -> tenants.
+	err := a.db.QueryRow(ctx,
+		`SELECT d.id, d.tenant_id, d.webroot_id, d.name, d.command, d.proxy_path, d.proxy_port,
+		        d.num_procs, d.stop_signal, d.stop_wait_secs, d.max_memory_mb, d.environment,
+		        d.enabled, d.status, d.status_message, d.created_at, d.updated_at,
+		        w.id, w.tenant_id, w.name, w.runtime, w.runtime_version, w.runtime_config, w.public_folder, w.status, w.status_message, w.created_at, w.updated_at,
+		        t.id, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.status, t.status_message, t.created_at, t.updated_at
+		 FROM daemons d
+		 JOIN webroots w ON w.id = d.webroot_id
+		 JOIN tenants t ON t.id = d.tenant_id
+		 WHERE d.id = $1`, daemonID,
+	).Scan(&dc.Daemon.ID, &dc.Daemon.TenantID, &dc.Daemon.WebrootID, &dc.Daemon.Name, &dc.Daemon.Command,
+		&dc.Daemon.ProxyPath, &dc.Daemon.ProxyPort,
+		&dc.Daemon.NumProcs, &dc.Daemon.StopSignal, &dc.Daemon.StopWaitSecs, &dc.Daemon.MaxMemoryMB, &envJSON,
+		&dc.Daemon.Enabled, &dc.Daemon.Status, &dc.Daemon.StatusMessage, &dc.Daemon.CreatedAt, &dc.Daemon.UpdatedAt,
+		&dc.Webroot.ID, &dc.Webroot.TenantID, &dc.Webroot.Name, &dc.Webroot.Runtime, &dc.Webroot.RuntimeVersion, &dc.Webroot.RuntimeConfig, &dc.Webroot.PublicFolder, &dc.Webroot.Status, &dc.Webroot.StatusMessage, &dc.Webroot.CreatedAt, &dc.Webroot.UpdatedAt,
+		&dc.Tenant.ID, &dc.Tenant.BrandID, &dc.Tenant.RegionID, &dc.Tenant.ClusterID, &dc.Tenant.ShardID, &dc.Tenant.UID, &dc.Tenant.SFTPEnabled, &dc.Tenant.Status, &dc.Tenant.StatusMessage, &dc.Tenant.CreatedAt, &dc.Tenant.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get daemon context: %w", err)
+	}
+
+	if len(envJSON) > 0 {
+		_ = json.Unmarshal(envJSON, &dc.Daemon.Environment)
+	}
+	if dc.Daemon.Environment == nil {
+		dc.Daemon.Environment = make(map[string]string)
+	}
+
+	// Fetch nodes if tenant has a shard.
+	if dc.Tenant.ShardID != nil {
+		nodes, err := a.ListNodesByShard(ctx, *dc.Tenant.ShardID)
+		if err != nil {
+			return nil, err
+		}
+		dc.Nodes = nodes
+	}
+
+	return &dc, nil
+}
+
+// ListDaemonsByWebroot retrieves all daemons for a webroot (excluding deleted).
+func (a *CoreDB) ListDaemonsByWebroot(ctx context.Context, webrootID string) ([]model.Daemon, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, tenant_id, webroot_id, name, command, proxy_path, proxy_port,
+		        num_procs, stop_signal, stop_wait_secs, max_memory_mb, environment,
+		        enabled, status, status_message, created_at, updated_at
+		 FROM daemons WHERE webroot_id = $1 AND status != $2 ORDER BY name`, webrootID, model.StatusDeleted,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list daemons by webroot: %w", err)
+	}
+	defer rows.Close()
+
+	var daemons []model.Daemon
+	for rows.Next() {
+		var d model.Daemon
+		var envJSON []byte
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.WebrootID, &d.Name, &d.Command,
+			&d.ProxyPath, &d.ProxyPort,
+			&d.NumProcs, &d.StopSignal, &d.StopWaitSecs, &d.MaxMemoryMB, &envJSON,
+			&d.Enabled, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan daemon row: %w", err)
+		}
+		if len(envJSON) > 0 {
+			_ = json.Unmarshal(envJSON, &d.Environment)
+		}
+		if d.Environment == nil {
+			d.Environment = make(map[string]string)
+		}
+		daemons = append(daemons, d)
+	}
+	return daemons, rows.Err()
+}
+
+// ListDaemonsByTenant retrieves all active daemons for a tenant (used in convergence).
+func (a *CoreDB) ListDaemonsByTenant(ctx context.Context, tenantID string) ([]model.Daemon, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, tenant_id, webroot_id, name, command, proxy_path, proxy_port,
+		        num_procs, stop_signal, stop_wait_secs, max_memory_mb, environment,
+		        enabled, status, status_message, created_at, updated_at
+		 FROM daemons WHERE tenant_id = $1 AND status = $2 ORDER BY name`, tenantID, model.StatusActive,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list daemons by tenant: %w", err)
+	}
+	defer rows.Close()
+
+	var daemons []model.Daemon
+	for rows.Next() {
+		var d model.Daemon
+		var envJSON []byte
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.WebrootID, &d.Name, &d.Command,
+			&d.ProxyPath, &d.ProxyPort,
+			&d.NumProcs, &d.StopSignal, &d.StopWaitSecs, &d.MaxMemoryMB, &envJSON,
+			&d.Enabled, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan daemon row: %w", err)
+		}
+		if len(envJSON) > 0 {
+			_ = json.Unmarshal(envJSON, &d.Environment)
+		}
+		if d.Environment == nil {
+			d.Environment = make(map[string]string)
+		}
+		daemons = append(daemons, d)
+	}
+	return daemons, rows.Err()
+}
+
 // ListCronJobsByTenant retrieves all active cron jobs for a tenant (used in convergence).
 func (a *CoreDB) ListCronJobsByTenant(ctx context.Context, tenantID string) ([]model.CronJob, error) {
 	rows, err := a.db.Query(ctx,

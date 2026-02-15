@@ -58,6 +58,20 @@ server {
     location / {
         try_files $uri $uri/ {{ .TryFilesTarget }};
     }
+{{ range .Daemons }}
+    location {{ .ProxyPath }} {
+        proxy_pass http://127.0.0.1:{{ .Port }};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+{{ end -}}
 {{ if eq .Runtime "php" }}
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
@@ -85,6 +99,9 @@ server {
 {{ if eq .Runtime "python" }}
     location / {
         proxy_pass http://unix:/run/gunicorn/{{ .TenantName }}-{{ .WebrootName }}.sock;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -94,6 +111,9 @@ server {
 {{ if eq .Runtime "ruby" }}
     location / {
         proxy_pass http://unix:/run/puma/{{ .TenantName }}-{{ .WebrootName }}.sock;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -127,6 +147,12 @@ func (m *NginxManager) SetShardName(name string) {
 	m.shardName = name
 }
 
+// DaemonProxyInfo holds proxy info for a daemon in the nginx template.
+type DaemonProxyInfo struct {
+	ProxyPath string
+	Port      int
+}
+
 type nginxTemplateData struct {
 	TenantName     string
 	TenantID       string
@@ -142,10 +168,12 @@ type nginxTemplateData struct {
 	SSLKeyPath     string
 	TryFilesTarget string
 	ProxyPort      uint32
+	Daemons        []DaemonProxyInfo
 }
 
 // GenerateConfig produces the nginx server block configuration for a webroot.
-func (m *NginxManager) GenerateConfig(webroot *runtime.WebrootInfo, fqdns []*FQDNInfo) (string, error) {
+// daemons may be nil when no daemon proxy locations are needed.
+func (m *NginxManager) GenerateConfig(webroot *runtime.WebrootInfo, fqdns []*FQDNInfo, daemons ...DaemonProxyInfo) (string, error) {
 	tenantName := webroot.TenantName
 	webrootName := webroot.Name
 	rt := webroot.Runtime
@@ -228,6 +256,7 @@ func (m *NginxManager) GenerateConfig(webroot *runtime.WebrootInfo, fqdns []*FQD
 		SSLKeyPath:     sslKeyPath,
 		TryFilesTarget: tryFilesTarget,
 		ProxyPort:      proxyPort,
+		Daemons:        daemons,
 	}
 
 	var buf bytes.Buffer

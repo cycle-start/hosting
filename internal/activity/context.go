@@ -63,6 +63,14 @@ type CronJobContext struct {
 	Nodes   []model.Node  `json:"nodes"`
 }
 
+// DaemonContext bundles all data needed by daemon workflows.
+type DaemonContext struct {
+	Daemon  model.Daemon  `json:"daemon"`
+	Webroot model.Webroot `json:"webroot"`
+	Tenant  model.Tenant  `json:"tenant"`
+	Nodes   []model.Node  `json:"nodes"`
+}
+
 // StalwartContext bundles Stalwart connection info resolved from the cluster config,
 // plus the FQDN fields needed by email account workflows.
 type StalwartContext struct {

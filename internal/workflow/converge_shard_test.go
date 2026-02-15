@@ -93,6 +93,9 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 	// ListCronJobsByWebroot for each webroot (no cron jobs in this test).
 	s.env.OnActivity("ListCronJobsByWebroot", mock.Anything, "wr-1").Return([]model.CronJob{}, nil)
 
+	// ListDaemonsByWebroot for each webroot (fetched for nginx proxy info and convergence).
+	s.env.OnActivity("ListDaemonsByWebroot", mock.Anything, "wr-1").Return([]model.Daemon{}, nil)
+
 	// ReloadNginx for each node.
 	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusActive)).Return(nil)

@@ -61,6 +61,7 @@ type NodeLocal struct {
 	s3       *agent.S3Manager
 	ssh      *agent.SSHManager
 	cron     *agent.CronManager
+	daemon   *agent.DaemonManager
 	runtimes map[string]runtime.Manager
 }
 
@@ -75,6 +76,7 @@ func NewNodeLocal(
 	s3 *agent.S3Manager,
 	ssh *agent.SSHManager,
 	cron *agent.CronManager,
+	daemon *agent.DaemonManager,
 	runtimes map[string]runtime.Manager,
 ) *NodeLocal {
 	return &NodeLocal{
@@ -87,6 +89,7 @@ func NewNodeLocal(
 		s3:       s3,
 		ssh:      ssh,
 		cron:     cron,
+		daemon:   daemon,
 		runtimes: runtimes,
 	}
 }
@@ -187,8 +190,14 @@ func (a *NodeLocal) CreateWebroot(ctx context.Context, params CreateWebrootParam
 		return nil
 	}
 
+	// Convert daemon proxy info for nginx generation.
+	daemonProxies := make([]agent.DaemonProxyInfo, len(params.Daemons))
+	for i, d := range params.Daemons {
+		daemonProxies[i] = agent.DaemonProxyInfo{ProxyPath: d.ProxyPath, Port: d.Port}
+	}
+
 	// Generate and write nginx config.
-	nginxConfig, err := a.nginx.GenerateConfig(info, fqdns)
+	nginxConfig, err := a.nginx.GenerateConfig(info, fqdns, daemonProxies...)
 	if err != nil {
 		return asNonRetryable(fmt.Errorf("generate nginx config: %w", err))
 	}
@@ -249,8 +258,14 @@ func (a *NodeLocal) UpdateWebroot(ctx context.Context, params UpdateWebrootParam
 		return nil
 	}
 
+	// Convert daemon proxy info for nginx generation.
+	daemonProxies := make([]agent.DaemonProxyInfo, len(params.Daemons))
+	for i, d := range params.Daemons {
+		daemonProxies[i] = agent.DaemonProxyInfo{ProxyPath: d.ProxyPath, Port: d.Port}
+	}
+
 	// Regenerate and write nginx config.
-	nginxConfig, err := a.nginx.GenerateConfig(info, fqdns)
+	nginxConfig, err := a.nginx.GenerateConfig(info, fqdns, daemonProxies...)
 	if err != nil {
 		return asNonRetryable(fmt.Errorf("generate nginx config: %w", err))
 	}
@@ -722,3 +737,91 @@ func (a *NodeLocal) DisableCronJobTimer(ctx context.Context, params CronJobTimer
 		TenantName: params.TenantName,
 	})
 }
+
+// --------------------------------------------------------------------------
+// Daemon activities
+// --------------------------------------------------------------------------
+
+// CreateDaemonConfig writes a supervisord config for a daemon and starts it.
+func (a *NodeLocal) CreateDaemonConfig(ctx context.Context, params CreateDaemonParams) error {
+	a.logger.Info().Str("daemon", params.ID).Str("tenant", params.TenantName).Msg("CreateDaemonConfig")
+	info := &agent.DaemonInfo{
+		ID:           params.ID,
+		TenantName:   params.TenantName,
+		WebrootName:  params.WebrootName,
+		Name:         params.Name,
+		Command:      params.Command,
+		ProxyPort:    params.ProxyPort,
+		NumProcs:     params.NumProcs,
+		StopSignal:   params.StopSignal,
+		StopWaitSecs: params.StopWaitSecs,
+		MaxMemoryMB:  params.MaxMemoryMB,
+		Environment:  params.Environment,
+	}
+	if err := a.daemon.Configure(ctx, info); err != nil {
+		return asNonRetryable(fmt.Errorf("configure daemon: %w", err))
+	}
+	if err := a.daemon.Start(ctx, info); err != nil {
+		return asNonRetryable(fmt.Errorf("start daemon: %w", err))
+	}
+	return nil
+}
+
+// UpdateDaemonConfig updates a supervisord config for a daemon and reloads it.
+func (a *NodeLocal) UpdateDaemonConfig(ctx context.Context, params UpdateDaemonParams) error {
+	a.logger.Info().Str("daemon", params.ID).Str("tenant", params.TenantName).Msg("UpdateDaemonConfig")
+	info := &agent.DaemonInfo{
+		ID:           params.ID,
+		TenantName:   params.TenantName,
+		WebrootName:  params.WebrootName,
+		Name:         params.Name,
+		Command:      params.Command,
+		ProxyPort:    params.ProxyPort,
+		NumProcs:     params.NumProcs,
+		StopSignal:   params.StopSignal,
+		StopWaitSecs: params.StopWaitSecs,
+		MaxMemoryMB:  params.MaxMemoryMB,
+		Environment:  params.Environment,
+	}
+	if err := a.daemon.Configure(ctx, info); err != nil {
+		return asNonRetryable(fmt.Errorf("configure daemon: %w", err))
+	}
+	if err := a.daemon.Reload(ctx, info); err != nil {
+		return asNonRetryable(fmt.Errorf("reload daemon: %w", err))
+	}
+	return nil
+}
+
+// DeleteDaemonConfig stops and removes a daemon's supervisord config.
+func (a *NodeLocal) DeleteDaemonConfig(ctx context.Context, params DeleteDaemonParams) error {
+	a.logger.Info().Str("daemon", params.ID).Str("tenant", params.TenantName).Msg("DeleteDaemonConfig")
+	return a.daemon.Remove(ctx, &agent.DaemonInfo{
+		ID:          params.ID,
+		TenantName:  params.TenantName,
+		WebrootName: params.WebrootName,
+		Name:        params.Name,
+	})
+}
+
+// EnableDaemon starts a daemon on this node.
+func (a *NodeLocal) EnableDaemon(ctx context.Context, params DaemonEnableParams) error {
+	a.logger.Info().Str("daemon", params.ID).Str("tenant", params.TenantName).Msg("EnableDaemon")
+	return a.daemon.Start(ctx, &agent.DaemonInfo{
+		ID:          params.ID,
+		TenantName:  params.TenantName,
+		WebrootName: params.WebrootName,
+		Name:        params.Name,
+	})
+}
+
+// DisableDaemon stops a daemon on this node.
+func (a *NodeLocal) DisableDaemon(ctx context.Context, params DaemonEnableParams) error {
+	a.logger.Info().Str("daemon", params.ID).Str("tenant", params.TenantName).Msg("DisableDaemon")
+	return a.daemon.Stop(ctx, &agent.DaemonInfo{
+		ID:          params.ID,
+		TenantName:  params.TenantName,
+		WebrootName: params.WebrootName,
+		Name:        params.Name,
+	})
+}
+

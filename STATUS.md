@@ -50,6 +50,7 @@ Full CRUD REST API at `api.hosting.test/api/v1` with OpenAPI docs at `/docs`.
 | Email Aliases | CRUD `/email-accounts/{id}/aliases`, retry | Yes | |
 | Email Forwards | CRUD `/email-accounts/{id}/forwards`, retry | Yes | External forwarding with keep-copy |
 | Email Auto-Replies | GET/PUT/DELETE `/email-accounts/{id}/autoreply`, retry | Yes | Vacation/out-of-office |
+| Daemons | CRUD `/webroots/{id}/daemons`, enable/disable/retry | Yes | Supervisord processes, optional nginx proxy |
 | Backups | CRUD `/tenants/{id}/backups`, restore, retry | Yes | Web (tar.gz) and MySQL (.sql.gz) |
 | Logs | GET `/logs` | No | Loki proxy for platform log querying |
 
@@ -91,6 +92,7 @@ Full CRUD REST API at `api.hosting.test/api/v1` with OpenAPI docs at `/docs`.
 - Backup: create, restore, delete; cron cleanup of old backups
 
 **Infrastructure workflows:**
+- Daemon: create, update, delete, enable, disable
 - `ConvergeShardWorkflow`: role-aware (web/database/valkey/LB), cleans orphaned nginx configs before provisioning, collects errors without stopping
 - `TenantProvisionWorkflow`: long-running orchestrator, processes provision signals sequentially as child workflows, uses ContinueAsNew after 1000 iterations
 - `UpdateServiceHostnamesWorkflow`: auto-generates DNS records for tenant services
@@ -188,6 +190,7 @@ All resources use UUID primary keys and auto-generated prefixed short names for 
 | Valkey | `kv_` | systemd unit, config, data dir |
 | S3 Bucket | `s3_` | RGW bucket (with tenant prefix) |
 | Cron Job | `cron_` | systemd timer/service |
+| Daemon | `daemon_` | supervisord program |
 
 Names are `{prefix}{10-char-random}`, globally unique, auto-generated on creation. Database and valkey usernames must start with the parent resource name (e.g., `db_abc123_admin`). See `docs/resource-naming.md` for details.
 
@@ -221,6 +224,15 @@ Names are `{prefix}{10-char-random}`, globally unique, auto-generated on creatio
 - Runs as tenant user with systemd security hardening (ProtectSystem, MemoryMax, CPUQuota)
 - Output captured in journald, shipped to Tenant Loki via Vector with `log_type=cron` label
 - Queryable via `GET /tenants/{id}/logs?log_type=cron&cron_job_id={id}`
+
+### Daemons
+
+- Long-running processes attached to webroots (WebSocket servers, queue workers, custom background services)
+- Supervisord-based process management with configurable `numprocs` (1-8), stop signal, stop wait, memory limit
+- Optional `proxy_path` (e.g., `/app`, `/ws`) auto-allocates a port (FNV hash into 10000-19999) and adds nginx `location` block with WebSocket Upgrade headers
+- Daemons without `proxy_path` run as pure background processes (no nginx integration)
+- Enable/disable lifecycle, convergence writes supervisord configs to all shard nodes
+- Nginx proxy locations support WebSocket connections (HTTP Upgrade headers + 24-hour timeout)
 
 ### Worker Runtime
 

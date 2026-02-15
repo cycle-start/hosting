@@ -1,0 +1,25 @@
+-- +goose Up
+CREATE TABLE daemons (
+    id              TEXT PRIMARY KEY,
+    tenant_id       TEXT NOT NULL REFERENCES tenants(id),
+    webroot_id      TEXT NOT NULL REFERENCES webroots(id),
+    name            TEXT NOT NULL UNIQUE,
+    command         TEXT NOT NULL,
+    proxy_path      TEXT,
+    proxy_port      INT,
+    num_procs       INT NOT NULL DEFAULT 1,
+    stop_signal     TEXT NOT NULL DEFAULT 'TERM',
+    stop_wait_secs  INT NOT NULL DEFAULT 30,
+    max_memory_mb   INT NOT NULL DEFAULT 512,
+    environment     JSONB NOT NULL DEFAULT '{}',
+    enabled         BOOLEAN NOT NULL DEFAULT true,
+    status          TEXT NOT NULL DEFAULT 'pending',
+    status_message  TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_daemons_tenant_id ON daemons(tenant_id);
+CREATE INDEX idx_daemons_webroot_id ON daemons(webroot_id);
+
+-- +goose Down
+DROP TABLE IF EXISTS daemons;

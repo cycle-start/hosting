@@ -828,3 +828,83 @@ func TestCleanOrphanedConfigs_MixedFiles(t *testing.T) {
 	assert.False(t, fileExists(filepath.Join(sitesDir, "tenant2_old.conf")))
 	assert.False(t, fileExists(filepath.Join(sitesDir, "tenant3_stale.conf")))
 }
+
+func TestGenerateConfig_WithDaemonProxy(t *testing.T) {
+	mgr := newTestNginxManager(t)
+
+	webroot := &runtime.WebrootInfo{
+		TenantName:     "tenant1",
+		Name:           "laravelapp",
+		Runtime:        "php",
+		RuntimeVersion: "8.5",
+		PublicFolder:   "public",
+	}
+	fqdns := []*FQDNInfo{
+		{FQDN: "example.com", SSLEnabled: false},
+	}
+	daemons := []DaemonProxyInfo{
+		{ProxyPath: "/app", Port: 14523},
+	}
+
+	config, err := mgr.GenerateConfig(webroot, fqdns, daemons...)
+	require.NoError(t, err)
+
+	// Verify daemon proxy location block.
+	assert.Contains(t, config, "location /app")
+	assert.Contains(t, config, "proxy_pass http://127.0.0.1:14523")
+	assert.Contains(t, config, "proxy_http_version 1.1")
+	assert.Contains(t, config, `proxy_set_header Upgrade $http_upgrade`)
+	assert.Contains(t, config, `proxy_set_header Connection "upgrade"`)
+	assert.Contains(t, config, "proxy_read_timeout 86400s")
+	assert.Contains(t, config, "proxy_send_timeout 86400s")
+
+	// PHP directives should still be present.
+	assert.Contains(t, config, "fastcgi_pass unix:/run/php/tenant1-php8.5.sock")
+}
+
+func TestGenerateConfig_WithMultipleDaemonProxies(t *testing.T) {
+	mgr := newTestNginxManager(t)
+
+	webroot := &runtime.WebrootInfo{
+		TenantName: "tenant1",
+		Name:       "nodeapp",
+		Runtime:    "node",
+	}
+	fqdns := []*FQDNInfo{
+		{FQDN: "example.com"},
+	}
+	daemons := []DaemonProxyInfo{
+		{ProxyPath: "/ws", Port: 10001},
+		{ProxyPath: "/api/stream", Port: 10002},
+	}
+
+	config, err := mgr.GenerateConfig(webroot, fqdns, daemons...)
+	require.NoError(t, err)
+
+	// Verify both daemon proxy location blocks.
+	assert.Contains(t, config, "location /ws")
+	assert.Contains(t, config, "proxy_pass http://127.0.0.1:10001")
+	assert.Contains(t, config, "location /api/stream")
+	assert.Contains(t, config, "proxy_pass http://127.0.0.1:10002")
+}
+
+func TestGenerateConfig_NoDaemons(t *testing.T) {
+	mgr := newTestNginxManager(t)
+
+	webroot := &runtime.WebrootInfo{
+		TenantName: "tenant1",
+		Name:       "staticsite",
+		Runtime:    "static",
+	}
+	fqdns := []*FQDNInfo{
+		{FQDN: "example.com"},
+	}
+
+	// No daemons passed — should work as before.
+	config, err := mgr.GenerateConfig(webroot, fqdns)
+	require.NoError(t, err)
+
+	// Should not contain any daemon proxy blocks.
+	assert.NotContains(t, config, "proxy_read_timeout 86400s")
+	assert.Contains(t, config, "server_name example.com")
+}

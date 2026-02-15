@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Trash2, Pencil, Globe } from 'lucide-react'
+import { Plus, Trash2, Pencil, Globe, Play, Pause, RotateCcw, Terminal, Clock } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { ResourceHeader } from '@/components/shared/resource-header'
@@ -22,12 +23,15 @@ import { TenantLogViewer } from '@/components/shared/tenant-log-viewer'
 import { formatDate } from '@/lib/utils'
 import { rules, validateField } from '@/lib/validation'
 import {
-  useWebroot, useFQDNs,
+  useWebroot, useFQDNs, useDaemons, useCronJobs,
   useUpdateWebroot, useCreateFQDN, useDeleteFQDN,
+  useCreateDaemon, useUpdateDaemon, useDeleteDaemon, useEnableDaemon, useDisableDaemon, useRetryDaemon,
+  useCreateCronJob, useUpdateCronJob, useDeleteCronJob, useEnableCronJob, useDisableCronJob, useRetryCronJob,
 } from '@/lib/hooks'
-import type { FQDN } from '@/lib/types'
+import type { FQDN, Daemon, CronJob } from '@/lib/types'
 
 const runtimes = ['php', 'node', 'python', 'ruby', 'static']
+const stopSignals = ['TERM', 'INT', 'QUIT', 'KILL', 'HUP']
 
 export function WebrootDetailPage() {
   const { id: tenantId, webrootId } = useParams({ from: '/auth/tenants/$id/webroots/$webrootId' as never })
@@ -47,11 +51,47 @@ export function WebrootDetailPage() {
   const [fqdnValue, setFqdnValue] = useState('')
   const [fqdnSsl, setFqdnSsl] = useState(true)
 
+  // Daemon state
+  const [createDaemonOpen, setCreateDaemonOpen] = useState(false)
+  const [editDaemon, setEditDaemon] = useState<Daemon | null>(null)
+  const [deleteDaemon, setDeleteDaemon] = useState<Daemon | null>(null)
+  const [daemonCommand, setDaemonCommand] = useState('')
+  const [daemonProxyPath, setDaemonProxyPath] = useState('')
+  const [daemonNumProcs, setDaemonNumProcs] = useState('1')
+  const [daemonStopSignal, setDaemonStopSignal] = useState('TERM')
+  const [daemonStopWait, setDaemonStopWait] = useState('30')
+  const [daemonMaxMem, setDaemonMaxMem] = useState('512')
+  const [daemonEnv, setDaemonEnv] = useState('')
+
+  // Cron job state
+  const [createCronOpen, setCreateCronOpen] = useState(false)
+  const [editCron, setEditCron] = useState<CronJob | null>(null)
+  const [deleteCron, setDeleteCron] = useState<CronJob | null>(null)
+  const [cronSchedule, setCronSchedule] = useState('')
+  const [cronCommand, setCronCommand] = useState('')
+  const [cronWorkDir, setCronWorkDir] = useState('')
+  const [cronTimeout, setCronTimeout] = useState('300')
+  const [cronMaxMem, setCronMaxMem] = useState('512')
+
   const { data: webroot, isLoading } = useWebroot(webrootId)
   const { data: fqdnsData, isLoading: fqdnsLoading } = useFQDNs(webrootId)
+  const { data: daemonsData, isLoading: daemonsLoading } = useDaemons(webrootId)
+  const { data: cronJobsData, isLoading: cronJobsLoading } = useCronJobs(webrootId)
   const updateMut = useUpdateWebroot()
   const createFqdnMut = useCreateFQDN()
   const deleteFqdnMut = useDeleteFQDN()
+  const createDaemonMut = useCreateDaemon()
+  const updateDaemonMut = useUpdateDaemon()
+  const deleteDaemonMut = useDeleteDaemon()
+  const enableDaemonMut = useEnableDaemon()
+  const disableDaemonMut = useDisableDaemon()
+  const retryDaemonMut = useRetryDaemon()
+  const createCronMut = useCreateCronJob()
+  const updateCronMut = useUpdateCronJob()
+  const deleteCronMut = useDeleteCronJob()
+  const enableCronMut = useEnableCronJob()
+  const disableCronMut = useDisableCronJob()
+  const retryCronMut = useRetryCronJob()
 
   if (isLoading || !webroot) {
     return <div className="space-y-6"><Skeleton className="h-10 w-64" /><Skeleton className="h-64 w-full" /></div>
@@ -83,7 +123,124 @@ export function WebrootDetailPage() {
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }
 
-  const columns: ColumnDef<FQDN>[] = [
+  // Daemon helpers
+  const parseEnvString = (s: string): Record<string, string> => {
+    const env: Record<string, string> = {}
+    for (const line of s.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+      const eqIdx = trimmed.indexOf('=')
+      if (eqIdx > 0) env[trimmed.substring(0, eqIdx)] = trimmed.substring(eqIdx + 1)
+    }
+    return env
+  }
+
+  const envToString = (env: Record<string, string>): string =>
+    Object.entries(env).map(([k, v]) => `${k}=${v}`).join('\n')
+
+  const resetDaemonForm = () => {
+    setDaemonCommand(''); setDaemonProxyPath(''); setDaemonNumProcs('1')
+    setDaemonStopSignal('TERM'); setDaemonStopWait('30'); setDaemonMaxMem('512'); setDaemonEnv('')
+    setTouched({})
+  }
+
+  const openCreateDaemon = () => { resetDaemonForm(); setCreateDaemonOpen(true) }
+
+  const openEditDaemon = (d: Daemon) => {
+    setDaemonCommand(d.command)
+    setDaemonProxyPath(d.proxy_path ?? '')
+    setDaemonNumProcs(String(d.num_procs))
+    setDaemonStopSignal(d.stop_signal)
+    setDaemonStopWait(String(d.stop_wait_secs))
+    setDaemonMaxMem(String(d.max_memory_mb))
+    setDaemonEnv(envToString(d.environment))
+    setEditDaemon(d)
+  }
+
+  const handleCreateDaemon = async () => {
+    setTouched({ daemonCmd: true })
+    if (!daemonCommand.trim()) return
+    try {
+      await createDaemonMut.mutateAsync({
+        webroot_id: webrootId,
+        command: daemonCommand,
+        proxy_path: daemonProxyPath || undefined,
+        num_procs: parseInt(daemonNumProcs) || 1,
+        stop_signal: daemonStopSignal,
+        stop_wait_secs: parseInt(daemonStopWait) || 30,
+        max_memory_mb: parseInt(daemonMaxMem) || 512,
+        environment: parseEnvString(daemonEnv),
+      })
+      toast.success('Daemon created'); setCreateDaemonOpen(false); resetDaemonForm()
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
+  }
+
+  const handleUpdateDaemon = async () => {
+    if (!editDaemon || !daemonCommand.trim()) return
+    try {
+      await updateDaemonMut.mutateAsync({
+        id: editDaemon.id,
+        command: daemonCommand,
+        proxy_path: daemonProxyPath || undefined,
+        num_procs: parseInt(daemonNumProcs) || 1,
+        stop_signal: daemonStopSignal,
+        stop_wait_secs: parseInt(daemonStopWait) || 30,
+        max_memory_mb: parseInt(daemonMaxMem) || 512,
+        environment: parseEnvString(daemonEnv),
+      })
+      toast.success('Daemon updated'); setEditDaemon(null)
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
+  }
+
+  // Cron job helpers
+  const resetCronForm = () => {
+    setCronSchedule(''); setCronCommand(''); setCronWorkDir(''); setCronTimeout('300'); setCronMaxMem('512')
+    setTouched({})
+  }
+
+  const openCreateCron = () => { resetCronForm(); setCreateCronOpen(true) }
+
+  const openEditCron = (c: CronJob) => {
+    setCronSchedule(c.schedule)
+    setCronCommand(c.command)
+    setCronWorkDir(c.working_directory)
+    setCronTimeout(String(c.timeout_seconds))
+    setCronMaxMem(String(c.max_memory_mb))
+    setEditCron(c)
+  }
+
+  const handleCreateCron = async () => {
+    setTouched({ cronSchedule: true, cronCmd: true })
+    if (!cronSchedule.trim() || !cronCommand.trim()) return
+    try {
+      await createCronMut.mutateAsync({
+        webroot_id: webrootId,
+        schedule: cronSchedule,
+        command: cronCommand,
+        working_directory: cronWorkDir || undefined,
+        timeout_seconds: parseInt(cronTimeout) || 300,
+        max_memory_mb: parseInt(cronMaxMem) || 512,
+      })
+      toast.success('Cron job created'); setCreateCronOpen(false); resetCronForm()
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
+  }
+
+  const handleUpdateCron = async () => {
+    if (!editCron || !cronSchedule.trim() || !cronCommand.trim()) return
+    try {
+      await updateCronMut.mutateAsync({
+        id: editCron.id,
+        schedule: cronSchedule,
+        command: cronCommand,
+        working_directory: cronWorkDir || undefined,
+        timeout_seconds: parseInt(cronTimeout) || 300,
+        max_memory_mb: parseInt(cronMaxMem) || 512,
+      })
+      toast.success('Cron job updated'); setEditCron(null)
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
+  }
+
+  const fqdnColumns: ColumnDef<FQDN>[] = [
     {
       accessorKey: 'fqdn', header: 'Hostname',
       cell: ({ row }) => <span className="font-medium">{row.original.fqdn}</span>,
@@ -109,6 +266,194 @@ export function WebrootDetailPage() {
       ),
     },
   ]
+
+  const daemonColumns: ColumnDef<Daemon>[] = [
+    {
+      accessorKey: 'name', header: 'Name',
+      cell: ({ row }) => <span className="font-mono text-sm">{row.original.name}</span>,
+    },
+    {
+      accessorKey: 'command', header: 'Command',
+      cell: ({ row }) => <span className="font-mono text-xs truncate max-w-[200px] block">{row.original.command}</span>,
+    },
+    {
+      accessorKey: 'proxy_path', header: 'Proxy Path',
+      cell: ({ row }) => row.original.proxy_path
+        ? <span className="font-mono text-sm">{row.original.proxy_path} :{row.original.proxy_port}</span>
+        : <span className="text-muted-foreground">-</span>,
+    },
+    {
+      accessorKey: 'enabled', header: 'Enabled',
+      cell: ({ row }) => row.original.enabled
+        ? <span className="text-green-600">Yes</span>
+        : <span className="text-muted-foreground">No</span>,
+    },
+    {
+      accessorKey: 'status', header: 'Status',
+      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => {
+        const d = row.original
+        return (
+          <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+            {d.status === 'failed' && (
+              <Button variant="ghost" size="icon" title="Retry" onClick={() => retryDaemonMut.mutateAsync(d.id).then(() => toast.success('Retrying')).catch(() => toast.error('Failed'))}>
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            )}
+            {d.status === 'active' && d.enabled && (
+              <Button variant="ghost" size="icon" title="Disable" onClick={() => disableDaemonMut.mutateAsync(d.id).then(() => toast.success('Disabling')).catch(() => toast.error('Failed'))}>
+                <Pause className="h-4 w-4" />
+              </Button>
+            )}
+            {d.status === 'active' && !d.enabled && (
+              <Button variant="ghost" size="icon" title="Enable" onClick={() => enableDaemonMut.mutateAsync(d.id).then(() => toast.success('Enabling')).catch(() => toast.error('Failed'))}>
+                <Play className="h-4 w-4" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" onClick={() => openEditDaemon(d)}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => setDeleteDaemon(d)}>
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          </div>
+        )
+      },
+    },
+  ]
+
+  const cronColumns: ColumnDef<CronJob>[] = [
+    {
+      accessorKey: 'name', header: 'Name',
+      cell: ({ row }) => <span className="font-mono text-sm">{row.original.name}</span>,
+    },
+    {
+      accessorKey: 'schedule', header: 'Schedule',
+      cell: ({ row }) => <span className="font-mono text-xs">{row.original.schedule}</span>,
+    },
+    {
+      accessorKey: 'command', header: 'Command',
+      cell: ({ row }) => <span className="font-mono text-xs truncate max-w-[200px] block">{row.original.command}</span>,
+    },
+    {
+      accessorKey: 'enabled', header: 'Enabled',
+      cell: ({ row }) => row.original.enabled
+        ? <span className="text-green-600">Yes</span>
+        : <span className="text-muted-foreground">No</span>,
+    },
+    {
+      accessorKey: 'status', header: 'Status',
+      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => {
+        const c = row.original
+        return (
+          <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+            {c.status === 'failed' && (
+              <Button variant="ghost" size="icon" title="Retry" onClick={() => retryCronMut.mutateAsync(c.id).then(() => toast.success('Retrying')).catch(() => toast.error('Failed'))}>
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            )}
+            {c.status === 'active' && c.enabled && (
+              <Button variant="ghost" size="icon" title="Disable" onClick={() => disableCronMut.mutateAsync(c.id).then(() => toast.success('Disabling')).catch(() => toast.error('Failed'))}>
+                <Pause className="h-4 w-4" />
+              </Button>
+            )}
+            {c.status === 'active' && !c.enabled && (
+              <Button variant="ghost" size="icon" title="Enable" onClick={() => enableCronMut.mutateAsync(c.id).then(() => toast.success('Enabling')).catch(() => toast.error('Failed'))}>
+                <Play className="h-4 w-4" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" onClick={() => openEditCron(c)}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => setDeleteCron(c)}>
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          </div>
+        )
+      },
+    },
+  ]
+
+  const daemonFormContent = (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Command *</Label>
+        <Input placeholder="php artisan reverb:start --port=$PORT" value={daemonCommand} onChange={(e) => setDaemonCommand(e.target.value)} onBlur={() => touch('daemonCmd')} />
+        {touched['daemonCmd'] && !daemonCommand.trim() && <p className="text-xs text-destructive">Required</p>}
+      </div>
+      <div className="space-y-2">
+        <Label>Proxy Path</Label>
+        <Input placeholder="/ws (optional, enables nginx proxy)" value={daemonProxyPath} onChange={(e) => setDaemonProxyPath(e.target.value)} />
+        <p className="text-xs text-muted-foreground">When set, nginx proxies this path to the daemon. $PORT env var is injected automatically.</p>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Num Procs</Label>
+          <Input type="number" min="1" max="8" value={daemonNumProcs} onChange={(e) => setDaemonNumProcs(e.target.value)} />
+        </div>
+        <div className="space-y-2">
+          <Label>Stop Signal</Label>
+          <Select value={daemonStopSignal} onValueChange={setDaemonStopSignal}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {stopSignals.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Stop Wait (seconds)</Label>
+          <Input type="number" min="1" max="300" value={daemonStopWait} onChange={(e) => setDaemonStopWait(e.target.value)} />
+        </div>
+        <div className="space-y-2">
+          <Label>Max Memory (MB)</Label>
+          <Input type="number" min="16" max="4096" value={daemonMaxMem} onChange={(e) => setDaemonMaxMem(e.target.value)} />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Environment</Label>
+        <Textarea placeholder="KEY=value (one per line)" value={daemonEnv} onChange={(e) => setDaemonEnv(e.target.value)} rows={3} className="font-mono text-sm" />
+      </div>
+    </div>
+  )
+
+  const cronFormContent = (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Schedule *</Label>
+        <Input placeholder="*/5 * * * *" value={cronSchedule} onChange={(e) => setCronSchedule(e.target.value)} onBlur={() => touch('cronSchedule')} className="font-mono" />
+        {touched['cronSchedule'] && !cronSchedule.trim() && <p className="text-xs text-destructive">Required</p>}
+        <p className="text-xs text-muted-foreground">Cron expression (minute hour day month weekday)</p>
+      </div>
+      <div className="space-y-2">
+        <Label>Command *</Label>
+        <Input placeholder="php artisan schedule:run" value={cronCommand} onChange={(e) => setCronCommand(e.target.value)} onBlur={() => touch('cronCmd')} />
+        {touched['cronCmd'] && !cronCommand.trim() && <p className="text-xs text-destructive">Required</p>}
+      </div>
+      <div className="space-y-2">
+        <Label>Working Directory</Label>
+        <Input placeholder="(defaults to webroot root)" value={cronWorkDir} onChange={(e) => setCronWorkDir(e.target.value)} />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Timeout (seconds)</Label>
+          <Input type="number" min="1" max="86400" value={cronTimeout} onChange={(e) => setCronTimeout(e.target.value)} />
+        </div>
+        <div className="space-y-2">
+          <Label>Max Memory (MB)</Label>
+          <Input type="number" min="16" max="4096" value={cronMaxMem} onChange={(e) => setCronMaxMem(e.target.value)} />
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="space-y-6">
@@ -136,6 +481,7 @@ export function WebrootDetailPage() {
         <span className="ml-4">Created: {formatDate(webroot.created_at)}</span>
       </div>
 
+      {/* FQDNs */}
       <div>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">FQDNs</h2>
@@ -146,8 +492,38 @@ export function WebrootDetailPage() {
         {!fqdnsLoading && (fqdnsData?.items?.length ?? 0) === 0 ? (
           <EmptyState icon={Globe} title="No FQDNs" description="Add a domain name to this webroot." action={{ label: 'Add FQDN', onClick: () => setCreateFqdnOpen(true) }} />
         ) : (
-          <DataTable columns={columns} data={fqdnsData?.items ?? []} loading={fqdnsLoading} searchColumn="fqdn" searchPlaceholder="Search FQDNs..."
+          <DataTable columns={fqdnColumns} data={fqdnsData?.items ?? []} loading={fqdnsLoading} searchColumn="fqdn" searchPlaceholder="Search FQDNs..."
             onRowClick={(f) => navigate({ to: '/tenants/$id/fqdns/$fqdnId', params: { id: tenantId, fqdnId: f.id } })} />
+        )}
+      </div>
+
+      {/* Daemons */}
+      <div>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Daemons</h2>
+          <Button size="sm" onClick={openCreateDaemon}>
+            <Plus className="mr-2 h-4 w-4" /> Add Daemon
+          </Button>
+        </div>
+        {!daemonsLoading && (daemonsData?.items?.length ?? 0) === 0 ? (
+          <EmptyState icon={Terminal} title="No Daemons" description="Add a long-running process (WebSocket server, queue worker, etc.)." action={{ label: 'Add Daemon', onClick: openCreateDaemon }} />
+        ) : (
+          <DataTable columns={daemonColumns} data={daemonsData?.items ?? []} loading={daemonsLoading} searchColumn="name" searchPlaceholder="Search daemons..." />
+        )}
+      </div>
+
+      {/* Cron Jobs */}
+      <div>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Cron Jobs</h2>
+          <Button size="sm" onClick={openCreateCron}>
+            <Plus className="mr-2 h-4 w-4" /> Add Cron Job
+          </Button>
+        </div>
+        {!cronJobsLoading && (cronJobsData?.items?.length ?? 0) === 0 ? (
+          <EmptyState icon={Clock} title="No Cron Jobs" description="Schedule recurring tasks for this webroot." action={{ label: 'Add Cron Job', onClick: openCreateCron }} />
+        ) : (
+          <DataTable columns={cronColumns} data={cronJobsData?.items ?? []} loading={cronJobsLoading} searchColumn="name" searchPlaceholder="Search cron jobs..." />
         )}
       </div>
 
@@ -213,11 +589,79 @@ export function WebrootDetailPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Create Daemon */}
+      <Dialog open={createDaemonOpen} onOpenChange={setCreateDaemonOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Add Daemon</DialogTitle></DialogHeader>
+          {daemonFormContent}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateDaemonOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateDaemon} disabled={createDaemonMut.isPending}>
+              {createDaemonMut.isPending ? 'Creating...' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Daemon */}
+      <Dialog open={!!editDaemon} onOpenChange={(o) => !o && setEditDaemon(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Edit Daemon</DialogTitle></DialogHeader>
+          {daemonFormContent}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDaemon(null)}>Cancel</Button>
+            <Button onClick={handleUpdateDaemon} disabled={updateDaemonMut.isPending}>
+              {updateDaemonMut.isPending ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Cron Job */}
+      <Dialog open={createCronOpen} onOpenChange={setCreateCronOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Add Cron Job</DialogTitle></DialogHeader>
+          {cronFormContent}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateCronOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateCron} disabled={createCronMut.isPending}>
+              {createCronMut.isPending ? 'Creating...' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Cron Job */}
+      <Dialog open={!!editCron} onOpenChange={(o) => !o && setEditCron(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Edit Cron Job</DialogTitle></DialogHeader>
+          {cronFormContent}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditCron(null)}>Cancel</Button>
+            <Button onClick={handleUpdateCron} disabled={updateCronMut.isPending}>
+              {updateCronMut.isPending ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete FQDN */}
       <ConfirmDialog open={!!deleteFqdn} onOpenChange={(o) => !o && setDeleteFqdn(null)} title="Delete FQDN"
         description={`Delete "${deleteFqdn?.fqdn}"? Certificates and email accounts will be removed.`}
         confirmLabel="Delete" variant="destructive" loading={deleteFqdnMut.isPending}
         onConfirm={async () => { try { await deleteFqdnMut.mutateAsync(deleteFqdn!.id); toast.success('FQDN deleted'); setDeleteFqdn(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
+
+      {/* Delete Daemon */}
+      <ConfirmDialog open={!!deleteDaemon} onOpenChange={(o) => !o && setDeleteDaemon(null)} title="Delete Daemon"
+        description={`Delete daemon "${deleteDaemon?.name}"? The process will be stopped and removed from all nodes.`}
+        confirmLabel="Delete" variant="destructive" loading={deleteDaemonMut.isPending}
+        onConfirm={async () => { try { await deleteDaemonMut.mutateAsync(deleteDaemon!.id); toast.success('Daemon deleted'); setDeleteDaemon(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
+
+      {/* Delete Cron Job */}
+      <ConfirmDialog open={!!deleteCron} onOpenChange={(o) => !o && setDeleteCron(null)} title="Delete Cron Job"
+        description={`Delete cron job "${deleteCron?.name}"? The timer will be stopped and removed from all nodes.`}
+        confirmLabel="Delete" variant="destructive" loading={deleteCronMut.isPending}
+        onConfirm={async () => { try { await deleteCronMut.mutateAsync(deleteCron!.id); toast.success('Cron job deleted'); setDeleteCron(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
     </div>
   )
 }

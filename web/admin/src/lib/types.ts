@@ -250,6 +250,43 @@ export interface EmailAutoReply {
   updated_at: string
 }
 
+export interface CronJob {
+  id: string
+  tenant_id: string
+  webroot_id: string
+  name: string
+  schedule: string
+  command: string
+  working_directory: string
+  timeout_seconds: number
+  max_memory_mb: number
+  enabled: boolean
+  status: string
+  status_message?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Daemon {
+  id: string
+  tenant_id: string
+  webroot_id: string
+  name: string
+  command: string
+  proxy_path?: string | null
+  proxy_port?: number | null
+  num_procs: number
+  stop_signal: string
+  stop_wait_secs: number
+  max_memory_mb: number
+  environment: Record<string, string>
+  enabled: boolean
+  status: string
+  status_message?: string
+  created_at: string
+  updated_at: string
+}
+
 export interface SSHKey {
   id: string
   tenant_id: string

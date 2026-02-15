@@ -45,6 +45,7 @@ type DesiredWebroot struct {
 	Status         string           `json:"status"`
 	FQDNs          []DesiredFQDN    `json:"fqdns,omitempty"`
 	CronJobs       []DesiredCronJob `json:"cron_jobs,omitempty"`
+	Daemons        []DesiredDaemon  `json:"daemons,omitempty"`
 }
 
 // DesiredCronJob is a cron job in the desired state.
@@ -52,6 +53,15 @@ type DesiredCronJob struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`
 	Enabled bool   `json:"enabled"`
+}
+
+// DesiredDaemon is a daemon in the desired state.
+type DesiredDaemon struct {
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	Enabled   bool    `json:"enabled"`
+	ProxyPath *string `json:"proxy_path,omitempty"`
+	ProxyPort *int    `json:"proxy_port,omitempty"`
 }
 
 // DesiredFQDN is an FQDN in the desired state.

@@ -246,8 +246,33 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		}
 	}
 
+	// Fetch daemons per webroot for nginx proxy locations during convergence.
+	webrootDaemons := make(map[string][]model.Daemon) // keyed by webroot ID
+	for _, entry := range webrootEntries {
+		var daemons []model.Daemon
+		err = workflow.ExecuteActivity(ctx, "ListDaemonsByWebroot", entry.webroot.ID).Get(ctx, &daemons)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("list daemons for webroot %s: %v", entry.webroot.ID, err))
+			continue
+		}
+		if len(daemons) > 0 {
+			webrootDaemons[entry.webroot.ID] = daemons
+		}
+	}
+
 	// Create webroots on each node.
 	for _, entry := range webrootEntries {
+		// Build daemon proxy info for this webroot's nginx config.
+		var daemonProxies []activity.DaemonProxyInfo
+		for _, d := range webrootDaemons[entry.webroot.ID] {
+			if d.ProxyPath != nil && d.ProxyPort != nil {
+				daemonProxies = append(daemonProxies, activity.DaemonProxyInfo{
+					ProxyPath: *d.ProxyPath,
+					Port:      *d.ProxyPort,
+				})
+			}
+		}
+
 		for _, node := range nodes {
 			nodeCtx := nodeActivityCtx(ctx, node.ID)
 			err = workflow.ExecuteActivity(nodeCtx, "CreateWebroot", activity.CreateWebrootParams{
@@ -259,6 +284,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				RuntimeConfig:  string(entry.webroot.RuntimeConfig),
 				PublicFolder:   entry.webroot.PublicFolder,
 				FQDNs:          entry.fqdns,
+				Daemons:        daemonProxies,
 			}).Get(ctx, nil)
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("create webroot %s on node %s: %v", entry.webroot.ID, node.ID, err))
@@ -312,6 +338,56 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 					err = workflow.ExecuteActivity(nodeCtx, "EnableCronJobTimer", timerParams).Get(ctx, nil)
 					if err != nil {
 						errs = append(errs, fmt.Sprintf("enable cron timer %s on node %s: %v", job.ID, node.ID, err))
+					}
+				}
+			}
+		}
+	}
+
+	// Converge daemons for each webroot.
+	for _, entry := range webrootEntries {
+		daemons := webrootDaemons[entry.webroot.ID]
+		for _, daemon := range daemons {
+			if daemon.Status != model.StatusActive {
+				continue
+			}
+
+			createParams := activity.CreateDaemonParams{
+				ID:           daemon.ID,
+				TenantName:   entry.tenant.Name,
+				WebrootName:  entry.webroot.Name,
+				Name:         daemon.Name,
+				Command:      daemon.Command,
+				ProxyPort:    daemon.ProxyPort,
+				NumProcs:     daemon.NumProcs,
+				StopSignal:   daemon.StopSignal,
+				StopWaitSecs: daemon.StopWaitSecs,
+				MaxMemoryMB:  daemon.MaxMemoryMB,
+				Environment:  daemon.Environment,
+			}
+
+			// Write supervisord config on all nodes.
+			for _, node := range nodes {
+				nodeCtx := nodeActivityCtx(ctx, node.ID)
+				err = workflow.ExecuteActivity(nodeCtx, "CreateDaemonConfig", createParams).Get(ctx, nil)
+				if err != nil {
+					errs = append(errs, fmt.Sprintf("create daemon %s on node %s: %v", daemon.ID, node.ID, err))
+				}
+			}
+
+			// Disable daemon on all nodes if not enabled.
+			if !daemon.Enabled {
+				disableParams := activity.DaemonEnableParams{
+					ID:          daemon.ID,
+					TenantName:  entry.tenant.Name,
+					WebrootName: entry.webroot.Name,
+					Name:        daemon.Name,
+				}
+				for _, node := range nodes {
+					nodeCtx := nodeActivityCtx(ctx, node.ID)
+					err = workflow.ExecuteActivity(nodeCtx, "DisableDaemon", disableParams).Get(ctx, nil)
+					if err != nil {
+						errs = append(errs, fmt.Sprintf("disable daemon %s on node %s: %v", daemon.ID, node.ID, err))
 					}
 				}
 			}
