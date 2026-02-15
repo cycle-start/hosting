@@ -15,6 +15,8 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/edvin/hosting/internal/model"
 )
 
 // validNameRe matches only alphanumeric characters and underscores.
@@ -467,4 +469,109 @@ func (m *DatabaseManager) DeleteUser(ctx context.Context, dbName, username strin
 
 	sql := fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%'", username)
 	return m.execMySQL(ctx, sql)
+}
+
+// SyncUserHosts rebuilds MySQL user host patterns for all users of a database
+// based on the current access rules. When rules exist, each user gets one MySQL
+// account per allowed CIDR. When no rules exist, users get host '%' (any host).
+func (m *DatabaseManager) SyncUserHosts(ctx context.Context, dbName string, users []model.DatabaseUser, rules []model.DatabaseAccessRule) error {
+	if err := validateName(dbName); err != nil {
+		return err
+	}
+
+	// Determine the host patterns to use.
+	hosts := []string{"%"} // default: any host
+	if len(rules) > 0 {
+		hosts = make([]string, len(rules))
+		for i, rule := range rules {
+			hosts[i] = cidrToMySQLHost(rule.CIDR)
+		}
+	}
+
+	for _, user := range users {
+		if err := validateName(user.Username); err != nil {
+			return err
+		}
+
+		m.logger.Info().
+			Str("database", dbName).
+			Str("username", user.Username).
+			Strs("hosts", hosts).
+			Msg("syncing user host patterns")
+
+		escapedPassword := strings.ReplaceAll(user.Password, "'", "\\'")
+		privStr := strings.Join(user.Privileges, ", ")
+		if privStr == "" {
+			privStr = "ALL PRIVILEGES"
+		}
+
+		// Drop all existing user entries by scanning mysql.user for matching usernames.
+		baseArgs, err := m.mysqlArgs()
+		if err != nil {
+			return err
+		}
+		scanSQL := fmt.Sprintf("SELECT Host FROM mysql.user WHERE User = '%s'", user.Username)
+		scanCmd := exec.CommandContext(ctx, "mysql", append(baseArgs, "-N", "-e", scanSQL)...)
+		scanOut, _ := scanCmd.CombinedOutput()
+		for _, host := range strings.Split(strings.TrimSpace(string(scanOut)), "\n") {
+			host = strings.TrimSpace(host)
+			if host != "" {
+				_ = m.execMySQL(ctx, fmt.Sprintf("DROP USER IF EXISTS '%s'@'%s'", user.Username, host))
+			}
+		}
+
+		// Create user entries for each allowed host.
+		for _, host := range hosts {
+			createSQL := fmt.Sprintf("CREATE USER '%s'@'%s' IDENTIFIED WITH mysql_native_password BY '%s'",
+				user.Username, host, escapedPassword)
+			if err := m.execMySQL(ctx, createSQL); err != nil {
+				return fmt.Errorf("create user %s@%s: %w", user.Username, host, err)
+			}
+
+			grantSQL := fmt.Sprintf("GRANT %s ON `%s`.* TO '%s'@'%s'", privStr, dbName, user.Username, host)
+			if err := m.execMySQL(ctx, grantSQL); err != nil {
+				return fmt.Errorf("grant privileges to %s@%s: %w", user.Username, host, err)
+			}
+		}
+	}
+
+	return m.execMySQL(ctx, "FLUSH PRIVILEGES")
+}
+
+// cidrToMySQLHost converts a CIDR notation to a MySQL host pattern.
+// Examples:
+//   - "10.0.0.0/8" -> "10.%.%.%"
+//   - "192.168.1.0/24" -> "192.168.1.%"
+//   - "10.0.0.5/32" -> "10.0.0.5"
+//   - For IPv6, returns the full CIDR as MySQL supports it since 8.0.23.
+func cidrToMySQLHost(cidr string) string {
+	// Parse the CIDR.
+	ip, ipNet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		// If it's not a valid CIDR, return it as-is (could be a hostname or IP).
+		return cidr
+	}
+
+	// IPv6: MySQL 8.0.23+ supports CIDR-like notation with netmask.
+	if ip.To4() == nil {
+		ones, _ := ipNet.Mask.Size()
+		return fmt.Sprintf("%s/%d", ipNet.IP.String(), ones)
+	}
+
+	// IPv4: Convert to MySQL wildcard pattern.
+	ones, _ := ipNet.Mask.Size()
+	parts := strings.Split(ipNet.IP.String(), ".")
+
+	switch {
+	case ones == 32:
+		return ip.String()
+	case ones >= 24:
+		return parts[0] + "." + parts[1] + "." + parts[2] + ".%"
+	case ones >= 16:
+		return parts[0] + "." + parts[1] + ".%.%"
+	case ones >= 8:
+		return parts[0] + ".%.%.%"
+	default:
+		return "%"
+	}
 }

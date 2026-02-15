@@ -163,6 +163,8 @@ func main() {
 	w.RegisterWorkflow(workflow.CleanupAuditLogsWorkflow)
 	w.RegisterWorkflow(workflow.CleanupOldBackupsWorkflow)
 	w.RegisterWorkflow(workflow.CheckReplicationHealthWorkflow)
+	w.RegisterWorkflow(workflow.SyncEgressRulesWorkflow)
+	w.RegisterWorkflow(workflow.SyncDatabaseAccessWorkflow)
 
 	if cfg.MetricsAddr != "" {
 		metricsSrv := metrics.NewServer(cfg.MetricsAddr)

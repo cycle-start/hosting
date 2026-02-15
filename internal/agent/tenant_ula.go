@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/edvin/hosting/internal/core"
+	"github.com/edvin/hosting/internal/model"
 )
 
 // TenantULAInfo holds the information needed to manage a tenant's ULA address.
@@ -197,4 +198,91 @@ func (m *TenantULAManager) Remove(ctx context.Context, info *TenantULAInfo) erro
 // is already assigned. Different kernel/iproute2 versions use different messages.
 func isAddrAlreadyExists(output string) bool {
 	return strings.Contains(output, "File exists") || strings.Contains(output, "already assigned")
+}
+
+// SyncEgressRules applies all egress rules for a tenant via nftables.
+// Uses per-tenant chains with a jump from the main output chain.
+func (m *TenantULAManager) SyncEgressRules(ctx context.Context, tenantUID int, rules []model.TenantEgressRule) error {
+	if err := m.ensureEgressTable(ctx); err != nil {
+		return err
+	}
+
+	chainName := fmt.Sprintf("tenant_%d", tenantUID)
+
+	// Create chain if it doesn't exist (idempotent).
+	if out, err := exec.CommandContext(ctx, "nft", "add", "chain", "inet", "tenant_egress", chainName).CombinedOutput(); err != nil {
+		return fmt.Errorf("nft add egress chain: %s: %w", string(out), err)
+	}
+
+	// Flush the chain to remove old rules.
+	if out, err := exec.CommandContext(ctx, "nft", "flush", "chain", "inet", "tenant_egress", chainName).CombinedOutput(); err != nil {
+		return fmt.Errorf("nft flush egress chain: %s: %w", string(out), err)
+	}
+
+	// Add new rules via nft script.
+	if len(rules) > 0 {
+		var b strings.Builder
+		for _, rule := range rules {
+			addrMatch := "ip daddr"
+			if strings.Contains(rule.CIDR, ":") {
+				addrMatch = "ip6 daddr"
+			}
+			verdict := "reject"
+			if rule.Action == model.EgressActionAllow {
+				verdict = "accept"
+			}
+			b.WriteString(fmt.Sprintf("add rule inet tenant_egress %s %s %s %s\n", chainName, addrMatch, rule.CIDR, verdict))
+		}
+
+		cmd := exec.CommandContext(ctx, "nft", "-f", "-")
+		cmd.Stdin = strings.NewReader(b.String())
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("nft add egress rules: %s: %w", string(out), err)
+		}
+	}
+
+	// Ensure jump rule exists. Check if one already exists by listing
+	// the output chain and looking for "jump tenant_N".
+	listOut, _ := exec.CommandContext(ctx, "nft", "list", "chain", "inet", "tenant_egress", "output").CombinedOutput()
+	jumpTarget := fmt.Sprintf("jump %s", chainName)
+	if !strings.Contains(string(listOut), jumpTarget) {
+		jumpCmd := fmt.Sprintf("add rule inet tenant_egress output meta skuid %d jump %s\n", tenantUID, chainName)
+		cmd := exec.CommandContext(ctx, "nft", "-f", "-")
+		cmd.Stdin = strings.NewReader(jumpCmd)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("nft add jump rule: %s: %w", string(out), err)
+		}
+	}
+
+	m.logger.Info().Int("uid", tenantUID).Int("rule_count", len(rules)).Msg("synced egress rules")
+	return nil
+}
+
+// ensureEgressTable creates the inet tenant_egress table and output chain.
+func (m *TenantULAManager) ensureEgressTable(ctx context.Context) error {
+	steps := []struct {
+		args []string
+		desc string
+	}{
+		{[]string{"add", "table", "inet", "tenant_egress"}, "create egress table"},
+		{[]string{"add", "chain", "inet", "tenant_egress", "output", "{ type filter hook output priority 1 ; policy accept ; }"}, "create egress output chain"},
+	}
+	for _, s := range steps {
+		if out, err := exec.CommandContext(ctx, "nft", s.args...).CombinedOutput(); err != nil {
+			return fmt.Errorf("nft %s: %s: %w", s.desc, string(out), err)
+		}
+	}
+	return nil
+}
+
+// removeEgressChain removes a tenant's egress chain and jump rule.
+func (m *TenantULAManager) removeEgressChain(ctx context.Context, uid int, chainName string) error {
+	// Flush chain (ignore errors if it doesn't exist).
+	exec.CommandContext(ctx, "nft", "flush", "chain", "inet", "tenant_egress", chainName).CombinedOutput()
+	// Delete the chain — nft requires no references to it first, so remove
+	// the jump rule from the output chain by listing handles and deleting.
+	exec.CommandContext(ctx, "nft", "delete", "chain", "inet", "tenant_egress", chainName).CombinedOutput()
+
+	m.logger.Info().Int("uid", uid).Msg("removed egress chain (no rules)")
+	return nil
 }

@@ -1,6 +1,10 @@
 package activity
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/edvin/hosting/internal/model"
+)
 
 // CreateTenantParams holds parameters for creating a tenant on a node.
 type CreateTenantParams struct {
@@ -350,4 +354,17 @@ type ConfigureULARoutesParams struct {
 type UpdateShardConfigParams struct {
 	ShardID string
 	Config  json.RawMessage
+}
+
+// SyncEgressRulesParams holds parameters for syncing nftables egress rules on a node.
+type SyncEgressRulesParams struct {
+	TenantUID int
+	Rules     []model.TenantEgressRule
+}
+
+// SyncDatabaseUserHostsParams holds parameters for rebuilding MySQL user host patterns.
+type SyncDatabaseUserHostsParams struct {
+	DatabaseName string
+	Users        []model.DatabaseUser
+	AccessRules  []model.DatabaseAccessRule
 }

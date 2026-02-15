@@ -874,6 +874,26 @@ func (a *NodeLocal) ConfigureULARoutes(ctx context.Context, params ConfigureULAR
 }
 
 // --------------------------------------------------------------------------
+// Egress rules activities
+// --------------------------------------------------------------------------
+
+// SyncEgressRules applies the full set of egress rules for a tenant via nftables.
+func (a *NodeLocal) SyncEgressRules(ctx context.Context, params SyncEgressRulesParams) error {
+	a.logger.Info().Int("uid", params.TenantUID).Int("rule_count", len(params.Rules)).Msg("SyncEgressRules")
+	return asNonRetryable(a.tenantULA.SyncEgressRules(ctx, params.TenantUID, params.Rules))
+}
+
+// --------------------------------------------------------------------------
+// Database access rules activities
+// --------------------------------------------------------------------------
+
+// SyncDatabaseUserHosts rebuilds MySQL users with host patterns based on access rules.
+func (a *NodeLocal) SyncDatabaseUserHosts(ctx context.Context, params SyncDatabaseUserHostsParams) error {
+	a.logger.Info().Str("database", params.DatabaseName).Int("user_count", len(params.Users)).Int("rule_count", len(params.AccessRules)).Msg("SyncDatabaseUserHosts")
+	return asNonRetryable(a.database.SyncUserHosts(ctx, params.DatabaseName, params.Users, params.AccessRules))
+}
+
+// --------------------------------------------------------------------------
 // Env file helpers
 // --------------------------------------------------------------------------
 

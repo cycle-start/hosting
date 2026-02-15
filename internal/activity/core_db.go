@@ -1636,3 +1636,130 @@ func (a *CoreDB) ListCronJobsByTenant(ctx context.Context, tenantID string) ([]m
 	}
 	return jobs, rows.Err()
 }
+
+// SetTenantEgressRulesProvisioning sets all pending/deleting rules for a tenant to provisioning.
+func (a *CoreDB) SetTenantEgressRulesProvisioning(ctx context.Context, tenantID string) error {
+	_, err := a.db.Exec(ctx,
+		`UPDATE tenant_egress_rules SET status = 'provisioning', updated_at = now()
+		 WHERE tenant_id = $1 AND status IN ('pending', 'deleting', 'failed')`, tenantID)
+	if err != nil {
+		return fmt.Errorf("set tenant egress rules provisioning: %w", err)
+	}
+	return nil
+}
+
+// GetActiveEgressRules returns all active + provisioning egress rules for a tenant.
+func (a *CoreDB) GetActiveEgressRules(ctx context.Context, tenantID string) ([]model.TenantEgressRule, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, tenant_id, cidr, action, description, status, status_message, created_at, updated_at
+		 FROM tenant_egress_rules
+		 WHERE tenant_id = $1 AND status NOT IN ('deleting', 'deleted')
+		 ORDER BY id`, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("get active egress rules: %w", err)
+	}
+	defer rows.Close()
+
+	var rules []model.TenantEgressRule
+	for rows.Next() {
+		var r model.TenantEgressRule
+		if err := rows.Scan(&r.ID, &r.TenantID, &r.CIDR, &r.Action, &r.Description,
+			&r.Status, &r.StatusMessage, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan egress rule: %w", err)
+		}
+		rules = append(rules, r)
+	}
+	return rules, rows.Err()
+}
+
+// FinalizeTenantEgressRules sets provisioning rules to active and hard-deletes deleting rules.
+func (a *CoreDB) FinalizeTenantEgressRules(ctx context.Context, tenantID string) error {
+	_, err := a.db.Exec(ctx,
+		`UPDATE tenant_egress_rules SET status = 'active', updated_at = now()
+		 WHERE tenant_id = $1 AND status = 'provisioning'`, tenantID)
+	if err != nil {
+		return fmt.Errorf("finalize tenant egress rules (active): %w", err)
+	}
+	// Rules that were being deleted get hard-deleted now that nftables is synced.
+	_, err = a.db.Exec(ctx,
+		`DELETE FROM tenant_egress_rules WHERE tenant_id = $1 AND status = 'deleting'`, tenantID)
+	if err != nil {
+		return fmt.Errorf("finalize tenant egress rules (delete): %w", err)
+	}
+	return nil
+}
+
+// SetDatabaseAccessRulesProvisioning sets all pending/deleting rules for a database to provisioning.
+func (a *CoreDB) SetDatabaseAccessRulesProvisioning(ctx context.Context, databaseID string) error {
+	_, err := a.db.Exec(ctx,
+		`UPDATE database_access_rules SET status = 'provisioning', updated_at = now()
+		 WHERE database_id = $1 AND status IN ('pending', 'deleting', 'failed')`, databaseID)
+	if err != nil {
+		return fmt.Errorf("set database access rules provisioning: %w", err)
+	}
+	return nil
+}
+
+// GetActiveDatabaseAccessRules returns all active + provisioning access rules for a database.
+func (a *CoreDB) GetActiveDatabaseAccessRules(ctx context.Context, databaseID string) ([]model.DatabaseAccessRule, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, database_id, cidr, description, status, status_message, created_at, updated_at
+		 FROM database_access_rules
+		 WHERE database_id = $1 AND status NOT IN ('deleting', 'deleted')
+		 ORDER BY id`, databaseID)
+	if err != nil {
+		return nil, fmt.Errorf("get active database access rules: %w", err)
+	}
+	defer rows.Close()
+
+	var rules []model.DatabaseAccessRule
+	for rows.Next() {
+		var r model.DatabaseAccessRule
+		if err := rows.Scan(&r.ID, &r.DatabaseID, &r.CIDR, &r.Description,
+			&r.Status, &r.StatusMessage, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan database access rule: %w", err)
+		}
+		rules = append(rules, r)
+	}
+	return rules, rows.Err()
+}
+
+// GetActiveDatabaseUsers returns all active database users for a database.
+func (a *CoreDB) GetActiveDatabaseUsers(ctx context.Context, databaseID string) ([]model.DatabaseUser, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, database_id, username, password, privileges, status, status_message, created_at, updated_at
+		 FROM database_users
+		 WHERE database_id = $1 AND status = 'active'
+		 ORDER BY id`, databaseID)
+	if err != nil {
+		return nil, fmt.Errorf("get active database users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []model.DatabaseUser
+	for rows.Next() {
+		var u model.DatabaseUser
+		if err := rows.Scan(&u.ID, &u.DatabaseID, &u.Username, &u.Password,
+			&u.Privileges, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan database user: %w", err)
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
+// FinalizeDatabaseAccessRules sets provisioning rules to active and hard-deletes deleting rules.
+func (a *CoreDB) FinalizeDatabaseAccessRules(ctx context.Context, databaseID string) error {
+	_, err := a.db.Exec(ctx,
+		`UPDATE database_access_rules SET status = 'active', updated_at = now()
+		 WHERE database_id = $1 AND status = 'provisioning'`, databaseID)
+	if err != nil {
+		return fmt.Errorf("finalize database access rules (active): %w", err)
+	}
+	_, err = a.db.Exec(ctx,
+		`DELETE FROM database_access_rules WHERE database_id = $1 AND status = 'deleting'`, databaseID)
+	if err != nil {
+		return fmt.Errorf("finalize database access rules (delete): %w", err)
+	}
+	return nil
+}
