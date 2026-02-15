@@ -20,7 +20,28 @@ func NewDaemonService(db DB, tc temporalclient.Client) *DaemonService {
 }
 
 func (s *DaemonService) Create(ctx context.Context, daemon *model.Daemon) error {
-	// TODO: Assign node_id via round-robin across active shard nodes
+	// Assign node_id via least-loaded round-robin across active shard nodes.
+	var shardID *string
+	err := s.db.QueryRow(ctx, "SELECT shard_id FROM tenants WHERE id = $1", daemon.TenantID).Scan(&shardID)
+	if err != nil {
+		return fmt.Errorf("look up tenant shard: %w", err)
+	}
+
+	if shardID != nil {
+		var nodeID string
+		err = s.db.QueryRow(ctx,
+			`SELECT n.id FROM nodes n
+			 LEFT JOIN daemons d ON d.node_id = n.id AND d.status != 'deleted'
+			 WHERE n.shard_id = $1 AND n.status = 'active'
+			 GROUP BY n.id
+			 ORDER BY COUNT(d.id) ASC, n.id ASC
+			 LIMIT 1`, *shardID,
+		).Scan(&nodeID)
+		if err != nil {
+			return fmt.Errorf("find least-loaded node in shard %s: %w", *shardID, err)
+		}
+		daemon.NodeID = &nodeID
+	}
 
 	envJSON, err := json.Marshal(daemon.Environment)
 	if err != nil {

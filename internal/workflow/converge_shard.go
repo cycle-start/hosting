@@ -10,6 +10,7 @@ import (
 
 	"github.com/edvin/hosting/internal/activity"
 	"github.com/edvin/hosting/internal/agent"
+	"github.com/edvin/hosting/internal/core"
 	"github.com/edvin/hosting/internal/model"
 )
 
@@ -257,15 +258,37 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		}
 	}
 
+	// Build a node index map for ULA computation.
+	nodeShardIndex := make(map[string]int) // node ID -> shard_index
+	for _, node := range nodes {
+		if node.ShardIndex != nil {
+			nodeShardIndex[node.ID] = *node.ShardIndex
+		}
+	}
+
+	// Determine the cluster ID from the first node (all nodes in a shard share the same cluster).
+	clusterID := ""
+	if len(nodes) > 0 {
+		clusterID = nodes[0].ClusterID
+	}
+
 	// Create webroots on each node.
 	for _, entry := range webrootEntries {
 		// Build daemon proxy info for this webroot's nginx config.
 		var daemonProxies []activity.DaemonProxyInfo
 		for _, d := range webrootDaemons[entry.webroot.ID] {
 			if d.ProxyPath != nil && d.ProxyPort != nil {
+				targetIP := "127.0.0.1"
+				if d.NodeID != nil {
+					if idx, ok := nodeShardIndex[*d.NodeID]; ok {
+						targetIP = core.ComputeTenantULA(clusterID, idx, entry.tenant.UID)
+					}
+				}
 				daemonProxies = append(daemonProxies, activity.DaemonProxyInfo{
 					ProxyPath: *d.ProxyPath,
 					Port:      *d.ProxyPort,
+					TargetIP:  targetIP,
+					ProxyURL:  core.FormatDaemonProxyURL(targetIP, *d.ProxyPort),
 				})
 			}
 		}

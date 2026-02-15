@@ -60,7 +60,7 @@ server {
     }
 {{ range .Daemons }}
     location {{ .ProxyPath }} {
-        proxy_pass http://127.0.0.1:{{ .Port }};
+        proxy_pass {{ .ProxyURL }};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -151,6 +151,8 @@ func (m *NginxManager) SetShardName(name string) {
 type DaemonProxyInfo struct {
 	ProxyPath string
 	Port      int
+	TargetIP  string // IPv6 ULA or 127.0.0.1 fallback
+	ProxyURL  string // Pre-formatted proxy_pass URL (e.g. "http://[fd00:1:2::a]:14523")
 }
 
 type nginxTemplateData struct {

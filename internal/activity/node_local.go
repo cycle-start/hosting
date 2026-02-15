@@ -183,7 +183,7 @@ func (a *NodeLocal) CreateWebroot(ctx context.Context, params CreateWebrootParam
 	// Convert daemon proxy info for nginx generation.
 	daemonProxies := make([]agent.DaemonProxyInfo, len(params.Daemons))
 	for i, d := range params.Daemons {
-		daemonProxies[i] = agent.DaemonProxyInfo{ProxyPath: d.ProxyPath, Port: d.Port}
+		daemonProxies[i] = agent.DaemonProxyInfo{ProxyPath: d.ProxyPath, Port: d.Port, TargetIP: d.TargetIP, ProxyURL: d.ProxyURL}
 	}
 
 	// Generate and write nginx config.
@@ -246,7 +246,7 @@ func (a *NodeLocal) UpdateWebroot(ctx context.Context, params UpdateWebrootParam
 	// Convert daemon proxy info for nginx generation.
 	daemonProxies := make([]agent.DaemonProxyInfo, len(params.Daemons))
 	for i, d := range params.Daemons {
-		daemonProxies[i] = agent.DaemonProxyInfo{ProxyPath: d.ProxyPath, Port: d.Port}
+		daemonProxies[i] = agent.DaemonProxyInfo{ProxyPath: d.ProxyPath, Port: d.Port, TargetIP: d.TargetIP, ProxyURL: d.ProxyURL}
 	}
 
 	// Regenerate and write nginx config.

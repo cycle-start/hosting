@@ -9,10 +9,24 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/edvin/hosting/internal/activity"
+	"github.com/edvin/hosting/internal/core"
 	"github.com/edvin/hosting/internal/model"
 )
 
-// CreateDaemonWorkflow provisions a daemon on all nodes in the tenant's shard.
+// findDaemonNode returns the node assigned to the daemon, or nil if not found.
+func findDaemonNode(dc *activity.DaemonContext) *model.Node {
+	if dc.Daemon.NodeID == nil {
+		return nil
+	}
+	for _, n := range dc.Nodes {
+		if n.ID == *dc.Daemon.NodeID {
+			return &n
+		}
+	}
+	return nil
+}
+
+// CreateDaemonWorkflow provisions a daemon on its assigned node.
 func CreateDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -46,6 +60,13 @@ func CreateDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 		return noShardErr
 	}
 
+	node := findDaemonNode(&daemonCtx)
+	if node == nil {
+		noNodeErr := fmt.Errorf("daemon %s has no node assigned", daemonID)
+		_ = setResourceFailed(ctx, "daemons", daemonID, noNodeErr)
+		return noNodeErr
+	}
+
 	createParams := activity.CreateDaemonParams{
 		ID:           daemonCtx.Daemon.ID,
 		NodeID:       daemonCtx.Daemon.NodeID,
@@ -61,13 +82,11 @@ func CreateDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 		Environment:  daemonCtx.Daemon.Environment,
 	}
 
-	// Write config and start on all nodes.
+	// Write config and start on the daemon's assigned node.
 	var errs []string
-	for _, node := range daemonCtx.Nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		if err := workflow.ExecuteActivity(nodeCtx, "CreateDaemonConfig", createParams).Get(ctx, nil); err != nil {
-			errs = append(errs, fmt.Sprintf("node %s: create config: %v", node.ID, err))
-		}
+	nodeCtx := nodeActivityCtx(ctx, node.ID)
+	if err := workflow.ExecuteActivity(nodeCtx, "CreateDaemonConfig", createParams).Get(ctx, nil); err != nil {
+		errs = append(errs, fmt.Sprintf("node %s: create config: %v", node.ID, err))
 	}
 
 	// If the daemon has a proxy_path, regenerate nginx on all nodes.
@@ -98,7 +117,7 @@ func CreateDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 	}).Get(ctx, nil)
 }
 
-// UpdateDaemonWorkflow updates the daemon configuration on all nodes.
+// UpdateDaemonWorkflow updates the daemon configuration on its assigned node.
 func UpdateDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -131,6 +150,13 @@ func UpdateDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 		return noShardErr
 	}
 
+	node := findDaemonNode(&daemonCtx)
+	if node == nil {
+		noNodeErr := fmt.Errorf("daemon %s has no node assigned", daemonID)
+		_ = setResourceFailed(ctx, "daemons", daemonID, noNodeErr)
+		return noNodeErr
+	}
+
 	updateParams := activity.CreateDaemonParams{
 		ID:           daemonCtx.Daemon.ID,
 		NodeID:       daemonCtx.Daemon.NodeID,
@@ -146,15 +172,14 @@ func UpdateDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 		Environment:  daemonCtx.Daemon.Environment,
 	}
 
+	// Update config on the daemon's assigned node.
 	var errs []string
-	for _, node := range daemonCtx.Nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		if err := workflow.ExecuteActivity(nodeCtx, "UpdateDaemonConfig", updateParams).Get(ctx, nil); err != nil {
-			errs = append(errs, fmt.Sprintf("node %s: update config: %v", node.ID, err))
-		}
+	nodeCtx := nodeActivityCtx(ctx, node.ID)
+	if err := workflow.ExecuteActivity(nodeCtx, "UpdateDaemonConfig", updateParams).Get(ctx, nil); err != nil {
+		errs = append(errs, fmt.Sprintf("node %s: update config: %v", node.ID, err))
 	}
 
-	// Always regenerate nginx in case proxy_path changed.
+	// Always regenerate nginx on all nodes in case proxy_path changed.
 	nginxErrs := regenerateWebrootNginxOnNodes(ctx, daemonCtx.Webroot, daemonCtx.Tenant, daemonCtx.Nodes)
 	errs = append(errs, nginxErrs...)
 
@@ -180,7 +205,7 @@ func UpdateDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 	}).Get(ctx, nil)
 }
 
-// DeleteDaemonWorkflow removes daemon config from all nodes.
+// DeleteDaemonWorkflow removes daemon config from the daemon's assigned node.
 func DeleteDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -213,6 +238,13 @@ func DeleteDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 		return noShardErr
 	}
 
+	node := findDaemonNode(&daemonCtx)
+	if node == nil {
+		noNodeErr := fmt.Errorf("daemon %s has no node assigned", daemonID)
+		_ = setResourceFailed(ctx, "daemons", daemonID, noNodeErr)
+		return noNodeErr
+	}
+
 	deleteParams := activity.DeleteDaemonParams{
 		ID:          daemonCtx.Daemon.ID,
 		TenantName:  daemonCtx.Tenant.Name,
@@ -220,15 +252,14 @@ func DeleteDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 		Name:        daemonCtx.Daemon.Name,
 	}
 
+	// Delete config on the daemon's assigned node.
 	var errs []string
-	for _, node := range daemonCtx.Nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		if err := workflow.ExecuteActivity(nodeCtx, "DeleteDaemonConfig", deleteParams).Get(ctx, nil); err != nil {
-			errs = append(errs, fmt.Sprintf("node %s: delete config: %v", node.ID, err))
-		}
+	nodeCtx := nodeActivityCtx(ctx, node.ID)
+	if err := workflow.ExecuteActivity(nodeCtx, "DeleteDaemonConfig", deleteParams).Get(ctx, nil); err != nil {
+		errs = append(errs, fmt.Sprintf("node %s: delete config: %v", node.ID, err))
 	}
 
-	// Regenerate nginx to remove the proxy location.
+	// Regenerate nginx on all nodes to remove the proxy location.
 	if daemonCtx.Daemon.ProxyPath != nil {
 		nginxErrs := regenerateWebrootNginxOnNodes(ctx, daemonCtx.Webroot, daemonCtx.Tenant, daemonCtx.Nodes)
 		errs = append(errs, nginxErrs...)
@@ -256,7 +287,7 @@ func DeleteDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 	}).Get(ctx, nil)
 }
 
-// EnableDaemonWorkflow starts the daemon on all nodes.
+// EnableDaemonWorkflow starts the daemon on its assigned node.
 func EnableDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -288,6 +319,13 @@ func EnableDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 		return noShardErr
 	}
 
+	node := findDaemonNode(&daemonCtx)
+	if node == nil {
+		noNodeErr := fmt.Errorf("daemon %s has no node assigned", daemonID)
+		_ = setResourceFailed(ctx, "daemons", daemonID, noNodeErr)
+		return noNodeErr
+	}
+
 	enableParams := activity.DaemonEnableParams{
 		ID:          daemonCtx.Daemon.ID,
 		TenantName:  daemonCtx.Tenant.Name,
@@ -295,18 +333,11 @@ func EnableDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 		Name:        daemonCtx.Daemon.Name,
 	}
 
-	var errs []string
-	for _, node := range daemonCtx.Nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		if err := workflow.ExecuteActivity(nodeCtx, "EnableDaemon", enableParams).Get(ctx, nil); err != nil {
-			errs = append(errs, fmt.Sprintf("node %s: %v", node.ID, err))
-		}
-	}
-
-	if len(errs) > 0 {
-		msg := strings.Join(errs, "; ")
-		_ = setResourceFailed(ctx, "daemons", daemonID, fmt.Errorf("%s", msg))
-		return fmt.Errorf("enable daemon failed: %s", msg)
+	// Enable on the daemon's assigned node only.
+	nodeCtx := nodeActivityCtx(ctx, node.ID)
+	if err := workflow.ExecuteActivity(nodeCtx, "EnableDaemon", enableParams).Get(ctx, nil); err != nil {
+		_ = setResourceFailed(ctx, "daemons", daemonID, err)
+		return fmt.Errorf("enable daemon failed: node %s: %v", node.ID, err)
 	}
 
 	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
@@ -316,7 +347,7 @@ func EnableDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 	}).Get(ctx, nil)
 }
 
-// DisableDaemonWorkflow stops the daemon on all nodes.
+// DisableDaemonWorkflow stops the daemon on its assigned node.
 func DisableDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -348,6 +379,13 @@ func DisableDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 		return noShardErr
 	}
 
+	node := findDaemonNode(&daemonCtx)
+	if node == nil {
+		noNodeErr := fmt.Errorf("daemon %s has no node assigned", daemonID)
+		_ = setResourceFailed(ctx, "daemons", daemonID, noNodeErr)
+		return noNodeErr
+	}
+
 	disableParams := activity.DaemonEnableParams{
 		ID:          daemonCtx.Daemon.ID,
 		TenantName:  daemonCtx.Tenant.Name,
@@ -355,26 +393,11 @@ func DisableDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 		Name:        daemonCtx.Daemon.Name,
 	}
 
-	var errs []string
-	for _, node := range daemonCtx.Nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		if err := workflow.ExecuteActivity(nodeCtx, "DisableDaemon", disableParams).Get(ctx, nil); err != nil {
-			errs = append(errs, fmt.Sprintf("node %s: %v", node.ID, err))
-		}
-	}
-
-	if len(errs) > 0 {
-		msg := strings.Join(errs, "; ")
-		if len(msg) > 4000 {
-			msg = msg[:4000]
-		}
-		_ = workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
-			Table:         "daemons",
-			ID:            daemonID,
-			Status:        model.StatusFailed,
-			StatusMessage: &msg,
-		}).Get(ctx, nil)
-		return fmt.Errorf("disable daemon failed: %s", msg)
+	// Disable on the daemon's assigned node only.
+	nodeCtx := nodeActivityCtx(ctx, node.ID)
+	if err := workflow.ExecuteActivity(nodeCtx, "DisableDaemon", disableParams).Get(ctx, nil); err != nil {
+		_ = setResourceFailed(ctx, "daemons", daemonID, err)
+		return fmt.Errorf("disable daemon failed: node %s: %v", node.ID, err)
 	}
 
 	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
@@ -414,13 +437,35 @@ func regenerateWebrootNginxOnNodes(ctx workflow.Context, webroot model.Webroot, 
 		}
 	}
 
+	// Build a node index map for ULA computation.
+	nodeShardIndex := make(map[string]int) // node ID -> shard_index
+	for _, n := range nodes {
+		if n.ShardIndex != nil {
+			nodeShardIndex[n.ID] = *n.ShardIndex
+		}
+	}
+
+	// Determine the cluster ID from the first node.
+	clusterID := ""
+	if len(nodes) > 0 {
+		clusterID = nodes[0].ClusterID
+	}
+
 	// Build daemon proxy info for active daemons with proxy_path.
 	var daemonProxies []activity.DaemonProxyInfo
 	for _, d := range daemons {
 		if d.Status == model.StatusActive && d.ProxyPath != nil && d.ProxyPort != nil {
+			targetIP := "127.0.0.1"
+			if d.NodeID != nil {
+				if idx, ok := nodeShardIndex[*d.NodeID]; ok {
+					targetIP = core.ComputeTenantULA(clusterID, idx, tenant.UID)
+				}
+			}
 			daemonProxies = append(daemonProxies, activity.DaemonProxyInfo{
 				ProxyPath: *d.ProxyPath,
 				Port:      *d.ProxyPort,
+				TargetIP:  targetIP,
+				ProxyURL:  core.FormatDaemonProxyURL(targetIP, *d.ProxyPort),
 			})
 		}
 	}

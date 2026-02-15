@@ -33,10 +33,12 @@ func (s *CreateDaemonWorkflowTestSuite) AfterTest(suiteName, testName string) {
 func (s *CreateDaemonWorkflowTestSuite) TestSuccess_NoProxy() {
 	daemonID := "daemon-1"
 	shardID := "shard-1"
+	nodeID := "node-1"
 	daemonCtx := activity.DaemonContext{
 		Daemon: model.Daemon{
 			ID:           daemonID,
 			TenantID:     "tenant-1",
+			NodeID:       &nodeID,
 			WebrootID:    "wr-1",
 			Name:         "daemon_abc123",
 			Command:      "php artisan queue:work",
@@ -69,9 +71,10 @@ func (s *CreateDaemonWorkflowTestSuite) TestSuccess_NoProxy() {
 	}).Return(nil)
 	s.env.OnActivity("GetDaemonContext", mock.Anything, daemonID).Return(&daemonCtx, nil)
 
-	// CreateDaemonConfig on each node.
+	// CreateDaemonConfig on the daemon's assigned node only.
 	s.env.OnActivity("CreateDaemonConfig", mock.Anything, activity.CreateDaemonParams{
 		ID:           daemonID,
+		NodeID:       &nodeID,
 		TenantName:   "t_test123456",
 		WebrootName:  "main",
 		Name:         "daemon_abc123",
@@ -97,12 +100,14 @@ func (s *CreateDaemonWorkflowTestSuite) TestSuccess_NoProxy() {
 func (s *CreateDaemonWorkflowTestSuite) TestSuccess_WithProxy() {
 	daemonID := "daemon-2"
 	shardID := "shard-1"
+	nodeID := "node-1"
 	proxyPath := "/app"
 	proxyPort := 14523
 	daemonCtx := activity.DaemonContext{
 		Daemon: model.Daemon{
 			ID:           daemonID,
 			TenantID:     "tenant-1",
+			NodeID:       &nodeID,
 			WebrootID:    "wr-1",
 			Name:         "daemon_xyz789",
 			Command:      "php artisan reverb:start --port=$PORT",
@@ -139,6 +144,7 @@ func (s *CreateDaemonWorkflowTestSuite) TestSuccess_WithProxy() {
 
 	s.env.OnActivity("CreateDaemonConfig", mock.Anything, activity.CreateDaemonParams{
 		ID:           daemonID,
+		NodeID:       &nodeID,
 		TenantName:   "t_test123456",
 		WebrootName:  "main",
 		Name:         "daemon_xyz789",
@@ -151,7 +157,7 @@ func (s *CreateDaemonWorkflowTestSuite) TestSuccess_WithProxy() {
 		Environment:  map[string]string{"APP_ENV": "production"},
 	}).Return(nil)
 
-	// With proxy_path: regenerate nginx (ListDaemonsByWebroot + GetFQDNsByWebrootID + UpdateWebroot + ReloadNginx).
+	// With proxy_path: regenerate nginx on all nodes (ListDaemonsByWebroot + GetFQDNsByWebrootID + UpdateWebroot + ReloadNginx).
 	s.env.OnActivity("ListDaemonsByWebroot", mock.Anything, "wr-1").Return([]model.Daemon{daemonCtx.Daemon}, nil)
 	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, "wr-1").Return([]model.FQDN{
 		{FQDN: "example.com", WebrootID: "wr-1", SSLEnabled: true, Status: model.StatusActive},
@@ -184,10 +190,32 @@ func (s *CreateDaemonWorkflowTestSuite) TestGetContextFails() {
 
 func (s *CreateDaemonWorkflowTestSuite) TestNoShard() {
 	daemonID := "daemon-4"
+	nodeID := "node-1"
+	daemonCtx := activity.DaemonContext{
+		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID},
+		Webroot: model.Webroot{ID: "wr-1"},
+		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand"},
+		Nodes:   []model.Node{{ID: "node-1"}},
+	}
+
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
+		Table: "daemons", ID: daemonID, Status: model.StatusProvisioning,
+	}).Return(nil)
+	s.env.OnActivity("GetDaemonContext", mock.Anything, daemonID).Return(&daemonCtx, nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("daemons", daemonID)).Return(nil)
+
+	s.env.ExecuteWorkflow(CreateDaemonWorkflow, daemonID)
+	s.True(s.env.IsWorkflowCompleted())
+	s.Error(s.env.GetWorkflowError())
+}
+
+func (s *CreateDaemonWorkflowTestSuite) TestNoNode() {
+	daemonID := "daemon-6"
+	shardID := "shard-1"
 	daemonCtx := activity.DaemonContext{
 		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1"},
 		Webroot: model.Webroot{ID: "wr-1"},
-		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand"},
+		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
 		Nodes:   []model.Node{{ID: "node-1"}},
 	}
 
@@ -234,8 +262,9 @@ func (s *DeleteDaemonWorkflowTestSuite) AfterTest(suiteName, testName string) {
 func (s *DeleteDaemonWorkflowTestSuite) TestSuccess_NoProxy() {
 	daemonID := "daemon-1"
 	shardID := "shard-1"
+	nodeID := "node-1"
 	daemonCtx := activity.DaemonContext{
-		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", WebrootID: "wr-1", Name: "daemon_abc123", Environment: map[string]string{}},
+		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1", Name: "daemon_abc123", Environment: map[string]string{}},
 		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
 		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
 		Nodes:   []model.Node{{ID: "node-1"}},
@@ -260,11 +289,12 @@ func (s *DeleteDaemonWorkflowTestSuite) TestSuccess_NoProxy() {
 func (s *DeleteDaemonWorkflowTestSuite) TestSuccess_WithProxy() {
 	daemonID := "daemon-2"
 	shardID := "shard-1"
+	nodeID := "node-1"
 	proxyPath := "/ws"
 	proxyPort := 15000
 	daemonCtx := activity.DaemonContext{
 		Daemon: model.Daemon{
-			ID: daemonID, TenantID: "tenant-1", WebrootID: "wr-1", Name: "daemon_ws123",
+			ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1", Name: "daemon_ws123",
 			ProxyPath: &proxyPath, ProxyPort: &proxyPort, Environment: map[string]string{},
 		},
 		Webroot: model.Webroot{ID: "wr-1", Name: "main", Runtime: "php", RuntimeVersion: "8.5", RuntimeConfig: json.RawMessage(`{}`), PublicFolder: "public"},
@@ -280,7 +310,7 @@ func (s *DeleteDaemonWorkflowTestSuite) TestSuccess_WithProxy() {
 		ID: daemonID, TenantName: "t_test123456", WebrootName: "main", Name: "daemon_ws123",
 	}).Return(nil)
 
-	// With proxy_path: regenerate nginx to remove proxy location.
+	// With proxy_path: regenerate nginx on all nodes to remove proxy location.
 	s.env.OnActivity("ListDaemonsByWebroot", mock.Anything, "wr-1").Return([]model.Daemon{}, nil)
 	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, "wr-1").Return([]model.FQDN{}, nil)
 	s.env.OnActivity("UpdateWebroot", mock.Anything, mock.Anything).Return(nil)
@@ -309,6 +339,27 @@ func (s *DeleteDaemonWorkflowTestSuite) TestGetContextFails() {
 	s.Error(s.env.GetWorkflowError())
 }
 
+func (s *DeleteDaemonWorkflowTestSuite) TestNoNode() {
+	daemonID := "daemon-4"
+	shardID := "shard-1"
+	daemonCtx := activity.DaemonContext{
+		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", WebrootID: "wr-1", Name: "daemon_abc123", Environment: map[string]string{}},
+		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
+		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
+		Nodes:   []model.Node{{ID: "node-1"}},
+	}
+
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
+		Table: "daemons", ID: daemonID, Status: model.StatusDeleting,
+	}).Return(nil)
+	s.env.OnActivity("GetDaemonContext", mock.Anything, daemonID).Return(&daemonCtx, nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("daemons", daemonID)).Return(nil)
+
+	s.env.ExecuteWorkflow(DeleteDaemonWorkflow, daemonID)
+	s.True(s.env.IsWorkflowCompleted())
+	s.Error(s.env.GetWorkflowError())
+}
+
 // ---------- EnableDaemonWorkflow ----------
 
 type EnableDaemonWorkflowTestSuite struct {
@@ -329,8 +380,9 @@ func (s *EnableDaemonWorkflowTestSuite) AfterTest(suiteName, testName string) {
 func (s *EnableDaemonWorkflowTestSuite) TestSuccess() {
 	daemonID := "daemon-1"
 	shardID := "shard-1"
+	nodeID := "node-1"
 	daemonCtx := activity.DaemonContext{
-		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", WebrootID: "wr-1", Name: "daemon_abc", Environment: map[string]string{}},
+		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1", Name: "daemon_abc", Environment: map[string]string{}},
 		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
 		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
 		Nodes:   []model.Node{{ID: "node-1"}, {ID: "node-2"}},
@@ -355,6 +407,29 @@ func (s *EnableDaemonWorkflowTestSuite) TestSuccess() {
 func (s *EnableDaemonWorkflowTestSuite) TestNodeFails() {
 	daemonID := "daemon-2"
 	shardID := "shard-1"
+	nodeID := "node-1"
+	daemonCtx := activity.DaemonContext{
+		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1", Name: "daemon_abc", Environment: map[string]string{}},
+		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
+		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
+		Nodes:   []model.Node{{ID: "node-1"}},
+	}
+
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
+		Table: "daemons", ID: daemonID, Status: model.StatusProvisioning,
+	}).Return(nil)
+	s.env.OnActivity("GetDaemonContext", mock.Anything, daemonID).Return(&daemonCtx, nil)
+	s.env.OnActivity("EnableDaemon", mock.Anything, mock.Anything).Return(fmt.Errorf("node down"))
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("daemons", daemonID)).Return(nil)
+
+	s.env.ExecuteWorkflow(EnableDaemonWorkflow, daemonID)
+	s.True(s.env.IsWorkflowCompleted())
+	s.Error(s.env.GetWorkflowError())
+}
+
+func (s *EnableDaemonWorkflowTestSuite) TestNoNode() {
+	daemonID := "daemon-3"
+	shardID := "shard-1"
 	daemonCtx := activity.DaemonContext{
 		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", WebrootID: "wr-1", Name: "daemon_abc", Environment: map[string]string{}},
 		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
@@ -366,7 +441,6 @@ func (s *EnableDaemonWorkflowTestSuite) TestNodeFails() {
 		Table: "daemons", ID: daemonID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetDaemonContext", mock.Anything, daemonID).Return(&daemonCtx, nil)
-	s.env.OnActivity("EnableDaemon", mock.Anything, mock.Anything).Return(fmt.Errorf("node down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("daemons", daemonID)).Return(nil)
 
 	s.env.ExecuteWorkflow(EnableDaemonWorkflow, daemonID)
@@ -394,8 +468,9 @@ func (s *DisableDaemonWorkflowTestSuite) AfterTest(suiteName, testName string) {
 func (s *DisableDaemonWorkflowTestSuite) TestSuccess() {
 	daemonID := "daemon-1"
 	shardID := "shard-1"
+	nodeID := "node-1"
 	daemonCtx := activity.DaemonContext{
-		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", WebrootID: "wr-1", Name: "daemon_abc", Environment: map[string]string{}},
+		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1", Name: "daemon_abc", Environment: map[string]string{}},
 		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
 		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
 		Nodes:   []model.Node{{ID: "node-1"}},
@@ -420,6 +495,29 @@ func (s *DisableDaemonWorkflowTestSuite) TestSuccess() {
 func (s *DisableDaemonWorkflowTestSuite) TestNodeFails() {
 	daemonID := "daemon-2"
 	shardID := "shard-1"
+	nodeID := "node-1"
+	daemonCtx := activity.DaemonContext{
+		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1", Name: "daemon_abc", Environment: map[string]string{}},
+		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
+		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
+		Nodes:   []model.Node{{ID: "node-1"}},
+	}
+
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
+		Table: "daemons", ID: daemonID, Status: model.StatusProvisioning,
+	}).Return(nil)
+	s.env.OnActivity("GetDaemonContext", mock.Anything, daemonID).Return(&daemonCtx, nil)
+	s.env.OnActivity("DisableDaemon", mock.Anything, mock.Anything).Return(fmt.Errorf("node down"))
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("daemons", daemonID)).Return(nil)
+
+	s.env.ExecuteWorkflow(DisableDaemonWorkflow, daemonID)
+	s.True(s.env.IsWorkflowCompleted())
+	s.Error(s.env.GetWorkflowError())
+}
+
+func (s *DisableDaemonWorkflowTestSuite) TestNoNode() {
+	daemonID := "daemon-3"
+	shardID := "shard-1"
 	daemonCtx := activity.DaemonContext{
 		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", WebrootID: "wr-1", Name: "daemon_abc", Environment: map[string]string{}},
 		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
@@ -431,7 +529,6 @@ func (s *DisableDaemonWorkflowTestSuite) TestNodeFails() {
 		Table: "daemons", ID: daemonID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetDaemonContext", mock.Anything, daemonID).Return(&daemonCtx, nil)
-	s.env.OnActivity("DisableDaemon", mock.Anything, mock.Anything).Return(fmt.Errorf("node down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("daemons", daemonID)).Return(nil)
 
 	s.env.ExecuteWorkflow(DisableDaemonWorkflow, daemonID)
@@ -459,9 +556,10 @@ func (s *UpdateDaemonWorkflowTestSuite) AfterTest(suiteName, testName string) {
 func (s *UpdateDaemonWorkflowTestSuite) TestSuccess() {
 	daemonID := "daemon-1"
 	shardID := "shard-1"
+	nodeID := "node-1"
 	daemonCtx := activity.DaemonContext{
 		Daemon: model.Daemon{
-			ID: daemonID, TenantID: "tenant-1", WebrootID: "wr-1", Name: "daemon_abc",
+			ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1", Name: "daemon_abc",
 			Command: "node server.js", NumProcs: 1, StopSignal: "TERM",
 			StopWaitSecs: 30, MaxMemoryMB: 256, Environment: map[string]string{},
 		},
@@ -478,7 +576,7 @@ func (s *UpdateDaemonWorkflowTestSuite) TestSuccess() {
 		return p.ID == daemonID && p.Command == "node server.js"
 	})).Return(nil)
 
-	// UpdateDaemonWorkflow always regenerates nginx.
+	// UpdateDaemonWorkflow always regenerates nginx on all nodes.
 	s.env.OnActivity("ListDaemonsByWebroot", mock.Anything, "wr-1").Return([]model.Daemon{}, nil)
 	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, "wr-1").Return([]model.FQDN{}, nil)
 	s.env.OnActivity("UpdateWebroot", mock.Anything, mock.Anything).Return(nil)
@@ -491,6 +589,31 @@ func (s *UpdateDaemonWorkflowTestSuite) TestSuccess() {
 	s.env.ExecuteWorkflow(UpdateDaemonWorkflow, daemonID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
+}
+
+func (s *UpdateDaemonWorkflowTestSuite) TestNoNode() {
+	daemonID := "daemon-2"
+	shardID := "shard-1"
+	daemonCtx := activity.DaemonContext{
+		Daemon: model.Daemon{
+			ID: daemonID, TenantID: "tenant-1", WebrootID: "wr-1", Name: "daemon_abc",
+			Command: "node server.js", NumProcs: 1, StopSignal: "TERM",
+			StopWaitSecs: 30, MaxMemoryMB: 256, Environment: map[string]string{},
+		},
+		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
+		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
+		Nodes:   []model.Node{{ID: "node-1"}},
+	}
+
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
+		Table: "daemons", ID: daemonID, Status: model.StatusProvisioning,
+	}).Return(nil)
+	s.env.OnActivity("GetDaemonContext", mock.Anything, daemonID).Return(&daemonCtx, nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("daemons", daemonID)).Return(nil)
+
+	s.env.ExecuteWorkflow(UpdateDaemonWorkflow, daemonID)
+	s.True(s.env.IsWorkflowCompleted())
+	s.Error(s.env.GetWorkflowError())
 }
 
 // ---------- Run ----------

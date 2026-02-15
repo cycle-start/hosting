@@ -843,15 +843,15 @@ func TestGenerateConfig_WithDaemonProxy(t *testing.T) {
 		{FQDN: "example.com", SSLEnabled: false},
 	}
 	daemons := []DaemonProxyInfo{
-		{ProxyPath: "/app", Port: 14523},
+		{ProxyPath: "/app", Port: 14523, TargetIP: "fd00:1:2::2742", ProxyURL: "http://[fd00:1:2::2742]:14523"},
 	}
 
 	config, err := mgr.GenerateConfig(webroot, fqdns, daemons...)
 	require.NoError(t, err)
 
-	// Verify daemon proxy location block.
+	// Verify daemon proxy location block with IPv6 ULA address.
 	assert.Contains(t, config, "location /app")
-	assert.Contains(t, config, "proxy_pass http://127.0.0.1:14523")
+	assert.Contains(t, config, "proxy_pass http://[fd00:1:2::2742]:14523")
 	assert.Contains(t, config, "proxy_http_version 1.1")
 	assert.Contains(t, config, `proxy_set_header Upgrade $http_upgrade`)
 	assert.Contains(t, config, `proxy_set_header Connection "upgrade"`)
@@ -860,6 +860,31 @@ func TestGenerateConfig_WithDaemonProxy(t *testing.T) {
 
 	// PHP directives should still be present.
 	assert.Contains(t, config, "fastcgi_pass unix:/run/php/tenant1-php8.5.sock")
+}
+
+func TestGenerateConfig_WithDaemonProxy_IPv4Fallback(t *testing.T) {
+	mgr := newTestNginxManager(t)
+
+	webroot := &runtime.WebrootInfo{
+		TenantName:     "tenant1",
+		Name:           "laravelapp",
+		Runtime:        "php",
+		RuntimeVersion: "8.5",
+		PublicFolder:   "public",
+	}
+	fqdns := []*FQDNInfo{
+		{FQDN: "example.com", SSLEnabled: false},
+	}
+	daemons := []DaemonProxyInfo{
+		{ProxyPath: "/app", Port: 14523, TargetIP: "127.0.0.1", ProxyURL: "http://127.0.0.1:14523"},
+	}
+
+	config, err := mgr.GenerateConfig(webroot, fqdns, daemons...)
+	require.NoError(t, err)
+
+	// Verify daemon proxy location block with IPv4 fallback (no brackets).
+	assert.Contains(t, config, "location /app")
+	assert.Contains(t, config, "proxy_pass http://127.0.0.1:14523")
 }
 
 func TestGenerateConfig_WithMultipleDaemonProxies(t *testing.T) {
@@ -874,18 +899,18 @@ func TestGenerateConfig_WithMultipleDaemonProxies(t *testing.T) {
 		{FQDN: "example.com"},
 	}
 	daemons := []DaemonProxyInfo{
-		{ProxyPath: "/ws", Port: 10001},
-		{ProxyPath: "/api/stream", Port: 10002},
+		{ProxyPath: "/ws", Port: 10001, TargetIP: "fd00:a:1::3e8", ProxyURL: "http://[fd00:a:1::3e8]:10001"},
+		{ProxyPath: "/api/stream", Port: 10002, TargetIP: "fd00:a:2::3e8", ProxyURL: "http://[fd00:a:2::3e8]:10002"},
 	}
 
 	config, err := mgr.GenerateConfig(webroot, fqdns, daemons...)
 	require.NoError(t, err)
 
-	// Verify both daemon proxy location blocks.
+	// Verify both daemon proxy location blocks with IPv6 ULA addresses.
 	assert.Contains(t, config, "location /ws")
-	assert.Contains(t, config, "proxy_pass http://127.0.0.1:10001")
+	assert.Contains(t, config, "proxy_pass http://[fd00:a:1::3e8]:10001")
 	assert.Contains(t, config, "location /api/stream")
-	assert.Contains(t, config, "proxy_pass http://127.0.0.1:10002")
+	assert.Contains(t, config, "proxy_pass http://[fd00:a:2::3e8]:10002")
 }
 
 func TestGenerateConfig_NoDaemons(t *testing.T) {
