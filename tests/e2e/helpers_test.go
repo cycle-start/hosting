@@ -2,10 +2,16 @@ package e2e
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"os"
 	"os/exec"
@@ -14,6 +20,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/ssh"
 )
 
 // coreAPIURL is the base URL for the hosting core API.
@@ -472,3 +479,214 @@ func createTestTenant(t *testing.T, name string) (tenantID, regionID, clusterID,
 
 	return tenantID, regionID, clusterID, webShardID, dbShardID
 }
+
+// findShardIDByRole returns the shard ID for a given role, or empty string if not found.
+func findShardIDByRole(t *testing.T, clusterID, role string) string {
+	t.Helper()
+	resp, body := httpGet(t, fmt.Sprintf("%s/clusters/%s/shards", coreAPIURL, clusterID))
+	if resp.StatusCode != 200 {
+		return ""
+	}
+	shards := parsePaginatedItems(t, body)
+	for _, s := range shards {
+		if r, _ := s["role"].(string); r == role {
+			id, _ := s["id"].(string)
+			return id
+		}
+	}
+	return ""
+}
+
+// findValkeyShardID returns the shard ID for the valkey role in the cluster.
+func findValkeyShardID(t *testing.T, clusterID string) string {
+	t.Helper()
+	return findShardIDByRole(t, clusterID, "valkey")
+}
+
+// findEmailShardID returns the shard ID for the email role in the cluster.
+func findEmailShardID(t *testing.T, clusterID string) string {
+	t.Helper()
+	return findShardIDByRole(t, clusterID, "email")
+}
+
+// findDNSShardID returns the shard ID for the dns role in the cluster.
+func findDNSShardID(t *testing.T, clusterID string) string {
+	t.Helper()
+	return findShardIDByRole(t, clusterID, "dns")
+}
+
+// createTestWebroot creates a webroot on a tenant and waits for it to become active.
+func createTestWebroot(t *testing.T, tenantID, name, runtime, version string) string {
+	t.Helper()
+	resp, body := httpPost(t, fmt.Sprintf("%s/tenants/%s/webroots", coreAPIURL, tenantID), map[string]interface{}{
+		"name":            name,
+		"runtime":         runtime,
+		"runtime_version": version,
+	})
+	require.Equal(t, 202, resp.StatusCode, "create webroot: %s", body)
+	webroot := parseJSON(t, body)
+	webrootID := webroot["id"].(string)
+	t.Cleanup(func() { httpDelete(t, coreAPIURL+"/webroots/"+webrootID) })
+	waitForStatus(t, coreAPIURL+"/webroots/"+webrootID, "active", provisionTimeout)
+	return webrootID
+}
+
+// createTestFQDN creates an FQDN on a webroot and waits for it to become active.
+func createTestFQDN(t *testing.T, webrootID, fqdn string) string {
+	t.Helper()
+	resp, body := httpPost(t, fmt.Sprintf("%s/webroots/%s/fqdns", coreAPIURL, webrootID), map[string]interface{}{
+		"fqdn": fqdn,
+	})
+	require.Equal(t, 202, resp.StatusCode, "create FQDN: %s", body)
+	f := parseJSON(t, body)
+	fqdnID := f["id"].(string)
+	t.Cleanup(func() { httpDelete(t, coreAPIURL+"/fqdns/"+fqdnID) })
+	waitForStatus(t, coreAPIURL+"/fqdns/"+fqdnID, "active", provisionTimeout)
+	return fqdnID
+}
+
+// createTestZone creates a zone and waits for it to become active.
+func createTestZone(t *testing.T, tenantID, regionID, name string) string {
+	t.Helper()
+	resp, body := httpPost(t, coreAPIURL+"/zones", map[string]interface{}{
+		"name":      name,
+		"tenant_id": tenantID,
+		"region_id": regionID,
+	})
+	require.Equal(t, 202, resp.StatusCode, "create zone: %s", body)
+	zone := parseJSON(t, body)
+	zoneID := zone["id"].(string)
+	t.Cleanup(func() { httpDelete(t, coreAPIURL+"/zones/"+zoneID) })
+	waitForStatus(t, coreAPIURL+"/zones/"+zoneID, "active", provisionTimeout)
+	return zoneID
+}
+
+// createTestDatabase creates a database and waits for it to become active.
+func createTestDatabase(t *testing.T, tenantID, shardID, name string) string {
+	t.Helper()
+	resp, body := httpPost(t, fmt.Sprintf("%s/tenants/%s/databases", coreAPIURL, tenantID), map[string]interface{}{
+		"name":     name,
+		"shard_id": shardID,
+	})
+	require.Equal(t, 202, resp.StatusCode, "create database: %s", body)
+	db := parseJSON(t, body)
+	dbID := db["id"].(string)
+	t.Cleanup(func() { httpDelete(t, coreAPIURL+"/databases/"+dbID) })
+	waitForStatus(t, coreAPIURL+"/databases/"+dbID, "active", provisionTimeout)
+	return dbID
+}
+
+// createTestValkeyInstance creates a Valkey instance and waits for it to become active.
+func createTestValkeyInstance(t *testing.T, tenantID, shardID, name string) string {
+	t.Helper()
+	resp, body := httpPost(t, fmt.Sprintf("%s/tenants/%s/valkey-instances", coreAPIURL, tenantID), map[string]interface{}{
+		"name":          name,
+		"shard_id":      shardID,
+		"max_memory_mb": 64,
+	})
+	require.Equal(t, 202, resp.StatusCode, "create valkey instance: %s", body)
+	inst := parseJSON(t, body)
+	instID := inst["id"].(string)
+	t.Cleanup(func() { httpDelete(t, coreAPIURL+"/valkey-instances/"+instID) })
+	waitForStatus(t, coreAPIURL+"/valkey-instances/"+instID, "active", provisionTimeout)
+	return instID
+}
+
+// httpDoWithKey performs an HTTP request using a specific API key.
+func httpDoWithKey(t *testing.T, method, url string, body interface{}, key string) (*http.Response, string) {
+	t.Helper()
+	var reqBody io.Reader
+	if body != nil {
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			t.Fatalf("marshal body: %v", err)
+		}
+		reqBody = bytes.NewReader(jsonBody)
+	}
+	req, err := http.NewRequest(method, url, reqBody)
+	if err != nil {
+		t.Fatalf("create %s request %s: %v", method, url, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", key)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("%s %s: %v", method, url, err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp, string(b)
+}
+
+// httpGetWithKey performs an HTTP GET using a specific API key.
+func httpGetWithKey(t *testing.T, url, key string) (*http.Response, string) {
+	return httpDoWithKey(t, http.MethodGet, url, nil, key)
+}
+
+// httpPostWithKey performs an HTTP POST using a specific API key.
+func httpPostWithKey(t *testing.T, url string, body interface{}, key string) (*http.Response, string) {
+	return httpDoWithKey(t, http.MethodPost, url, body, key)
+}
+
+// httpDeleteWithKey performs an HTTP DELETE using a specific API key.
+func httpDeleteWithKey(t *testing.T, url, key string) (*http.Response, string) {
+	return httpDoWithKey(t, http.MethodDelete, url, nil, key)
+}
+
+// generateSSHKeyPair generates an RSA SSH key pair for testing.
+// Returns the public key in authorized_keys format.
+func generateSSHKeyPair(t *testing.T) string {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate RSA key: %v", err)
+	}
+	pub, err := ssh.NewPublicKey(&key.PublicKey)
+	if err != nil {
+		t.Fatalf("create SSH public key: %v", err)
+	}
+	return strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pub)))
+}
+
+// generateSelfSignedCert generates a self-signed TLS certificate for testing.
+func generateSelfSignedCert(t *testing.T, cn string) (certPEM, keyPEM string) {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate RSA key: %v", err)
+	}
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: cn},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		DNSNames:     []string{cn},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatalf("create certificate: %v", err)
+	}
+
+	var certBuf bytes.Buffer
+	pem.Encode(&certBuf, &pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+
+	var keyBuf bytes.Buffer
+	pem.Encode(&keyBuf, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+
+	return certBuf.String(), keyBuf.String()
+}
+
+// digQuery performs a DNS query using the dig command against a specific nameserver.
+func digQuery(t *testing.T, nameserverIP, recordType, name string) string {
+	t.Helper()
+	out, err := exec.Command("dig", "@"+nameserverIP, recordType, name, "+short").CombinedOutput()
+	if err != nil {
+		t.Logf("dig query failed (may be expected): %v: %s", err, string(out))
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+const migrationTimeout = 10 * time.Minute
