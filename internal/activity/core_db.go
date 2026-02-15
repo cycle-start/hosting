@@ -239,7 +239,7 @@ func (a *CoreDB) GetShardByID(ctx context.Context, id string) (*model.Shard, err
 // GetNodesByClusterAndRole retrieves all nodes in a cluster with the specified role.
 func (a *CoreDB) GetNodesByClusterAndRole(ctx context.Context, clusterID string, role string) ([]model.Node, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, cluster_id, shard_id, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at
+		`SELECT id, cluster_id, shard_id, shard_index, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at
 		 FROM nodes WHERE cluster_id = $1 AND $2 = ANY(roles) AND status = $3`, clusterID, role, model.StatusActive,
 	)
 	if err != nil {
@@ -250,7 +250,7 @@ func (a *CoreDB) GetNodesByClusterAndRole(ctx context.Context, clusterID string,
 	var nodes []model.Node
 	for rows.Next() {
 		var n model.Node
-		if err := rows.Scan(&n.ID, &n.ClusterID, &n.ShardID, &n.Hostname, &n.IPAddress, &n.IP6Address, &n.Roles, &n.Status, &n.CreatedAt, &n.UpdatedAt); err != nil {
+		if err := rows.Scan(&n.ID, &n.ClusterID, &n.ShardID, &n.ShardIndex, &n.Hostname, &n.IPAddress, &n.IP6Address, &n.Roles, &n.Status, &n.CreatedAt, &n.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan node row: %w", err)
 		}
 		nodes = append(nodes, n)
@@ -322,7 +322,7 @@ func (a *CoreDB) ListTenantsByShard(ctx context.Context, shardID string) ([]mode
 // ListNodesByShard retrieves all nodes assigned to a shard.
 func (a *CoreDB) ListNodesByShard(ctx context.Context, shardID string) ([]model.Node, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, cluster_id, shard_id, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at
+		`SELECT id, cluster_id, shard_id, shard_index, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at
 		 FROM nodes WHERE shard_id = $1 ORDER BY hostname`, shardID,
 	)
 	if err != nil {
@@ -333,7 +333,7 @@ func (a *CoreDB) ListNodesByShard(ctx context.Context, shardID string) ([]model.
 	var nodes []model.Node
 	for rows.Next() {
 		var n model.Node
-		if err := rows.Scan(&n.ID, &n.ClusterID, &n.ShardID, &n.Hostname, &n.IPAddress, &n.IP6Address, &n.Roles, &n.Status, &n.CreatedAt, &n.UpdatedAt); err != nil {
+		if err := rows.Scan(&n.ID, &n.ClusterID, &n.ShardID, &n.ShardIndex, &n.Hostname, &n.IPAddress, &n.IP6Address, &n.Roles, &n.Status, &n.CreatedAt, &n.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan node row: %w", err)
 		}
 		nodes = append(nodes, n)
@@ -367,9 +367,9 @@ func (a *CoreDB) GetTenantServicesByTenantID(ctx context.Context, tenantID strin
 func (a *CoreDB) GetNodeByID(ctx context.Context, id string) (*model.Node, error) {
 	var n model.Node
 	err := a.db.QueryRow(ctx,
-		`SELECT id, cluster_id, shard_id, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at
+		`SELECT id, cluster_id, shard_id, shard_index, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at
 		 FROM nodes WHERE id = $1`, id,
-	).Scan(&n.ID, &n.ClusterID, &n.ShardID, &n.Hostname, &n.IPAddress, &n.IP6Address,
+	).Scan(&n.ID, &n.ClusterID, &n.ShardID, &n.ShardIndex, &n.Hostname, &n.IPAddress, &n.IP6Address,
 		&n.Roles, &n.Status, &n.CreatedAt, &n.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get node by id: %w", err)
@@ -510,9 +510,9 @@ func (a *CoreDB) CreateShard(ctx context.Context, s *model.Shard) error {
 // CreateNode inserts a new node record.
 func (a *CoreDB) CreateNode(ctx context.Context, n *model.Node) error {
 	_, err := a.db.Exec(ctx,
-		`INSERT INTO nodes (id, cluster_id, shard_id, hostname, ip_address, ip6_address, roles, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		n.ID, n.ClusterID, n.ShardID, n.Hostname, n.IPAddress, n.IP6Address, n.Roles, n.Status, n.CreatedAt, n.UpdatedAt,
+		`INSERT INTO nodes (id, cluster_id, shard_id, shard_index, hostname, ip_address, ip6_address, roles, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		n.ID, n.ClusterID, n.ShardID, n.ShardIndex, n.Hostname, n.IPAddress, n.IP6Address, n.Roles, n.Status, n.CreatedAt, n.UpdatedAt,
 	)
 	return err
 }
@@ -1245,7 +1245,7 @@ func (a *CoreDB) GetDaemonContext(ctx context.Context, daemonID string) (*Daemon
 
 	// JOIN daemons -> webroots -> tenants.
 	err := a.db.QueryRow(ctx,
-		`SELECT d.id, d.tenant_id, d.webroot_id, d.name, d.command, d.proxy_path, d.proxy_port,
+		`SELECT d.id, d.tenant_id, d.node_id, d.webroot_id, d.name, d.command, d.proxy_path, d.proxy_port,
 		        d.num_procs, d.stop_signal, d.stop_wait_secs, d.max_memory_mb, d.environment,
 		        d.enabled, d.status, d.status_message, d.created_at, d.updated_at,
 		        w.id, w.tenant_id, w.name, w.runtime, w.runtime_version, w.runtime_config, w.public_folder, w.status, w.status_message, w.created_at, w.updated_at,
@@ -1254,7 +1254,7 @@ func (a *CoreDB) GetDaemonContext(ctx context.Context, daemonID string) (*Daemon
 		 JOIN webroots w ON w.id = d.webroot_id
 		 JOIN tenants t ON t.id = d.tenant_id
 		 WHERE d.id = $1`, daemonID,
-	).Scan(&dc.Daemon.ID, &dc.Daemon.TenantID, &dc.Daemon.WebrootID, &dc.Daemon.Name, &dc.Daemon.Command,
+	).Scan(&dc.Daemon.ID, &dc.Daemon.TenantID, &dc.Daemon.NodeID, &dc.Daemon.WebrootID, &dc.Daemon.Name, &dc.Daemon.Command,
 		&dc.Daemon.ProxyPath, &dc.Daemon.ProxyPort,
 		&dc.Daemon.NumProcs, &dc.Daemon.StopSignal, &dc.Daemon.StopWaitSecs, &dc.Daemon.MaxMemoryMB, &envJSON,
 		&dc.Daemon.Enabled, &dc.Daemon.Status, &dc.Daemon.StatusMessage, &dc.Daemon.CreatedAt, &dc.Daemon.UpdatedAt,
@@ -1286,7 +1286,7 @@ func (a *CoreDB) GetDaemonContext(ctx context.Context, daemonID string) (*Daemon
 // ListDaemonsByWebroot retrieves all daemons for a webroot (excluding deleted).
 func (a *CoreDB) ListDaemonsByWebroot(ctx context.Context, webrootID string) ([]model.Daemon, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, webroot_id, name, command, proxy_path, proxy_port,
+		`SELECT id, tenant_id, node_id, webroot_id, name, command, proxy_path, proxy_port,
 		        num_procs, stop_signal, stop_wait_secs, max_memory_mb, environment,
 		        enabled, status, status_message, created_at, updated_at
 		 FROM daemons WHERE webroot_id = $1 AND status != $2 ORDER BY name`, webrootID, model.StatusDeleted,
@@ -1300,7 +1300,7 @@ func (a *CoreDB) ListDaemonsByWebroot(ctx context.Context, webrootID string) ([]
 	for rows.Next() {
 		var d model.Daemon
 		var envJSON []byte
-		if err := rows.Scan(&d.ID, &d.TenantID, &d.WebrootID, &d.Name, &d.Command,
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.NodeID, &d.WebrootID, &d.Name, &d.Command,
 			&d.ProxyPath, &d.ProxyPort,
 			&d.NumProcs, &d.StopSignal, &d.StopWaitSecs, &d.MaxMemoryMB, &envJSON,
 			&d.Enabled, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt); err != nil {
@@ -1320,7 +1320,7 @@ func (a *CoreDB) ListDaemonsByWebroot(ctx context.Context, webrootID string) ([]
 // ListDaemonsByTenant retrieves all active daemons for a tenant (used in convergence).
 func (a *CoreDB) ListDaemonsByTenant(ctx context.Context, tenantID string) ([]model.Daemon, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, webroot_id, name, command, proxy_path, proxy_port,
+		`SELECT id, tenant_id, node_id, webroot_id, name, command, proxy_path, proxy_port,
 		        num_procs, stop_signal, stop_wait_secs, max_memory_mb, environment,
 		        enabled, status, status_message, created_at, updated_at
 		 FROM daemons WHERE tenant_id = $1 AND status = $2 ORDER BY name`, tenantID, model.StatusActive,
@@ -1334,7 +1334,7 @@ func (a *CoreDB) ListDaemonsByTenant(ctx context.Context, tenantID string) ([]mo
 	for rows.Next() {
 		var d model.Daemon
 		var envJSON []byte
-		if err := rows.Scan(&d.ID, &d.TenantID, &d.WebrootID, &d.Name, &d.Command,
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.NodeID, &d.WebrootID, &d.Name, &d.Command,
 			&d.ProxyPath, &d.ProxyPort,
 			&d.NumProcs, &d.StopSignal, &d.StopWaitSecs, &d.MaxMemoryMB, &envJSON,
 			&d.Enabled, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt); err != nil {

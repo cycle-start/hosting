@@ -20,15 +20,17 @@ func NewDaemonService(db DB, tc temporalclient.Client) *DaemonService {
 }
 
 func (s *DaemonService) Create(ctx context.Context, daemon *model.Daemon) error {
+	// TODO: Assign node_id via round-robin across active shard nodes
+
 	envJSON, err := json.Marshal(daemon.Environment)
 	if err != nil {
 		return fmt.Errorf("marshal environment: %w", err)
 	}
 
 	_, err = s.db.Exec(ctx,
-		`INSERT INTO daemons (id, tenant_id, webroot_id, name, command, proxy_path, proxy_port, num_procs, stop_signal, stop_wait_secs, max_memory_mb, environment, enabled, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
-		daemon.ID, daemon.TenantID, daemon.WebrootID, daemon.Name, daemon.Command,
+		`INSERT INTO daemons (id, tenant_id, node_id, webroot_id, name, command, proxy_path, proxy_port, num_procs, stop_signal, stop_wait_secs, max_memory_mb, environment, enabled, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+		daemon.ID, daemon.TenantID, daemon.NodeID, daemon.WebrootID, daemon.Name, daemon.Command,
 		daemon.ProxyPath, daemon.ProxyPort, daemon.NumProcs, daemon.StopSignal,
 		daemon.StopWaitSecs, daemon.MaxMemoryMB, envJSON,
 		daemon.Enabled, daemon.Status, daemon.CreatedAt, daemon.UpdatedAt,
@@ -50,12 +52,12 @@ func (s *DaemonService) Create(ctx context.Context, daemon *model.Daemon) error 
 	return nil
 }
 
-const daemonColumns = `id, tenant_id, webroot_id, name, command, proxy_path, proxy_port, num_procs, stop_signal, stop_wait_secs, max_memory_mb, environment, enabled, status, status_message, created_at, updated_at`
+const daemonColumns = `id, tenant_id, node_id, webroot_id, name, command, proxy_path, proxy_port, num_procs, stop_signal, stop_wait_secs, max_memory_mb, environment, enabled, status, status_message, created_at, updated_at`
 
 func scanDaemon(row interface{ Scan(dest ...any) error }) (model.Daemon, error) {
 	var d model.Daemon
 	var envJSON []byte
-	err := row.Scan(&d.ID, &d.TenantID, &d.WebrootID, &d.Name, &d.Command,
+	err := row.Scan(&d.ID, &d.TenantID, &d.NodeID, &d.WebrootID, &d.Name, &d.Command,
 		&d.ProxyPath, &d.ProxyPort, &d.NumProcs, &d.StopSignal,
 		&d.StopWaitSecs, &d.MaxMemoryMB, &envJSON,
 		&d.Enabled, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt)

@@ -31,7 +31,7 @@ Designed for scale: millions of tenants across multiple regions, clusters, and b
 
 ## What It Does
 
-**Web Hosting** — PHP, Node.js, Python, Ruby, and static sites with nginx, per-tenant Linux users, CephFS shared storage, PHP-FPM socket activation, and long-running worker processes via supervisord.
+**Web Hosting** — PHP, Node.js, Python, Ruby, and static sites with nginx, per-tenant Linux users, CephFS shared storage, PHP-FPM socket activation, and long-running daemon processes via supervisord.
 
 **DNS** — PowerDNS with brand-aware NS/SOA records, auto-created A/AAAA records on FQDN binding, and auto MX/SPF for email.
 

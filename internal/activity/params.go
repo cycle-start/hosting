@@ -270,6 +270,7 @@ type CronJobTimerParams struct {
 // CreateDaemonParams holds parameters for creating a daemon on a node.
 type CreateDaemonParams struct {
 	ID           string
+	NodeID       *string
 	TenantName   string
 	WebrootName  string
 	Name         string

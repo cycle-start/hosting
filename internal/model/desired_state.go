@@ -58,6 +58,7 @@ type DesiredCronJob struct {
 // DesiredDaemon is a daemon in the desired state.
 type DesiredDaemon struct {
 	ID        string  `json:"id"`
+	NodeID    *string `json:"node_id,omitempty"`
 	Name      string  `json:"name"`
 	Enabled   bool    `json:"enabled"`
 	ProxyPath *string `json:"proxy_path,omitempty"`

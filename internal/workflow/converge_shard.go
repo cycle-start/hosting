@@ -162,11 +162,8 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				continue
 			}
 
-			// Only web-facing webroots have nginx configs.
-			if webroot.Runtime != "php-worker" {
-				confName := fmt.Sprintf("%s_%s.conf", tenant.Name, webroot.Name)
-				expectedConfigs[confName] = true
-			}
+			confName := fmt.Sprintf("%s_%s.conf", tenant.Name, webroot.Name)
+			expectedConfigs[confName] = true
 
 			// Get FQDNs for this webroot.
 			var fqdns []model.FQDN
@@ -354,6 +351,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 
 			createParams := activity.CreateDaemonParams{
 				ID:           daemon.ID,
+				NodeID:       daemon.NodeID,
 				TenantName:   entry.tenant.Name,
 				WebrootName:  entry.webroot.Name,
 				Name:         daemon.Name,

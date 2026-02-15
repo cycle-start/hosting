@@ -192,35 +192,39 @@ func TestCoreDB_ListNodesByShard_Success(t *testing.T) {
 	id1, id2 := "test-node-1", "test-node-2"
 	now := time.Now().Truncate(time.Microsecond)
 
+	shardIdx1 := 1
+	shardIdx2 := 2
 	rows := newMockRows(
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
 			*(dest[1].(*string)) = clusterID
 			*(dest[2].(**string)) = &shardID
-			*(dest[3].(*string)) = "node-1"
+			*(dest[3].(**int)) = &shardIdx1
+			*(dest[4].(*string)) = "node-1"
 			ip1 := "10.0.0.1"
 			ip61 := "::1"
-			*(dest[4].(**string)) = &ip1
-			*(dest[5].(**string)) = &ip61
-			*(dest[6].(*[]string)) = []string{"web"}
-			*(dest[7].(*string)) = model.StatusActive
-			*(dest[8].(*time.Time)) = now
+			*(dest[5].(**string)) = &ip1
+			*(dest[6].(**string)) = &ip61
+			*(dest[7].(*[]string)) = []string{"web"}
+			*(dest[8].(*string)) = model.StatusActive
 			*(dest[9].(*time.Time)) = now
+			*(dest[10].(*time.Time)) = now
 			return nil
 		},
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id2
 			*(dest[1].(*string)) = clusterID
 			*(dest[2].(**string)) = &shardID
-			*(dest[3].(*string)) = "node-2"
+			*(dest[3].(**int)) = &shardIdx2
+			*(dest[4].(*string)) = "node-2"
 			ip2 := "10.0.0.2"
 			ip62 := "::2"
-			*(dest[4].(**string)) = &ip2
-			*(dest[5].(**string)) = &ip62
-			*(dest[6].(*[]string)) = []string{"db"}
-			*(dest[7].(*string)) = model.StatusActive
-			*(dest[8].(*time.Time)) = now
+			*(dest[5].(**string)) = &ip2
+			*(dest[6].(**string)) = &ip62
+			*(dest[7].(*[]string)) = []string{"db"}
+			*(dest[8].(*string)) = model.StatusActive
 			*(dest[9].(*time.Time)) = now
+			*(dest[10].(*time.Time)) = now
 			return nil
 		},
 	)

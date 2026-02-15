@@ -234,16 +234,9 @@ Names are `{prefix}{10-char-random}`, globally unique, auto-generated on creatio
 - Enable/disable lifecycle, convergence writes supervisord configs to all shard nodes
 - Nginx proxy locations support WebSocket connections (HTTP Upgrade headers + 24-hour timeout)
 
-### Worker Runtime
-
-- Generic "worker" runtime type for long-lived background processes (e.g., Laravel queue workers)
-- Supervisord-based process management with configurable `numprocs` (1-8)
-- No nginx config generation for worker runtimes
-- Versioned PHP binary, systemd security hardening (NoNewPrivileges, ProtectSystem, PrivateTmp)
-
 ### Tenant Log Access
 
-- Two Loki instances: Platform Loki (30-day, core services) + Tenant Loki (7-day, nginx/PHP-FPM/cron/worker)
+- Two Loki instances: Platform Loki (30-day, core services) + Tenant Loki (7-day, nginx/PHP-FPM/cron/daemon)
 - Logs on local SSD (`/var/log/hosting/{tenantID}/`), shipped by Vector with structured metadata
 - Tenant-scoped `GET /tenants/{id}/logs` proxies to Tenant Loki with tenant/webroot/log_type filtering
 

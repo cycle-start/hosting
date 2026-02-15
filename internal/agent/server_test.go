@@ -11,7 +11,7 @@ func TestNewServer_InitializesRuntimes(t *testing.T) {
 	srv := NewServer(zerolog.Nop(), Config{})
 
 	// Verify all expected runtimes are registered.
-	expectedRuntimes := []string{"php", "php-worker", "node", "python", "ruby", "static"}
+	expectedRuntimes := []string{"php", "node", "python", "ruby", "static"}
 	for _, rt := range expectedRuntimes {
 		_, ok := srv.runtimes[rt]
 		assert.True(t, ok, "runtime %q should be registered", rt)

@@ -9,6 +9,7 @@ type Node struct {
 	ID           string     `json:"id" db:"id"`
 	ClusterID    string     `json:"cluster_id" db:"cluster_id"`
 	ShardID      *string    `json:"shard_id,omitempty" db:"shard_id"`
+	ShardIndex   *int       `json:"shard_index,omitempty" db:"shard_index"`
 	Hostname     string     `json:"hostname" db:"hostname"`
 	IPAddress    *string    `json:"ip_address,omitempty" db:"ip_address"`
 	IP6Address   *string    `json:"ip6_address,omitempty" db:"ip6_address"`

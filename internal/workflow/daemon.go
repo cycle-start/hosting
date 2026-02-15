@@ -48,6 +48,7 @@ func CreateDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 
 	createParams := activity.CreateDaemonParams{
 		ID:           daemonCtx.Daemon.ID,
+		NodeID:       daemonCtx.Daemon.NodeID,
 		TenantName:   daemonCtx.Tenant.Name,
 		WebrootName:  daemonCtx.Webroot.Name,
 		Name:         daemonCtx.Daemon.Name,
@@ -132,6 +133,7 @@ func UpdateDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 
 	updateParams := activity.CreateDaemonParams{
 		ID:           daemonCtx.Daemon.ID,
+		NodeID:       daemonCtx.Daemon.NodeID,
 		TenantName:   daemonCtx.Tenant.Name,
 		WebrootName:  daemonCtx.Webroot.Name,
 		Name:         daemonCtx.Daemon.Name,
