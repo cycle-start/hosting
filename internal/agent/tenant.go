@@ -49,6 +49,10 @@ func (m *TenantManager) WebStorageDir() string {
 //
 //	/var/log/hosting/{tenant}/           tenant:tenant 0750
 func (m *TenantManager) Create(ctx context.Context, info *TenantInfo) error {
+	if err := checkMount(m.webStorageDir); err != nil {
+		return err
+	}
+
 	name := info.Name
 	uid := info.UID
 	chrootDir := filepath.Join(m.webStorageDir, name)
@@ -125,6 +129,32 @@ func (m *TenantManager) Create(ctx context.Context, info *TenantInfo) error {
 		return status.Errorf(codes.Internal, "chown failed for %s: %s: %v", logDir, string(output), err)
 	}
 
+	// Set CephFS quota if configured.
+	if info.DiskQuotaBytes > 0 {
+		if err := m.setQuota(ctx, chrootDir, info.DiskQuotaBytes); err != nil {
+			m.logger.Warn().Err(err).Str("tenant", name).Msg("failed to set CephFS quota (non-fatal)")
+		}
+	}
+
+	return nil
+}
+
+// setQuota sets the CephFS directory quota for a tenant using extended attributes.
+// A quotaBytes value of 0 means no quota (removes any existing quota).
+func (m *TenantManager) setQuota(ctx context.Context, tenantDir string, quotaBytes int64) error {
+	if quotaBytes <= 0 {
+		return nil
+	}
+	cmd := exec.CommandContext(ctx, "setfattr",
+		"-n", "ceph.quota.max_bytes",
+		"-v", strconv.FormatInt(quotaBytes, 10),
+		tenantDir,
+	)
+	m.logger.Debug().Strs("cmd", cmd.Args).Msg("setting CephFS quota")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return status.Errorf(codes.Internal,
+			"set CephFS quota on %s: %s: %v", tenantDir, string(output), err)
+	}
 	return nil
 }
 
@@ -173,6 +203,10 @@ func (m *TenantManager) Unsuspend(ctx context.Context, name string) error {
 
 // Delete removes a tenant user account and its CephFS directory.
 func (m *TenantManager) Delete(ctx context.Context, name string) error {
+	if err := checkMount(m.webStorageDir); err != nil {
+		return err
+	}
+
 	m.logger.Info().Str("tenant", name).Msg("deleting tenant user")
 
 	// Kill all processes owned by the user.

@@ -30,6 +30,14 @@ echo "proc /proc proc defaults,hidepid=2 0 0" >> /etc/fstab
 # Vector role-specific config.
 cp /tmp/vector-web.toml /etc/vector/config.d/web.toml
 
+# CephFS mount dependency for node-agent on web nodes.
+mkdir -p /etc/systemd/system/node-agent.service.d
+cat > /etc/systemd/system/node-agent.service.d/cephfs.conf << 'EOF'
+[Unit]
+After=var-www-storage.mount
+Requires=var-www-storage.mount
+EOF
+
 # Cleanup.
 apt-get clean
 rm -rf /var/lib/apt/lists/*

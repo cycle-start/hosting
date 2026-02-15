@@ -74,9 +74,9 @@ func (a *CoreDB) GetBrandByID(ctx context.Context, id string) (*model.Brand, err
 func (a *CoreDB) GetTenantByID(ctx context.Context, id string) (*model.Tenant, error) {
 	var t model.Tenant
 	err := a.db.QueryRow(ctx,
-		`SELECT id, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, status, status_message, created_at, updated_at
+		`SELECT id, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, ssh_enabled, disk_quota_bytes, status, status_message, created_at, updated_at
 		 FROM tenants WHERE id = $1`, id,
-	).Scan(&t.ID, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.Status, &t.StatusMessage, &t.CreatedAt, &t.UpdatedAt)
+	).Scan(&t.ID, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.SSHEnabled, &t.DiskQuotaBytes, &t.Status, &t.StatusMessage, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get tenant by id: %w", err)
 	}
@@ -300,7 +300,7 @@ func (a *CoreDB) CreateCertificate(ctx context.Context, params CreateCertificate
 // ListTenantsByShard retrieves all tenants assigned to a shard.
 func (a *CoreDB) ListTenantsByShard(ctx context.Context, shardID string) ([]model.Tenant, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, status, status_message, created_at, updated_at
+		`SELECT id, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, ssh_enabled, disk_quota_bytes, status, status_message, created_at, updated_at
 		 FROM tenants WHERE shard_id = $1 ORDER BY id`, shardID,
 	)
 	if err != nil {
@@ -311,7 +311,7 @@ func (a *CoreDB) ListTenantsByShard(ctx context.Context, shardID string) ([]mode
 	var tenants []model.Tenant
 	for rows.Next() {
 		var t model.Tenant
-		if err := rows.Scan(&t.ID, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.Status, &t.StatusMessage, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.SSHEnabled, &t.DiskQuotaBytes, &t.Status, &t.StatusMessage, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan tenant row: %w", err)
 		}
 		tenants = append(tenants, t)

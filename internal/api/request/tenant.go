@@ -1,12 +1,13 @@
 package request
 
 type CreateTenant struct {
-	BrandID     string `json:"brand_id" validate:"required"`
-	RegionID    string `json:"region_id" validate:"required"`
-	ClusterID   string `json:"cluster_id" validate:"required"`
-	ShardID     string `json:"shard_id" validate:"required"`
-	SFTPEnabled *bool  `json:"sftp_enabled"`
-	SSHEnabled  *bool  `json:"ssh_enabled"`
+	BrandID        string `json:"brand_id" validate:"required"`
+	RegionID       string `json:"region_id" validate:"required"`
+	ClusterID      string `json:"cluster_id" validate:"required"`
+	ShardID        string `json:"shard_id" validate:"required"`
+	SFTPEnabled    *bool  `json:"sftp_enabled"`
+	SSHEnabled     *bool  `json:"ssh_enabled"`
+	DiskQuotaBytes *int64 `json:"disk_quota_bytes"`
 	// Nested (all optional)
 	Zones           []CreateZoneNested           `json:"zones" validate:"omitempty,dive"`
 	Webroots        []CreateWebrootNested        `json:"webroots" validate:"omitempty,dive"`
@@ -17,6 +18,7 @@ type CreateTenant struct {
 }
 
 type UpdateTenant struct {
-	SFTPEnabled *bool `json:"sftp_enabled"`
-	SSHEnabled  *bool `json:"ssh_enabled"`
+	SFTPEnabled    *bool  `json:"sftp_enabled"`
+	SSHEnabled     *bool  `json:"ssh_enabled"`
+	DiskQuotaBytes *int64 `json:"disk_quota_bytes"`
 }

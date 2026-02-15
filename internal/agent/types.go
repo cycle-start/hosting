@@ -2,11 +2,12 @@ package agent
 
 // TenantInfo holds the information needed to manage a tenant on a node.
 type TenantInfo struct {
-	ID          string
-	Name        string
-	UID         int32
-	SFTPEnabled bool
-	SSHEnabled  bool
+	ID             string
+	Name           string
+	UID            int32
+	SFTPEnabled    bool
+	SSHEnabled     bool
+	DiskQuotaBytes int64
 }
 
 // FQDNInfo holds the FQDN configuration for nginx.

@@ -99,11 +99,12 @@ func NewNodeLocal(
 func (a *NodeLocal) CreateTenant(ctx context.Context, params CreateTenantParams) error {
 	a.logger.Info().Str("tenant", params.ID).Msg("CreateTenant")
 	return asNonRetryable(a.tenant.Create(ctx, &agent.TenantInfo{
-		ID:          params.ID,
-		Name:        params.ID,
-		UID:         int32(params.UID),
-		SFTPEnabled: params.SFTPEnabled,
-		SSHEnabled:  params.SSHEnabled,
+		ID:             params.ID,
+		Name:           params.ID,
+		UID:            int32(params.UID),
+		SFTPEnabled:    params.SFTPEnabled,
+		SSHEnabled:     params.SSHEnabled,
+		DiskQuotaBytes: params.DiskQuotaBytes,
 	}))
 }
 

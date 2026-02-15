@@ -18,7 +18,7 @@ write_files:
 
       IP="${ip_address}"
       HOST=$(hostname -s)
-      FSID=$(cat /proc/sys/kernel/random/uuid)
+      FSID="${ceph_fsid}"
       OSD_DISK="/dev/vdc"
 
       mkdir -p /etc/ceph /var/lib/ceph/bootstrap-osd

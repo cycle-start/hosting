@@ -9,9 +9,10 @@ type Tenant struct {
 	ClusterID   string  `json:"cluster_id" db:"cluster_id"`
 	ShardID     *string `json:"shard_id,omitempty" db:"shard_id"`
 	UID         int     `json:"uid" db:"uid"`
-	SFTPEnabled bool    `json:"sftp_enabled" db:"sftp_enabled"`
-	SSHEnabled  bool    `json:"ssh_enabled" db:"ssh_enabled"`
-	Status        string  `json:"status" db:"status"`
+	SFTPEnabled    bool    `json:"sftp_enabled" db:"sftp_enabled"`
+	SSHEnabled     bool    `json:"ssh_enabled" db:"ssh_enabled"`
+	DiskQuotaBytes int64   `json:"disk_quota_bytes" db:"disk_quota_bytes"`
+	Status         string  `json:"status" db:"status"`
 	StatusMessage *string `json:"status_message,omitempty" db:"status_message"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`

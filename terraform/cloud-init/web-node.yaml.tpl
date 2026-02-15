@@ -25,12 +25,48 @@ write_files:
       SERVICE_NAME=node-agent
       METRICS_ADDR=:9100
 
+  - path: /etc/ceph/ceph.conf
+    content: |
+      [global]
+      fsid = ${ceph_fsid}
+      mon host = ${storage_node_ip}
+      auth cluster required = cephx
+      auth service required = cephx
+      auth client required = cephx
+
+  - path: /etc/systemd/system/var-www-storage.mount
+    content: |
+      [Unit]
+      Description=CephFS Web Storage
+      After=network-online.target
+      Wants=network-online.target
+
+      [Mount]
+      What=${storage_node_ip}:/
+      Where=/var/www/storage
+      Type=ceph
+      Options=name=web,secretfile=/etc/ceph/ceph.client.web.secret,noatime,_netdev
+      TimeoutSec=30
+
+      [Install]
+      WantedBy=multi-user.target
+
 runcmd:
-  # Fetch CephFS client keyring and config from storage node.
-  - scp -o StrictHostKeyChecking=no ubuntu@${storage_node_ip}:/etc/ceph/ceph.client.web.keyring /etc/ceph/
-  - scp -o StrictHostKeyChecking=no ubuntu@${storage_node_ip}:/etc/ceph/ceph.conf /etc/ceph/
-  # Mount CephFS for shared web storage.
-  - mount -t ceph ${storage_node_ip}:/ /var/www/storage -o name=web,secretfile=/etc/ceph/ceph.client.web.keyring
-  - echo "${storage_node_ip}:/ /var/www/storage ceph name=web,secretfile=/etc/ceph/ceph.client.web.keyring,noatime 0 0" >> /etc/fstab
+  # Fetch the CephFS client keyring from the storage node (retry up to 5 minutes).
+  - |
+    for i in $(seq 1 60); do
+      scp -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
+        ubuntu@${storage_node_ip}:/etc/ceph/ceph.client.web.keyring \
+        /etc/ceph/ceph.client.web.keyring && break
+      echo "Waiting for storage node CephFS keyring (attempt $i/60)..."
+      sleep 5
+    done
+  # Extract the base64 secret for the kernel CephFS client.
+  - grep 'key = ' /etc/ceph/ceph.client.web.keyring | awk '{print $3}' > /etc/ceph/ceph.client.web.secret
+  - chmod 600 /etc/ceph/ceph.client.web.secret /etc/ceph/ceph.client.web.keyring
+  # Mount CephFS via systemd.
   - systemctl daemon-reload
+  - systemctl enable --now var-www-storage.mount
+  # Verify the mount is active before starting the node-agent.
+  - mountpoint -q /var/www/storage || (echo "FATAL: CephFS not mounted" && exit 1)
   - systemctl start node-agent

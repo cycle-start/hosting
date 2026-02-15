@@ -57,10 +57,11 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "CreateTenant", activity.CreateTenantParams{
-			ID:          tenant.ID,
-			UID:         tenant.UID,
-			SFTPEnabled: tenant.SFTPEnabled,
-			SSHEnabled:  tenant.SSHEnabled,
+			ID:             tenant.ID,
+			UID:            tenant.UID,
+			SFTPEnabled:    tenant.SFTPEnabled,
+			SSHEnabled:     tenant.SSHEnabled,
+			DiskQuotaBytes: tenant.DiskQuotaBytes,
 		}).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "tenants", tenantID, err)

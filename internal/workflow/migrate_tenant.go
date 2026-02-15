@@ -90,9 +90,11 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 	for _, node := range targetNodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "CreateTenant", activity.CreateTenantParams{
-			ID:          tenant.ID,
-			UID:         tenant.UID,
-			SFTPEnabled: tenant.SFTPEnabled,
+			ID:             tenant.ID,
+			UID:            tenant.UID,
+			SFTPEnabled:    tenant.SFTPEnabled,
+			SSHEnabled:     tenant.SSHEnabled,
+			DiskQuotaBytes: tenant.DiskQuotaBytes,
 		}).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "tenants", tenantID, err)

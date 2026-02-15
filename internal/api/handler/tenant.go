@@ -132,6 +132,9 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 	if req.SSHEnabled != nil {
 		tenant.SSHEnabled = *req.SSHEnabled
 	}
+	if req.DiskQuotaBytes != nil {
+		tenant.DiskQuotaBytes = *req.DiskQuotaBytes
+	}
 
 	if err := h.svc.Create(r.Context(), tenant); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
@@ -398,6 +401,9 @@ func (h *Tenant) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.SSHEnabled != nil {
 		tenant.SSHEnabled = *req.SSHEnabled
+	}
+	if req.DiskQuotaBytes != nil {
+		tenant.DiskQuotaBytes = *req.DiskQuotaBytes
 	}
 
 	if err := h.svc.Update(r.Context(), tenant); err != nil {

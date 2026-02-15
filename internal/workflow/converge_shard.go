@@ -222,10 +222,11 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		for _, node := range nodes {
 			nodeCtx := nodeActivityCtx(ctx, node.ID)
 			err = workflow.ExecuteActivity(nodeCtx, "CreateTenant", activity.CreateTenantParams{
-				ID:          tenant.ID,
-				UID:         tenant.UID,
-				SFTPEnabled: tenant.SFTPEnabled,
-				SSHEnabled:  tenant.SSHEnabled,
+				ID:             tenant.ID,
+				UID:            tenant.UID,
+				SFTPEnabled:    tenant.SFTPEnabled,
+				SSHEnabled:     tenant.SSHEnabled,
+				DiskQuotaBytes: tenant.DiskQuotaBytes,
 			}).Get(ctx, nil)
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("create tenant %s on node %s: %v", tenant.ID, node.ID, err))

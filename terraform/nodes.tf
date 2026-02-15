@@ -28,6 +28,8 @@ resource "random_uuid" "lb_node_id" {
   count = length(var.lb_nodes)
 }
 
+resource "random_uuid" "ceph_fsid" {}
+
 # --- Volumes (backed by golden images) ---
 
 resource "libvirt_volume" "web_node" {
@@ -117,6 +119,7 @@ resource "libvirt_cloudinit_disk" "web_node" {
     storage_node_ip  = var.storage_nodes[0].ip
     region_id        = var.region_id
     cluster_id       = var.cluster_id
+    ceph_fsid        = random_uuid.ceph_fsid.result
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.web_nodes[count.index].ip
@@ -246,6 +249,7 @@ resource "libvirt_cloudinit_disk" "storage_node" {
     filestore_enabled  = true
     region_id          = var.region_id
     cluster_id         = var.cluster_id
+    ceph_fsid          = random_uuid.ceph_fsid.result
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.storage_nodes[count.index].ip

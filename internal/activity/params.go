@@ -4,10 +4,11 @@ import "encoding/json"
 
 // CreateTenantParams holds parameters for creating a tenant on a node.
 type CreateTenantParams struct {
-	ID          string
-	UID         int
-	SFTPEnabled bool
-	SSHEnabled  bool
+	ID             string
+	UID            int
+	SFTPEnabled    bool
+	SSHEnabled     bool
+	DiskQuotaBytes int64
 }
 
 // UpdateTenantParams holds parameters for updating a tenant on a node.
