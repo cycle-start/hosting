@@ -74,15 +74,19 @@ func CreateEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 		return err
 	}
 
-	// Auto-create email DNS records (MX, SPF) if a zone exists.
+	// Auto-create email DNS records (MX, SPF, DKIM, DMARC) if a zone exists.
 	mailHostname := sctx.MailHostname
 	if mailHostname == "" {
 		mailHostname = "mail." + sctx.FQDN
 	}
 	err = workflow.ExecuteActivity(ctx, "AutoCreateEmailDNSRecords", activity.AutoCreateEmailDNSRecordsParams{
-		FQDN:         sctx.FQDN,
-		MailHostname: mailHostname,
-		SourceFQDNID: sctx.FQDNID,
+		FQDN:          sctx.FQDN,
+		MailHostname:  mailHostname,
+		SPFIncludes:   sctx.SPFIncludes,
+		DKIMSelector:  sctx.DKIMSelector,
+		DKIMPublicKey: sctx.DKIMPublicKey,
+		DMARCPolicy:   sctx.DMARCPolicy,
+		SourceFQDNID:  sctx.FQDNID,
 	}).Get(ctx, nil)
 	if err != nil {
 		_ = setResourceFailed(ctx, "email_accounts", accountID, err)

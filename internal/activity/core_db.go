@@ -1065,19 +1065,23 @@ func (a *CoreDB) GetS3AccessKeyContext(ctx context.Context, keyID string) (*S3Ac
 	return &sc, nil
 }
 
-// GetStalwartContext resolves Stalwart connection info by traversing FQDN -> webroot -> tenant -> cluster.
+// GetStalwartContext resolves Stalwart connection info by traversing FQDN -> webroot -> tenant -> cluster,
+// and includes the brand's mail DNS configuration (SPF, DKIM, DMARC).
 func (a *CoreDB) GetStalwartContext(ctx context.Context, fqdnID string) (*StalwartContext, error) {
 	var sc StalwartContext
 	var clusterConfig []byte
 
 	err := a.db.QueryRow(ctx,
-		`SELECT f.id, f.fqdn, c.config
+		`SELECT f.id, f.fqdn, c.config,
+		 b.mail_hostname, b.spf_includes, b.dkim_selector, b.dkim_public_key, b.dmarc_policy
 		 FROM fqdns f
 		 JOIN webroots w ON w.id = f.webroot_id
 		 JOIN tenants t ON t.id = w.tenant_id
 		 JOIN clusters c ON c.id = t.cluster_id
+		 JOIN brands b ON b.id = t.brand_id
 		 WHERE f.id = $1`, fqdnID,
-	).Scan(&sc.FQDNID, &sc.FQDN, &clusterConfig)
+	).Scan(&sc.FQDNID, &sc.FQDN, &clusterConfig,
+		&sc.MailHostname, &sc.SPFIncludes, &sc.DKIMSelector, &sc.DKIMPublicKey, &sc.DMARCPolicy)
 	if err != nil {
 		return nil, fmt.Errorf("get stalwart context: %w", err)
 	}
@@ -1093,7 +1097,10 @@ func (a *CoreDB) GetStalwartContext(ctx context.Context, fqdnID string) (*Stalwa
 
 	sc.StalwartURL = cfg.StalwartURL
 	sc.StalwartToken = cfg.StalwartToken
-	sc.MailHostname = cfg.MailHostname
+	// Brand mail_hostname overrides cluster config mail_hostname if set.
+	if sc.MailHostname == "" {
+		sc.MailHostname = cfg.MailHostname
+	}
 
 	return &sc, nil
 }

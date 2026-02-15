@@ -72,11 +72,15 @@ type DaemonContext struct {
 }
 
 // StalwartContext bundles Stalwart connection info resolved from the cluster config,
-// plus the FQDN fields needed by email account workflows.
+// plus the FQDN fields and brand mail DNS config needed by email account workflows.
 type StalwartContext struct {
 	StalwartURL   string `json:"stalwart_url"`
 	StalwartToken string `json:"stalwart_token"`
 	MailHostname  string `json:"mail_hostname"`
 	FQDNID        string `json:"fqdn_id"`
 	FQDN          string `json:"fqdn"`
+	SPFIncludes   string `json:"spf_includes"`
+	DKIMSelector  string `json:"dkim_selector"`
+	DKIMPublicKey string `json:"dkim_public_key"`
+	DMARCPolicy   string `json:"dmarc_policy"`
 }
