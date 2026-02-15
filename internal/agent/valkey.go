@@ -384,6 +384,8 @@ func (m *ValkeyManager) UpdateUser(ctx context.Context, instanceName string, por
 }
 
 // DeleteUser deletes a Valkey ACL user via valkey-cli.
+// This operation is idempotent: if the instance or user no longer exists,
+// it is treated as success.
 func (m *ValkeyManager) DeleteUser(ctx context.Context, instanceName string, port int, username string) error {
 	if err := validateName(username); err != nil {
 		return err
@@ -393,11 +395,16 @@ func (m *ValkeyManager) DeleteUser(ctx context.Context, instanceName string, por
 
 	instancePassword, err := m.readInstancePassword(instanceName)
 	if err != nil {
-		return status.Errorf(codes.Internal, "read instance password: %v", err)
+		// Instance config not found — instance already deleted, user is gone.
+		m.logger.Info().Str("instance", instanceName).Str("username", username).Msg("instance config not found, treating user as deleted")
+		return nil
 	}
 
 	if _, err := m.execValkeyCLI(ctx, port, instancePassword, "ACL", "DELUSER", username); err != nil {
-		return err
+		// If the instance is unreachable, log and return nil — the user can't
+		// exist on an instance that is already gone.
+		m.logger.Warn().Err(err).Str("username", username).Msg("ACL DELUSER failed, treating as success")
+		return nil
 	}
 
 	// Persist ACL changes.

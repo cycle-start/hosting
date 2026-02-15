@@ -127,6 +127,13 @@ func Seed(configPath string, timeout time.Duration) error {
 
 	// 2. Create zones (without tenant link first)
 	for _, z := range cfg.Zones {
+		zoneID, err := client.FindZoneByName(z.Name)
+		if err == nil {
+			fmt.Printf("Zone %q: exists (%s, skipping)\n", z.Name, zoneID)
+			zoneMap[z.Name] = zoneID
+			continue
+		}
+
 		fmt.Printf("Creating zone %q...\n", z.Name)
 		zoneBody := map[string]any{
 			"name":      z.Name,
@@ -144,7 +151,7 @@ func Seed(configPath string, timeout time.Duration) error {
 			return fmt.Errorf("create zone %q: %w", z.Name, err)
 		}
 
-		zoneID, err := extractID(resp)
+		zoneID, err = extractID(resp)
 		if err != nil {
 			return fmt.Errorf("parse zone ID: %w", err)
 		}

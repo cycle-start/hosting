@@ -16,7 +16,10 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    3,
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    10 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
@@ -54,10 +57,10 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 		return noShardErr
 	}
 
-	// Create webroot on each node in the shard.
-	for _, node := range wctx.Nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "CreateWebroot", activity.CreateWebrootParams{
+	// Create webroot on each node in the shard (parallel).
+	errs := fanOutNodes(ctx, wctx.Nodes, func(gCtx workflow.Context, node model.Node) error {
+		nodeCtx := nodeActivityCtx(gCtx, node.ID)
+		return workflow.ExecuteActivity(nodeCtx, "CreateWebroot", activity.CreateWebrootParams{
 			ID:             wctx.Webroot.ID,
 			TenantName:     wctx.Tenant.Name,
 			Name:           wctx.Webroot.Name,
@@ -68,11 +71,12 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 			EnvFileName:    wctx.Webroot.EnvFileName,
 			EnvShellSource: wctx.Webroot.EnvShellSource,
 			FQDNs:          fqdnParams,
-		}).Get(ctx, nil)
-		if err != nil {
-			_ = setResourceFailed(ctx, "webroots", webrootID, err)
-			return err
-		}
+		}).Get(gCtx, nil)
+	})
+	if len(errs) > 0 {
+		combinedErr := fmt.Errorf("create webroot errors: %s", joinErrors(errs))
+		_ = setResourceFailed(ctx, "webroots", webrootID, combinedErr)
+		return combinedErr
 	}
 
 	// Set status to active.
@@ -88,7 +92,10 @@ func UpdateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    3,
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    10 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
@@ -160,7 +167,10 @@ func DeleteWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    3,
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    10 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
@@ -189,14 +199,18 @@ func DeleteWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 		return noShardErr
 	}
 
-	// Delete webroot on each node in the shard.
-	for _, node := range wctx.Nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "DeleteWebroot", wctx.Tenant.Name, wctx.Webroot.Name).Get(ctx, nil)
-		if err != nil {
-			_ = setResourceFailed(ctx, "webroots", webrootID, err)
-			return err
+	// Delete webroot on each node in the shard (parallel, continue-on-error).
+	errs := fanOutNodes(ctx, wctx.Nodes, func(gCtx workflow.Context, node model.Node) error {
+		nodeCtx := nodeActivityCtx(gCtx, node.ID)
+		if err := workflow.ExecuteActivity(nodeCtx, "DeleteWebroot", wctx.Tenant.Name, wctx.Webroot.Name).Get(gCtx, nil); err != nil {
+			return fmt.Errorf("node %s: %v", node.ID, err)
 		}
+		return nil
+	})
+	if len(errs) > 0 {
+		combinedErr := fmt.Errorf("delete webroot errors: %s", joinErrors(errs))
+		_ = setResourceFailed(ctx, "webroots", webrootID, combinedErr)
+		return combinedErr
 	}
 
 	// Set status to deleted.

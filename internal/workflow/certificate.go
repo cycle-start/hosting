@@ -18,7 +18,10 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 2 * time.Minute,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    3,
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    10 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
@@ -202,7 +205,10 @@ func UploadCustomCertWorkflow(ctx workflow.Context, certID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    3,
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    10 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
@@ -285,7 +291,10 @@ func RenewLECertWorkflow(ctx workflow.Context) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    3,
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    10 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
@@ -320,7 +329,10 @@ func CleanupExpiredCertsWorkflow(ctx workflow.Context) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    3,
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    10 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)

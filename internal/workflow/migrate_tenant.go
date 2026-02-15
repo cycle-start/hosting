@@ -18,7 +18,10 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 5 * time.Minute,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    3,
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    10 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)

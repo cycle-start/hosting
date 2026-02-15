@@ -29,7 +29,10 @@ func ConvergeShardWorkflow(ctx workflow.Context, params ConvergeShardParams) err
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    3,
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    10 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
@@ -125,18 +128,15 @@ func convergeLBShard(ctx workflow.Context, shard model.Shard, nodes []model.Node
 func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) []string {
 	logger := workflow.GetLogger(ctx)
 
-	// List all tenants on this shard.
-	var tenants []model.Tenant
-	err := workflow.ExecuteActivity(ctx, "ListTenantsByShard", shardID).Get(ctx, &tenants)
+	// Fetch all desired state for the shard in a single batch query.
+	var state activity.ShardDesiredState
+	err := workflow.ExecuteActivity(ctx, "GetShardDesiredState", shardID).Get(ctx, &state)
 	if err != nil {
-		return []string{fmt.Sprintf("list tenants: %v", err)}
+		return []string{fmt.Sprintf("get shard desired state: %v", err)}
 	}
 
-	// Build the expected nginx config set from all active webroots across all
-	// active tenants. This is used to clean orphaned configs before and after
-	// creating webroots, preventing stale configs from blocking nginx reloads.
+	// Build the expected nginx config set and webroot entries from batch data.
 	expectedConfigs := make(map[string]bool)
-	// We also collect webroot data upfront to avoid fetching it twice.
 	type webrootEntry struct {
 		tenant  model.Tenant
 		webroot model.Webroot
@@ -145,70 +145,36 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 	var webrootEntries []webrootEntry
 
 	var errs []string
-	for _, tenant := range tenants {
+	for _, tenant := range state.Tenants {
 		if tenant.Status != model.StatusActive {
 			continue
 		}
-
-		// List webroots for this tenant.
-		var webroots []model.Webroot
-		err = workflow.ExecuteActivity(ctx, "ListWebrootsByTenantID", tenant.ID).Get(ctx, &webroots)
-		if err != nil {
-			errs = append(errs, fmt.Sprintf("list webroots for tenant %s: %v", tenant.ID, err))
-			continue
-		}
-
-		for _, webroot := range webroots {
-			if webroot.Status != model.StatusActive {
-				continue
-			}
-
+		for _, webroot := range state.Webroots[tenant.ID] {
 			confName := fmt.Sprintf("%s_%s.conf", tenant.Name, webroot.Name)
 			expectedConfigs[confName] = true
-
-			// Get FQDNs for this webroot.
-			var fqdns []model.FQDN
-			err = workflow.ExecuteActivity(ctx, "GetFQDNsByWebrootID", webroot.ID).Get(ctx, &fqdns)
-			if err != nil {
-				errs = append(errs, fmt.Sprintf("get fqdns for webroot %s: %v", webroot.ID, err))
-				continue
-			}
-
-			var fqdnParams []activity.FQDNParam
-			for _, f := range fqdns {
-				if f.Status != model.StatusActive {
-					continue
-				}
-				fqdnParams = append(fqdnParams, activity.FQDNParam{
-					FQDN:       f.FQDN,
-					WebrootID:  f.WebrootID,
-					SSLEnabled: f.SSLEnabled,
-				})
-			}
-
 			webrootEntries = append(webrootEntries, webrootEntry{
 				tenant:  tenant,
 				webroot: webroot,
-				fqdns:   fqdnParams,
+				fqdns:   state.FQDNs[webroot.ID],
 			})
 		}
 	}
 
-	// Clean orphaned nginx configs on each node BEFORE creating webroots.
-	// This prevents stale configs from causing nginx -t failures that block
-	// all new webroot provisioning.
-	for _, node := range nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
+	// Clean orphaned nginx configs on each node BEFORE creating webroots (parallel).
+	cleanErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
+		nodeCtx := nodeActivityCtx(gCtx, node.ID)
 		var result activity.CleanOrphanedConfigsResult
-		err = workflow.ExecuteActivity(nodeCtx, "CleanOrphanedConfigs", activity.CleanOrphanedConfigsInput{
+		if err := workflow.ExecuteActivity(nodeCtx, "CleanOrphanedConfigs", activity.CleanOrphanedConfigsInput{
 			ExpectedConfigs: expectedConfigs,
-		}).Get(ctx, &result)
-		if err != nil {
-			errs = append(errs, fmt.Sprintf("clean orphaned configs on node %s: %v", node.ID, err))
-		} else if len(result.Removed) > 0 {
+		}).Get(gCtx, &result); err != nil {
+			return fmt.Errorf("clean orphaned configs on node %s: %v", node.ID, err)
+		}
+		if len(result.Removed) > 0 {
 			logger.Warn("removed orphaned nginx configs", "node", node.ID, "removed", result.Removed)
 		}
-	}
+		return nil
+	})
+	errs = append(errs, cleanErrs...)
 
 	// Determine the cluster ID from the first node (all nodes in a shard share the same cluster).
 	clusterID := ""
@@ -216,68 +182,68 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		clusterID = nodes[0].ClusterID
 	}
 
-	// Create tenants and webroots on each node.
-	for _, tenant := range tenants {
+	// Create tenants on each node (per-tenant, parallel across nodes).
+	for _, tenant := range state.Tenants {
 		if tenant.Status != model.StatusActive {
 			continue
 		}
 
-		// Create tenant on each node.
-		for _, node := range nodes {
-			nodeCtx := nodeActivityCtx(ctx, node.ID)
-			err = workflow.ExecuteActivity(nodeCtx, "CreateTenant", activity.CreateTenantParams{
-				ID:             tenant.ID,
-				Name:           tenant.Name,
-				UID:            tenant.UID,
-				SFTPEnabled:    tenant.SFTPEnabled,
-				SSHEnabled:     tenant.SSHEnabled,
-				DiskQuotaBytes: tenant.DiskQuotaBytes,
-			}).Get(ctx, nil)
-			if err != nil {
-				errs = append(errs, fmt.Sprintf("create tenant %s on node %s: %v", tenant.ID, node.ID, err))
-				continue
+		t := tenant // capture
+		tenantErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
+			nodeCtx := nodeActivityCtx(gCtx, node.ID)
+			if err := workflow.ExecuteActivity(nodeCtx, "CreateTenant", activity.CreateTenantParams{
+				ID:             t.ID,
+				Name:           t.Name,
+				UID:            t.UID,
+				SFTPEnabled:    t.SFTPEnabled,
+				SSHEnabled:     t.SSHEnabled,
+				DiskQuotaBytes: t.DiskQuotaBytes,
+			}).Get(gCtx, nil); err != nil {
+				return fmt.Errorf("create tenant %s on node %s: %v", t.ID, node.ID, err)
 			}
 
 			// Sync SSH/SFTP config on the node.
-			err = workflow.ExecuteActivity(nodeCtx, "SyncSSHConfig", activity.SyncSSHConfigParams{
-				TenantName:  tenant.Name,
-				SSHEnabled:  tenant.SSHEnabled,
-				SFTPEnabled: tenant.SFTPEnabled,
-			}).Get(ctx, nil)
-			if err != nil {
-				errs = append(errs, fmt.Sprintf("sync ssh config for %s on node %s: %v", tenant.ID, node.ID, err))
+			if err := workflow.ExecuteActivity(nodeCtx, "SyncSSHConfig", activity.SyncSSHConfigParams{
+				TenantName:  t.Name,
+				SSHEnabled:  t.SSHEnabled,
+				SFTPEnabled: t.SFTPEnabled,
+			}).Get(gCtx, nil); err != nil {
+				return fmt.Errorf("sync ssh config for %s on node %s: %v", t.ID, node.ID, err)
 			}
-		}
+			return nil
+		})
+		errs = append(errs, tenantErrs...)
 	}
 
-	// Configure tenant ULA addresses on each node.
-	for _, tenant := range tenants {
+	// Configure tenant ULA addresses on each node (parallel across nodes per tenant).
+	for _, tenant := range state.Tenants {
 		if tenant.Status != model.StatusActive {
 			continue
 		}
-		for _, node := range nodes {
+		t := tenant // capture
+		ulaErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
 			if node.ShardIndex == nil {
-				continue
+				return nil
 			}
-			nodeCtx := nodeActivityCtx(ctx, node.ID)
-			err = workflow.ExecuteActivity(nodeCtx, "ConfigureTenantAddresses",
+			nodeCtx := nodeActivityCtx(gCtx, node.ID)
+			if err := workflow.ExecuteActivity(nodeCtx, "ConfigureTenantAddresses",
 				activity.ConfigureTenantAddressesParams{
-					TenantName:   tenant.Name,
-					TenantUID:    tenant.UID,
+					TenantName:   t.Name,
+					TenantUID:    t.UID,
 					ClusterID:    clusterID,
 					NodeShardIdx: *node.ShardIndex,
-				}).Get(ctx, nil)
-			if err != nil {
-				errs = append(errs, fmt.Sprintf("configure ULA for %s on %s: %v", tenant.ID, node.ID, err))
+				}).Get(gCtx, nil); err != nil {
+				return fmt.Errorf("configure ULA for %s on %s: %v", t.ID, node.ID, err)
 			}
-		}
+			return nil
+		})
+		errs = append(errs, ulaErrs...)
 	}
 
-	// Configure cross-node ULA routes on each node so nginx can proxy to daemons
-	// running on other nodes in the shard.
-	for _, node := range nodes {
+	// Configure cross-node ULA routes on each node (parallel).
+	routeErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
 		if node.ShardIndex == nil {
-			continue
+			return nil
 		}
 		var otherIndices []int
 		for _, other := range nodes {
@@ -286,32 +252,22 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 			}
 		}
 		if len(otherIndices) > 0 {
-			nodeCtx := nodeActivityCtx(ctx, node.ID)
-			err = workflow.ExecuteActivity(nodeCtx, "ConfigureULARoutes",
+			nodeCtx := nodeActivityCtx(gCtx, node.ID)
+			if err := workflow.ExecuteActivity(nodeCtx, "ConfigureULARoutes",
 				activity.ConfigureULARoutesParams{
 					ClusterID:        clusterID,
 					ThisNodeIndex:    *node.ShardIndex,
 					OtherNodeIndices: otherIndices,
-				}).Get(ctx, nil)
-			if err != nil {
-				errs = append(errs, fmt.Sprintf("configure ULA routes on %s: %v", node.ID, err))
+				}).Get(gCtx, nil); err != nil {
+				return fmt.Errorf("configure ULA routes on %s: %v", node.ID, err)
 			}
 		}
-	}
+		return nil
+	})
+	errs = append(errs, routeErrs...)
 
-	// Fetch daemons per webroot for nginx proxy locations during convergence.
-	webrootDaemons := make(map[string][]model.Daemon) // keyed by webroot ID
-	for _, entry := range webrootEntries {
-		var daemons []model.Daemon
-		err = workflow.ExecuteActivity(ctx, "ListDaemonsByWebroot", entry.webroot.ID).Get(ctx, &daemons)
-		if err != nil {
-			errs = append(errs, fmt.Sprintf("list daemons for webroot %s: %v", entry.webroot.ID, err))
-			continue
-		}
-		if len(daemons) > 0 {
-			webrootDaemons[entry.webroot.ID] = daemons
-		}
-	}
+	// Daemon data from batch query (keyed by webroot ID).
+	webrootDaemons := state.Daemons
 
 	// Build a node index map for ULA computation.
 	nodeShardIndex := make(map[string]int) // node ID -> shard_index
@@ -321,7 +277,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		}
 	}
 
-	// Create webroots on each node.
+	// Create webroots on each node (parallel across nodes per webroot).
 	for _, entry := range webrootEntries {
 		// Build daemon proxy info for this webroot's nginx config.
 		var daemonProxies []activity.DaemonProxyInfo
@@ -342,36 +298,33 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 			}
 		}
 
-		for _, node := range nodes {
-			nodeCtx := nodeActivityCtx(ctx, node.ID)
-			err = workflow.ExecuteActivity(nodeCtx, "CreateWebroot", activity.CreateWebrootParams{
-				ID:             entry.webroot.ID,
-				TenantName:     entry.tenant.Name,
-				Name:           entry.webroot.Name,
-				Runtime:        entry.webroot.Runtime,
-				RuntimeVersion: entry.webroot.RuntimeVersion,
-				RuntimeConfig:  string(entry.webroot.RuntimeConfig),
-				PublicFolder:   entry.webroot.PublicFolder,
-				EnvFileName:    entry.webroot.EnvFileName,
-				EnvShellSource: entry.webroot.EnvShellSource,
-				FQDNs:          entry.fqdns,
-				Daemons:        daemonProxies,
-			}).Get(ctx, nil)
-			if err != nil {
-				errs = append(errs, fmt.Sprintf("create webroot %s on node %s: %v", entry.webroot.ID, node.ID, err))
+		e := entry // capture
+		dp := daemonProxies
+		wrErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
+			nodeCtx := nodeActivityCtx(gCtx, node.ID)
+			if err := workflow.ExecuteActivity(nodeCtx, "CreateWebroot", activity.CreateWebrootParams{
+				ID:             e.webroot.ID,
+				TenantName:     e.tenant.Name,
+				Name:           e.webroot.Name,
+				Runtime:        e.webroot.Runtime,
+				RuntimeVersion: e.webroot.RuntimeVersion,
+				RuntimeConfig:  string(e.webroot.RuntimeConfig),
+				PublicFolder:   e.webroot.PublicFolder,
+				EnvFileName:    e.webroot.EnvFileName,
+				EnvShellSource: e.webroot.EnvShellSource,
+				FQDNs:          e.fqdns,
+				Daemons:        dp,
+			}).Get(gCtx, nil); err != nil {
+				return fmt.Errorf("create webroot %s on node %s: %v", e.webroot.ID, node.ID, err)
 			}
-		}
+			return nil
+		})
+		errs = append(errs, wrErrs...)
 	}
 
 	// Converge cron jobs for each webroot.
 	for _, entry := range webrootEntries {
-		var cronJobs []model.CronJob
-		err = workflow.ExecuteActivity(ctx, "ListCronJobsByWebroot", entry.webroot.ID).Get(ctx, &cronJobs)
-		if err != nil {
-			errs = append(errs, fmt.Sprintf("list cron jobs for webroot %s: %v", entry.webroot.ID, err))
-			continue
-		}
-
+		cronJobs := state.CronJobs[entry.webroot.ID]
 		for _, job := range cronJobs {
 			if job.Status != model.StatusActive {
 				continue
@@ -389,28 +342,31 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				MaxMemoryMB:      job.MaxMemoryMB,
 			}
 
-			// Write unit files on all nodes.
-			for _, node := range nodes {
-				nodeCtx := nodeActivityCtx(ctx, node.ID)
-				err = workflow.ExecuteActivity(nodeCtx, "CreateCronJobUnits", createParams).Get(ctx, nil)
-				if err != nil {
-					errs = append(errs, fmt.Sprintf("create cron job %s on node %s: %v", job.ID, node.ID, err))
+			// Write unit files on all nodes (parallel).
+			j := job // capture
+			cronErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
+				nodeCtx := nodeActivityCtx(gCtx, node.ID)
+				if err := workflow.ExecuteActivity(nodeCtx, "CreateCronJobUnits", createParams).Get(gCtx, nil); err != nil {
+					return fmt.Errorf("create cron job %s on node %s: %v", j.ID, node.ID, err)
 				}
-			}
+				return nil
+			})
+			errs = append(errs, cronErrs...)
 
-			// Enable timer on all nodes — flock ensures single execution.
-			if job.Enabled {
+			// Enable timer on all nodes (parallel) — flock ensures single execution.
+			if j.Enabled {
 				timerParams := activity.CronJobTimerParams{
-					ID:         job.ID,
+					ID:         j.ID,
 					TenantName: entry.tenant.Name,
 				}
-				for _, node := range nodes {
-					nodeCtx := nodeActivityCtx(ctx, node.ID)
-					err = workflow.ExecuteActivity(nodeCtx, "EnableCronJobTimer", timerParams).Get(ctx, nil)
-					if err != nil {
-						errs = append(errs, fmt.Sprintf("enable cron timer %s on node %s: %v", job.ID, node.ID, err))
+				timerErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
+					nodeCtx := nodeActivityCtx(gCtx, node.ID)
+					if err := workflow.ExecuteActivity(nodeCtx, "EnableCronJobTimer", timerParams).Get(gCtx, nil); err != nil {
+						return fmt.Errorf("enable cron timer %s on node %s: %v", j.ID, node.ID, err)
 					}
-				}
+					return nil
+				})
+				errs = append(errs, timerErrs...)
 			}
 		}
 	}
@@ -447,42 +403,46 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				Environment:  daemon.Environment,
 			}
 
-			// Write supervisord config on all nodes.
-			for _, node := range nodes {
-				nodeCtx := nodeActivityCtx(ctx, node.ID)
-				err = workflow.ExecuteActivity(nodeCtx, "CreateDaemonConfig", createParams).Get(ctx, nil)
-				if err != nil {
-					errs = append(errs, fmt.Sprintf("create daemon %s on node %s: %v", daemon.ID, node.ID, err))
+			// Write supervisord config on all nodes (parallel).
+			d := daemon // capture
+			daemonErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
+				nodeCtx := nodeActivityCtx(gCtx, node.ID)
+				if err := workflow.ExecuteActivity(nodeCtx, "CreateDaemonConfig", createParams).Get(gCtx, nil); err != nil {
+					return fmt.Errorf("create daemon %s on node %s: %v", d.ID, node.ID, err)
 				}
-			}
+				return nil
+			})
+			errs = append(errs, daemonErrs...)
 
-			// Disable daemon on all nodes if not enabled.
-			if !daemon.Enabled {
+			// Disable daemon on all nodes if not enabled (parallel).
+			if !d.Enabled {
 				disableParams := activity.DaemonEnableParams{
-					ID:          daemon.ID,
+					ID:          d.ID,
 					TenantName:  entry.tenant.Name,
 					WebrootName: entry.webroot.Name,
-					Name:        daemon.Name,
+					Name:        d.Name,
 				}
-				for _, node := range nodes {
-					nodeCtx := nodeActivityCtx(ctx, node.ID)
-					err = workflow.ExecuteActivity(nodeCtx, "DisableDaemon", disableParams).Get(ctx, nil)
-					if err != nil {
-						errs = append(errs, fmt.Sprintf("disable daemon %s on node %s: %v", daemon.ID, node.ID, err))
+				disableErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
+					nodeCtx := nodeActivityCtx(gCtx, node.ID)
+					if err := workflow.ExecuteActivity(nodeCtx, "DisableDaemon", disableParams).Get(gCtx, nil); err != nil {
+						return fmt.Errorf("disable daemon %s on node %s: %v", d.ID, node.ID, err)
 					}
-				}
+					return nil
+				})
+				errs = append(errs, disableErrs...)
 			}
 		}
 	}
 
-	// Reload nginx on all nodes.
-	for _, node := range nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err := workflow.ExecuteActivity(nodeCtx, "ReloadNginx").Get(ctx, nil)
-		if err != nil {
-			errs = append(errs, fmt.Sprintf("reload nginx on node %s: %v", node.ID, err))
+	// Reload nginx on all nodes (parallel).
+	reloadErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
+		nodeCtx := nodeActivityCtx(gCtx, node.ID)
+		if err := workflow.ExecuteActivity(nodeCtx, "ReloadNginx").Get(gCtx, nil); err != nil {
+			return fmt.Errorf("reload nginx on node %s: %v", node.ID, err)
 		}
-	}
+		return nil
+	})
+	errs = append(errs, reloadErrs...)
 
 	return errs
 }

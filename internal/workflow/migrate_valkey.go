@@ -25,7 +25,10 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 10 * time.Minute,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    3,
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    10 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)

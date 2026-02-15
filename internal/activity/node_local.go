@@ -26,21 +26,25 @@ type grpcStatusError interface {
 }
 
 // asNonRetryable checks whether err (or any error in its chain) is a gRPC
-// status error with codes.InvalidArgument. If so it wraps the error as a
+// status error with a deterministic error code. If so it wraps the error as a
 // Temporal non-retryable application error so that the activity is not
-// retried — validation failures are deterministic and will never succeed
-// on retry. All other errors are returned unchanged.
+// retried — these failures will never succeed on retry. All other errors
+// (including codes.Internal) are returned unchanged and may be retried.
 func asNonRetryable(err error) error {
 	if err == nil {
 		return nil
 	}
 	var se grpcStatusError
-	if errors.As(err, &se) && se.GRPCStatus().Code() == codes.InvalidArgument {
-		return temporal.NewNonRetryableApplicationError(
-			se.GRPCStatus().Message(),
-			"InvalidArgument",
-			err,
-		)
+	if errors.As(err, &se) {
+		code := se.GRPCStatus().Code()
+		switch code {
+		case codes.InvalidArgument, codes.NotFound, codes.AlreadyExists, codes.FailedPrecondition:
+			return temporal.NewNonRetryableApplicationError(
+				se.GRPCStatus().Message(),
+				code.String(),
+				err,
+			)
+		}
 	}
 	return err
 }

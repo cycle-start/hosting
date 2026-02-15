@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -67,18 +68,8 @@ func (m *TenantManager) Create(ctx context.Context, info *TenantInfo) error {
 	checkCmd := exec.CommandContext(ctx, "id", name)
 	if err := checkCmd.Run(); err != nil {
 		// User does not exist — create it.
-		// -M: don't create home (we manage CephFS dirs ourselves)
-		// -d /home: chroot-relative home path (what user sees after chroot)
-		cmd := exec.CommandContext(ctx, "useradd",
-			"-M",
-			"-d", "/home",
-			"-u", strconv.FormatInt(int64(uid), 10),
-			"-s", "/bin/bash",
-			name,
-		)
-		m.logger.Debug().Strs("cmd", cmd.Args).Msg("executing useradd")
-		if output, err := cmd.CombinedOutput(); err != nil {
-			return status.Errorf(codes.Internal, "useradd failed for %s: %s: %v", name, string(output), err)
+		if err := m.createUser(ctx, name, uid); err != nil {
+			return err
 		}
 	} else {
 		m.logger.Info().Str("tenant", name).Msg("user already exists, converging state")
@@ -136,6 +127,68 @@ func (m *TenantManager) Create(ctx context.Context, info *TenantInfo) error {
 		}
 	}
 
+	return nil
+}
+
+// createUser creates a Linux user with the given name and UID. If the UID is already
+// taken by a different user (orphaned from a previous DB state), the stale user is
+// removed and creation is retried.
+func (m *TenantManager) createUser(ctx context.Context, name string, uid int32) error {
+	// -M: don't create home (we manage CephFS dirs ourselves)
+	// -d /home: chroot-relative home path (what user sees after chroot)
+	cmd := exec.CommandContext(ctx, "useradd",
+		"-M",
+		"-d", "/home",
+		"-u", strconv.FormatInt(int64(uid), 10),
+		"-s", "/bin/bash",
+		name,
+	)
+	m.logger.Debug().Strs("cmd", cmd.Args).Msg("executing useradd")
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		return nil
+	}
+
+	outStr := string(output)
+	if !strings.Contains(outStr, "UID") || !strings.Contains(outStr, "not unique") {
+		return status.Errorf(codes.Internal, "useradd failed for %s: %s: %v", name, outStr, err)
+	}
+
+	// UID already taken by a stale user — look up its name and remove it.
+	m.logger.Warn().Int32("uid", uid).Str("tenant", name).Msg("UID already taken by stale user, cleaning up")
+	getentCmd := exec.CommandContext(ctx, "getent", "passwd", strconv.FormatInt(int64(uid), 10))
+	getentOut, err := getentCmd.Output()
+	if err != nil {
+		return status.Errorf(codes.Internal, "getent passwd %d failed: %v", uid, err)
+	}
+	// getent output: "username:x:uid:gid:comment:home:shell"
+	parts := strings.SplitN(string(getentOut), ":", 2)
+	if len(parts) == 0 || parts[0] == "" {
+		return status.Errorf(codes.Internal, "could not parse stale user from getent output: %s", string(getentOut))
+	}
+	staleUser := parts[0]
+
+	m.logger.Info().Str("stale_user", staleUser).Int32("uid", uid).Msg("removing stale user to reclaim UID")
+
+	// Kill any running processes for the stale user before removing.
+	killCmd := exec.CommandContext(ctx, "pkill", "-9", "-u", staleUser)
+	_ = killCmd.Run() // Ignore error — no processes is fine.
+
+	delCmd := exec.CommandContext(ctx, "userdel", staleUser)
+	if delOutput, err := delCmd.CombinedOutput(); err != nil {
+		return status.Errorf(codes.Internal, "userdel stale user %s failed: %s: %v", staleUser, string(delOutput), err)
+	}
+
+	// Retry useradd.
+	retryCmd := exec.CommandContext(ctx, "useradd",
+		"-M", "-d", "/home",
+		"-u", strconv.FormatInt(int64(uid), 10),
+		"-s", "/bin/bash",
+		name,
+	)
+	if retryOutput, err := retryCmd.CombinedOutput(); err != nil {
+		return status.Errorf(codes.Internal, "useradd retry failed for %s: %s: %v", name, string(retryOutput), err)
+	}
 	return nil
 }
 
@@ -215,10 +268,13 @@ func (m *TenantManager) Delete(ctx context.Context, name string) error {
 	_ = killCmd.Run()
 
 	// Remove the user (no -r since home is on CephFS, not local).
+	// Treat "does not exist" as success — idempotent.
 	cmd := exec.CommandContext(ctx, "userdel", name)
 	m.logger.Debug().Strs("cmd", cmd.Args).Msg("executing userdel")
 	if output, err := cmd.CombinedOutput(); err != nil {
-		return status.Errorf(codes.Internal, "userdel failed for %s: %s: %v", name, string(output), err)
+		if !strings.Contains(string(output), "does not exist") {
+			return status.Errorf(codes.Internal, "userdel failed for %s: %s: %v", name, string(output), err)
+		}
 	}
 
 	// Remove the CephFS directory tree.

@@ -94,13 +94,10 @@ func (m *TenantULAManager) Configure(ctx context.Context, info *TenantULAInfo) e
 		Int("uid", info.TenantUID).
 		Msg("configuring tenant ULA")
 
-	// Add IPv6 address to tenant0 interface.
+	// Add IPv6 address to tenant0 interface — idempotent.
 	out, err := exec.CommandContext(ctx, "ip", "-6", "addr", "add", ula+"/128", "dev", "tenant0").CombinedOutput()
-	if err != nil {
-		// "RTNETLINK answers: File exists" means the address is already assigned — idempotent.
-		if !strings.Contains(string(out), "File exists") {
-			return fmt.Errorf("ip addr add %s: %s: %w", ula, string(out), err)
-		}
+	if err != nil && !isAddrAlreadyExists(string(out)) {
+		return fmt.Errorf("ip addr add %s: %s: %w", ula, string(out), err)
 	}
 
 	// Add nftables element to allow this (address, uid) pair.
@@ -132,10 +129,10 @@ func (m *TenantULAManager) ConfigureRoutes(ctx context.Context, info *ULARoutesI
 
 	clusterHash := core.ComputeClusterHash(info.ClusterID)
 
-	// Add transit address on primary interface (idempotent).
+	// Add transit address on primary interface — idempotent.
 	transitAddr := fmt.Sprintf("fd00:%x:0::%x/64", clusterHash, info.ThisNodeIndex)
 	out, err := exec.CommandContext(ctx, "ip", "-6", "addr", "add", transitAddr, "dev", iface).CombinedOutput()
-	if err != nil && !strings.Contains(string(out), "File exists") {
+	if err != nil && !isAddrAlreadyExists(string(out)) {
 		return fmt.Errorf("ip addr add transit %s dev %s: %s: %w", transitAddr, iface, string(out), err)
 	}
 	m.logger.Info().Str("addr", transitAddr).Str("dev", iface).Msg("transit address configured")
@@ -194,4 +191,10 @@ func (m *TenantULAManager) Remove(ctx context.Context, info *TenantULAInfo) erro
 		fmt.Sprintf("{ %s . %d }", ula, info.TenantUID)).CombinedOutput()
 
 	return nil
+}
+
+// isAddrAlreadyExists checks if an `ip addr add` error indicates the address
+// is already assigned. Different kernel/iproute2 versions use different messages.
+func isAddrAlreadyExists(output string) bool {
+	return strings.Contains(output, "File exists") || strings.Contains(output, "already assigned")
 }

@@ -17,7 +17,10 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    3,
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    10 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
@@ -74,9 +77,9 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 		})
 	}
 
-	for _, node := range fctx.Nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "UpdateWebroot", activity.UpdateWebrootParams{
+	bindErrs := fanOutNodes(ctx, fctx.Nodes, func(gCtx workflow.Context, node model.Node) error {
+		nodeCtx := nodeActivityCtx(gCtx, node.ID)
+		return workflow.ExecuteActivity(nodeCtx, "UpdateWebroot", activity.UpdateWebrootParams{
 			ID:             fctx.Webroot.ID,
 			TenantName:     fctx.Tenant.Name,
 			Name:           fctx.Webroot.Name,
@@ -85,11 +88,12 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 			RuntimeConfig:  string(fctx.Webroot.RuntimeConfig),
 			PublicFolder:   fctx.Webroot.PublicFolder,
 			FQDNs:          fqdnParams,
-		}).Get(ctx, nil)
-		if err != nil {
-			_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
-			return err
-		}
+		}).Get(gCtx, nil)
+	})
+	if len(bindErrs) > 0 {
+		combinedErr := fmt.Errorf("bind fqdn errors: %s", joinErrors(bindErrs))
+		_ = setResourceFailed(ctx, "fqdns", fqdnID, combinedErr)
+		return combinedErr
 	}
 
 	// If SSL is enabled, start a child workflow for Let's Encrypt provisioning.
@@ -131,7 +135,10 @@ func UnbindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    3,
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    10 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)

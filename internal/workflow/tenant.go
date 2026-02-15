@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"go.temporal.io/sdk/temporal"
@@ -16,7 +17,10 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    3,
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    10 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
@@ -59,47 +63,47 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		clusterID = nodes[0].ClusterID
 	}
 
-	// Create tenant on each node in the shard.
-	for _, node := range nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "CreateTenant", activity.CreateTenantParams{
+	// Create tenant on each node in the shard (parallel).
+	errs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
+		nodeCtx := nodeActivityCtx(gCtx, node.ID)
+		if err := workflow.ExecuteActivity(nodeCtx, "CreateTenant", activity.CreateTenantParams{
 			ID:             tenant.ID,
 			Name:           tenant.Name,
 			UID:            tenant.UID,
 			SFTPEnabled:    tenant.SFTPEnabled,
 			SSHEnabled:     tenant.SSHEnabled,
 			DiskQuotaBytes: tenant.DiskQuotaBytes,
-		}).Get(ctx, nil)
-		if err != nil {
-			_ = setResourceFailed(ctx, "tenants", tenantID, err)
-			return err
+		}).Get(gCtx, nil); err != nil {
+			return fmt.Errorf("node %s: create tenant: %v", node.ID, err)
 		}
 
 		// Sync SSH/SFTP config on the node.
-		err = workflow.ExecuteActivity(nodeCtx, "SyncSSHConfig", activity.SyncSSHConfigParams{
+		if err := workflow.ExecuteActivity(nodeCtx, "SyncSSHConfig", activity.SyncSSHConfigParams{
 			TenantName:  tenant.Name,
 			SSHEnabled:  tenant.SSHEnabled,
 			SFTPEnabled: tenant.SFTPEnabled,
-		}).Get(ctx, nil)
-		if err != nil {
-			_ = setResourceFailed(ctx, "tenants", tenantID, err)
-			return err
+		}).Get(gCtx, nil); err != nil {
+			return fmt.Errorf("node %s: sync ssh config: %v", node.ID, err)
 		}
 
 		// Configure tenant ULA addresses for daemon networking.
 		if node.ShardIndex != nil {
-			err = workflow.ExecuteActivity(nodeCtx, "ConfigureTenantAddresses",
+			if err := workflow.ExecuteActivity(nodeCtx, "ConfigureTenantAddresses",
 				activity.ConfigureTenantAddressesParams{
 					TenantName:   tenant.Name,
 					TenantUID:    tenant.UID,
 					ClusterID:    clusterID,
 					NodeShardIdx: *node.ShardIndex,
-				}).Get(ctx, nil)
-			if err != nil {
-				_ = setResourceFailed(ctx, "tenants", tenantID, err)
-				return err
+				}).Get(gCtx, nil); err != nil {
+				return fmt.Errorf("node %s: configure ULA: %v", node.ID, err)
 			}
 		}
+		return nil
+	})
+	if len(errs) > 0 {
+		combinedErr := fmt.Errorf("create tenant errors: %s", joinErrors(errs))
+		_ = setResourceFailed(ctx, "tenants", tenantID, combinedErr)
+		return combinedErr
 	}
 
 	// Set status to active.
@@ -115,7 +119,10 @@ func UpdateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    3,
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    10 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
@@ -191,7 +198,10 @@ func SuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    3,
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    10 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
@@ -239,7 +249,10 @@ func UnsuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    3,
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    10 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
@@ -298,7 +311,10 @@ func DeleteTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+			MaximumAttempts:    3,
+			InitialInterval:    1 * time.Second,
+			MaximumInterval:    10 * time.Second,
+			BackoffCoefficient: 2.0,
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
@@ -340,37 +356,42 @@ func DeleteTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		deleteClusterID = nodes[0].ClusterID
 	}
 
-	// Delete tenant on each node in the shard.
-	for _, node := range nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
+	// Delete tenant on each node in the shard (parallel, continue-on-error).
+	errs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
+		nodeCtx := nodeActivityCtx(gCtx, node.ID)
+		var nodeErrs []string
 
 		// Remove tenant ULA addresses before deleting the tenant.
 		if node.ShardIndex != nil {
-			err = workflow.ExecuteActivity(nodeCtx, "RemoveTenantAddresses",
+			if err := workflow.ExecuteActivity(nodeCtx, "RemoveTenantAddresses",
 				activity.ConfigureTenantAddressesParams{
 					TenantName:   tenant.Name,
 					TenantUID:    tenant.UID,
 					ClusterID:    deleteClusterID,
 					NodeShardIdx: *node.ShardIndex,
-				}).Get(ctx, nil)
-			if err != nil {
-				_ = setResourceFailed(ctx, "tenants", tenantID, err)
-				return err
+				}).Get(gCtx, nil); err != nil {
+				nodeErrs = append(nodeErrs, fmt.Sprintf("remove ULA: %v", err))
 			}
 		}
 
 		// Remove SSH config before deleting the tenant.
-		err = workflow.ExecuteActivity(nodeCtx, "RemoveSSHConfig", tenant.Name).Get(ctx, nil)
-		if err != nil {
-			_ = setResourceFailed(ctx, "tenants", tenantID, err)
-			return err
+		if err := workflow.ExecuteActivity(nodeCtx, "RemoveSSHConfig", tenant.Name).Get(gCtx, nil); err != nil {
+			nodeErrs = append(nodeErrs, fmt.Sprintf("remove SSH config: %v", err))
 		}
 
-		err = workflow.ExecuteActivity(nodeCtx, "DeleteTenant", tenant.Name).Get(ctx, nil)
-		if err != nil {
-			_ = setResourceFailed(ctx, "tenants", tenantID, err)
-			return err
+		if err := workflow.ExecuteActivity(nodeCtx, "DeleteTenant", tenant.Name).Get(gCtx, nil); err != nil {
+			nodeErrs = append(nodeErrs, fmt.Sprintf("delete tenant: %v", err))
 		}
+
+		if len(nodeErrs) > 0 {
+			return fmt.Errorf("node %s: %s", node.ID, strings.Join(nodeErrs, "; "))
+		}
+		return nil
+	})
+	if len(errs) > 0 {
+		combinedErr := fmt.Errorf("delete errors: %s", joinErrors(errs))
+		_ = setResourceFailed(ctx, "tenants", tenantID, combinedErr)
+		return combinedErr
 	}
 
 	// Set status to deleted.

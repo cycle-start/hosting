@@ -56,18 +56,23 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 	webroots := []model.Webroot{
 		{ID: "wr-1", TenantID: "tenant-1", Name: "main", Runtime: "php", RuntimeVersion: "8.5", RuntimeConfig: json.RawMessage(`{}`), PublicFolder: "public", Status: model.StatusActive},
 	}
-	fqdns := []model.FQDN{
-		{ID: "fqdn-1", FQDN: "example.com", WebrootID: "wr-1", SSLEnabled: true, Status: model.StatusActive},
-	}
-
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusConverging)).Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("ListTenantsByShard", mock.Anything, shardID).Return(tenants, nil)
 
-	// Webroot and FQDN listing (now happens before CleanOrphanedConfigs).
-	s.env.OnActivity("ListWebrootsByTenantID", mock.Anything, "tenant-1").Return(webroots, nil)
-	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, "wr-1").Return(fqdns, nil)
+	// Batch data fetch (replaces ListTenantsByShard + ListWebrootsByTenantID + GetFQDNsByWebrootID + ListDaemonsByWebroot + ListCronJobsByWebroot).
+	s.env.OnActivity("GetShardDesiredState", mock.Anything, shardID).Return(&activity.ShardDesiredState{
+		Tenants: tenants,
+		Webroots: map[string][]model.Webroot{
+			"tenant-1": webroots,
+		},
+		FQDNs: map[string][]activity.FQDNParam{
+			"wr-1": {{FQDN: "example.com", WebrootID: "wr-1", SSLEnabled: true}},
+		},
+		Daemons:  map[string][]model.Daemon{},
+		CronJobs: map[string][]model.CronJob{},
+		SSHKeys:  map[string][]string{},
+	}, nil)
 
 	// CleanOrphanedConfigs on each node before creating webroots.
 	s.env.OnActivity("CleanOrphanedConfigs", mock.Anything, activity.CleanOrphanedConfigsInput{
@@ -89,12 +94,6 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 		PublicFolder: "public",
 		FQDNs:        []activity.FQDNParam{{FQDN: "example.com", WebrootID: "wr-1", SSLEnabled: true}},
 	}).Return(nil)
-
-	// ListCronJobsByWebroot for each webroot (no cron jobs in this test).
-	s.env.OnActivity("ListCronJobsByWebroot", mock.Anything, "wr-1").Return([]model.CronJob{}, nil)
-
-	// ListDaemonsByWebroot for each webroot (fetched for nginx proxy info and convergence).
-	s.env.OnActivity("ListDaemonsByWebroot", mock.Anything, "wr-1").Return([]model.Daemon{}, nil)
 
 	// ReloadNginx for each node.
 	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
@@ -219,10 +218,16 @@ func (s *ConvergeShardWorkflowTestSuite) TestSkipsInactiveResources() {
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusConverging)).Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("ListTenantsByShard", mock.Anything, shardID).Return(tenants, nil)
 
-	// Webroot listing for active tenant (no webroots).
-	s.env.OnActivity("ListWebrootsByTenantID", mock.Anything, "tenant-active").Return([]model.Webroot{}, nil)
+	// Batch data fetch — provisioning tenant excluded by GetShardDesiredState (only active tenants).
+	s.env.OnActivity("GetShardDesiredState", mock.Anything, shardID).Return(&activity.ShardDesiredState{
+		Tenants:  tenants,
+		Webroots: map[string][]model.Webroot{},
+		FQDNs:    map[string][]activity.FQDNParam{},
+		Daemons:  map[string][]model.Daemon{},
+		CronJobs: map[string][]model.CronJob{},
+		SSHKeys:  map[string][]string{},
+	}, nil)
 
 	// CleanOrphanedConfigs with empty expected set (no active webroots).
 	s.env.OnActivity("CleanOrphanedConfigs", mock.Anything, activity.CleanOrphanedConfigsInput{

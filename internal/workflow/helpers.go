@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.temporal.io/sdk/temporal"
@@ -11,6 +12,48 @@ import (
 	"github.com/edvin/hosting/internal/activity"
 	"github.com/edvin/hosting/internal/model"
 )
+
+// fanOutNodes executes fn for each node in parallel using Temporal goroutines
+// and collects errors. Returns nil if all succeeded, or the collected error
+// strings if any failed.
+func fanOutNodes(ctx workflow.Context, nodes []model.Node, fn func(workflow.Context, model.Node) error) []string {
+	if len(nodes) <= 1 {
+		// No benefit from fan-out with 0 or 1 node — run inline.
+		for _, node := range nodes {
+			if err := fn(ctx, node); err != nil {
+				return []string{err.Error()}
+			}
+		}
+		return nil
+	}
+
+	mu := workflow.NewMutex(ctx)
+	wg := workflow.NewWaitGroup(ctx)
+	var errs []string
+	for _, node := range nodes {
+		node := node // capture loop variable
+		wg.Add(1)
+		workflow.Go(ctx, func(gCtx workflow.Context) {
+			defer wg.Done()
+			if err := fn(gCtx, node); err != nil {
+				_ = mu.Lock(gCtx)
+				errs = append(errs, err.Error())
+				mu.Unlock()
+			}
+		})
+	}
+	wg.Wait(ctx)
+	return errs
+}
+
+// joinErrors joins error strings, truncating at 4000 chars.
+func joinErrors(errs []string) string {
+	msg := strings.Join(errs, "; ")
+	if len(msg) > 4000 {
+		msg = msg[:4000]
+	}
+	return msg
+}
 
 // setResourceFailed is a helper to set a resource status to failed with an error message.
 // It returns any error but callers typically ignore it since the primary

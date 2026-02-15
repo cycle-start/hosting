@@ -328,11 +328,12 @@ func (m *NginxManager) RemoveConfig(tenantName, webrootName string) error {
 func (m *NginxManager) Reload(ctx context.Context) error {
 	m.logger.Info().Msg("testing and reloading nginx")
 
-	// Test configuration first.
+	// Test configuration first. Config errors are non-retryable (FailedPrecondition)
+	// since they require a code/config fix, not a retry.
 	testCmd := exec.CommandContext(ctx, "nginx", "-t")
 	m.logger.Debug().Strs("cmd", testCmd.Args).Msg("executing nginx -t")
 	if output, err := testCmd.CombinedOutput(); err != nil {
-		return status.Errorf(codes.Internal, "nginx config test failed: %s: %v", string(output), err)
+		return status.Errorf(codes.FailedPrecondition, "nginx config test failed: %s: %v", string(output), err)
 	}
 
 	// Check if nginx is running by looking for a valid PID file.

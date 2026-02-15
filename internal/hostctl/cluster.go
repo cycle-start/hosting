@@ -247,11 +247,15 @@ func updateCluster(client *Client, clusterID string, def ClusterDef) error {
 		if len(def.Spec.Shards) > 0 {
 			shards := make([]map[string]any, len(def.Spec.Shards))
 			for i, s := range def.Spec.Shards {
-				shards[i] = map[string]any{
+				shard := map[string]any{
 					"name":       s.Name,
 					"role":       s.Role,
 					"node_count": s.NodeCount,
 				}
+				if s.LBBackend != "" {
+					shard["lb_backend"] = s.LBBackend
+				}
+				shards[i] = shard
 			}
 			spec["shards"] = shards
 		}
