@@ -167,6 +167,11 @@ func (h *ZoneRecord) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if record.ManagedBy == model.ManagedByAuto {
+		response.WriteError(w, http.StatusForbidden, "auto-managed records cannot be edited; create a custom record to override")
+		return
+	}
+
 	if req.Content != "" {
 		record.Content = req.Content
 	}
@@ -200,6 +205,16 @@ func (h *ZoneRecord) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := request.RequireID(chi.URLParam(r, "id"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	record, err := h.svc.GetByID(r.Context(), id)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if record.ManagedBy == model.ManagedByAuto {
+		response.WriteError(w, http.StatusForbidden, "auto-managed records cannot be deleted; they are managed by the platform")
 		return
 	}
 

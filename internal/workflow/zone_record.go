@@ -69,6 +69,15 @@ func CreateZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 		return err
 	}
 
+	// If this is a custom record, deactivate any matching auto records in PowerDNS.
+	// Auto records stay in core DB but are removed from PowerDNS (override).
+	if zctx.Record.ManagedBy == model.ManagedByCustom {
+		_ = workflow.ExecuteActivity(ctx, "DeactivateAutoRecords", activity.DeactivateAutoRecordsParams{
+			Name: zctx.Record.Name,
+			Type: zctx.Record.Type,
+		}).Get(ctx, nil)
+	}
+
 	// Set status to active.
 	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
 		Table:  "zone_records",
@@ -197,10 +206,29 @@ func DeleteZoneRecordWorkflow(ctx workflow.Context, recordID string) error {
 		}
 	}
 
+	// Capture record info before deletion for reactivation check.
+	recordName := zctx.Record.Name
+	recordType := zctx.Record.Type
+	recordManagedBy := zctx.Record.ManagedBy
+
 	// Set status to deleted.
-	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
+	err = workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
 		Table:  "zone_records",
 		ID:     recordID,
 		Status: model.StatusDeleted,
 	}).Get(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	// If we just deleted a custom record, reactivate any matching auto records
+	// that were previously overridden.
+	if recordManagedBy == model.ManagedByCustom {
+		_ = workflow.ExecuteActivity(ctx, "ReactivateAutoRecords", activity.DeactivateAutoRecordsParams{
+			Name: recordName,
+			Type: recordType,
+		}).Get(ctx, nil)
+	}
+
+	return nil
 }

@@ -102,6 +102,18 @@ func CreateZoneWorkflow(ctx workflow.Context, zoneID string) error {
 		return err
 	}
 
+	// Create retroactive auto DNS records for any existing FQDNs/email accounts
+	// whose domain falls under this zone. This handles the zone-after-FQDN scenario.
+	err = workflow.ExecuteActivity(ctx, "RetroactiveAutoRecords", activity.RetroactiveAutoRecordsParams{
+		ZoneName: zone.Name,
+		ZoneID:   zoneID,
+		BrandID:  zone.BrandID,
+	}).Get(ctx, nil)
+	if err != nil {
+		// Retroactive record creation failure is non-fatal — the zone itself is usable.
+		workflow.GetLogger(ctx).Warn("retroactive auto records failed", "zoneID", zoneID, "error", err)
+	}
+
 	// Set status to active.
 	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
 		Table:  "zones",
