@@ -25,6 +25,11 @@ type BrandDef struct {
 	PrimaryNS       string   `yaml:"primary_ns"`
 	SecondaryNS     string   `yaml:"secondary_ns"`
 	HostmasterEmail string   `yaml:"hostmaster_email"`
+	MailHostname    string   `yaml:"mail_hostname"`
+	SPFIncludes     string   `yaml:"spf_includes"`
+	DKIMSelector    string   `yaml:"dkim_selector"`
+	DKIMPublicKey   string   `yaml:"dkim_public_key"`
+	DMARCPolicy     string   `yaml:"dmarc_policy"`
 	AllowedClusters []string `yaml:"allowed_clusters"`
 }
 

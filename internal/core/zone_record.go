@@ -19,10 +19,10 @@ func NewZoneRecordService(db DB, tc temporalclient.Client) *ZoneRecordService {
 
 func (s *ZoneRecordService) Create(ctx context.Context, record *model.ZoneRecord) error {
 	_, err := s.db.Exec(ctx,
-		`INSERT INTO zone_records (id, zone_id, type, name, content, ttl, priority, managed_by, source_fqdn_id, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+		`INSERT INTO zone_records (id, zone_id, type, name, content, ttl, priority, managed_by, source_type, source_fqdn_id, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 		record.ID, record.ZoneID, record.Type, record.Name, record.Content,
-		record.TTL, record.Priority, record.ManagedBy, record.SourceFQDNID,
+		record.TTL, record.Priority, record.ManagedBy, record.SourceType, record.SourceFQDNID,
 		record.Status, record.CreatedAt, record.UpdatedAt,
 	)
 	if err != nil {
@@ -50,10 +50,10 @@ func (s *ZoneRecordService) Create(ctx context.Context, record *model.ZoneRecord
 func (s *ZoneRecordService) GetByID(ctx context.Context, id string) (*model.ZoneRecord, error) {
 	var r model.ZoneRecord
 	err := s.db.QueryRow(ctx,
-		`SELECT id, zone_id, type, name, content, ttl, priority, managed_by, source_fqdn_id, status, status_message, created_at, updated_at
+		`SELECT id, zone_id, type, name, content, ttl, priority, managed_by, source_type, source_fqdn_id, status, status_message, created_at, updated_at
 		 FROM zone_records WHERE id = $1`, id,
 	).Scan(&r.ID, &r.ZoneID, &r.Type, &r.Name, &r.Content,
-		&r.TTL, &r.Priority, &r.ManagedBy, &r.SourceFQDNID,
+		&r.TTL, &r.Priority, &r.ManagedBy, &r.SourceType, &r.SourceFQDNID,
 		&r.Status, &r.StatusMessage, &r.CreatedAt, &r.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get zone record %s: %w", id, err)
@@ -62,7 +62,7 @@ func (s *ZoneRecordService) GetByID(ctx context.Context, id string) (*model.Zone
 }
 
 func (s *ZoneRecordService) ListByZone(ctx context.Context, zoneID string, limit int, cursor string) ([]model.ZoneRecord, bool, error) {
-	query := `SELECT id, zone_id, type, name, content, ttl, priority, managed_by, source_fqdn_id, status, status_message, created_at, updated_at FROM zone_records WHERE zone_id = $1`
+	query := `SELECT id, zone_id, type, name, content, ttl, priority, managed_by, source_type, source_fqdn_id, status, status_message, created_at, updated_at FROM zone_records WHERE zone_id = $1`
 	args := []any{zoneID}
 	argIdx := 2
 
@@ -86,7 +86,7 @@ func (s *ZoneRecordService) ListByZone(ctx context.Context, zoneID string, limit
 	for rows.Next() {
 		var r model.ZoneRecord
 		if err := rows.Scan(&r.ID, &r.ZoneID, &r.Type, &r.Name, &r.Content,
-			&r.TTL, &r.Priority, &r.ManagedBy, &r.SourceFQDNID,
+			&r.TTL, &r.Priority, &r.ManagedBy, &r.SourceType, &r.SourceFQDNID,
 			&r.Status, &r.StatusMessage, &r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan zone record: %w", err)
 		}

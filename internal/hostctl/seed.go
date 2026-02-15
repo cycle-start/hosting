@@ -93,6 +93,11 @@ func Seed(configPath string, timeout time.Duration) error {
 				"primary_ns":       b.PrimaryNS,
 				"secondary_ns":     b.SecondaryNS,
 				"hostmaster_email": b.HostmasterEmail,
+				"mail_hostname":    b.MailHostname,
+				"spf_includes":     b.SPFIncludes,
+				"dkim_selector":    b.DKIMSelector,
+				"dkim_public_key":  b.DKIMPublicKey,
+				"dmarc_policy":     b.DMARCPolicy,
 			})
 			if err != nil {
 				return fmt.Errorf("create brand %q: %w", b.Name, err)

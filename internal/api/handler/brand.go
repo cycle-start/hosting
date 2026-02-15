@@ -77,6 +77,11 @@ func (h *Brand) Create(w http.ResponseWriter, r *http.Request) {
 		PrimaryNS:       req.PrimaryNS,
 		SecondaryNS:     req.SecondaryNS,
 		HostmasterEmail: req.HostmasterEmail,
+		MailHostname:    req.MailHostname,
+		SPFIncludes:     req.SPFIncludes,
+		DKIMSelector:    req.DKIMSelector,
+		DKIMPublicKey:   req.DKIMPublicKey,
+		DMARCPolicy:     req.DMARCPolicy,
 		Status:          model.StatusActive,
 		CreatedAt:       now,
 		UpdatedAt:       now,
@@ -163,6 +168,21 @@ func (h *Brand) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.HostmasterEmail != nil {
 		brand.HostmasterEmail = *req.HostmasterEmail
+	}
+	if req.MailHostname != nil {
+		brand.MailHostname = *req.MailHostname
+	}
+	if req.SPFIncludes != nil {
+		brand.SPFIncludes = *req.SPFIncludes
+	}
+	if req.DKIMSelector != nil {
+		brand.DKIMSelector = *req.DKIMSelector
+	}
+	if req.DKIMPublicKey != nil {
+		brand.DKIMPublicKey = *req.DKIMPublicKey
+	}
+	if req.DMARCPolicy != nil {
+		brand.DMARCPolicy = *req.DMARCPolicy
 	}
 
 	if err := h.svc.Update(r.Context(), brand); err != nil {

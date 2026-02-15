@@ -66,10 +66,11 @@ func (a *CoreDB) UpdateResourceStatus(ctx context.Context, params UpdateResource
 func (a *CoreDB) GetBrandByID(ctx context.Context, id string) (*model.Brand, error) {
 	var b model.Brand
 	err := a.db.QueryRow(ctx,
-		`SELECT id, name, base_hostname, primary_ns, secondary_ns, hostmaster_email, status, created_at, updated_at
+		`SELECT id, name, base_hostname, primary_ns, secondary_ns, hostmaster_email, mail_hostname, spf_includes, dkim_selector, dkim_public_key, dmarc_policy, status, created_at, updated_at
 		 FROM brands WHERE id = $1`, id,
 	).Scan(&b.ID, &b.Name, &b.BaseHostname, &b.PrimaryNS, &b.SecondaryNS,
-		&b.HostmasterEmail, &b.Status, &b.CreatedAt, &b.UpdatedAt)
+		&b.HostmasterEmail, &b.MailHostname, &b.SPFIncludes, &b.DKIMSelector,
+		&b.DKIMPublicKey, &b.DMARCPolicy, &b.Status, &b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get brand by id: %w", err)
 	}
@@ -992,12 +993,12 @@ func (a *CoreDB) GetZoneRecordContext(ctx context.Context, recordID string) (*Zo
 
 	// JOIN zone_records with zones.
 	err := a.db.QueryRow(ctx,
-		`SELECT r.id, r.zone_id, r.type, r.name, r.content, r.ttl, r.priority, r.managed_by, r.source_fqdn_id, r.status, r.status_message, r.created_at, r.updated_at,
+		`SELECT r.id, r.zone_id, r.type, r.name, r.content, r.ttl, r.priority, r.managed_by, r.source_type, r.source_fqdn_id, r.status, r.status_message, r.created_at, r.updated_at,
 		        z.name
 		 FROM zone_records r
 		 JOIN zones z ON z.id = r.zone_id
 		 WHERE r.id = $1`, recordID,
-	).Scan(&zc.Record.ID, &zc.Record.ZoneID, &zc.Record.Type, &zc.Record.Name, &zc.Record.Content, &zc.Record.TTL, &zc.Record.Priority, &zc.Record.ManagedBy, &zc.Record.SourceFQDNID, &zc.Record.Status, &zc.Record.StatusMessage, &zc.Record.CreatedAt, &zc.Record.UpdatedAt,
+	).Scan(&zc.Record.ID, &zc.Record.ZoneID, &zc.Record.Type, &zc.Record.Name, &zc.Record.Content, &zc.Record.TTL, &zc.Record.Priority, &zc.Record.ManagedBy, &zc.Record.SourceType, &zc.Record.SourceFQDNID, &zc.Record.Status, &zc.Record.StatusMessage, &zc.Record.CreatedAt, &zc.Record.UpdatedAt,
 		&zc.ZoneName)
 	if err != nil {
 		return nil, fmt.Errorf("get zone record context: %w", err)

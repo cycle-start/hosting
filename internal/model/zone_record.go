@@ -11,6 +11,7 @@ type ZoneRecord struct {
 	TTL          int     `json:"ttl" db:"ttl"`
 	Priority     *int    `json:"priority,omitempty" db:"priority"`
 	ManagedBy    string  `json:"managed_by" db:"managed_by"`
+	SourceType   string  `json:"source_type" db:"source_type"`
 	SourceFQDNID *string `json:"source_fqdn_id,omitempty" db:"source_fqdn_id"`
 	Status        string    `json:"status" db:"status"`
 	StatusMessage *string   `json:"status_message,omitempty" db:"status_message"`
@@ -19,6 +20,13 @@ type ZoneRecord struct {
 }
 
 const (
-	ManagedByUser     = "user"
-	ManagedByPlatform = "platform"
+	ManagedByCustom   = "custom"
+	ManagedByAuto     = "auto"
+
+	// Source types for auto-managed records.
+	SourceTypeFQDN      = "fqdn"
+	SourceTypeEmailMX   = "email-mx"
+	SourceTypeEmailSPF  = "email-spf"
+	SourceTypeEmailDKIM = "email-dkim"
+	SourceTypeEmailDMARC = "email-dmarc"
 )

@@ -41,7 +41,7 @@ func TestZoneRecordService_Create_Success(t *testing.T) {
 		Content:   "1.2.3.4",
 		TTL:       3600,
 		Priority:  &priority,
-		ManagedBy: model.ManagedByUser,
+		ManagedBy: model.ManagedByCustom,
 		Status:    model.StatusPending,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
@@ -130,12 +130,13 @@ func TestZoneRecordService_GetByID_Success(t *testing.T) {
 		*(dest[4].(*string)) = "1.2.3.4"
 		*(dest[5].(*int)) = 3600
 		*(dest[6].(**int)) = &priority
-		*(dest[7].(*string)) = model.ManagedByUser
-		*(dest[8].(**string)) = nil // source_fqdn_id
-		*(dest[9].(*string)) = model.StatusActive
-		*(dest[10].(**string)) = nil // status_message
-		*(dest[11].(*time.Time)) = now
+		*(dest[7].(*string)) = model.ManagedByCustom
+		*(dest[8].(*string)) = ""   // source_type
+		*(dest[9].(**string)) = nil  // source_fqdn_id
+		*(dest[10].(*string)) = model.StatusActive
+		*(dest[11].(**string)) = nil // status_message
 		*(dest[12].(*time.Time)) = now
+		*(dest[13].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -192,12 +193,13 @@ func TestZoneRecordService_ListByZone_Success(t *testing.T) {
 			*(dest[4].(*string)) = "1.2.3.4"
 			*(dest[5].(*int)) = 3600
 			*(dest[6].(**int)) = &priority
-			*(dest[7].(*string)) = model.ManagedByUser
-			*(dest[8].(**string)) = nil // source_fqdn_id
-			*(dest[9].(*string)) = model.StatusActive
-			*(dest[10].(**string)) = nil // status_message
-			*(dest[11].(*time.Time)) = now
+			*(dest[7].(*string)) = model.ManagedByCustom
+			*(dest[8].(*string)) = ""   // source_type
+			*(dest[9].(**string)) = nil  // source_fqdn_id
+			*(dest[10].(*string)) = model.StatusActive
+			*(dest[11].(**string)) = nil // status_message
 			*(dest[12].(*time.Time)) = now
+			*(dest[13].(*time.Time)) = now
 			return nil
 		},
 	)

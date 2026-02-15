@@ -18,10 +18,11 @@ func NewBrandService(db DB) *BrandService {
 
 func (s *BrandService) Create(ctx context.Context, brand *model.Brand) error {
 	_, err := s.db.Exec(ctx,
-		`INSERT INTO brands (id, name, base_hostname, primary_ns, secondary_ns, hostmaster_email, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		`INSERT INTO brands (id, name, base_hostname, primary_ns, secondary_ns, hostmaster_email, mail_hostname, spf_includes, dkim_selector, dkim_public_key, dmarc_policy, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
 		brand.ID, brand.Name, brand.BaseHostname, brand.PrimaryNS, brand.SecondaryNS,
-		brand.HostmasterEmail, brand.Status, brand.CreatedAt, brand.UpdatedAt,
+		brand.HostmasterEmail, brand.MailHostname, brand.SPFIncludes, brand.DKIMSelector,
+		brand.DKIMPublicKey, brand.DMARCPolicy, brand.Status, brand.CreatedAt, brand.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("insert brand: %w", err)
@@ -32,10 +33,11 @@ func (s *BrandService) Create(ctx context.Context, brand *model.Brand) error {
 func (s *BrandService) GetByID(ctx context.Context, id string) (*model.Brand, error) {
 	var b model.Brand
 	err := s.db.QueryRow(ctx,
-		`SELECT id, name, base_hostname, primary_ns, secondary_ns, hostmaster_email, status, created_at, updated_at
+		`SELECT id, name, base_hostname, primary_ns, secondary_ns, hostmaster_email, mail_hostname, spf_includes, dkim_selector, dkim_public_key, dmarc_policy, status, created_at, updated_at
 		 FROM brands WHERE id = $1`, id,
 	).Scan(&b.ID, &b.Name, &b.BaseHostname, &b.PrimaryNS, &b.SecondaryNS,
-		&b.HostmasterEmail, &b.Status, &b.CreatedAt, &b.UpdatedAt)
+		&b.HostmasterEmail, &b.MailHostname, &b.SPFIncludes, &b.DKIMSelector,
+		&b.DKIMPublicKey, &b.DMARCPolicy, &b.Status, &b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get brand %s: %w", id, err)
 	}
@@ -43,7 +45,7 @@ func (s *BrandService) GetByID(ctx context.Context, id string) (*model.Brand, er
 }
 
 func (s *BrandService) List(ctx context.Context, params request.ListParams) ([]model.Brand, bool, error) {
-	query := `SELECT id, name, base_hostname, primary_ns, secondary_ns, hostmaster_email, status, created_at, updated_at FROM brands WHERE true`
+	query := `SELECT id, name, base_hostname, primary_ns, secondary_ns, hostmaster_email, mail_hostname, spf_includes, dkim_selector, dkim_public_key, dmarc_policy, status, created_at, updated_at FROM brands WHERE true`
 	args := []any{}
 	argIdx := 1
 
@@ -90,7 +92,8 @@ func (s *BrandService) List(ctx context.Context, params request.ListParams) ([]m
 	for rows.Next() {
 		var b model.Brand
 		if err := rows.Scan(&b.ID, &b.Name, &b.BaseHostname, &b.PrimaryNS, &b.SecondaryNS,
-			&b.HostmasterEmail, &b.Status, &b.CreatedAt, &b.UpdatedAt); err != nil {
+			&b.HostmasterEmail, &b.MailHostname, &b.SPFIncludes, &b.DKIMSelector,
+			&b.DKIMPublicKey, &b.DMARCPolicy, &b.Status, &b.CreatedAt, &b.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan brand: %w", err)
 		}
 		brands = append(brands, b)
@@ -109,10 +112,12 @@ func (s *BrandService) List(ctx context.Context, params request.ListParams) ([]m
 func (s *BrandService) Update(ctx context.Context, brand *model.Brand) error {
 	_, err := s.db.Exec(ctx,
 		`UPDATE brands SET name = $1, base_hostname = $2, primary_ns = $3, secondary_ns = $4,
-		 hostmaster_email = $5, status = $6, updated_at = now()
-		 WHERE id = $7`,
+		 hostmaster_email = $5, mail_hostname = $6, spf_includes = $7, dkim_selector = $8,
+		 dkim_public_key = $9, dmarc_policy = $10, status = $11, updated_at = now()
+		 WHERE id = $12`,
 		brand.Name, brand.BaseHostname, brand.PrimaryNS, brand.SecondaryNS,
-		brand.HostmasterEmail, brand.Status, brand.ID,
+		brand.HostmasterEmail, brand.MailHostname, brand.SPFIncludes, brand.DKIMSelector,
+		brand.DKIMPublicKey, brand.DMARCPolicy, brand.Status, brand.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update brand %s: %w", brand.ID, err)

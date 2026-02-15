@@ -23,7 +23,7 @@ func NewZoneRecord(svc *core.ZoneRecordService) *ZoneRecord {
 // ListByZone godoc
 //
 //	@Summary		List zone records
-//	@Description	Returns a paginated list of DNS records in the specified zone, including both user-managed and platform-managed records.
+//	@Description	Returns a paginated list of DNS records in the specified zone, including both custom-managed and auto-managed records.
 //	@Tags			Zone Records
 //	@Security		ApiKeyAuth
 //	@Param			zoneID	path		string	true	"Zone ID"
@@ -58,7 +58,7 @@ func (h *ZoneRecord) ListByZone(w http.ResponseWriter, r *http.Request) {
 // Create godoc
 //
 //	@Summary		Create a zone record
-//	@Description	Creates a DNS record (A, AAAA, CNAME, MX, TXT, SRV, NS, CAA, PTR) in the specified zone. Records are marked as managed_by "user" by default. Platform-managed records (created by FQDN binding) cannot be created via this endpoint. Returns 202 and triggers a Temporal workflow to sync the record to PowerDNS. Defaults TTL to 3600 if not specified.
+//	@Description	Creates a DNS record (A, AAAA, CNAME, MX, TXT, SRV, NS, CAA, PTR) in the specified zone. Records are marked as managed_by "custom" by default. Auto-managed records (created by FQDN binding) cannot be created via this endpoint. Returns 202 and triggers a Temporal workflow to sync the record to PowerDNS. Defaults TTL to 3600 if not specified.
 //	@Tags			Zone Records
 //	@Security		ApiKeyAuth
 //	@Param			zoneID	path		string						true	"Zone ID"
@@ -94,7 +94,7 @@ func (h *ZoneRecord) Create(w http.ResponseWriter, r *http.Request) {
 		Content:   req.Content,
 		TTL:       ttl,
 		Priority:  req.Priority,
-		ManagedBy: model.ManagedByUser,
+		ManagedBy: model.ManagedByCustom,
 		Status:    model.StatusPending,
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -138,7 +138,7 @@ func (h *ZoneRecord) Get(w http.ResponseWriter, r *http.Request) {
 // Update godoc
 //
 //	@Summary		Update a zone record
-//	@Description	Updates the content, TTL, or priority of a DNS record. Only user-managed records can be updated; platform-managed records will be rejected. Returns 202 and triggers a Temporal workflow to sync the changes to PowerDNS.
+//	@Description	Updates the content, TTL, or priority of a DNS record. Only custom-managed records can be updated; auto-managed records will be rejected. Returns 202 and triggers a Temporal workflow to sync the changes to PowerDNS.
 //	@Tags			Zone Records
 //	@Security		ApiKeyAuth
 //	@Param			id		path		string						true	"Zone record ID"
@@ -188,7 +188,7 @@ func (h *ZoneRecord) Update(w http.ResponseWriter, r *http.Request) {
 // Delete godoc
 //
 //	@Summary		Delete a zone record
-//	@Description	Deletes a DNS record from the zone. Only user-managed records can be deleted; platform-managed records will be rejected. Returns 202 and triggers a Temporal workflow to remove the record from PowerDNS.
+//	@Description	Deletes a DNS record from the zone. Only custom-managed records can be deleted; auto-managed records will be rejected. Returns 202 and triggers a Temporal workflow to remove the record from PowerDNS.
 //	@Tags			Zone Records
 //	@Security		ApiKeyAuth
 //	@Param			id	path	string	true	"Zone record ID"

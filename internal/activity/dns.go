@@ -29,7 +29,7 @@ type AutoCreateDNSRecordsParams struct {
 }
 
 // AutoCreateDNSRecords creates A and AAAA records for an FQDN in the matching
-// zone, if the zone exists and no user-managed record already exists.
+// zone, if the zone exists and no custom-managed record already exists.
 func (a *DNS) AutoCreateDNSRecords(ctx context.Context, params AutoCreateDNSRecordsParams) error {
 	// Find the zone for this FQDN by walking up the domain hierarchy.
 	zoneName, err := a.findZoneForFQDN(ctx, params.FQDN)
@@ -47,13 +47,13 @@ func (a *DNS) AutoCreateDNSRecords(ctx context.Context, params AutoCreateDNSReco
 		return fmt.Errorf("get dns zone id: %w", err)
 	}
 
-	// Check if a user-managed record already exists for this FQDN.
+	// Check if a custom-managed record already exists for this FQDN.
 	userManaged, err := a.hasUserManagedRecord(ctx, params.FQDN)
 	if err != nil {
-		return fmt.Errorf("check user managed record: %w", err)
+		return fmt.Errorf("check custom managed record: %w", err)
 	}
 	if userManaged {
-		// User-managed record exists; do not overwrite.
+		// Custom-managed record exists; do not overwrite.
 		return nil
 	}
 
@@ -78,10 +78,10 @@ func (a *DNS) AutoCreateDNSRecords(ctx context.Context, params AutoCreateDNSReco
 			return fmt.Errorf("create %s record for %s: %w", recordType, addr.Address, err)
 		}
 
-		// Also record in core DB that these are platform-managed.
+		// Also record in core DB that these are auto-managed.
 		_, err = a.coreDB.Exec(ctx,
-			`INSERT INTO zone_records (id, zone_id, type, name, content, ttl, managed_by, source_fqdn_id, status, created_at, updated_at)
-			 SELECT gen_random_uuid(), z.id, $1, $2, $3, 300, 'platform', $4, 'active', now(), now()
+			`INSERT INTO zone_records (id, zone_id, type, name, content, ttl, managed_by, source_type, source_fqdn_id, status, created_at, updated_at)
+			 SELECT gen_random_uuid(), z.id, $1, $2, $3, 300, 'auto', 'fqdn', $4, 'active', now(), now()
 			 FROM zones z WHERE z.name = $5 AND z.status = 'active'
 			 ON CONFLICT DO NOTHING`,
 			recordType, params.FQDN, addr.Address, params.SourceFQDNID, zoneName,
@@ -94,7 +94,7 @@ func (a *DNS) AutoCreateDNSRecords(ctx context.Context, params AutoCreateDNSReco
 	return nil
 }
 
-// AutoDeleteDNSRecords removes platform-managed DNS records for an FQDN
+// AutoDeleteDNSRecords removes auto-managed DNS records for an FQDN
 // from both the PowerDNS database and core DB.
 func (a *DNS) AutoDeleteDNSRecords(ctx context.Context, fqdn string) error {
 	zoneName, err := a.findZoneForFQDN(ctx, fqdn)
@@ -128,12 +128,12 @@ func (a *DNS) AutoDeleteDNSRecords(ctx context.Context, fqdn string) error {
 		return fmt.Errorf("delete AAAA record: %w", err)
 	}
 
-	// Remove platform-managed records from core DB.
+	// Remove auto-managed records from core DB.
 	_, err = a.coreDB.Exec(ctx,
-		`DELETE FROM zone_records WHERE name = $1 AND managed_by = 'platform'`, fqdn,
+		`DELETE FROM zone_records WHERE name = $1 AND managed_by = 'auto'`, fqdn,
 	)
 	if err != nil {
-		return fmt.Errorf("delete platform records from core db: %w", err)
+		return fmt.Errorf("delete auto records from core db: %w", err)
 	}
 
 	return nil
@@ -222,13 +222,13 @@ func (a *DNS) findZoneForFQDN(ctx context.Context, fqdn string) (string, error) 
 	return "", nil
 }
 
-// hasUserManagedRecord checks if a user-managed DNS record exists for the given FQDN
+// hasUserManagedRecord checks if a custom-managed DNS record exists for the given FQDN
 // in the core DB.
 func (a *DNS) hasUserManagedRecord(ctx context.Context, fqdn string) (bool, error) {
 	var count int
 	err := a.coreDB.QueryRow(ctx,
 		`SELECT COUNT(*) FROM zone_records
-		 WHERE name = $1 AND managed_by = 'user' AND status = 'active'
+		 WHERE name = $1 AND managed_by = 'custom' AND status = 'active'
 		 AND (type = 'A' OR type = 'AAAA')`, fqdn,
 	).Scan(&count)
 	if err != nil {
@@ -284,34 +284,34 @@ func (a *DNS) AutoCreateEmailDNSRecords(ctx context.Context, params AutoCreateEm
 		return fmt.Errorf("create SPF record: %w", err)
 	}
 
-	// Record MX in core DB as platform-managed.
+	// Record MX in core DB as auto-managed.
 	_, err = a.coreDB.Exec(ctx,
-		`INSERT INTO zone_records (id, zone_id, type, name, content, ttl, priority, managed_by, source_fqdn_id, status, created_at, updated_at)
-		 SELECT gen_random_uuid(), z.id, 'MX', $1, $2, 300, 10, 'platform', $3, 'active', now(), now()
+		`INSERT INTO zone_records (id, zone_id, type, name, content, ttl, priority, managed_by, source_type, source_fqdn_id, status, created_at, updated_at)
+		 SELECT gen_random_uuid(), z.id, 'MX', $1, $2, 300, 10, 'auto', 'email-mx', $3, 'active', now(), now()
 		 FROM zones z WHERE z.name = $4 AND z.status = 'active'
 		 ON CONFLICT DO NOTHING`,
 		params.FQDN, params.MailHostname, params.SourceFQDNID, zoneName,
 	)
 	if err != nil {
-		return fmt.Errorf("record platform MX in core db: %w", err)
+		return fmt.Errorf("record auto MX in core db: %w", err)
 	}
 
-	// Record SPF in core DB as platform-managed.
+	// Record SPF in core DB as auto-managed.
 	_, err = a.coreDB.Exec(ctx,
-		`INSERT INTO zone_records (id, zone_id, type, name, content, ttl, managed_by, source_fqdn_id, status, created_at, updated_at)
-		 SELECT gen_random_uuid(), z.id, 'TXT', $1, $2, 300, 'platform', $3, 'active', now(), now()
+		`INSERT INTO zone_records (id, zone_id, type, name, content, ttl, managed_by, source_type, source_fqdn_id, status, created_at, updated_at)
+		 SELECT gen_random_uuid(), z.id, 'TXT', $1, $2, 300, 'auto', 'email-spf', $3, 'active', now(), now()
 		 FROM zones z WHERE z.name = $4 AND z.status = 'active'
 		 ON CONFLICT DO NOTHING`,
 		params.FQDN, "v=spf1 mx ~all", params.SourceFQDNID, zoneName,
 	)
 	if err != nil {
-		return fmt.Errorf("record platform SPF in core db: %w", err)
+		return fmt.Errorf("record auto SPF in core db: %w", err)
 	}
 
 	return nil
 }
 
-// AutoDeleteEmailDNSRecords removes platform-managed email DNS records (MX, TXT)
+// AutoDeleteEmailDNSRecords removes auto-managed email DNS records (MX, TXT)
 // for an FQDN from both the PowerDNS database and core DB.
 func (a *DNS) AutoDeleteEmailDNSRecords(ctx context.Context, fqdn string) error {
 	zoneName, err := a.findZoneForFQDN(ctx, fqdn)
@@ -345,13 +345,13 @@ func (a *DNS) AutoDeleteEmailDNSRecords(ctx context.Context, fqdn string) error 
 		return fmt.Errorf("delete TXT record: %w", err)
 	}
 
-	// Remove platform-managed email records from core DB.
+	// Remove auto-managed email records from core DB.
 	_, err = a.coreDB.Exec(ctx,
-		`DELETE FROM zone_records WHERE name = $1 AND managed_by = 'platform'
+		`DELETE FROM zone_records WHERE name = $1 AND managed_by = 'auto'
 		 AND type IN ('MX', 'TXT')`, fqdn,
 	)
 	if err != nil {
-		return fmt.Errorf("delete platform email records from core db: %w", err)
+		return fmt.Errorf("delete auto email records from core db: %w", err)
 	}
 
 	return nil
