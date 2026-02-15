@@ -261,6 +261,59 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		}
 	}
 
+	// Converge cron jobs for each webroot.
+	for _, entry := range webrootEntries {
+		var cronJobs []model.CronJob
+		err = workflow.ExecuteActivity(ctx, "ListCronJobsByWebroot", entry.webroot.ID).Get(ctx, &cronJobs)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("list cron jobs for webroot %s: %v", entry.webroot.ID, err))
+			continue
+		}
+
+		for _, job := range cronJobs {
+			if job.Status != model.StatusActive {
+				continue
+			}
+
+			createParams := activity.CreateCronJobParams{
+				ID:               job.ID,
+				TenantID:         entry.tenant.ID,
+				WebrootName:      entry.webroot.Name,
+				Name:             job.Name,
+				Schedule:         job.Schedule,
+				Command:          job.Command,
+				WorkingDirectory: job.WorkingDirectory,
+				TimeoutSeconds:   job.TimeoutSeconds,
+				MaxMemoryMB:      job.MaxMemoryMB,
+			}
+
+			// Write unit files on all nodes.
+			for _, node := range nodes {
+				nodeCtx := nodeActivityCtx(ctx, node.ID)
+				err = workflow.ExecuteActivity(nodeCtx, "CreateCronJobUnits", createParams).Get(ctx, nil)
+				if err != nil {
+					errs = append(errs, fmt.Sprintf("create cron job %s on node %s: %v", job.ID, node.ID, err))
+				}
+			}
+
+			// Enable timer on designated node if the job is enabled.
+			if job.Enabled {
+				designated := designatedNode(job.ID, nodes)
+				if designated != "" {
+					timerParams := activity.CronJobTimerParams{
+						ID:       job.ID,
+						TenantID: entry.tenant.ID,
+					}
+					nodeCtx := nodeActivityCtx(ctx, designated)
+					err = workflow.ExecuteActivity(nodeCtx, "EnableCronJobTimer", timerParams).Get(ctx, nil)
+					if err != nil {
+						errs = append(errs, fmt.Sprintf("enable cron timer %s on node %s: %v", job.ID, designated, err))
+					}
+				}
+			}
+		}
+	}
+
 	// Reload nginx on all nodes.
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)

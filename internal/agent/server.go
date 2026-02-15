@@ -32,6 +32,7 @@ type Server struct {
 	database *DatabaseManager
 	valkey   *ValkeyManager
 	ssh      *SSHManager
+	cron     *CronManager
 	runtimes map[string]runtime.Manager
 
 	// ShardID is the shard this node belongs to, resolved at startup from the core DB.
@@ -68,6 +69,7 @@ func NewServer(logger zerolog.Logger, cfg Config) *Server {
 		database: NewDatabaseManager(logger, cfg),
 		valkey:   NewValkeyManager(logger, cfg, svcMgr),
 		ssh:      NewSSHManager(logger, cfg.SSHConfigDir, cfg.WebStorageDir),
+		cron:     NewCronManager(logger, cfg),
 		runtimes: runtimes,
 	}
 }
@@ -89,6 +91,9 @@ func (s *Server) ValkeyManager() *ValkeyManager { return s.valkey }
 
 // SSHManager returns the server's SSH manager.
 func (s *Server) SSHManager() *SSHManager { return s.ssh }
+
+// CronManager returns the server's cron manager.
+func (s *Server) CronManager() *CronManager { return s.cron }
 
 // Runtimes returns the server's runtime managers.
 func (s *Server) Runtimes() map[string]runtime.Manager { return s.runtimes }

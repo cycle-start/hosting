@@ -55,6 +55,7 @@ type NodeLocal struct {
 	valkey   *agent.ValkeyManager
 	s3       *agent.S3Manager
 	ssh      *agent.SSHManager
+	cron     *agent.CronManager
 	runtimes map[string]runtime.Manager
 }
 
@@ -68,6 +69,7 @@ func NewNodeLocal(
 	valkey *agent.ValkeyManager,
 	s3 *agent.S3Manager,
 	ssh *agent.SSHManager,
+	cron *agent.CronManager,
 	runtimes map[string]runtime.Manager,
 ) *NodeLocal {
 	return &NodeLocal{
@@ -79,6 +81,7 @@ func NewNodeLocal(
 		valkey:   valkey,
 		s3:       s3,
 		ssh:      ssh,
+		cron:     cron,
 		runtimes: runtimes,
 	}
 }
@@ -611,4 +614,67 @@ func (a *NodeLocal) DeleteS3AccessKey(ctx context.Context, params DeleteS3Access
 func (a *NodeLocal) UpdateS3BucketPolicy(ctx context.Context, params UpdateS3BucketPolicyParams) error {
 	a.logger.Info().Str("tenant", params.TenantID).Str("bucket", params.Name).Bool("public", params.Public).Msg("UpdateS3BucketPolicy")
 	return asNonRetryable(a.s3.SetBucketPolicy(ctx, params.TenantID, params.Name, params.Public))
+}
+
+// --------------------------------------------------------------------------
+// Cron job activities
+// --------------------------------------------------------------------------
+
+// CreateCronJobUnits writes systemd timer+service units for a cron job on this node.
+func (a *NodeLocal) CreateCronJobUnits(ctx context.Context, params CreateCronJobParams) error {
+	a.logger.Info().Str("cron_job", params.ID).Str("tenant", params.TenantID).Msg("CreateCronJobUnits")
+	return a.cron.CreateUnits(ctx, &agent.CronJobInfo{
+		ID:               params.ID,
+		TenantID:         params.TenantID,
+		WebrootName:      params.WebrootName,
+		Name:             params.Name,
+		Schedule:         params.Schedule,
+		Command:          params.Command,
+		WorkingDirectory: params.WorkingDirectory,
+		TimeoutSeconds:   params.TimeoutSeconds,
+		MaxMemoryMB:      params.MaxMemoryMB,
+	})
+}
+
+// UpdateCronJobUnits rewrites systemd units for a cron job on this node.
+func (a *NodeLocal) UpdateCronJobUnits(ctx context.Context, params UpdateCronJobParams) error {
+	a.logger.Info().Str("cron_job", params.ID).Str("tenant", params.TenantID).Msg("UpdateCronJobUnits")
+	return a.cron.UpdateUnits(ctx, &agent.CronJobInfo{
+		ID:               params.ID,
+		TenantID:         params.TenantID,
+		WebrootName:      params.WebrootName,
+		Name:             params.Name,
+		Schedule:         params.Schedule,
+		Command:          params.Command,
+		WorkingDirectory: params.WorkingDirectory,
+		TimeoutSeconds:   params.TimeoutSeconds,
+		MaxMemoryMB:      params.MaxMemoryMB,
+	})
+}
+
+// DeleteCronJobUnits stops, disables, and removes systemd units on this node.
+func (a *NodeLocal) DeleteCronJobUnits(ctx context.Context, params DeleteCronJobParams) error {
+	a.logger.Info().Str("cron_job", params.ID).Str("tenant", params.TenantID).Msg("DeleteCronJobUnits")
+	return a.cron.DeleteUnits(ctx, &agent.CronJobInfo{
+		ID:       params.ID,
+		TenantID: params.TenantID,
+	})
+}
+
+// EnableCronJobTimer starts the systemd timer on this node.
+func (a *NodeLocal) EnableCronJobTimer(ctx context.Context, params CronJobTimerParams) error {
+	a.logger.Info().Str("cron_job", params.ID).Str("tenant", params.TenantID).Msg("EnableCronJobTimer")
+	return a.cron.EnableTimer(ctx, &agent.CronJobInfo{
+		ID:       params.ID,
+		TenantID: params.TenantID,
+	})
+}
+
+// DisableCronJobTimer stops the systemd timer on this node.
+func (a *NodeLocal) DisableCronJobTimer(ctx context.Context, params CronJobTimerParams) error {
+	a.logger.Info().Str("cron_job", params.ID).Str("tenant", params.TenantID).Msg("DisableCronJobTimer")
+	return a.cron.DisableTimer(ctx, &agent.CronJobInfo{
+		ID:       params.ID,
+		TenantID: params.TenantID,
+	})
 }

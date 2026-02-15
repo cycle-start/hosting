@@ -55,6 +55,14 @@ type S3AccessKeyContext struct {
 	Nodes  []model.Node      `json:"nodes"`
 }
 
+// CronJobContext bundles all data needed by cron job workflows.
+type CronJobContext struct {
+	CronJob model.CronJob `json:"cron_job"`
+	Webroot model.Webroot `json:"webroot"`
+	Tenant  model.Tenant  `json:"tenant"`
+	Nodes   []model.Node  `json:"nodes"`
+}
+
 // StalwartContext bundles Stalwart connection info resolved from the cluster config,
 // plus the FQDN fields needed by email account workflows.
 type StalwartContext struct {

@@ -41,6 +41,7 @@ type TenantResourceSummary struct {
 	ValkeyUsers     ResourceStatusCounts `json:"valkey_users"`
 	SSHKeys         ResourceStatusCounts `json:"ssh_keys"`
 	Backups         ResourceStatusCounts `json:"backups"`
+	CronJobs        ResourceStatusCounts `json:"cron_jobs"`
 	Total           int                  `json:"total"`
 	Pending         int                  `json:"pending"`
 	Provisioning    int                  `json:"provisioning"`

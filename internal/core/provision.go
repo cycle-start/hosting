@@ -259,6 +259,15 @@ func resolveTenantIDFromS3Bucket(ctx context.Context, db DB, bucketID string) (s
 	return *tenantID, nil
 }
 
+func resolveTenantIDFromCronJob(ctx context.Context, db DB, cronJobID string) (string, error) {
+	var tenantID string
+	err := db.QueryRow(ctx, "SELECT tenant_id FROM cron_jobs WHERE id = $1", cronJobID).Scan(&tenantID)
+	if err != nil {
+		return "", fmt.Errorf("resolve tenant from cron job %s: %w", cronJobID, err)
+	}
+	return tenantID, nil
+}
+
 func resolveTenantIDFromS3AccessKey(ctx context.Context, db DB, keyID string) (string, error) {
 	var tenantID *string
 	err := db.QueryRow(ctx,

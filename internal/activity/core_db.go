@@ -1152,3 +1152,79 @@ func (a *CoreDB) GetOldBackups(ctx context.Context, retentionDays int) ([]model.
 	}
 	return backups, rows.Err()
 }
+
+// GetCronJobContext fetches a cron job and its related webroot, tenant, and nodes.
+func (a *CoreDB) GetCronJobContext(ctx context.Context, cronJobID string) (*CronJobContext, error) {
+	var cc CronJobContext
+
+	// JOIN cron_jobs -> webroots -> tenants.
+	err := a.db.QueryRow(ctx,
+		`SELECT c.id, c.tenant_id, c.webroot_id, c.name, c.schedule, c.command, c.working_directory, c.enabled, c.timeout_seconds, c.max_memory_mb, c.status, c.status_message, c.created_at, c.updated_at,
+		        w.id, w.tenant_id, w.name, w.runtime, w.runtime_version, w.runtime_config, w.public_folder, w.status, w.status_message, w.created_at, w.updated_at,
+		        t.id, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.status, t.status_message, t.created_at, t.updated_at
+		 FROM cron_jobs c
+		 JOIN webroots w ON w.id = c.webroot_id
+		 JOIN tenants t ON t.id = c.tenant_id
+		 WHERE c.id = $1`, cronJobID,
+	).Scan(&cc.CronJob.ID, &cc.CronJob.TenantID, &cc.CronJob.WebrootID, &cc.CronJob.Name, &cc.CronJob.Schedule, &cc.CronJob.Command, &cc.CronJob.WorkingDirectory, &cc.CronJob.Enabled, &cc.CronJob.TimeoutSeconds, &cc.CronJob.MaxMemoryMB, &cc.CronJob.Status, &cc.CronJob.StatusMessage, &cc.CronJob.CreatedAt, &cc.CronJob.UpdatedAt,
+		&cc.Webroot.ID, &cc.Webroot.TenantID, &cc.Webroot.Name, &cc.Webroot.Runtime, &cc.Webroot.RuntimeVersion, &cc.Webroot.RuntimeConfig, &cc.Webroot.PublicFolder, &cc.Webroot.Status, &cc.Webroot.StatusMessage, &cc.Webroot.CreatedAt, &cc.Webroot.UpdatedAt,
+		&cc.Tenant.ID, &cc.Tenant.BrandID, &cc.Tenant.RegionID, &cc.Tenant.ClusterID, &cc.Tenant.ShardID, &cc.Tenant.UID, &cc.Tenant.SFTPEnabled, &cc.Tenant.Status, &cc.Tenant.StatusMessage, &cc.Tenant.CreatedAt, &cc.Tenant.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get cron job context: %w", err)
+	}
+
+	// Fetch nodes if tenant has a shard.
+	if cc.Tenant.ShardID != nil {
+		nodes, err := a.ListNodesByShard(ctx, *cc.Tenant.ShardID)
+		if err != nil {
+			return nil, err
+		}
+		cc.Nodes = nodes
+	}
+
+	return &cc, nil
+}
+
+// ListCronJobsByWebroot retrieves all cron jobs for a webroot (excluding deleted).
+func (a *CoreDB) ListCronJobsByWebroot(ctx context.Context, webrootID string) ([]model.CronJob, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, tenant_id, webroot_id, name, schedule, command, working_directory, enabled, timeout_seconds, max_memory_mb, status, status_message, created_at, updated_at
+		 FROM cron_jobs WHERE webroot_id = $1 AND status != $2 ORDER BY name`, webrootID, model.StatusDeleted,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list cron jobs by webroot: %w", err)
+	}
+	defer rows.Close()
+
+	var jobs []model.CronJob
+	for rows.Next() {
+		var j model.CronJob
+		if err := rows.Scan(&j.ID, &j.TenantID, &j.WebrootID, &j.Name, &j.Schedule, &j.Command, &j.WorkingDirectory, &j.Enabled, &j.TimeoutSeconds, &j.MaxMemoryMB, &j.Status, &j.StatusMessage, &j.CreatedAt, &j.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan cron job row: %w", err)
+		}
+		jobs = append(jobs, j)
+	}
+	return jobs, rows.Err()
+}
+
+// ListCronJobsByTenant retrieves all active cron jobs for a tenant (used in convergence).
+func (a *CoreDB) ListCronJobsByTenant(ctx context.Context, tenantID string) ([]model.CronJob, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, tenant_id, webroot_id, name, schedule, command, working_directory, enabled, timeout_seconds, max_memory_mb, status, status_message, created_at, updated_at
+		 FROM cron_jobs WHERE tenant_id = $1 AND status = $2 ORDER BY name`, tenantID, model.StatusActive,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list cron jobs by tenant: %w", err)
+	}
+	defer rows.Close()
+
+	var jobs []model.CronJob
+	for rows.Next() {
+		var j model.CronJob
+		if err := rows.Scan(&j.ID, &j.TenantID, &j.WebrootID, &j.Name, &j.Schedule, &j.Command, &j.WorkingDirectory, &j.Enabled, &j.TimeoutSeconds, &j.MaxMemoryMB, &j.Status, &j.StatusMessage, &j.CreatedAt, &j.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan cron job row: %w", err)
+		}
+		jobs = append(jobs, j)
+	}
+	return jobs, rows.Err()
+}

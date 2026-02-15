@@ -31,6 +31,7 @@ type Services struct {
 	S3AccessKey      *S3AccessKeyService
 	SSHKey           *SSHKeyService
 	Backup           *BackupService
+	CronJob          *CronJobService
 	APIKey           *APIKeyService
 	OIDC             *OIDCService
 	Search           *SearchService
@@ -66,6 +67,7 @@ func NewServices(db DB, tc temporalclient.Client, oidcIssuerURL string) *Service
 		S3AccessKey:      NewS3AccessKeyService(db, tc),
 		SSHKey:           NewSSHKeyService(db, tc),
 		Backup:           NewBackupService(db, tc),
+		CronJob:          NewCronJobService(db, tc),
 		APIKey:           NewAPIKeyService(db),
 		OIDC:             NewOIDCService(db, oidcIssuerURL),
 		Search:           NewSearchService(db),

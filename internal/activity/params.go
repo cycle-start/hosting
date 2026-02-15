@@ -232,6 +232,34 @@ type CleanOrphanedConfigsResult struct {
 	Removed []string `json:"removed"`
 }
 
+// CreateCronJobParams holds parameters for creating a cron job on a node.
+type CreateCronJobParams struct {
+	ID               string
+	TenantID         string
+	WebrootName      string
+	Name             string
+	Schedule         string
+	Command          string
+	WorkingDirectory string
+	TimeoutSeconds   int
+	MaxMemoryMB      int
+}
+
+// UpdateCronJobParams holds parameters for updating a cron job on a node.
+type UpdateCronJobParams = CreateCronJobParams
+
+// DeleteCronJobParams holds parameters for deleting a cron job on a node.
+type DeleteCronJobParams struct {
+	ID       string
+	TenantID string
+}
+
+// CronJobTimerParams holds parameters for enabling/disabling a cron job timer on a node.
+type CronJobTimerParams struct {
+	ID       string
+	TenantID string
+}
+
 // BackupResult holds the result of a backup operation.
 type BackupResult struct {
 	StoragePath string

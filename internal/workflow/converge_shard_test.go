@@ -90,6 +90,9 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 		FQDNs:        []activity.FQDNParam{{FQDN: "example.com", WebrootID: "wr-1", SSLEnabled: true}},
 	}).Return(nil)
 
+	// ListCronJobsByWebroot for each webroot (no cron jobs in this test).
+	s.env.OnActivity("ListCronJobsByWebroot", mock.Anything, "wr-1").Return([]model.CronJob{}, nil)
+
 	// ReloadNginx for each node.
 	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusActive)).Return(nil)

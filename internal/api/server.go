@@ -327,6 +327,26 @@ func (s *Server) setupRoutes() {
 			r.Delete("/webroots/{id}", webroot.Delete)
 		})
 
+		// Cron jobs
+		cronJob := handler.NewCronJob(s.services)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("cron_jobs", "read"))
+			r.Get("/webroots/{webrootID}/cron-jobs", cronJob.ListByWebroot)
+			r.Get("/cron-jobs/{id}", cronJob.Get)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("cron_jobs", "write"))
+			r.Post("/webroots/{webrootID}/cron-jobs", cronJob.Create)
+			r.Put("/cron-jobs/{id}", cronJob.Update)
+			r.Post("/cron-jobs/{id}/enable", cronJob.Enable)
+			r.Post("/cron-jobs/{id}/disable", cronJob.Disable)
+			r.Post("/cron-jobs/{id}/retry", cronJob.Retry)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("cron_jobs", "delete"))
+			r.Delete("/cron-jobs/{id}", cronJob.Delete)
+		})
+
 		// FQDNs
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireScope("fqdns", "read"))

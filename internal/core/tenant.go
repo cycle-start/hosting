@@ -331,7 +331,9 @@ func (s *TenantService) ResourceSummary(ctx context.Context, tenantID string) (*
 		UNION ALL
 		SELECT 'ssh_keys', status, count(*) FROM ssh_keys WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status
 		UNION ALL
-		SELECT 'backups', status, count(*) FROM backups WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status`
+		SELECT 'backups', status, count(*) FROM backups WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status
+		UNION ALL
+		SELECT 'cron_jobs', status, count(*) FROM cron_jobs WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status`
 
 	rows, err := s.db.Query(ctx, query, tenantID)
 	if err != nil {
@@ -372,6 +374,7 @@ func (s *TenantService) ResourceSummary(ctx context.Context, tenantID string) (*
 		ValkeyUsers:      counts["valkey_users"],
 		SSHKeys:          counts["ssh_keys"],
 		Backups:          counts["backups"],
+		CronJobs:         counts["cron_jobs"],
 	}
 
 	// Ensure nil maps become empty maps for clean JSON.
@@ -395,6 +398,7 @@ func (s *TenantService) ResourceSummary(ctx context.Context, tenantID string) (*
 	ensureMap(&summary.ValkeyUsers)
 	ensureMap(&summary.SSHKeys)
 	ensureMap(&summary.Backups)
+	ensureMap(&summary.CronJobs)
 
 	// Compute aggregates.
 	for _, m := range []model.ResourceStatusCounts{
@@ -403,7 +407,7 @@ func (s *TenantService) ResourceSummary(ctx context.Context, tenantID string) (*
 		summary.Databases, summary.DatabaseUsers,
 		summary.Zones, summary.ZoneRecords,
 		summary.ValkeyInstances, summary.ValkeyUsers,
-		summary.SSHKeys, summary.Backups,
+		summary.SSHKeys, summary.Backups, summary.CronJobs,
 	} {
 		for status, count := range m {
 			summary.Total += count
@@ -487,6 +491,7 @@ func (s *TenantService) RetryFailed(ctx context.Context, tenantID string) (int, 
 		{"SELECT id, name FROM s3_buckets WHERE tenant_id = $1 AND status = 'failed'", "s3_buckets", "CreateS3BucketWorkflow", "s3-bucket"},
 		{`SELECT k.id, k.access_key_id FROM s3_access_keys k JOIN s3_buckets b ON b.id = k.s3_bucket_id WHERE b.tenant_id = $1 AND k.status = 'failed'`, "s3_access_keys", "CreateS3AccessKeyWorkflow", "s3-access-key"},
 		{"SELECT id, type || '/' || source_name FROM backups WHERE tenant_id = $1 AND status = 'failed'", "backups", "CreateBackupWorkflow", "backup-create"},
+		{"SELECT id, name FROM cron_jobs WHERE tenant_id = $1 AND status = 'failed'", "cron_jobs", "CreateCronJobWorkflow", "cron-job"},
 	}
 
 	type retryItem struct {
