@@ -100,9 +100,9 @@ func (a *Stalwart) StalwartSyncForwardScript(ctx context.Context, params Stalwar
 	// Query active forwards from the core DB.
 	rows, err := a.db.Query(ctx,
 		`SELECT destination, keep_copy FROM email_forwards
-		 WHERE email_account_id = $1 AND status NOT IN ($2, $3)
+		 WHERE email_account_id = $1 AND status != $2
 		 ORDER BY destination`,
-		params.EmailAccountID, model.StatusDeleted, model.StatusDeleting,
+		params.EmailAccountID, model.StatusDeleting,
 	)
 	if err != nil {
 		return fmt.Errorf("query forwards: %w", err)

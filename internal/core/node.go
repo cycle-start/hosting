@@ -55,7 +55,7 @@ func (s *NodeService) GetByID(ctx context.Context, id string) (*model.Node, erro
 }
 
 func (s *NodeService) ListByCluster(ctx context.Context, clusterID string, params request.ListParams) ([]model.Node, bool, error) {
-	query := `SELECT id, cluster_id, shard_id, shard_index, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at FROM nodes WHERE cluster_id = $1 AND status != 'deleted'`
+	query := `SELECT id, cluster_id, shard_id, shard_index, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at FROM nodes WHERE cluster_id = $1`
 	args := []any{clusterID}
 	argIdx := 2
 

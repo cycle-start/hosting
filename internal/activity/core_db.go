@@ -40,7 +40,13 @@ type UpdateResourceStatusParams struct {
 
 // UpdateResourceStatus sets the status of a resource row in the given table.
 func (a *CoreDB) UpdateResourceStatus(ctx context.Context, params UpdateResourceStatusParams) error {
-	if params.Status == model.StatusActive || params.Status == model.StatusDeleted {
+	if params.Status == model.StatusDeleted {
+		// Hard delete — remove the row entirely.
+		query := fmt.Sprintf("DELETE FROM %s WHERE id = $1", params.Table)
+		_, err := a.db.Exec(ctx, query, params.ID)
+		return err
+	}
+	if params.Status == model.StatusActive {
 		// Clear status_message on success transitions.
 		query := fmt.Sprintf("UPDATE %s SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", params.Table)
 		_, err := a.db.Exec(ctx, query, params.Status, params.ID)
@@ -262,7 +268,7 @@ func (a *CoreDB) GetNodesByClusterAndRole(ctx context.Context, clusterID string,
 func (a *CoreDB) GetFQDNsByWebrootID(ctx context.Context, webrootID string) ([]model.FQDN, error) {
 	rows, err := a.db.Query(ctx,
 		`SELECT id, fqdn, webroot_id, ssl_enabled, status, status_message, created_at, updated_at
-		 FROM fqdns WHERE webroot_id = $1 AND status != $2`, webrootID, model.StatusDeleted,
+		 FROM fqdns WHERE webroot_id = $1`, webrootID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get fqdns by webroot id: %w", err)
@@ -403,7 +409,7 @@ func (a *CoreDB) UpdateValkeyInstanceShardID(ctx context.Context, instanceID str
 func (a *CoreDB) ListWebrootsByTenantID(ctx context.Context, tenantID string) ([]model.Webroot, error) {
 	rows, err := a.db.Query(ctx,
 		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, status, status_message, created_at, updated_at
-		 FROM webroots WHERE tenant_id = $1 AND status != $2`, tenantID, model.StatusDeleted,
+		 FROM webroots WHERE tenant_id = $1`, tenantID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list webroots by tenant: %w", err)
@@ -425,7 +431,7 @@ func (a *CoreDB) ListWebrootsByTenantID(ctx context.Context, tenantID string) ([
 func (a *CoreDB) ListDatabasesByTenantID(ctx context.Context, tenantID string) ([]model.Database, error) {
 	rows, err := a.db.Query(ctx,
 		`SELECT id, tenant_id, name, shard_id, node_id, status, status_message, created_at, updated_at
-		 FROM databases WHERE tenant_id = $1 AND status != $2`, tenantID, model.StatusDeleted,
+		 FROM databases WHERE tenant_id = $1`, tenantID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list databases by tenant: %w", err)
@@ -488,7 +494,7 @@ func (a *CoreDB) GetEmailAccountByID(ctx context.Context, id string) (*model.Ema
 func (a *CoreDB) CountActiveEmailAccountsByFQDN(ctx context.Context, fqdnID string) (int, error) {
 	var count int
 	err := a.db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM email_accounts WHERE fqdn_id = $1 AND status != $2`, fqdnID, model.StatusDeleted,
+		`SELECT COUNT(*) FROM email_accounts WHERE fqdn_id = $1`, fqdnID,
 	).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("count active email accounts by fqdn: %w", err)
@@ -522,7 +528,7 @@ func (a *CoreDB) CreateNode(ctx context.Context, n *model.Node) error {
 func (a *CoreDB) ListDatabasesByShard(ctx context.Context, shardID string) ([]model.Database, error) {
 	rows, err := a.db.Query(ctx,
 		`SELECT id, tenant_id, name, shard_id, node_id, status, status_message, created_at, updated_at
-		 FROM databases WHERE shard_id = $1 AND status != $2 ORDER BY name`, shardID, model.StatusDeleted,
+		 FROM databases WHERE shard_id = $1 ORDER BY name`, shardID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list databases by shard: %w", err)
@@ -544,7 +550,7 @@ func (a *CoreDB) ListDatabasesByShard(ctx context.Context, shardID string) ([]mo
 func (a *CoreDB) ListValkeyInstancesByShard(ctx context.Context, shardID string) ([]model.ValkeyInstance, error) {
 	rows, err := a.db.Query(ctx,
 		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, status_message, created_at, updated_at
-		 FROM valkey_instances WHERE shard_id = $1 AND status != $2 ORDER BY name`, shardID, model.StatusDeleted,
+		 FROM valkey_instances WHERE shard_id = $1 ORDER BY name`, shardID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list valkey instances by shard: %w", err)
@@ -566,7 +572,7 @@ func (a *CoreDB) ListValkeyInstancesByShard(ctx context.Context, shardID string)
 func (a *CoreDB) ListDatabaseUsersByDatabaseID(ctx context.Context, databaseID string) ([]model.DatabaseUser, error) {
 	rows, err := a.db.Query(ctx,
 		`SELECT id, database_id, username, password, privileges, status, status_message, created_at, updated_at
-		 FROM database_users WHERE database_id = $1 AND status != $2`, databaseID, model.StatusDeleted,
+		 FROM database_users WHERE database_id = $1`, databaseID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list database users by database: %w", err)
@@ -588,7 +594,7 @@ func (a *CoreDB) ListDatabaseUsersByDatabaseID(ctx context.Context, databaseID s
 func (a *CoreDB) ListValkeyUsersByInstanceID(ctx context.Context, instanceID string) ([]model.ValkeyUser, error) {
 	rows, err := a.db.Query(ctx,
 		`SELECT id, valkey_instance_id, username, password, privileges, key_pattern, status, status_message, created_at, updated_at
-		 FROM valkey_users WHERE valkey_instance_id = $1 AND status != $2`, instanceID, model.StatusDeleted,
+		 FROM valkey_users WHERE valkey_instance_id = $1`, instanceID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list valkey users by instance: %w", err)
@@ -1189,7 +1195,7 @@ func (a *CoreDB) GetCronJobContext(ctx context.Context, cronJobID string) (*Cron
 func (a *CoreDB) ListCronJobsByWebroot(ctx context.Context, webrootID string) ([]model.CronJob, error) {
 	rows, err := a.db.Query(ctx,
 		`SELECT id, tenant_id, webroot_id, name, schedule, command, working_directory, enabled, timeout_seconds, max_memory_mb, status, status_message, created_at, updated_at
-		 FROM cron_jobs WHERE webroot_id = $1 AND status != $2 ORDER BY name`, webrootID, model.StatusDeleted,
+		 FROM cron_jobs WHERE webroot_id = $1 ORDER BY name`, webrootID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list cron jobs by webroot: %w", err)
@@ -1289,7 +1295,7 @@ func (a *CoreDB) ListDaemonsByWebroot(ctx context.Context, webrootID string) ([]
 		`SELECT id, tenant_id, node_id, webroot_id, name, command, proxy_path, proxy_port,
 		        num_procs, stop_signal, stop_wait_secs, max_memory_mb, environment,
 		        enabled, status, status_message, created_at, updated_at
-		 FROM daemons WHERE webroot_id = $1 AND status != $2 ORDER BY name`, webrootID, model.StatusDeleted,
+		 FROM daemons WHERE webroot_id = $1 ORDER BY name`, webrootID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list daemons by webroot: %w", err)

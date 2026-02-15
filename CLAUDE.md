@@ -20,6 +20,7 @@ HOSTING_E2E=1 go test ./tests/e2e/... -v
 - **API responses**: List endpoints return `{items: [...], has_more: bool}`. Async operations return 202 Accepted.
 - **Handlers**: parse/validate request → build model → call service → return response. No business logic in handlers.
 - **Config**: All config is via environment variables loaded in `internal/config/config.go`.
+- **No soft deletes**: Always hard-delete rows (`DELETE FROM`). Never set `status = 'deleted'` and leave rows in the table. `UpdateResourceStatus` with `StatusDeleted` performs a `DELETE FROM`.
 
 ## Helm Chart Sync Rule
 

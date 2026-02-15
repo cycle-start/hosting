@@ -11,7 +11,7 @@ CREATE TABLE ssh_keys (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_ssh_keys_tenant_id ON ssh_keys(tenant_id);
-CREATE UNIQUE INDEX idx_ssh_keys_tenant_fingerprint ON ssh_keys(tenant_id, fingerprint) WHERE status != 'deleted';
+CREATE UNIQUE INDEX idx_ssh_keys_tenant_fingerprint ON ssh_keys(tenant_id, fingerprint);
 
 -- +goose Down
 DROP TABLE ssh_keys;

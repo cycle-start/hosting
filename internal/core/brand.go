@@ -43,7 +43,7 @@ func (s *BrandService) GetByID(ctx context.Context, id string) (*model.Brand, er
 }
 
 func (s *BrandService) List(ctx context.Context, params request.ListParams) ([]model.Brand, bool, error) {
-	query := `SELECT id, name, base_hostname, primary_ns, secondary_ns, hostmaster_email, status, created_at, updated_at FROM brands WHERE status != 'deleted'`
+	query := `SELECT id, name, base_hostname, primary_ns, secondary_ns, hostmaster_email, status, created_at, updated_at FROM brands WHERE true`
 	args := []any{}
 	argIdx := 1
 
@@ -122,8 +122,7 @@ func (s *BrandService) Update(ctx context.Context, brand *model.Brand) error {
 
 func (s *BrandService) Delete(ctx context.Context, id string) error {
 	_, err := s.db.Exec(ctx,
-		"UPDATE brands SET status = $1, updated_at = now() WHERE id = $2",
-		model.StatusDeleted, id,
+		"DELETE FROM brands WHERE id = $1", id,
 	)
 	if err != nil {
 		return fmt.Errorf("delete brand %s: %w", id, err)

@@ -61,25 +61,25 @@ func (s *DashboardService) Stats(ctx context.Context) (*DashboardStats, error) {
 		WITH region_count AS (
 			SELECT count(*) AS c FROM regions
 		), cluster_count AS (
-			SELECT count(*) AS c FROM clusters WHERE status != 'deleted'
+			SELECT count(*) AS c FROM clusters
 		), shard_count AS (
-			SELECT count(*) AS c FROM shards WHERE status != 'deleted'
+			SELECT count(*) AS c FROM shards
 		), node_count AS (
-			SELECT count(*) AS c FROM nodes WHERE status != 'deleted'
+			SELECT count(*) AS c FROM nodes
 		), tenant_count AS (
-			SELECT count(*) AS c FROM tenants WHERE status != 'deleted'
+			SELECT count(*) AS c FROM tenants
 		), tenant_active AS (
 			SELECT count(*) AS c FROM tenants WHERE status = 'active'
 		), tenant_suspended AS (
 			SELECT count(*) AS c FROM tenants WHERE status = 'suspended'
 		), database_count AS (
-			SELECT count(*) AS c FROM databases WHERE status != 'deleted'
+			SELECT count(*) AS c FROM databases
 		), zone_count AS (
-			SELECT count(*) AS c FROM zones WHERE status != 'deleted'
+			SELECT count(*) AS c FROM zones
 		), valkey_count AS (
-			SELECT count(*) AS c FROM valkey_instances WHERE status != 'deleted'
+			SELECT count(*) AS c FROM valkey_instances
 		), fqdn_count AS (
-			SELECT count(*) AS c FROM fqdns WHERE status != 'deleted'
+			SELECT count(*) AS c FROM fqdns
 		)
 		SELECT
 			(SELECT c FROM region_count),
@@ -115,8 +115,7 @@ func (s *DashboardService) Stats(ctx context.Context) (*DashboardStats, error) {
 	// Tenants per shard
 	tpsRows, err := s.db.Query(ctx,
 		`SELECT s.id, s.name, s.role, count(t.id)
-		 FROM shards s LEFT JOIN tenants t ON t.shard_id = s.id AND t.status != 'deleted'
-		 WHERE s.status != 'deleted'
+		 FROM shards s LEFT JOIN tenants t ON t.shard_id = s.id
 		 GROUP BY s.id, s.name, s.role
 		 ORDER BY count(t.id) DESC`)
 	if err != nil {
@@ -138,8 +137,7 @@ func (s *DashboardService) Stats(ctx context.Context) (*DashboardStats, error) {
 	// Nodes per cluster
 	npcRows, err := s.db.Query(ctx,
 		`SELECT c.id, c.name, count(n.id)
-		 FROM clusters c LEFT JOIN nodes n ON n.cluster_id = c.id AND n.status != 'deleted'
-		 WHERE c.status != 'deleted'
+		 FROM clusters c LEFT JOIN nodes n ON n.cluster_id = c.id
 		 GROUP BY c.id, c.name
 		 ORDER BY count(n.id) DESC`)
 	if err != nil {
@@ -160,7 +158,7 @@ func (s *DashboardService) Stats(ctx context.Context) (*DashboardStats, error) {
 
 	// Tenants by status
 	tbsRows, err := s.db.Query(ctx,
-		`SELECT status, count(*) FROM tenants WHERE status != 'deleted' GROUP BY status ORDER BY count(*) DESC`)
+		`SELECT status, count(*) FROM tenants GROUP BY status ORDER BY count(*) DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("dashboard tenants by status: %w", err)
 	}

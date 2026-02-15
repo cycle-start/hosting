@@ -68,7 +68,7 @@ func (s *TenantService) GetByID(ctx context.Context, id string) (*model.Tenant, 
 }
 
 func (s *TenantService) List(ctx context.Context, params request.ListParams) ([]model.Tenant, bool, error) {
-	query := `SELECT t.id, t.name, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.created_at, t.updated_at, r.name, c.name, s.name FROM tenants t JOIN regions r ON r.id = t.region_id JOIN clusters c ON c.id = t.cluster_id LEFT JOIN shards s ON s.id = t.shard_id WHERE t.status != 'deleted'`
+	query := `SELECT t.id, t.name, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.created_at, t.updated_at, r.name, c.name, s.name FROM tenants t JOIN regions r ON r.id = t.region_id JOIN clusters c ON c.id = t.cluster_id LEFT JOIN shards s ON s.id = t.shard_id WHERE true`
 	args := []any{}
 	argIdx := 1
 
@@ -303,37 +303,37 @@ type MigrateTenantParams struct {
 
 func (s *TenantService) ResourceSummary(ctx context.Context, tenantID string) (*model.TenantResourceSummary, error) {
 	const query = `
-		SELECT 'webroots' AS resource_type, status, count(*) FROM webroots WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status
+		SELECT 'webroots' AS resource_type, status, count(*) FROM webroots WHERE tenant_id = $1 GROUP BY status
 		UNION ALL
-		SELECT 'fqdns', f.status, count(*) FROM fqdns f JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND f.status != 'deleted' GROUP BY f.status
+		SELECT 'fqdns', f.status, count(*) FROM fqdns f JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 GROUP BY f.status
 		UNION ALL
-		SELECT 'certificates', c.status, count(*) FROM certificates c JOIN fqdns f ON f.id = c.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND c.status != 'deleted' GROUP BY c.status
+		SELECT 'certificates', c.status, count(*) FROM certificates c JOIN fqdns f ON f.id = c.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 GROUP BY c.status
 		UNION ALL
-		SELECT 'email_accounts', ea.status, count(*) FROM email_accounts ea JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND ea.status != 'deleted' GROUP BY ea.status
+		SELECT 'email_accounts', ea.status, count(*) FROM email_accounts ea JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 GROUP BY ea.status
 		UNION ALL
-		SELECT 'email_aliases', al.status, count(*) FROM email_aliases al JOIN email_accounts ea ON ea.id = al.email_account_id JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND al.status != 'deleted' GROUP BY al.status
+		SELECT 'email_aliases', al.status, count(*) FROM email_aliases al JOIN email_accounts ea ON ea.id = al.email_account_id JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 GROUP BY al.status
 		UNION ALL
-		SELECT 'email_forwards', ef.status, count(*) FROM email_forwards ef JOIN email_accounts ea ON ea.id = ef.email_account_id JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND ef.status != 'deleted' GROUP BY ef.status
+		SELECT 'email_forwards', ef.status, count(*) FROM email_forwards ef JOIN email_accounts ea ON ea.id = ef.email_account_id JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 GROUP BY ef.status
 		UNION ALL
-		SELECT 'email_autoreplies', ar.status, count(*) FROM email_autoreplies ar JOIN email_accounts ea ON ea.id = ar.email_account_id JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND ar.status != 'deleted' GROUP BY ar.status
+		SELECT 'email_autoreplies', ar.status, count(*) FROM email_autoreplies ar JOIN email_accounts ea ON ea.id = ar.email_account_id JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 GROUP BY ar.status
 		UNION ALL
-		SELECT 'databases', status, count(*) FROM databases WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status
+		SELECT 'databases', status, count(*) FROM databases WHERE tenant_id = $1 GROUP BY status
 		UNION ALL
-		SELECT 'database_users', du.status, count(*) FROM database_users du JOIN databases d ON d.id = du.database_id WHERE d.tenant_id = $1 AND du.status != 'deleted' GROUP BY du.status
+		SELECT 'database_users', du.status, count(*) FROM database_users du JOIN databases d ON d.id = du.database_id WHERE d.tenant_id = $1 GROUP BY du.status
 		UNION ALL
-		SELECT 'zones', status, count(*) FROM zones WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status
+		SELECT 'zones', status, count(*) FROM zones WHERE tenant_id = $1 GROUP BY status
 		UNION ALL
-		SELECT 'zone_records', zr.status, count(*) FROM zone_records zr JOIN zones z ON z.id = zr.zone_id WHERE z.tenant_id = $1 AND zr.status != 'deleted' GROUP BY zr.status
+		SELECT 'zone_records', zr.status, count(*) FROM zone_records zr JOIN zones z ON z.id = zr.zone_id WHERE z.tenant_id = $1 GROUP BY zr.status
 		UNION ALL
-		SELECT 'valkey_instances', status, count(*) FROM valkey_instances WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status
+		SELECT 'valkey_instances', status, count(*) FROM valkey_instances WHERE tenant_id = $1 GROUP BY status
 		UNION ALL
-		SELECT 'valkey_users', vu.status, count(*) FROM valkey_users vu JOIN valkey_instances vi ON vi.id = vu.valkey_instance_id WHERE vi.tenant_id = $1 AND vu.status != 'deleted' GROUP BY vu.status
+		SELECT 'valkey_users', vu.status, count(*) FROM valkey_users vu JOIN valkey_instances vi ON vi.id = vu.valkey_instance_id WHERE vi.tenant_id = $1 GROUP BY vu.status
 		UNION ALL
-		SELECT 'ssh_keys', status, count(*) FROM ssh_keys WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status
+		SELECT 'ssh_keys', status, count(*) FROM ssh_keys WHERE tenant_id = $1 GROUP BY status
 		UNION ALL
-		SELECT 'backups', status, count(*) FROM backups WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status
+		SELECT 'backups', status, count(*) FROM backups WHERE tenant_id = $1 GROUP BY status
 		UNION ALL
-		SELECT 'cron_jobs', status, count(*) FROM cron_jobs WHERE tenant_id = $1 AND status != 'deleted' GROUP BY status`
+		SELECT 'cron_jobs', status, count(*) FROM cron_jobs WHERE tenant_id = $1 GROUP BY status`
 
 	rows, err := s.db.Query(ctx, query, tenantID)
 	if err != nil {

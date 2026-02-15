@@ -75,7 +75,7 @@ func (s *ZoneService) GetByID(ctx context.Context, id string) (*model.Zone, erro
 }
 
 func (s *ZoneService) List(ctx context.Context, params request.ListParams) ([]model.Zone, bool, error) {
-	query := `SELECT z.id, z.brand_id, z.tenant_id, z.name, z.region_id, z.status, z.status_message, z.created_at, z.updated_at, r.name FROM zones z JOIN regions r ON r.id = z.region_id WHERE z.status != 'deleted'`
+	query := `SELECT z.id, z.brand_id, z.tenant_id, z.name, z.region_id, z.status, z.status_message, z.created_at, z.updated_at, r.name FROM zones z JOIN regions r ON r.id = z.region_id WHERE true`
 	args := []any{}
 	argIdx := 1
 

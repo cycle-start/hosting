@@ -41,57 +41,57 @@ func (s *SearchService) Search(ctx context.Context, query string, limit int) ([]
 	queries := []queryDef{
 		{
 			sql: `SELECT 'brand', id, name, '', status FROM brands
-				WHERE status != 'deleted' AND (id ILIKE $1 OR name ILIKE $1)
+				WHERE id ILIKE $1 OR name ILIKE $1
 				LIMIT $2`,
 			args: []any{pattern, limit},
 		},
 		{
 			sql: `SELECT 'tenant', id, name, '', status FROM tenants
-				WHERE status != 'deleted' AND (id ILIKE $1 OR name ILIKE $1)
+				WHERE id ILIKE $1 OR name ILIKE $1
 				LIMIT $2`,
 			args: []any{pattern, limit},
 		},
 		{
 			sql: `SELECT 'zone', id, name, tenant_id, status FROM zones
-				WHERE status != 'deleted' AND name ILIKE $1
+				WHERE name ILIKE $1
 				LIMIT $2`,
 			args: []any{pattern, limit},
 		},
 		{
 			sql: `SELECT 'webroot', id, name, tenant_id, status FROM webroots
-				WHERE status != 'deleted' AND name ILIKE $1
+				WHERE name ILIKE $1
 				LIMIT $2`,
 			args: []any{pattern, limit},
 		},
 		{
 			sql: `SELECT 'fqdn', f.id, f.fqdn, w.tenant_id, f.status
 				FROM fqdns f JOIN webroots w ON f.webroot_id = w.id
-				WHERE f.status != 'deleted' AND f.fqdn ILIKE $1
+				WHERE f.fqdn ILIKE $1
 				LIMIT $2`,
 			args: []any{pattern, limit},
 		},
 		{
 			sql: `SELECT 'database', id, name, tenant_id, status FROM databases
-				WHERE status != 'deleted' AND name ILIKE $1
+				WHERE name ILIKE $1
 				LIMIT $2`,
 			args: []any{pattern, limit},
 		},
 		{
 			sql: `SELECT 'email_account', e.id, e.address, w.tenant_id, e.status
 				FROM email_accounts e JOIN fqdns f ON e.fqdn_id = f.id JOIN webroots w ON f.webroot_id = w.id
-				WHERE e.status != 'deleted' AND e.address ILIKE $1
+				WHERE e.address ILIKE $1
 				LIMIT $2`,
 			args: []any{pattern, limit},
 		},
 		{
 			sql: `SELECT 'valkey_instance', id, name, tenant_id, status FROM valkey_instances
-				WHERE status != 'deleted' AND name ILIKE $1
+				WHERE name ILIKE $1
 				LIMIT $2`,
 			args: []any{pattern, limit},
 		},
 		{
 			sql: `SELECT 's3_bucket', id, name, COALESCE(tenant_id, ''), status FROM s3_buckets
-				WHERE status != 'deleted' AND name ILIKE $1
+				WHERE name ILIKE $1
 				LIMIT $2`,
 			args: []any{pattern, limit},
 		},

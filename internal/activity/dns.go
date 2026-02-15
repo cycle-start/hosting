@@ -130,8 +130,7 @@ func (a *DNS) AutoDeleteDNSRecords(ctx context.Context, fqdn string) error {
 
 	// Remove platform-managed records from core DB.
 	_, err = a.coreDB.Exec(ctx,
-		`UPDATE zone_records SET status = 'deleted', updated_at = now()
-		 WHERE name = $1 AND managed_by = 'platform' AND status = 'active'`, fqdn,
+		`DELETE FROM zone_records WHERE name = $1 AND managed_by = 'platform'`, fqdn,
 	)
 	if err != nil {
 		return fmt.Errorf("delete platform records from core db: %w", err)
@@ -348,8 +347,7 @@ func (a *DNS) AutoDeleteEmailDNSRecords(ctx context.Context, fqdn string) error 
 
 	// Remove platform-managed email records from core DB.
 	_, err = a.coreDB.Exec(ctx,
-		`UPDATE zone_records SET status = 'deleted', updated_at = now()
-		 WHERE name = $1 AND managed_by = 'platform' AND status = 'active'
+		`DELETE FROM zone_records WHERE name = $1 AND managed_by = 'platform'
 		 AND type IN ('MX', 'TXT')`, fqdn,
 	)
 	if err != nil {

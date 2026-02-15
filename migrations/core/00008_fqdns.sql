@@ -9,7 +9,7 @@ CREATE TABLE fqdns (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE UNIQUE INDEX fqdns_fqdn_key ON fqdns (fqdn) WHERE status NOT IN ('deleted', 'deleting');
+CREATE UNIQUE INDEX fqdns_fqdn_key ON fqdns (fqdn) WHERE status != 'deleting';
 
 -- +goose Down
 DROP TABLE fqdns;
