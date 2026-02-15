@@ -38,6 +38,8 @@ Full CRUD REST API at `api.hosting.test/api/v1` with OpenAPI docs at `/docs`.
 | FQDNs | CRUD `/webroots/{id}/fqdns`, retry | Yes | Auto-DNS + auto-LB-map + optional LE cert |
 | Certificates | List/upload `/fqdns/{id}/certificates`, retry | Yes | PEM upload, LE provisioning |
 | SSH Keys | CRUD `/tenants/{id}/ssh-keys`, retry | Yes | SSH public keys for SFTP/SSH access |
+| Egress Rules | CRUD `/tenants/{id}/egress-rules`, retry | Yes | Per-tenant nftables egress CIDR rules |
+| Database Access Rules | CRUD `/databases/{id}/access-rules`, retry | Yes | Per-database MySQL host pattern rules |
 | Zones | CRUD `/zones`, tenant reassign, retry | Yes | Brand-scoped DNS zones |
 | Zone Records | CRUD `/zones/{id}/records`, retry | Yes | A/AAAA/CNAME/MX/TXT/NS/etc. |
 | Databases | CRUD `/tenants/{id}/databases`, migrate, retry | Yes | MySQL; charset, collation |
@@ -90,6 +92,8 @@ Full CRUD REST API at `api.hosting.test/api/v1` with OpenAPI docs at `/docs`.
 - Email Forward: create, delete (Sieve script generation)
 - Email Auto-Reply: update, delete (vacation via JMAP)
 - SSH Key: add, remove (syncs authorized_keys across all shard nodes)
+- Egress Rule: sync (applies all tenant's rules to nftables on all shard nodes)
+- Database Access Rule: sync (rebuilds MySQL user host patterns on primary node)
 - Backup: create, restore, delete; cron cleanup of old backups
 
 **Infrastructure workflows:**
@@ -119,8 +123,10 @@ Runs on each VM node, connecting to Temporal via `node-{uuid}` task queue:
 - Separate PowerDNS PostgreSQL database for zone/record storage
 - Brand-aware NS records (each brand defines its own NS hostnames and hostmaster)
 - Auto-created A/AAAA records when binding FQDNs (if zone exists)
-- Auto-created MX/SPF records when creating email accounts
-- Platform-managed vs user-managed record tracking
+- Auto-created MX/SPF/DKIM/DMARC records when creating email accounts
+- Custom records override auto records (auto records preserved in core DB for reactivation)
+- Retroactive auto-record creation when zone appears after existing FQDNs
+- Platform-managed vs user-managed record tracking with source_type
 
 ### Load Balancing (HAProxy)
 
