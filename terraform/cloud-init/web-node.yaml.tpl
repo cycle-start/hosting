@@ -75,6 +75,19 @@ write_files:
         "$CORE_API_URL/internal/v1/cron-jobs/$CRON_JOB_ID/outcome" \
         >/dev/null 2>&1 || true
 
+  - path: /etc/systemd/network/50-tenant0.netdev
+    content: |
+      [NetDev]
+      Name=tenant0
+      Kind=dummy
+
+  - path: /etc/systemd/network/50-tenant0.network
+    content: |
+      [Match]
+      Name=tenant0
+      [Network]
+      Description=Tenant ULA addresses
+
   - path: /etc/logrotate.d/hosting-tenant-logs
     content: |
       /var/log/hosting/*/*.log {
@@ -106,4 +119,6 @@ runcmd:
   - systemctl enable --now var-www-storage.mount
   # Verify the mount is active before starting the node-agent.
   - mountpoint -q /var/www/storage || (echo "FATAL: CephFS not mounted" && exit 1)
+  # Create tenant0 dummy interface for ULA addresses.
+  - systemctl restart systemd-networkd
   - systemctl start node-agent

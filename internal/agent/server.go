@@ -33,8 +33,9 @@ type Server struct {
 	valkey   *ValkeyManager
 	ssh      *SSHManager
 	cron     *CronManager
-	daemon   *DaemonManager
-	runtimes map[string]runtime.Manager
+	daemon    *DaemonManager
+	tenantULA *TenantULAManager
+	runtimes  map[string]runtime.Manager
 
 	// ShardID is the shard this node belongs to, resolved at startup from the core DB.
 	ShardID string
@@ -71,8 +72,9 @@ func NewServer(logger zerolog.Logger, cfg Config) *Server {
 		valkey:   NewValkeyManager(logger, cfg, svcMgr),
 		ssh:      NewSSHManager(logger, cfg.SSHConfigDir, cfg.WebStorageDir),
 		cron:     NewCronManager(logger, cfg),
-		daemon:   NewDaemonManager(logger, cfg),
-		runtimes: runtimes,
+		daemon:    NewDaemonManager(logger, cfg),
+		tenantULA: NewTenantULAManager(logger),
+		runtimes:  runtimes,
 	}
 }
 
@@ -99,6 +101,9 @@ func (s *Server) CronManager() *CronManager { return s.cron }
 
 // DaemonManager returns the server's daemon manager.
 func (s *Server) DaemonManager() *DaemonManager { return s.daemon }
+
+// TenantULAManager returns the server's tenant ULA manager.
+func (s *Server) TenantULAManager() *TenantULAManager { return s.tenantULA }
 
 // Runtimes returns the server's runtime managers.
 func (s *Server) Runtimes() map[string]runtime.Manager { return s.runtimes }

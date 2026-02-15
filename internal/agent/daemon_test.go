@@ -108,6 +108,35 @@ func TestDaemonConfigTemplate_WithPort(t *testing.T) {
 	assert.Contains(t, config, `APP_ENV="production"`)
 }
 
+func TestDaemonConfigTemplate_WithPortAndHost(t *testing.T) {
+	env := map[string]string{
+		"APP_ENV": "production",
+		"HOST":    "fd00:1:2::2742",
+		"PORT":    "14523",
+	}
+
+	data := daemonConfigData{
+		TenantName:   "t_abc123",
+		WebrootName:  "main",
+		DaemonName:   "daemon_ws123",
+		Command:      "php artisan reverb:start --host=$HOST --port=$PORT",
+		WorkingDir:   "/var/www/storage/t_abc123/webroots/main",
+		NumProcs:     1,
+		StopSignal:   "TERM",
+		StopWaitSecs: 30,
+		MaxMemoryMB:  256,
+		Environment:  formatDaemonEnvironment(env),
+	}
+
+	var b bytes.Buffer
+	require.NoError(t, daemonConfigTmpl.Execute(&b, data))
+	config := b.String()
+
+	assert.Contains(t, config, `HOST="fd00:1:2::2742"`)
+	assert.Contains(t, config, `PORT="14523"`)
+	assert.Contains(t, config, `APP_ENV="production"`)
+}
+
 func TestDaemonConfigTemplate_MultiProc(t *testing.T) {
 	data := daemonConfigData{
 		TenantName:   "t_abc123",

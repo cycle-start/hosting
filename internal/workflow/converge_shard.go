@@ -210,6 +210,12 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		}
 	}
 
+	// Determine the cluster ID from the first node (all nodes in a shard share the same cluster).
+	clusterID := ""
+	if len(nodes) > 0 {
+		clusterID = nodes[0].ClusterID
+	}
+
 	// Create tenants and webroots on each node.
 	for _, tenant := range tenants {
 		if tenant.Status != model.StatusActive {
@@ -244,6 +250,29 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		}
 	}
 
+	// Configure tenant ULA addresses on each node.
+	for _, tenant := range tenants {
+		if tenant.Status != model.StatusActive {
+			continue
+		}
+		for _, node := range nodes {
+			if node.ShardIndex == nil {
+				continue
+			}
+			nodeCtx := nodeActivityCtx(ctx, node.ID)
+			err = workflow.ExecuteActivity(nodeCtx, "ConfigureTenantAddresses",
+				activity.ConfigureTenantAddressesParams{
+					TenantName:   tenant.Name,
+					TenantUID:    tenant.UID,
+					ClusterID:    clusterID,
+					NodeShardIdx: *node.ShardIndex,
+				}).Get(ctx, nil)
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("configure ULA for %s on %s: %v", tenant.ID, node.ID, err))
+			}
+		}
+	}
+
 	// Fetch daemons per webroot for nginx proxy locations during convergence.
 	webrootDaemons := make(map[string][]model.Daemon) // keyed by webroot ID
 	for _, entry := range webrootEntries {
@@ -264,12 +293,6 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		if node.ShardIndex != nil {
 			nodeShardIndex[node.ID] = *node.ShardIndex
 		}
-	}
-
-	// Determine the cluster ID from the first node (all nodes in a shard share the same cluster).
-	clusterID := ""
-	if len(nodes) > 0 {
-		clusterID = nodes[0].ClusterID
 	}
 
 	// Create webroots on each node.
@@ -372,6 +395,14 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				continue
 			}
 
+			// Compute the tenant's ULA on the daemon's assigned node.
+			hostIP := ""
+			if daemon.NodeID != nil {
+				if idx, ok := nodeShardIndex[*daemon.NodeID]; ok {
+					hostIP = core.ComputeTenantULA(clusterID, idx, entry.tenant.UID)
+				}
+			}
+
 			createParams := activity.CreateDaemonParams{
 				ID:           daemon.ID,
 				NodeID:       daemon.NodeID,
@@ -380,6 +411,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				Name:         daemon.Name,
 				Command:      daemon.Command,
 				ProxyPort:    daemon.ProxyPort,
+				HostIP:       hostIP,
 				NumProcs:     daemon.NumProcs,
 				StopSignal:   daemon.StopSignal,
 				StopWaitSecs: daemon.StopWaitSecs,

@@ -68,7 +68,7 @@ When a daemon has `proxy_path` set, the parent webroot's nginx config is regener
 
 ```nginx
 location /app {
-    proxy_pass http://127.0.0.1:14523;
+    proxy_pass http://[fd00:1:2::2742]:14523;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -81,7 +81,7 @@ location /app {
 }
 ```
 
-This supports WebSocket connections through nginx (HTTP Upgrade headers + 24-hour timeout).
+The `proxy_pass` target uses the tenant's ULA IPv6 address on the daemon's assigned node. This supports WebSocket connections through nginx (HTTP Upgrade headers + 24-hour timeout) and cross-node proxying.
 
 ### Supervisord Config
 
@@ -97,14 +97,16 @@ autostart=true
 autorestart=unexpected
 stopsignal=TERM
 stopwaitsecs=30
-environment=PORT="14523",APP_ENV="production"
+environment=HOST="fd00:1:2::2742",PORT="14523",APP_ENV="production"
 ```
+
+When `proxy_path` is set, `PORT` and `HOST` are auto-injected. `HOST` is the tenant's ULA IPv6 address on the daemon's assigned node — the daemon should bind to `$HOST:$PORT`.
 
 ### Convergence
 
 Daemons are converged as part of web shard convergence (`ConvergeShardWorkflow`):
 1. Daemon proxy info is fetched per webroot and included in nginx config generation
-2. Supervisord configs are written to all nodes
+2. Supervisord configs are written to the daemon's assigned node
 3. Disabled daemons are explicitly stopped
 
 ## Examples
@@ -113,13 +115,13 @@ Daemons are converged as part of web shard convergence (`ConvergeShardWorkflow`)
 
 ```json
 {
-  "command": "php artisan reverb:start --port=$PORT",
+  "command": "php artisan reverb:start --host=$HOST --port=$PORT",
   "proxy_path": "/app",
   "max_memory_mb": 256
 }
 ```
 
-The PHP webroot handles REST traffic normally. WebSocket connections to `/app` are proxied to the Reverb daemon.
+The PHP webroot handles REST traffic normally. WebSocket connections to `/app` are proxied to the Reverb daemon. The daemon binds to the tenant's ULA IPv6 address (`$HOST`) on its allocated port (`$PORT`).
 
 ### Background Queue Worker
 
@@ -143,13 +145,28 @@ No `proxy_path` — this is a pure background process with no nginx integration.
 }
 ```
 
-## Planned: Per-Tenant IPv6 & Single-Node Execution
+## Single-Node Execution & Per-Tenant IPv6
 
-The current implementation runs daemons on all shard nodes and proxies via `127.0.0.1`. The planned architecture assigns each daemon to a **single node** and uses **per-tenant per-node ULA IPv6 addresses** for cross-node proxying. See [daemon-networking plan](plans/daemon-networking.md) for full details.
+Each daemon runs on **one specific node** in the shard, assigned via least-loaded round-robin on creation. The daemon's `node_id` is stored in the database and used for all lifecycle operations.
 
-Key changes:
-- Each daemon gets a `node_id` — runs on one node only, distributed across shard for load balancing
-- Per-tenant IPv6 ULA: `fd00:{cluster}:{node_index}::{tenant_uid}` — deterministic, never floats
-- Nginx on all nodes proxies to daemon node's tenant IPv6 address
-- nftables UID-based binding restriction for network isolation
-- `$HOST` env var auto-injected alongside `$PORT`
+Each tenant gets a **unique ULA IPv6 address on every node**, computed deterministically:
+
+```
+fd00:{cluster_hash}:{node_shard_index}::{tenant_uid_hex}
+```
+
+Nginx on **all nodes** proxies daemon traffic to the correct node's tenant ULA address. This means a request hitting any node in the shard will be proxied to the daemon's specific node.
+
+### Environment Variables
+
+When `proxy_path` is set, two environment variables are auto-injected:
+
+| Variable | Example | Purpose |
+|---|---|---|
+| `PORT` | `14523` | Allocated port number (FNV hash into 10000-19999) |
+| `HOST` | `fd00:1:2::2742` | Tenant's ULA on the daemon's assigned node |
+
+### Remaining Work
+
+- **Tenant ULA management on nodes:** `tenant0` dummy interface, `ConfigureTenantAddresses` activity, nftables UID-based binding restriction. See [daemon-networking plan](plans/daemon-networking.md).
+- **Failover:** manual daemon reassignment on node failure (automatic later).

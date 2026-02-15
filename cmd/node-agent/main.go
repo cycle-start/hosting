@@ -80,6 +80,7 @@ func main() {
 		srv.SSHManager(),
 		srv.CronManager(),
 		srv.DaemonManager(),
+		srv.TenantULAManager(),
 		srv.Runtimes(),
 	)
 	w.RegisterActivity(nodeActs)

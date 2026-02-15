@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/edvin/hosting/internal/core"
 	"github.com/stretchr/testify/require"
 )
 
@@ -89,11 +88,12 @@ func TestLaravelReverbQueue(t *testing.T) {
 	t.Logf("reverb daemon %s created, proxy_port=%d", reverbDaemonID, reverbPort)
 
 	// ---------------------------------------------------------------
-	// Phase 4: Configure .env and ULA
+	// Phase 4: Configure .env
 	// ---------------------------------------------------------------
+	// ULA addresses are now configured automatically by convergence
+	// (ConfigureTenantAddresses activity on each web node).
 
-	// Get daemon's assigned node_id.
-	// The daemon may not have node_id yet (set during workflow). Poll for it.
+	// Get daemon's assigned node_id to find the node IP for SSH commands.
 	var daemonNodeID string
 	deadline := time.Now().Add(provisionTimeout)
 	for time.Now().Before(deadline) {
@@ -108,17 +108,13 @@ func TestLaravelReverbQueue(t *testing.T) {
 	}
 	require.NotEmpty(t, daemonNodeID, "daemon never got a node_id")
 
-	// Get node details to find shard_index and cluster_id.
+	// Get daemon node IP for SSH commands (.env writing, artisan commands).
 	resp, body = httpGet(t, fmt.Sprintf("%s/clusters/%s/nodes", coreAPIURL, clusterID))
 	require.Equal(t, 200, resp.StatusCode, body)
 	nodes := parsePaginatedItems(t, body)
-	var daemonNodeShardIndex int
 	var daemonNodeIP string
 	for _, n := range nodes {
 		if nid, _ := n["id"].(string); nid == daemonNodeID {
-			if si, ok := n["shard_index"].(float64); ok {
-				daemonNodeShardIndex = int(si)
-			}
 			if ip, ok := n["ip_address"].(string); ok && ip != "" {
 				daemonNodeIP = ip
 				if idx := strings.Index(daemonNodeIP, "/"); idx != -1 {
@@ -129,15 +125,7 @@ func TestLaravelReverbQueue(t *testing.T) {
 		}
 	}
 	require.NotEmpty(t, daemonNodeIP, "could not find daemon node IP")
-	t.Logf("daemon node: id=%s ip=%s shard_index=%d", daemonNodeID, daemonNodeIP, daemonNodeShardIndex)
-
-	// Compute ULA and add to loopback on the daemon's node.
-	ula := core.ComputeTenantULA(clusterID, daemonNodeShardIndex, tenantUID)
-	t.Logf("computed ULA: %s", ula)
-	sshExec(t, daemonNodeIP, fmt.Sprintf("sudo ip -6 addr add %s/128 dev lo || true", ula))
-	t.Cleanup(func() {
-		sshExec(t, daemonNodeIP, fmt.Sprintf("sudo ip -6 addr del %s/128 dev lo || true", ula))
-	})
+	t.Logf("daemon node: id=%s ip=%s", daemonNodeID, daemonNodeIP)
 
 	// Write .env.
 	generateLaravelEnv(t, daemonNodeIP, webrootPath, tenantName, map[string]string{

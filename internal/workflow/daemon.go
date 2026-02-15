@@ -26,6 +26,16 @@ func findDaemonNode(dc *activity.DaemonContext) *model.Node {
 	return nil
 }
 
+// computeDaemonHostIP computes the tenant's ULA address on the daemon's assigned node.
+// Returns empty string if the node has no shard_index.
+func computeDaemonHostIP(dc *activity.DaemonContext, node *model.Node) string {
+	if node == nil || node.ShardIndex == nil {
+		return ""
+	}
+	clusterID := node.ClusterID
+	return core.ComputeTenantULA(clusterID, *node.ShardIndex, dc.Tenant.UID)
+}
+
 // CreateDaemonWorkflow provisions a daemon on its assigned node.
 func CreateDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 	ao := workflow.ActivityOptions{
@@ -75,6 +85,7 @@ func CreateDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 		Name:         daemonCtx.Daemon.Name,
 		Command:      daemonCtx.Daemon.Command,
 		ProxyPort:    daemonCtx.Daemon.ProxyPort,
+		HostIP:       computeDaemonHostIP(&daemonCtx, node),
 		NumProcs:     daemonCtx.Daemon.NumProcs,
 		StopSignal:   daemonCtx.Daemon.StopSignal,
 		StopWaitSecs: daemonCtx.Daemon.StopWaitSecs,
@@ -165,6 +176,7 @@ func UpdateDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 		Name:         daemonCtx.Daemon.Name,
 		Command:      daemonCtx.Daemon.Command,
 		ProxyPort:    daemonCtx.Daemon.ProxyPort,
+		HostIP:       computeDaemonHostIP(&daemonCtx, node),
 		NumProcs:     daemonCtx.Daemon.NumProcs,
 		StopSignal:   daemonCtx.Daemon.StopSignal,
 		StopWaitSecs: daemonCtx.Daemon.StopWaitSecs,

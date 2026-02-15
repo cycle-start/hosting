@@ -221,34 +221,35 @@ Recommend **Option A** for simplicity — ULAs are link-local to the cluster net
 
 ## Implementation Phases
 
-### Phase 1: Worker Runtime Removal
-- Delete `phpworker.go` and test file
-- Remove worker references from runtime manager, convergence, validation, admin UI
-- Remove `docs/plans/php-worker-runtime.md`
-- Update docs
+### Phase 1: Worker Runtime Removal ✅
+- Deleted `phpworker.go` and test file
+- Removed worker references from runtime manager, convergence, validation, admin UI
+- Removed `docs/plans/php-worker-runtime.md`
+- Updated docs
 
-### Phase 2: Node Index
-- Add `shard_index` to nodes migration
-- Assign index on shard assignment (auto-increment within shard)
-- Expose in node model
+### Phase 2: Node Index ✅
+- Added `shard_index` to nodes migration with partial unique index
+- Auto-assign index on shard assignment (max + 1 within shard)
+- Exposed in node model
 
-### Phase 3: Tenant ULA Management
-- Add `tenant0` dummy interface to cloud-init for web nodes
-- Node-agent activity: `ConfigureTenantAddresses` — adds/removes ULA addrs on `tenant0`
-- Convergence: call `ConfigureTenantAddresses` for each tenant
-- nftables rules: per-tenant UID binding restriction
+### Phase 3: Tenant ULA Management ✅
+- Added `tenant0` dummy interface to cloud-init for web nodes (systemd-networkd)
+- `TenantULAManager` in node-agent: manages ULA addrs on `tenant0` + nftables binding restrictions
+- `ConfigureTenantAddresses` / `RemoveTenantAddresses` activities wired into convergence, create, and delete workflows
+- nftables `ip6 tenant_binding` table with `allowed` set: `(addr, uid)` pairs, root exempt
 
-### Phase 4: Single-Node Daemon Assignment
-- Add `node_id` to daemon migration and model
-- Round-robin assignment in daemon creation
-- Update daemon workflows: create/enable/disable target single node
-- Update delete workflow: target assigned node
+### Phase 4: Single-Node Daemon Assignment ✅
+- Added `node_id` to daemon migration and model
+- Least-loaded round-robin assignment in daemon creation
+- All daemon workflows target single assigned node
+- Delete workflow targets assigned node
 
-### Phase 5: Cross-Node Nginx Proxy
-- Update `DaemonProxyInfo` to include target IP (ULA of daemon's node)
-- Update nginx template: `proxy_pass http://[ULA]:PORT`
-- Update `$HOST` env var injection in agent
-- Regenerate nginx on all nodes when daemon is created/updated/deleted/moved
+### Phase 5: Cross-Node Nginx Proxy ✅
+- `DaemonProxyInfo` includes `TargetIP` and `ProxyURL` (pre-formatted)
+- Nginx template: `proxy_pass {{ .ProxyURL }}` (handles IPv6 bracket notation)
+- `$HOST` and `$PORT` env vars auto-injected in supervisord config when proxy_path is set
+- Nginx regenerated on all nodes when daemon is created/updated/deleted
+- ULA computed via `core.ComputeTenantULA(clusterID, nodeShardIndex, tenantUID)`
 
 ### Phase 6: Failover
 - Detect node failure (health checks)

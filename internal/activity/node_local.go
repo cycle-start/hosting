@@ -56,8 +56,9 @@ type NodeLocal struct {
 	s3       *agent.S3Manager
 	ssh      *agent.SSHManager
 	cron     *agent.CronManager
-	daemon   *agent.DaemonManager
-	runtimes map[string]runtime.Manager
+	daemon    *agent.DaemonManager
+	tenantULA *agent.TenantULAManager
+	runtimes  map[string]runtime.Manager
 }
 
 // NewNodeLocal creates a new NodeLocal activity struct.
@@ -72,20 +73,22 @@ func NewNodeLocal(
 	ssh *agent.SSHManager,
 	cron *agent.CronManager,
 	daemon *agent.DaemonManager,
+	tenantULA *agent.TenantULAManager,
 	runtimes map[string]runtime.Manager,
 ) *NodeLocal {
 	return &NodeLocal{
-		logger:   logger.With().Str("component", "node-local-activity").Logger(),
-		tenant:   tenant,
-		webroot:  webroot,
-		nginx:    nginx,
-		database: database,
-		valkey:   valkey,
-		s3:       s3,
-		ssh:      ssh,
-		cron:     cron,
-		daemon:   daemon,
-		runtimes: runtimes,
+		logger:    logger.With().Str("component", "node-local-activity").Logger(),
+		tenant:    tenant,
+		webroot:   webroot,
+		nginx:     nginx,
+		database:  database,
+		valkey:    valkey,
+		s3:        s3,
+		ssh:       ssh,
+		cron:      cron,
+		daemon:    daemon,
+		tenantULA: tenantULA,
+		runtimes:  runtimes,
 	}
 }
 
@@ -737,6 +740,7 @@ func (a *NodeLocal) CreateDaemonConfig(ctx context.Context, params CreateDaemonP
 		Name:         params.Name,
 		Command:      params.Command,
 		ProxyPort:    params.ProxyPort,
+		HostIP:       params.HostIP,
 		NumProcs:     params.NumProcs,
 		StopSignal:   params.StopSignal,
 		StopWaitSecs: params.StopWaitSecs,
@@ -762,6 +766,7 @@ func (a *NodeLocal) UpdateDaemonConfig(ctx context.Context, params UpdateDaemonP
 		Name:         params.Name,
 		Command:      params.Command,
 		ProxyPort:    params.ProxyPort,
+		HostIP:       params.HostIP,
 		NumProcs:     params.NumProcs,
 		StopSignal:   params.StopSignal,
 		StopWaitSecs: params.StopWaitSecs,
@@ -807,6 +812,34 @@ func (a *NodeLocal) DisableDaemon(ctx context.Context, params DaemonEnableParams
 		TenantName:  params.TenantName,
 		WebrootName: params.WebrootName,
 		Name:        params.Name,
+	})
+}
+
+// --------------------------------------------------------------------------
+// Tenant ULA address activities
+// --------------------------------------------------------------------------
+
+// ConfigureTenantAddresses adds the tenant's ULA IPv6 address to tenant0 and
+// configures nftables binding restrictions.
+func (a *NodeLocal) ConfigureTenantAddresses(ctx context.Context, params ConfigureTenantAddressesParams) error {
+	a.logger.Info().Str("tenant", params.TenantName).Int("uid", params.TenantUID).Msg("ConfigureTenantAddresses")
+	return a.tenantULA.Configure(ctx, &agent.TenantULAInfo{
+		TenantName:   params.TenantName,
+		TenantUID:    params.TenantUID,
+		ClusterID:    params.ClusterID,
+		NodeShardIdx: params.NodeShardIdx,
+	})
+}
+
+// RemoveTenantAddresses removes the tenant's ULA IPv6 address from tenant0 and
+// cleans up nftables binding restrictions.
+func (a *NodeLocal) RemoveTenantAddresses(ctx context.Context, params ConfigureTenantAddressesParams) error {
+	a.logger.Info().Str("tenant", params.TenantName).Int("uid", params.TenantUID).Msg("RemoveTenantAddresses")
+	return a.tenantULA.Remove(ctx, &agent.TenantULAInfo{
+		TenantName:   params.TenantName,
+		TenantUID:    params.TenantUID,
+		ClusterID:    params.ClusterID,
+		NodeShardIdx: params.NodeShardIdx,
 	})
 }
 

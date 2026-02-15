@@ -22,6 +22,7 @@ type DaemonInfo struct {
 	Name         string
 	Command      string
 	ProxyPort    *int
+	HostIP       string // Tenant's ULA address on the daemon's assigned node (e.g. "fd00:1:2::a")
 	NumProcs     int
 	StopSignal   string
 	StopWaitSecs int
@@ -68,6 +69,9 @@ func (m *DaemonManager) Configure(ctx context.Context, info *DaemonInfo) error {
 	}
 	if info.ProxyPort != nil {
 		env["PORT"] = fmt.Sprintf("%d", *info.ProxyPort)
+		if info.HostIP != "" {
+			env["HOST"] = info.HostIP
+		}
 	}
 
 	data := daemonConfigData{

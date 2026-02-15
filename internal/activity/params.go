@@ -276,6 +276,7 @@ type CreateDaemonParams struct {
 	Name         string
 	Command      string
 	ProxyPort    *int
+	HostIP       string // Tenant's ULA address on the daemon's assigned node
 	NumProcs     int
 	StopSignal   string
 	StopWaitSecs int
@@ -321,6 +322,14 @@ type ConfigureReplicationParams struct {
 	PrimaryHost  string
 	ReplUser     string
 	ReplPassword string
+}
+
+// ConfigureTenantAddressesParams holds parameters for configuring tenant ULA addresses on a node.
+type ConfigureTenantAddressesParams struct {
+	TenantName   string
+	TenantUID    int
+	ClusterID    string
+	NodeShardIdx int
 }
 
 // UpdateShardConfigParams holds parameters for updating a shard's config JSON.

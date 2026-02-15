@@ -53,6 +53,12 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		return err
 	}
 
+	// Determine cluster ID from nodes.
+	clusterID := ""
+	if len(nodes) > 0 {
+		clusterID = nodes[0].ClusterID
+	}
+
 	// Create tenant on each node in the shard.
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
@@ -78,6 +84,21 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		if err != nil {
 			_ = setResourceFailed(ctx, "tenants", tenantID, err)
 			return err
+		}
+
+		// Configure tenant ULA addresses for daemon networking.
+		if node.ShardIndex != nil {
+			err = workflow.ExecuteActivity(nodeCtx, "ConfigureTenantAddresses",
+				activity.ConfigureTenantAddressesParams{
+					TenantName:   tenant.Name,
+					TenantUID:    tenant.UID,
+					ClusterID:    clusterID,
+					NodeShardIdx: *node.ShardIndex,
+				}).Get(ctx, nil)
+			if err != nil {
+				_ = setResourceFailed(ctx, "tenants", tenantID, err)
+				return err
+			}
 		}
 	}
 
@@ -313,9 +334,30 @@ func DeleteTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		return err
 	}
 
+	// Determine cluster ID from nodes.
+	deleteClusterID := ""
+	if len(nodes) > 0 {
+		deleteClusterID = nodes[0].ClusterID
+	}
+
 	// Delete tenant on each node in the shard.
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
+
+		// Remove tenant ULA addresses before deleting the tenant.
+		if node.ShardIndex != nil {
+			err = workflow.ExecuteActivity(nodeCtx, "RemoveTenantAddresses",
+				activity.ConfigureTenantAddressesParams{
+					TenantName:   tenant.Name,
+					TenantUID:    tenant.UID,
+					ClusterID:    deleteClusterID,
+					NodeShardIdx: *node.ShardIndex,
+				}).Get(ctx, nil)
+			if err != nil {
+				_ = setResourceFailed(ctx, "tenants", tenantID, err)
+				return err
+			}
+		}
 
 		// Remove SSH config before deleting the tenant.
 		err = workflow.ExecuteActivity(nodeCtx, "RemoveSSHConfig", tenant.Name).Get(ctx, nil)
