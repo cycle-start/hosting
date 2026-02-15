@@ -115,9 +115,10 @@ func TestS3BucketService_GetByID_Success(t *testing.T) {
 		*(dest[5].(*int64)) = 1073741824
 		*(dest[6].(*string)) = model.StatusActive
 		*(dest[7].(**string)) = nil // status_message
-		*(dest[8].(*time.Time)) = now
+		*(dest[8].(*string)) = ""  // suspend_reason
 		*(dest[9].(*time.Time)) = now
-		*(dest[10].(**string)) = &shardName
+		*(dest[10].(*time.Time)) = now
+		*(dest[11].(**string)) = &shardName
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -180,9 +181,10 @@ func TestS3BucketService_ListByTenant_Success(t *testing.T) {
 			*(dest[5].(*int64)) = 1073741824
 			*(dest[6].(*string)) = model.StatusActive
 			*(dest[7].(**string)) = nil // status_message
-			*(dest[8].(*time.Time)) = now
+			*(dest[8].(*string)) = ""  // suspend_reason
 			*(dest[9].(*time.Time)) = now
-			*(dest[10].(**string)) = &shardName
+			*(dest[10].(*time.Time)) = now
+			*(dest[11].(**string)) = &shardName
 			return nil
 		},
 	)

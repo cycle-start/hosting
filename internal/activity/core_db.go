@@ -62,6 +62,95 @@ func (a *CoreDB) UpdateResourceStatus(ctx context.Context, params UpdateResource
 	return err
 }
 
+// SuspendResourceParams holds the parameters for SuspendResource and UnsuspendResource.
+type SuspendResourceParams struct {
+	Table  string `json:"table"`
+	ID     string `json:"id"`
+	Reason string `json:"reason"`
+}
+
+// SuspendResource sets a resource to suspended status with a reason.
+func (a *CoreDB) SuspendResource(ctx context.Context, params SuspendResourceParams) error {
+	query := fmt.Sprintf("UPDATE %s SET status = $1, suspend_reason = $2, updated_at = now() WHERE id = $3", params.Table)
+	_, err := a.db.Exec(ctx, query, model.StatusSuspended, params.Reason, params.ID)
+	return err
+}
+
+// UnsuspendResource sets a resource back to active status and clears the suspend reason.
+func (a *CoreDB) UnsuspendResource(ctx context.Context, params SuspendResourceParams) error {
+	query := fmt.Sprintf("UPDATE %s SET status = $1, suspend_reason = '', updated_at = now() WHERE id = $2", params.Table)
+	_, err := a.db.Exec(ctx, query, model.StatusActive, params.ID)
+	return err
+}
+
+// ListValkeyInstancesByTenantID retrieves all valkey instances for a tenant.
+func (a *CoreDB) ListValkeyInstancesByTenantID(ctx context.Context, tenantID string) ([]model.ValkeyInstance, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, status_message, suspend_reason, created_at, updated_at
+		 FROM valkey_instances WHERE tenant_id = $1`, tenantID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list valkey instances by tenant: %w", err)
+	}
+	defer rows.Close()
+
+	var instances []model.ValkeyInstance
+	for rows.Next() {
+		var v model.ValkeyInstance
+		if err := rows.Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB,
+			&v.Password, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan valkey instance row: %w", err)
+		}
+		instances = append(instances, v)
+	}
+	return instances, rows.Err()
+}
+
+// ListS3BucketsByTenantID retrieves all S3 buckets for a tenant.
+func (a *CoreDB) ListS3BucketsByTenantID(ctx context.Context, tenantID string) ([]model.S3Bucket, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, tenant_id, name, shard_id, public, quota_bytes, status, status_message, suspend_reason, created_at, updated_at
+		 FROM s3_buckets WHERE tenant_id = $1`, tenantID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list s3 buckets by tenant: %w", err)
+	}
+	defer rows.Close()
+
+	var buckets []model.S3Bucket
+	for rows.Next() {
+		var b model.S3Bucket
+		if err := rows.Scan(&b.ID, &b.TenantID, &b.Name, &b.ShardID,
+			&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.SuspendReason, &b.CreatedAt, &b.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan s3 bucket row: %w", err)
+		}
+		buckets = append(buckets, b)
+	}
+	return buckets, rows.Err()
+}
+
+// ListZonesByTenantID retrieves all zones for a tenant.
+func (a *CoreDB) ListZonesByTenantID(ctx context.Context, tenantID string) ([]model.Zone, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, brand_id, tenant_id, name, region_id, status, status_message, suspend_reason, created_at, updated_at
+		 FROM zones WHERE tenant_id = $1`, tenantID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list zones by tenant: %w", err)
+	}
+	defer rows.Close()
+
+	var zones []model.Zone
+	for rows.Next() {
+		var z model.Zone
+		if err := rows.Scan(&z.ID, &z.BrandID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.StatusMessage, &z.SuspendReason, &z.CreatedAt, &z.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan zone row: %w", err)
+		}
+		zones = append(zones, z)
+	}
+	return zones, rows.Err()
+}
+
 // GetBrandByID retrieves a brand by its ID.
 func (a *CoreDB) GetBrandByID(ctx context.Context, id string) (*model.Brand, error) {
 	var b model.Brand
@@ -81,9 +170,9 @@ func (a *CoreDB) GetBrandByID(ctx context.Context, id string) (*model.Brand, err
 func (a *CoreDB) GetTenantByID(ctx context.Context, id string) (*model.Tenant, error) {
 	var t model.Tenant
 	err := a.db.QueryRow(ctx,
-		`SELECT id, name, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, ssh_enabled, disk_quota_bytes, status, status_message, created_at, updated_at
+		`SELECT id, name, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, ssh_enabled, disk_quota_bytes, status, status_message, suspend_reason, created_at, updated_at
 		 FROM tenants WHERE id = $1`, id,
-	).Scan(&t.ID, &t.Name, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.SSHEnabled, &t.DiskQuotaBytes, &t.Status, &t.StatusMessage, &t.CreatedAt, &t.UpdatedAt)
+	).Scan(&t.ID, &t.Name, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.SSHEnabled, &t.DiskQuotaBytes, &t.Status, &t.StatusMessage, &t.SuspendReason, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get tenant by id: %w", err)
 	}
@@ -94,9 +183,9 @@ func (a *CoreDB) GetTenantByID(ctx context.Context, id string) (*model.Tenant, e
 func (a *CoreDB) GetWebrootByID(ctx context.Context, id string) (*model.Webroot, error) {
 	var w model.Webroot
 	err := a.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, status, status_message, created_at, updated_at
+		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, status, status_message, suspend_reason, created_at, updated_at
 		 FROM webroots WHERE id = $1`, id,
-	).Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion, &w.RuntimeConfig, &w.PublicFolder, &w.Status, &w.StatusMessage, &w.CreatedAt, &w.UpdatedAt)
+	).Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion, &w.RuntimeConfig, &w.PublicFolder, &w.Status, &w.StatusMessage, &w.SuspendReason, &w.CreatedAt, &w.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get webroot by id: %w", err)
 	}
@@ -120,9 +209,9 @@ func (a *CoreDB) GetFQDNByID(ctx context.Context, id string) (*model.FQDN, error
 func (a *CoreDB) GetZoneByID(ctx context.Context, id string) (*model.Zone, error) {
 	var z model.Zone
 	err := a.db.QueryRow(ctx,
-		`SELECT id, brand_id, tenant_id, name, region_id, status, status_message, created_at, updated_at
+		`SELECT id, brand_id, tenant_id, name, region_id, status, status_message, suspend_reason, created_at, updated_at
 		 FROM zones WHERE id = $1`, id,
-	).Scan(&z.ID, &z.BrandID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.StatusMessage, &z.CreatedAt, &z.UpdatedAt)
+	).Scan(&z.ID, &z.BrandID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.StatusMessage, &z.SuspendReason, &z.CreatedAt, &z.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get zone by id: %w", err)
 	}
@@ -133,9 +222,9 @@ func (a *CoreDB) GetZoneByID(ctx context.Context, id string) (*model.Zone, error
 func (a *CoreDB) GetZoneByName(ctx context.Context, name string) (*model.Zone, error) {
 	var z model.Zone
 	err := a.db.QueryRow(ctx,
-		`SELECT id, brand_id, tenant_id, name, region_id, status, status_message, created_at, updated_at
+		`SELECT id, brand_id, tenant_id, name, region_id, status, status_message, suspend_reason, created_at, updated_at
 		 FROM zones WHERE name = $1 AND status = $2`, name, model.StatusActive,
-	).Scan(&z.ID, &z.BrandID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.StatusMessage, &z.CreatedAt, &z.UpdatedAt)
+	).Scan(&z.ID, &z.BrandID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.StatusMessage, &z.SuspendReason, &z.CreatedAt, &z.UpdatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -162,9 +251,9 @@ func (a *CoreDB) GetZoneRecordByID(ctx context.Context, id string) (*model.ZoneR
 func (a *CoreDB) GetDatabaseByID(ctx context.Context, id string) (*model.Database, error) {
 	var d model.Database
 	err := a.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, shard_id, node_id, status, status_message, created_at, updated_at
+		`SELECT id, tenant_id, name, shard_id, node_id, status, status_message, suspend_reason, created_at, updated_at
 		 FROM databases WHERE id = $1`, id,
-	).Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt)
+	).Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID, &d.Status, &d.StatusMessage, &d.SuspendReason, &d.CreatedAt, &d.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get database by id: %w", err)
 	}
@@ -307,7 +396,7 @@ func (a *CoreDB) CreateCertificate(ctx context.Context, params CreateCertificate
 // ListTenantsByShard retrieves all tenants assigned to a shard.
 func (a *CoreDB) ListTenantsByShard(ctx context.Context, shardID string) ([]model.Tenant, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, name, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, ssh_enabled, disk_quota_bytes, status, status_message, created_at, updated_at
+		`SELECT id, name, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, ssh_enabled, disk_quota_bytes, status, status_message, suspend_reason, created_at, updated_at
 		 FROM tenants WHERE shard_id = $1 ORDER BY id`, shardID,
 	)
 	if err != nil {
@@ -318,7 +407,7 @@ func (a *CoreDB) ListTenantsByShard(ctx context.Context, shardID string) ([]mode
 	var tenants []model.Tenant
 	for rows.Next() {
 		var t model.Tenant
-		if err := rows.Scan(&t.ID, &t.Name, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.SSHEnabled, &t.DiskQuotaBytes, &t.Status, &t.StatusMessage, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.SSHEnabled, &t.DiskQuotaBytes, &t.Status, &t.StatusMessage, &t.SuspendReason, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan tenant row: %w", err)
 		}
 		tenants = append(tenants, t)
@@ -409,7 +498,7 @@ func (a *CoreDB) UpdateValkeyInstanceShardID(ctx context.Context, instanceID str
 // ListWebrootsByTenantID retrieves all webroots for a tenant.
 func (a *CoreDB) ListWebrootsByTenantID(ctx context.Context, tenantID string) ([]model.Webroot, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, env_shell_source, status, status_message, created_at, updated_at
+		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, env_shell_source, status, status_message, suspend_reason, created_at, updated_at
 		 FROM webroots WHERE tenant_id = $1`, tenantID,
 	)
 	if err != nil {
@@ -420,7 +509,7 @@ func (a *CoreDB) ListWebrootsByTenantID(ctx context.Context, tenantID string) ([
 	var webroots []model.Webroot
 	for rows.Next() {
 		var w model.Webroot
-		if err := rows.Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion, &w.RuntimeConfig, &w.PublicFolder, &w.EnvFileName, &w.EnvShellSource, &w.Status, &w.StatusMessage, &w.CreatedAt, &w.UpdatedAt); err != nil {
+		if err := rows.Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion, &w.RuntimeConfig, &w.PublicFolder, &w.EnvFileName, &w.EnvShellSource, &w.Status, &w.StatusMessage, &w.SuspendReason, &w.CreatedAt, &w.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan webroot row: %w", err)
 		}
 		webroots = append(webroots, w)
@@ -431,7 +520,7 @@ func (a *CoreDB) ListWebrootsByTenantID(ctx context.Context, tenantID string) ([
 // ListDatabasesByTenantID retrieves all databases for a tenant.
 func (a *CoreDB) ListDatabasesByTenantID(ctx context.Context, tenantID string) ([]model.Database, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, name, shard_id, node_id, status, status_message, created_at, updated_at
+		`SELECT id, tenant_id, name, shard_id, node_id, status, status_message, suspend_reason, created_at, updated_at
 		 FROM databases WHERE tenant_id = $1`, tenantID,
 	)
 	if err != nil {
@@ -442,7 +531,7 @@ func (a *CoreDB) ListDatabasesByTenantID(ctx context.Context, tenantID string) (
 	var databases []model.Database
 	for rows.Next() {
 		var d model.Database
-		if err := rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID, &d.Status, &d.StatusMessage, &d.SuspendReason, &d.CreatedAt, &d.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan database row: %w", err)
 		}
 		databases = append(databases, d)
@@ -454,10 +543,10 @@ func (a *CoreDB) ListDatabasesByTenantID(ctx context.Context, tenantID string) (
 func (a *CoreDB) GetValkeyInstanceByID(ctx context.Context, id string) (*model.ValkeyInstance, error) {
 	var v model.ValkeyInstance
 	err := a.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, status_message, created_at, updated_at
+		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, status_message, suspend_reason, created_at, updated_at
 		 FROM valkey_instances WHERE id = $1`, id,
 	).Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB,
-		&v.Password, &v.Status, &v.StatusMessage, &v.CreatedAt, &v.UpdatedAt)
+		&v.Password, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get valkey instance by id: %w", err)
 	}
@@ -528,7 +617,7 @@ func (a *CoreDB) CreateNode(ctx context.Context, n *model.Node) error {
 // ListDatabasesByShard retrieves all databases assigned to a shard (excluding deleted).
 func (a *CoreDB) ListDatabasesByShard(ctx context.Context, shardID string) ([]model.Database, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, name, shard_id, node_id, status, status_message, created_at, updated_at
+		`SELECT id, tenant_id, name, shard_id, node_id, status, status_message, suspend_reason, created_at, updated_at
 		 FROM databases WHERE shard_id = $1 ORDER BY name`, shardID,
 	)
 	if err != nil {
@@ -539,7 +628,7 @@ func (a *CoreDB) ListDatabasesByShard(ctx context.Context, shardID string) ([]mo
 	var databases []model.Database
 	for rows.Next() {
 		var d model.Database
-		if err := rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID, &d.Status, &d.StatusMessage, &d.SuspendReason, &d.CreatedAt, &d.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan database row: %w", err)
 		}
 		databases = append(databases, d)
@@ -550,7 +639,7 @@ func (a *CoreDB) ListDatabasesByShard(ctx context.Context, shardID string) ([]mo
 // ListValkeyInstancesByShard retrieves all valkey instances assigned to a shard (excluding deleted).
 func (a *CoreDB) ListValkeyInstancesByShard(ctx context.Context, shardID string) ([]model.ValkeyInstance, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, status_message, created_at, updated_at
+		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, status_message, suspend_reason, created_at, updated_at
 		 FROM valkey_instances WHERE shard_id = $1 ORDER BY name`, shardID,
 	)
 	if err != nil {
@@ -561,7 +650,7 @@ func (a *CoreDB) ListValkeyInstancesByShard(ctx context.Context, shardID string)
 	var instances []model.ValkeyInstance
 	for rows.Next() {
 		var v model.ValkeyInstance
-		if err := rows.Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB, &v.Password, &v.Status, &v.StatusMessage, &v.CreatedAt, &v.UpdatedAt); err != nil {
+		if err := rows.Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB, &v.Password, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan valkey instance row: %w", err)
 		}
 		instances = append(instances, v)
@@ -817,10 +906,10 @@ func (a *CoreDB) DeleteOldAuditLogs(ctx context.Context, retentionDays int) (int
 func (a *CoreDB) GetS3BucketByID(ctx context.Context, id string) (*model.S3Bucket, error) {
 	var b model.S3Bucket
 	err := a.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, shard_id, public, quota_bytes, status, status_message, created_at, updated_at
+		`SELECT id, tenant_id, name, shard_id, public, quota_bytes, status, status_message, suspend_reason, created_at, updated_at
 		 FROM s3_buckets WHERE id = $1`, id,
 	).Scan(&b.ID, &b.TenantID, &b.Name, &b.ShardID,
-		&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.CreatedAt, &b.UpdatedAt)
+		&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.SuspendReason, &b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get s3 bucket by id: %w", err)
 	}
@@ -847,13 +936,13 @@ func (a *CoreDB) GetWebrootContext(ctx context.Context, webrootID string) (*Webr
 
 	// JOIN webroots with tenants.
 	err := a.db.QueryRow(ctx,
-		`SELECT w.id, w.tenant_id, w.name, w.runtime, w.runtime_version, w.runtime_config, w.public_folder, w.env_file_name, w.env_shell_source, w.status, w.status_message, w.created_at, w.updated_at,
-		        t.id, t.name, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.created_at, t.updated_at
+		`SELECT w.id, w.tenant_id, w.name, w.runtime, w.runtime_version, w.runtime_config, w.public_folder, w.env_file_name, w.env_shell_source, w.status, w.status_message, w.suspend_reason, w.created_at, w.updated_at,
+		        t.id, t.name, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.suspend_reason, t.created_at, t.updated_at
 		 FROM webroots w
 		 JOIN tenants t ON t.id = w.tenant_id
 		 WHERE w.id = $1`, webrootID,
-	).Scan(&wc.Webroot.ID, &wc.Webroot.TenantID, &wc.Webroot.Name, &wc.Webroot.Runtime, &wc.Webroot.RuntimeVersion, &wc.Webroot.RuntimeConfig, &wc.Webroot.PublicFolder, &wc.Webroot.EnvFileName, &wc.Webroot.EnvShellSource, &wc.Webroot.Status, &wc.Webroot.StatusMessage, &wc.Webroot.CreatedAt, &wc.Webroot.UpdatedAt,
-		&wc.Tenant.ID, &wc.Tenant.Name, &wc.Tenant.BrandID, &wc.Tenant.RegionID, &wc.Tenant.ClusterID, &wc.Tenant.ShardID, &wc.Tenant.UID, &wc.Tenant.SFTPEnabled, &wc.Tenant.SSHEnabled, &wc.Tenant.DiskQuotaBytes, &wc.Tenant.Status, &wc.Tenant.StatusMessage, &wc.Tenant.CreatedAt, &wc.Tenant.UpdatedAt)
+	).Scan(&wc.Webroot.ID, &wc.Webroot.TenantID, &wc.Webroot.Name, &wc.Webroot.Runtime, &wc.Webroot.RuntimeVersion, &wc.Webroot.RuntimeConfig, &wc.Webroot.PublicFolder, &wc.Webroot.EnvFileName, &wc.Webroot.EnvShellSource, &wc.Webroot.Status, &wc.Webroot.StatusMessage, &wc.Webroot.SuspendReason, &wc.Webroot.CreatedAt, &wc.Webroot.UpdatedAt,
+		&wc.Tenant.ID, &wc.Tenant.Name, &wc.Tenant.BrandID, &wc.Tenant.RegionID, &wc.Tenant.ClusterID, &wc.Tenant.ShardID, &wc.Tenant.UID, &wc.Tenant.SFTPEnabled, &wc.Tenant.SSHEnabled, &wc.Tenant.DiskQuotaBytes, &wc.Tenant.Status, &wc.Tenant.StatusMessage, &wc.Tenant.SuspendReason, &wc.Tenant.CreatedAt, &wc.Tenant.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get webroot context: %w", err)
 	}
@@ -884,15 +973,15 @@ func (a *CoreDB) GetFQDNContext(ctx context.Context, fqdnID string) (*FQDNContex
 	// JOIN fqdns -> webroots -> tenants.
 	err := a.db.QueryRow(ctx,
 		`SELECT f.id, f.fqdn, f.webroot_id, f.ssl_enabled, f.status, f.status_message, f.created_at, f.updated_at,
-		        w.id, w.tenant_id, w.name, w.runtime, w.runtime_version, w.runtime_config, w.public_folder, w.env_file_name, w.env_shell_source, w.status, w.status_message, w.created_at, w.updated_at,
-		        t.id, t.name, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.created_at, t.updated_at
+		        w.id, w.tenant_id, w.name, w.runtime, w.runtime_version, w.runtime_config, w.public_folder, w.env_file_name, w.env_shell_source, w.status, w.status_message, w.suspend_reason, w.created_at, w.updated_at,
+		        t.id, t.name, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.suspend_reason, t.created_at, t.updated_at
 		 FROM fqdns f
 		 JOIN webroots w ON w.id = f.webroot_id
 		 JOIN tenants t ON t.id = w.tenant_id
 		 WHERE f.id = $1`, fqdnID,
 	).Scan(&fc.FQDN.ID, &fc.FQDN.FQDN, &fc.FQDN.WebrootID, &fc.FQDN.SSLEnabled, &fc.FQDN.Status, &fc.FQDN.StatusMessage, &fc.FQDN.CreatedAt, &fc.FQDN.UpdatedAt,
-		&fc.Webroot.ID, &fc.Webroot.TenantID, &fc.Webroot.Name, &fc.Webroot.Runtime, &fc.Webroot.RuntimeVersion, &fc.Webroot.RuntimeConfig, &fc.Webroot.PublicFolder, &fc.Webroot.EnvFileName, &fc.Webroot.EnvShellSource, &fc.Webroot.Status, &fc.Webroot.StatusMessage, &fc.Webroot.CreatedAt, &fc.Webroot.UpdatedAt,
-		&fc.Tenant.ID, &fc.Tenant.Name, &fc.Tenant.BrandID, &fc.Tenant.RegionID, &fc.Tenant.ClusterID, &fc.Tenant.ShardID, &fc.Tenant.UID, &fc.Tenant.SFTPEnabled, &fc.Tenant.SSHEnabled, &fc.Tenant.DiskQuotaBytes, &fc.Tenant.Status, &fc.Tenant.StatusMessage, &fc.Tenant.CreatedAt, &fc.Tenant.UpdatedAt)
+		&fc.Webroot.ID, &fc.Webroot.TenantID, &fc.Webroot.Name, &fc.Webroot.Runtime, &fc.Webroot.RuntimeVersion, &fc.Webroot.RuntimeConfig, &fc.Webroot.PublicFolder, &fc.Webroot.EnvFileName, &fc.Webroot.EnvShellSource, &fc.Webroot.Status, &fc.Webroot.StatusMessage, &fc.Webroot.SuspendReason, &fc.Webroot.CreatedAt, &fc.Webroot.UpdatedAt,
+		&fc.Tenant.ID, &fc.Tenant.Name, &fc.Tenant.BrandID, &fc.Tenant.RegionID, &fc.Tenant.ClusterID, &fc.Tenant.ShardID, &fc.Tenant.UID, &fc.Tenant.SFTPEnabled, &fc.Tenant.SSHEnabled, &fc.Tenant.DiskQuotaBytes, &fc.Tenant.Status, &fc.Tenant.StatusMessage, &fc.Tenant.SuspendReason, &fc.Tenant.CreatedAt, &fc.Tenant.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get fqdn context: %w", err)
 	}
@@ -936,12 +1025,12 @@ func (a *CoreDB) GetDatabaseUserContext(ctx context.Context, userID string) (*Da
 	// JOIN database_users with databases.
 	err := a.db.QueryRow(ctx,
 		`SELECT u.id, u.database_id, u.username, u.password, u.privileges, u.status, u.status_message, u.created_at, u.updated_at,
-		        d.id, d.tenant_id, d.name, d.shard_id, d.node_id, d.status, d.status_message, d.created_at, d.updated_at
+		        d.id, d.tenant_id, d.name, d.shard_id, d.node_id, d.status, d.status_message, d.suspend_reason, d.created_at, d.updated_at
 		 FROM database_users u
 		 JOIN databases d ON d.id = u.database_id
 		 WHERE u.id = $1`, userID,
 	).Scan(&dc.User.ID, &dc.User.DatabaseID, &dc.User.Username, &dc.User.Password, &dc.User.Privileges, &dc.User.Status, &dc.User.StatusMessage, &dc.User.CreatedAt, &dc.User.UpdatedAt,
-		&dc.Database.ID, &dc.Database.TenantID, &dc.Database.Name, &dc.Database.ShardID, &dc.Database.NodeID, &dc.Database.Status, &dc.Database.StatusMessage, &dc.Database.CreatedAt, &dc.Database.UpdatedAt)
+		&dc.Database.ID, &dc.Database.TenantID, &dc.Database.Name, &dc.Database.ShardID, &dc.Database.NodeID, &dc.Database.Status, &dc.Database.StatusMessage, &dc.Database.SuspendReason, &dc.Database.CreatedAt, &dc.Database.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get database user context: %w", err)
 	}
@@ -965,12 +1054,12 @@ func (a *CoreDB) GetValkeyUserContext(ctx context.Context, userID string) (*Valk
 	// JOIN valkey_users with valkey_instances.
 	err := a.db.QueryRow(ctx,
 		`SELECT u.id, u.valkey_instance_id, u.username, u.password, u.privileges, u.key_pattern, u.status, u.status_message, u.created_at, u.updated_at,
-		        i.id, i.tenant_id, i.name, i.shard_id, i.port, i.max_memory_mb, i.password, i.status, i.status_message, i.created_at, i.updated_at
+		        i.id, i.tenant_id, i.name, i.shard_id, i.port, i.max_memory_mb, i.password, i.status, i.status_message, i.suspend_reason, i.created_at, i.updated_at
 		 FROM valkey_users u
 		 JOIN valkey_instances i ON i.id = u.valkey_instance_id
 		 WHERE u.id = $1`, userID,
 	).Scan(&vc.User.ID, &vc.User.ValkeyInstanceID, &vc.User.Username, &vc.User.Password, &vc.User.Privileges, &vc.User.KeyPattern, &vc.User.Status, &vc.User.StatusMessage, &vc.User.CreatedAt, &vc.User.UpdatedAt,
-		&vc.Instance.ID, &vc.Instance.TenantID, &vc.Instance.Name, &vc.Instance.ShardID, &vc.Instance.Port, &vc.Instance.MaxMemoryMB, &vc.Instance.Password, &vc.Instance.Status, &vc.Instance.StatusMessage, &vc.Instance.CreatedAt, &vc.Instance.UpdatedAt)
+		&vc.Instance.ID, &vc.Instance.TenantID, &vc.Instance.Name, &vc.Instance.ShardID, &vc.Instance.Port, &vc.Instance.MaxMemoryMB, &vc.Instance.Password, &vc.Instance.Status, &vc.Instance.StatusMessage, &vc.Instance.SuspendReason, &vc.Instance.CreatedAt, &vc.Instance.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get valkey user context: %w", err)
 	}
@@ -1014,12 +1103,12 @@ func (a *CoreDB) GetBackupContext(ctx context.Context, backupID string) (*Backup
 	// JOIN backups with tenants.
 	err := a.db.QueryRow(ctx,
 		`SELECT b.id, b.tenant_id, b.type, b.source_id, b.source_name, b.storage_path, b.size_bytes, b.status, b.status_message, b.started_at, b.completed_at, b.created_at, b.updated_at,
-		        t.id, t.name, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.created_at, t.updated_at
+		        t.id, t.name, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.suspend_reason, t.created_at, t.updated_at
 		 FROM backups b
 		 JOIN tenants t ON t.id = b.tenant_id
 		 WHERE b.id = $1`, backupID,
 	).Scan(&bc.Backup.ID, &bc.Backup.TenantID, &bc.Backup.Type, &bc.Backup.SourceID, &bc.Backup.SourceName, &bc.Backup.StoragePath, &bc.Backup.SizeBytes, &bc.Backup.Status, &bc.Backup.StatusMessage, &bc.Backup.StartedAt, &bc.Backup.CompletedAt, &bc.Backup.CreatedAt, &bc.Backup.UpdatedAt,
-		&bc.Tenant.ID, &bc.Tenant.Name, &bc.Tenant.BrandID, &bc.Tenant.RegionID, &bc.Tenant.ClusterID, &bc.Tenant.ShardID, &bc.Tenant.UID, &bc.Tenant.SFTPEnabled, &bc.Tenant.SSHEnabled, &bc.Tenant.DiskQuotaBytes, &bc.Tenant.Status, &bc.Tenant.StatusMessage, &bc.Tenant.CreatedAt, &bc.Tenant.UpdatedAt)
+		&bc.Tenant.ID, &bc.Tenant.Name, &bc.Tenant.BrandID, &bc.Tenant.RegionID, &bc.Tenant.ClusterID, &bc.Tenant.ShardID, &bc.Tenant.UID, &bc.Tenant.SFTPEnabled, &bc.Tenant.SSHEnabled, &bc.Tenant.DiskQuotaBytes, &bc.Tenant.Status, &bc.Tenant.StatusMessage, &bc.Tenant.SuspendReason, &bc.Tenant.CreatedAt, &bc.Tenant.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get backup context: %w", err)
 	}
@@ -1043,12 +1132,12 @@ func (a *CoreDB) GetS3AccessKeyContext(ctx context.Context, keyID string) (*S3Ac
 	// JOIN s3_access_keys with s3_buckets.
 	err := a.db.QueryRow(ctx,
 		`SELECT k.id, k.s3_bucket_id, k.access_key_id, k.secret_access_key, k.permissions, k.status, k.status_message, k.created_at, k.updated_at,
-		        b.id, b.tenant_id, b.name, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.created_at, b.updated_at
+		        b.id, b.tenant_id, b.name, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.suspend_reason, b.created_at, b.updated_at
 		 FROM s3_access_keys k
 		 JOIN s3_buckets b ON b.id = k.s3_bucket_id
 		 WHERE k.id = $1`, keyID,
 	).Scan(&sc.Key.ID, &sc.Key.S3BucketID, &sc.Key.AccessKeyID, &sc.Key.SecretAccessKey, &sc.Key.Permissions, &sc.Key.Status, &sc.Key.StatusMessage, &sc.Key.CreatedAt, &sc.Key.UpdatedAt,
-		&sc.Bucket.ID, &sc.Bucket.TenantID, &sc.Bucket.Name, &sc.Bucket.ShardID, &sc.Bucket.Public, &sc.Bucket.QuotaBytes, &sc.Bucket.Status, &sc.Bucket.StatusMessage, &sc.Bucket.CreatedAt, &sc.Bucket.UpdatedAt)
+		&sc.Bucket.ID, &sc.Bucket.TenantID, &sc.Bucket.Name, &sc.Bucket.ShardID, &sc.Bucket.Public, &sc.Bucket.QuotaBytes, &sc.Bucket.Status, &sc.Bucket.StatusMessage, &sc.Bucket.SuspendReason, &sc.Bucket.CreatedAt, &sc.Bucket.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get s3 access key context: %w", err)
 	}
@@ -1174,15 +1263,15 @@ func (a *CoreDB) GetCronJobContext(ctx context.Context, cronJobID string) (*Cron
 	// JOIN cron_jobs -> webroots -> tenants.
 	err := a.db.QueryRow(ctx,
 		`SELECT c.id, c.tenant_id, c.webroot_id, c.name, c.schedule, c.command, c.working_directory, c.enabled, c.timeout_seconds, c.max_memory_mb, c.status, c.status_message, c.created_at, c.updated_at,
-		        w.id, w.tenant_id, w.name, w.runtime, w.runtime_version, w.runtime_config, w.public_folder, w.status, w.status_message, w.created_at, w.updated_at,
-		        t.id, t.name, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.created_at, t.updated_at
+		        w.id, w.tenant_id, w.name, w.runtime, w.runtime_version, w.runtime_config, w.public_folder, w.status, w.status_message, w.suspend_reason, w.created_at, w.updated_at,
+		        t.id, t.name, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.suspend_reason, t.created_at, t.updated_at
 		 FROM cron_jobs c
 		 JOIN webroots w ON w.id = c.webroot_id
 		 JOIN tenants t ON t.id = c.tenant_id
 		 WHERE c.id = $1`, cronJobID,
 	).Scan(&cc.CronJob.ID, &cc.CronJob.TenantID, &cc.CronJob.WebrootID, &cc.CronJob.Name, &cc.CronJob.Schedule, &cc.CronJob.Command, &cc.CronJob.WorkingDirectory, &cc.CronJob.Enabled, &cc.CronJob.TimeoutSeconds, &cc.CronJob.MaxMemoryMB, &cc.CronJob.Status, &cc.CronJob.StatusMessage, &cc.CronJob.CreatedAt, &cc.CronJob.UpdatedAt,
-		&cc.Webroot.ID, &cc.Webroot.TenantID, &cc.Webroot.Name, &cc.Webroot.Runtime, &cc.Webroot.RuntimeVersion, &cc.Webroot.RuntimeConfig, &cc.Webroot.PublicFolder, &cc.Webroot.Status, &cc.Webroot.StatusMessage, &cc.Webroot.CreatedAt, &cc.Webroot.UpdatedAt,
-		&cc.Tenant.ID, &cc.Tenant.Name, &cc.Tenant.BrandID, &cc.Tenant.RegionID, &cc.Tenant.ClusterID, &cc.Tenant.ShardID, &cc.Tenant.UID, &cc.Tenant.SFTPEnabled, &cc.Tenant.SSHEnabled, &cc.Tenant.DiskQuotaBytes, &cc.Tenant.Status, &cc.Tenant.StatusMessage, &cc.Tenant.CreatedAt, &cc.Tenant.UpdatedAt)
+		&cc.Webroot.ID, &cc.Webroot.TenantID, &cc.Webroot.Name, &cc.Webroot.Runtime, &cc.Webroot.RuntimeVersion, &cc.Webroot.RuntimeConfig, &cc.Webroot.PublicFolder, &cc.Webroot.Status, &cc.Webroot.StatusMessage, &cc.Webroot.SuspendReason, &cc.Webroot.CreatedAt, &cc.Webroot.UpdatedAt,
+		&cc.Tenant.ID, &cc.Tenant.Name, &cc.Tenant.BrandID, &cc.Tenant.RegionID, &cc.Tenant.ClusterID, &cc.Tenant.ShardID, &cc.Tenant.UID, &cc.Tenant.SFTPEnabled, &cc.Tenant.SSHEnabled, &cc.Tenant.DiskQuotaBytes, &cc.Tenant.Status, &cc.Tenant.StatusMessage, &cc.Tenant.SuspendReason, &cc.Tenant.CreatedAt, &cc.Tenant.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get cron job context: %w", err)
 	}
@@ -1262,8 +1351,8 @@ func (a *CoreDB) GetDaemonContext(ctx context.Context, daemonID string) (*Daemon
 		`SELECT d.id, d.tenant_id, d.node_id, d.webroot_id, d.name, d.command, d.proxy_path, d.proxy_port,
 		        d.num_procs, d.stop_signal, d.stop_wait_secs, d.max_memory_mb, d.environment,
 		        d.enabled, d.status, d.status_message, d.created_at, d.updated_at,
-		        w.id, w.tenant_id, w.name, w.runtime, w.runtime_version, w.runtime_config, w.public_folder, w.status, w.status_message, w.created_at, w.updated_at,
-		        t.id, t.name, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.created_at, t.updated_at
+		        w.id, w.tenant_id, w.name, w.runtime, w.runtime_version, w.runtime_config, w.public_folder, w.status, w.status_message, w.suspend_reason, w.created_at, w.updated_at,
+		        t.id, t.name, t.brand_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.suspend_reason, t.created_at, t.updated_at
 		 FROM daemons d
 		 JOIN webroots w ON w.id = d.webroot_id
 		 JOIN tenants t ON t.id = d.tenant_id
@@ -1272,8 +1361,8 @@ func (a *CoreDB) GetDaemonContext(ctx context.Context, daemonID string) (*Daemon
 		&dc.Daemon.ProxyPath, &dc.Daemon.ProxyPort,
 		&dc.Daemon.NumProcs, &dc.Daemon.StopSignal, &dc.Daemon.StopWaitSecs, &dc.Daemon.MaxMemoryMB, &envJSON,
 		&dc.Daemon.Enabled, &dc.Daemon.Status, &dc.Daemon.StatusMessage, &dc.Daemon.CreatedAt, &dc.Daemon.UpdatedAt,
-		&dc.Webroot.ID, &dc.Webroot.TenantID, &dc.Webroot.Name, &dc.Webroot.Runtime, &dc.Webroot.RuntimeVersion, &dc.Webroot.RuntimeConfig, &dc.Webroot.PublicFolder, &dc.Webroot.Status, &dc.Webroot.StatusMessage, &dc.Webroot.CreatedAt, &dc.Webroot.UpdatedAt,
-		&dc.Tenant.ID, &dc.Tenant.Name, &dc.Tenant.BrandID, &dc.Tenant.RegionID, &dc.Tenant.ClusterID, &dc.Tenant.ShardID, &dc.Tenant.UID, &dc.Tenant.SFTPEnabled, &dc.Tenant.SSHEnabled, &dc.Tenant.DiskQuotaBytes, &dc.Tenant.Status, &dc.Tenant.StatusMessage, &dc.Tenant.CreatedAt, &dc.Tenant.UpdatedAt)
+		&dc.Webroot.ID, &dc.Webroot.TenantID, &dc.Webroot.Name, &dc.Webroot.Runtime, &dc.Webroot.RuntimeVersion, &dc.Webroot.RuntimeConfig, &dc.Webroot.PublicFolder, &dc.Webroot.Status, &dc.Webroot.StatusMessage, &dc.Webroot.SuspendReason, &dc.Webroot.CreatedAt, &dc.Webroot.UpdatedAt,
+		&dc.Tenant.ID, &dc.Tenant.Name, &dc.Tenant.BrandID, &dc.Tenant.RegionID, &dc.Tenant.ClusterID, &dc.Tenant.ShardID, &dc.Tenant.UID, &dc.Tenant.SFTPEnabled, &dc.Tenant.SSHEnabled, &dc.Tenant.DiskQuotaBytes, &dc.Tenant.Status, &dc.Tenant.StatusMessage, &dc.Tenant.SuspendReason, &dc.Tenant.CreatedAt, &dc.Tenant.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get daemon context: %w", err)
 	}
@@ -1373,7 +1462,7 @@ func (a *CoreDB) GetShardDesiredState(ctx context.Context, shardID string) (*Sha
 
 	// 2. Fetch all active webroots for those tenants.
 	wrRows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, env_shell_source, status, status_message, created_at, updated_at
+		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, env_shell_source, status, status_message, suspend_reason, created_at, updated_at
 		 FROM webroots WHERE tenant_id = ANY($1) AND status = $2`, tenantIDs, model.StatusActive)
 	if err != nil {
 		return nil, fmt.Errorf("batch list webroots: %w", err)
@@ -1383,7 +1472,7 @@ func (a *CoreDB) GetShardDesiredState(ctx context.Context, shardID string) (*Sha
 	var webrootIDs []string
 	for wrRows.Next() {
 		var w model.Webroot
-		if err := wrRows.Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion, &w.RuntimeConfig, &w.PublicFolder, &w.EnvFileName, &w.EnvShellSource, &w.Status, &w.StatusMessage, &w.CreatedAt, &w.UpdatedAt); err != nil {
+		if err := wrRows.Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion, &w.RuntimeConfig, &w.PublicFolder, &w.EnvFileName, &w.EnvShellSource, &w.Status, &w.StatusMessage, &w.SuspendReason, &w.CreatedAt, &w.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan webroot: %w", err)
 		}
 		result.Webroots[w.TenantID] = append(result.Webroots[w.TenantID], w)

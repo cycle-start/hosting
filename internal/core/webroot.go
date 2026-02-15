@@ -45,11 +45,11 @@ func (s *WebrootService) Create(ctx context.Context, webroot *model.Webroot) err
 func (s *WebrootService) GetByID(ctx context.Context, id string) (*model.Webroot, error) {
 	var w model.Webroot
 	err := s.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, env_shell_source, status, status_message, created_at, updated_at
+		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, env_shell_source, status, status_message, suspend_reason, created_at, updated_at
 		 FROM webroots WHERE id = $1`, id,
 	).Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion,
 		&w.RuntimeConfig, &w.PublicFolder, &w.EnvFileName, &w.EnvShellSource,
-		&w.Status, &w.StatusMessage, &w.CreatedAt, &w.UpdatedAt)
+		&w.Status, &w.StatusMessage, &w.SuspendReason, &w.CreatedAt, &w.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get webroot %s: %w", id, err)
 	}
@@ -57,7 +57,7 @@ func (s *WebrootService) GetByID(ctx context.Context, id string) (*model.Webroot
 }
 
 func (s *WebrootService) ListByTenant(ctx context.Context, tenantID string, limit int, cursor string) ([]model.Webroot, bool, error) {
-	query := `SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, env_shell_source, status, status_message, created_at, updated_at FROM webroots WHERE tenant_id = $1`
+	query := `SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, env_shell_source, status, status_message, suspend_reason, created_at, updated_at FROM webroots WHERE tenant_id = $1`
 	args := []any{tenantID}
 	argIdx := 2
 
@@ -82,7 +82,7 @@ func (s *WebrootService) ListByTenant(ctx context.Context, tenantID string, limi
 		var w model.Webroot
 		if err := rows.Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion,
 			&w.RuntimeConfig, &w.PublicFolder, &w.EnvFileName, &w.EnvShellSource,
-			&w.Status, &w.StatusMessage, &w.CreatedAt, &w.UpdatedAt); err != nil {
+			&w.Status, &w.StatusMessage, &w.SuspendReason, &w.CreatedAt, &w.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan webroot: %w", err)
 		}
 		webroots = append(webroots, w)

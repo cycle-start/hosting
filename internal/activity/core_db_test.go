@@ -103,8 +103,9 @@ func TestCoreDB_ListTenantsByShard_Success(t *testing.T) {
 			*(dest[9].(*int64)) = 0
 			*(dest[10].(*string)) = model.StatusActive
 			*(dest[11].(**string)) = nil
-			*(dest[12].(*time.Time)) = now
+			*(dest[12].(*string)) = ""
 			*(dest[13].(*time.Time)) = now
+			*(dest[14].(*time.Time)) = now
 			return nil
 		},
 		func(dest ...any) error {
@@ -120,8 +121,9 @@ func TestCoreDB_ListTenantsByShard_Success(t *testing.T) {
 			*(dest[9].(*int64)) = 1073741824
 			*(dest[10].(*string)) = model.StatusPending
 			*(dest[11].(**string)) = nil
-			*(dest[12].(*time.Time)) = now
+			*(dest[12].(*string)) = ""
 			*(dest[13].(*time.Time)) = now
+			*(dest[14].(*time.Time)) = now
 			return nil
 		},
 	)

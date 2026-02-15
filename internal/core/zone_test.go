@@ -114,9 +114,10 @@ func TestZoneService_GetByID_Success(t *testing.T) {
 		*(dest[4].(*string)) = regionID
 		*(dest[5].(*string)) = model.StatusActive
 		*(dest[6].(**string)) = nil // status_message
-		*(dest[7].(*time.Time)) = now
+		*(dest[7].(*string)) = ""  // suspend_reason
 		*(dest[8].(*time.Time)) = now
-		*(dest[9].(*string)) = regionName
+		*(dest[9].(*time.Time)) = now
+		*(dest[10].(*string)) = regionName
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -172,9 +173,10 @@ func TestZoneService_List_Success(t *testing.T) {
 			*(dest[4].(*string)) = regionID
 			*(dest[5].(*string)) = model.StatusActive
 			*(dest[6].(**string)) = nil // status_message
-			*(dest[7].(*time.Time)) = now
+			*(dest[7].(*string)) = ""  // suspend_reason
 			*(dest[8].(*time.Time)) = now
-			*(dest[9].(*string)) = regionName
+			*(dest[9].(*time.Time)) = now
+			*(dest[10].(*string)) = regionName
 			return nil
 		},
 	)

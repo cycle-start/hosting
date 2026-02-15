@@ -66,13 +66,13 @@ func (s *ValkeyInstanceService) Create(ctx context.Context, instance *model.Valk
 func (s *ValkeyInstanceService) GetByID(ctx context.Context, id string) (*model.ValkeyInstance, error) {
 	var v model.ValkeyInstance
 	err := s.db.QueryRow(ctx,
-		`SELECT vi.id, vi.tenant_id, vi.name, vi.shard_id, vi.port, vi.max_memory_mb, vi.password, vi.status, vi.status_message, vi.created_at, vi.updated_at,
+		`SELECT vi.id, vi.tenant_id, vi.name, vi.shard_id, vi.port, vi.max_memory_mb, vi.password, vi.status, vi.status_message, vi.suspend_reason, vi.created_at, vi.updated_at,
 		        s.name
 		 FROM valkey_instances vi
 		 LEFT JOIN shards s ON s.id = vi.shard_id
 		 WHERE vi.id = $1`, id,
 	).Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB,
-		&v.Password, &v.Status, &v.StatusMessage, &v.CreatedAt, &v.UpdatedAt,
+		&v.Password, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt,
 		&v.ShardName)
 	if err != nil {
 		return nil, fmt.Errorf("get valkey instance %s: %w", id, err)
@@ -81,7 +81,7 @@ func (s *ValkeyInstanceService) GetByID(ctx context.Context, id string) (*model.
 }
 
 func (s *ValkeyInstanceService) ListByTenant(ctx context.Context, tenantID string, limit int, cursor string) ([]model.ValkeyInstance, bool, error) {
-	query := `SELECT vi.id, vi.tenant_id, vi.name, vi.shard_id, vi.port, vi.max_memory_mb, vi.password, vi.status, vi.status_message, vi.created_at, vi.updated_at, s.name FROM valkey_instances vi LEFT JOIN shards s ON s.id = vi.shard_id WHERE vi.tenant_id = $1`
+	query := `SELECT vi.id, vi.tenant_id, vi.name, vi.shard_id, vi.port, vi.max_memory_mb, vi.password, vi.status, vi.status_message, vi.suspend_reason, vi.created_at, vi.updated_at, s.name FROM valkey_instances vi LEFT JOIN shards s ON s.id = vi.shard_id WHERE vi.tenant_id = $1`
 	args := []any{tenantID}
 	argIdx := 2
 
@@ -105,7 +105,7 @@ func (s *ValkeyInstanceService) ListByTenant(ctx context.Context, tenantID strin
 	for rows.Next() {
 		var v model.ValkeyInstance
 		if err := rows.Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB,
-			&v.Password, &v.Status, &v.StatusMessage, &v.CreatedAt, &v.UpdatedAt,
+			&v.Password, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt,
 			&v.ShardName); err != nil {
 			return nil, false, fmt.Errorf("scan valkey instance: %w", err)
 		}

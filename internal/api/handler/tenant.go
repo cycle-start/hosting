@@ -449,10 +449,11 @@ func (h *Tenant) Delete(w http.ResponseWriter, r *http.Request) {
 // Suspend godoc
 //
 //	@Summary		Suspend a tenant
-//	@Description	Suspends a tenant, disabling all web traffic and services. Async — returns 202 and triggers a workflow that converges shard configuration.
+//	@Description	Suspends a tenant, disabling all web traffic and services. Cascades suspension to all child resources. Async — returns 202 and triggers a workflow that converges shard configuration.
 //	@Tags			Tenants
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Tenant ID"
+//	@Param			body body object true "Suspend request" example({"reason": "abuse"})
 //	@Success		202
 //	@Failure		400 {object} response.ErrorResponse
 //	@Failure		500 {object} response.ErrorResponse
@@ -464,11 +465,23 @@ func (h *Tenant) Suspend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var req struct {
+		Reason string `json:"reason" validate:"required"`
+	}
+	if err := request.Decode(r, &req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if req.Reason == "" {
+		response.WriteError(w, http.StatusBadRequest, "reason is required")
+		return
+	}
+
 	if !h.checkTenantBrandAccess(w, r, id) {
 		return
 	}
 
-	if err := h.svc.Suspend(r.Context(), id); err != nil {
+	if err := h.svc.Suspend(r.Context(), id, req.Reason); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

@@ -271,9 +271,10 @@ func TestDatabaseMigrate_Success(t *testing.T) {
 		*(dest[4].(**string)) = nil
 		*(dest[5].(*string)) = "active"
 		*(dest[6].(**string)) = nil
-		*(dest[7].(*time.Time)) = now
+		*(dest[7].(*string)) = ""
 		*(dest[8].(*time.Time)) = now
-		*(dest[9].(**string)) = nil
+		*(dest[9].(*time.Time)) = now
+		*(dest[10].(**string)) = nil
 		return nil
 	}}
 	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(getRow).Once()

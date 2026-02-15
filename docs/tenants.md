@@ -16,6 +16,7 @@ A **tenant** is the fundamental unit of hosting. Each tenant maps to a Linux use
 | `ssh_enabled` | bool | Whether SSH access is enabled |
 | `status` | string | Current lifecycle status |
 | `status_message` | string | Error message when status is `failed` |
+| `suspend_reason` | string | Reason for suspension (e.g., "abuse", "unpaid", "migration") |
 
 ## Lifecycle
 
@@ -58,8 +59,8 @@ All endpoints require `ApiKeyAuth`. Brand access is enforced on every request.
 
 | Method | Path | Response | Description |
 |--------|------|----------|-------------|
-| `POST` | `/tenants/{id}/suspend` | 202 | Suspend tenant, disabling all services |
-| `POST` | `/tenants/{id}/unsuspend` | 202 | Unsuspend, restoring services |
+| `POST` | `/tenants/{id}/suspend` | 202 | Suspend tenant with reason, cascades to all child resources |
+| `POST` | `/tenants/{id}/unsuspend` | 202 | Unsuspend, restoring tenant and all child resources |
 | `POST` | `/tenants/{id}/migrate` | 202 | Migrate to a different web shard |
 | `POST` | `/tenants/{id}/retry` | 202 | Retry provisioning for a failed tenant |
 | `POST` | `/tenants/{id}/retry-failed` | 202 | Retry all failed child resources |
@@ -114,6 +115,26 @@ POST /tenants/{id}/migrate
 ```
 
 Triggers `MigrateTenantWorkflow` which moves the tenant to a different web shard. Optionally migrates associated zones and FQDNs.
+
+## Suspension
+
+```json
+POST /tenants/{id}/suspend
+{
+  "reason": "abuse"
+}
+```
+
+Suspending a tenant requires a `reason` (free text, e.g., "abuse", "unpaid", "migration"). The reason is stored in `suspend_reason` on the tenant and all cascaded child resources.
+
+**Cascade behavior:** When a tenant is suspended, all active child resources are also suspended with the same reason:
+- Webroots
+- Databases
+- Valkey instances
+- S3 buckets
+- Zones
+
+Unsuspending (`POST /tenants/{id}/unsuspend`) restores the tenant and all suspended child resources to active, clearing `suspend_reason`.
 
 ## Retry Failed Resources
 

@@ -114,9 +114,10 @@ func TestValkeyInstanceMigrate_Success(t *testing.T) {
 		*(dest[6].(*string)) = ""
 		*(dest[7].(*string)) = "active"
 		*(dest[8].(**string)) = nil
-		*(dest[9].(*time.Time)) = now
+		*(dest[9].(*string)) = ""
 		*(dest[10].(*time.Time)) = now
-		*(dest[11].(**string)) = nil
+		*(dest[11].(*time.Time)) = now
+		*(dest[12].(**string)) = nil
 		return nil
 	}}
 	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(getRow).Once()

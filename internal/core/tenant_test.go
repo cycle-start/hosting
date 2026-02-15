@@ -216,11 +216,12 @@ func TestTenantService_GetByID_Success(t *testing.T) {
 		*(dest[9].(*int64)) = int64(1073741824)
 		*(dest[10].(*string)) = model.StatusActive
 		*(dest[11].(**string)) = nil // status_message
-		*(dest[12].(*time.Time)) = now
+		*(dest[12].(*string)) = ""  // suspend_reason
 		*(dest[13].(*time.Time)) = now
-		*(dest[14].(*string)) = regionName
-		*(dest[15].(*string)) = clusterName
-		*(dest[16].(**string)) = &shardName
+		*(dest[14].(*time.Time)) = now
+		*(dest[15].(*string)) = regionName
+		*(dest[16].(*string)) = clusterName
+		*(dest[17].(**string)) = &shardName
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -297,11 +298,12 @@ func TestTenantService_List_Success(t *testing.T) {
 			*(dest[9].(*int64)) = int64(0)
 			*(dest[10].(*string)) = model.StatusActive
 			*(dest[11].(**string)) = nil // status_message
-			*(dest[12].(*time.Time)) = now
+			*(dest[12].(*string)) = ""  // suspend_reason
 			*(dest[13].(*time.Time)) = now
-			*(dest[14].(*string)) = regionName
-			*(dest[15].(*string)) = clusterName
-			*(dest[16].(**string)) = &shardName
+			*(dest[14].(*time.Time)) = now
+			*(dest[15].(*string)) = regionName
+			*(dest[16].(*string)) = clusterName
+			*(dest[17].(**string)) = &shardName
 			return nil
 		},
 		func(dest ...any) error {
@@ -317,11 +319,12 @@ func TestTenantService_List_Success(t *testing.T) {
 			*(dest[9].(*int64)) = int64(0)
 			*(dest[10].(*string)) = model.StatusPending
 			*(dest[11].(**string)) = nil // status_message
-			*(dest[12].(*time.Time)) = now
+			*(dest[12].(*string)) = ""  // suspend_reason
 			*(dest[13].(*time.Time)) = now
-			*(dest[14].(*string)) = regionName
-			*(dest[15].(*string)) = clusterName
-			*(dest[16].(**string)) = &shardName
+			*(dest[14].(*time.Time)) = now
+			*(dest[15].(*string)) = regionName
+			*(dest[16].(*string)) = clusterName
+			*(dest[17].(**string)) = &shardName
 			return nil
 		},
 	)
@@ -525,7 +528,7 @@ func TestTenantService_Suspend_Success(t *testing.T) {
 	wfRun.On("GetRunID").Return("mock-run-id")
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
-	err := svc.Suspend(ctx, tenantID)
+	err := svc.Suspend(ctx, tenantID, "abuse")
 	require.NoError(t, err)
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
@@ -541,7 +544,7 @@ func TestTenantService_Suspend_DBError(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
 
-	err := svc.Suspend(ctx, tenantID)
+	err := svc.Suspend(ctx, tenantID, "abuse")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "status to suspended")
 	db.AssertExpectations(t)
@@ -558,7 +561,7 @@ func TestTenantService_Suspend_WorkflowError(t *testing.T) {
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
-	err := svc.Suspend(ctx, tenantID)
+	err := svc.Suspend(ctx, tenantID, "abuse")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "start SuspendTenantWorkflow")
 	db.AssertExpectations(t)
@@ -596,11 +599,12 @@ func TestTenantService_ListByShard_Success(t *testing.T) {
 			*(dest[9].(*int64)) = int64(0)
 			*(dest[10].(*string)) = model.StatusActive
 			*(dest[11].(**string)) = nil // status_message
-			*(dest[12].(*time.Time)) = now
+			*(dest[12].(*string)) = ""  // suspend_reason
 			*(dest[13].(*time.Time)) = now
-			*(dest[14].(*string)) = regionName
-			*(dest[15].(*string)) = clusterName
-			*(dest[16].(**string)) = &shardName
+			*(dest[14].(*time.Time)) = now
+			*(dest[15].(*string)) = regionName
+			*(dest[16].(*string)) = clusterName
+			*(dest[17].(**string)) = &shardName
 			return nil
 		},
 		func(dest ...any) error {
@@ -616,11 +620,12 @@ func TestTenantService_ListByShard_Success(t *testing.T) {
 			*(dest[9].(*int64)) = int64(0)
 			*(dest[10].(*string)) = model.StatusPending
 			*(dest[11].(**string)) = nil // status_message
-			*(dest[12].(*time.Time)) = now
+			*(dest[12].(*string)) = ""  // suspend_reason
 			*(dest[13].(*time.Time)) = now
-			*(dest[14].(*string)) = regionName
-			*(dest[15].(*string)) = clusterName
-			*(dest[16].(**string)) = &shardName
+			*(dest[14].(*time.Time)) = now
+			*(dest[15].(*string)) = regionName
+			*(dest[16].(*string)) = clusterName
+			*(dest[17].(**string)) = &shardName
 			return nil
 		},
 	)

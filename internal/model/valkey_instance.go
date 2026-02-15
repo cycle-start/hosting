@@ -12,6 +12,7 @@ type ValkeyInstance struct {
 	Password    string  `json:"password,omitempty" db:"password"`
 	Status        string  `json:"status" db:"status"`
 	StatusMessage *string `json:"status_message,omitempty" db:"status_message"`
+	SuspendReason string  `json:"suspend_reason" db:"suspend_reason"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 	ShardName   *string   `json:"shard_name,omitempty" db:"-"`

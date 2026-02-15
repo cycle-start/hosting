@@ -67,13 +67,13 @@ Full CRUD REST API at `api.hosting.test/api/v1` with OpenAPI docs at `/docs`.
 **Response patterns:**
 - List endpoints: `{items: [...], next_cursor, has_more}` with search/sort/status filtering
 - Async operations: 202 Accepted, Temporal workflow handles provisioning
-- Status progression: `pending -> provisioning -> active` (or `failed` with `status_message`)
+- Status progression: `pending -> provisioning -> active` (or `failed` with `status_message`, or `suspended` with `suspend_reason`)
 - All async resources support `POST /{resource}/{id}/retry` to re-trigger failed provisioning
 
 ### Temporal Workflows
 
 **Resource lifecycle (all with retry support):**
-- Tenant: create, update, suspend, unsuspend, delete, migrate (cross-shard)
+- Tenant: create, update, suspend (with reason, cascades to all child resources), unsuspend (cascades), delete, migrate (cross-shard)
 - Webroot: create, update, delete
 - FQDN: bind (auto-DNS + auto-LB-map + optional LE cert), unbind
 - Zone: create (brand-aware SOA + NS records), delete

@@ -50,13 +50,13 @@ func (s *S3BucketService) Create(ctx context.Context, bucket *model.S3Bucket) er
 func (s *S3BucketService) GetByID(ctx context.Context, id string) (*model.S3Bucket, error) {
 	var b model.S3Bucket
 	err := s.db.QueryRow(ctx,
-		`SELECT b.id, b.tenant_id, b.name, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.created_at, b.updated_at,
+		`SELECT b.id, b.tenant_id, b.name, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.suspend_reason, b.created_at, b.updated_at,
 		        sh.name
 		 FROM s3_buckets b
 		 LEFT JOIN shards sh ON sh.id = b.shard_id
 		 WHERE b.id = $1`, id,
 	).Scan(&b.ID, &b.TenantID, &b.Name, &b.ShardID,
-		&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.CreatedAt, &b.UpdatedAt,
+		&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.SuspendReason, &b.CreatedAt, &b.UpdatedAt,
 		&b.ShardName)
 	if err != nil {
 		return nil, fmt.Errorf("get s3 bucket %s: %w", id, err)
@@ -65,7 +65,7 @@ func (s *S3BucketService) GetByID(ctx context.Context, id string) (*model.S3Buck
 }
 
 func (s *S3BucketService) ListByTenant(ctx context.Context, tenantID string, params request.ListParams) ([]model.S3Bucket, bool, error) {
-	query := `SELECT b.id, b.tenant_id, b.name, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.created_at, b.updated_at, sh.name FROM s3_buckets b LEFT JOIN shards sh ON sh.id = b.shard_id WHERE b.tenant_id = $1`
+	query := `SELECT b.id, b.tenant_id, b.name, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.suspend_reason, b.created_at, b.updated_at, sh.name FROM s3_buckets b LEFT JOIN shards sh ON sh.id = b.shard_id WHERE b.tenant_id = $1`
 	args := []any{tenantID}
 	argIdx := 2
 
@@ -112,7 +112,7 @@ func (s *S3BucketService) ListByTenant(ctx context.Context, tenantID string, par
 	for rows.Next() {
 		var b model.S3Bucket
 		if err := rows.Scan(&b.ID, &b.TenantID, &b.Name, &b.ShardID,
-			&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.CreatedAt, &b.UpdatedAt,
+			&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.SuspendReason, &b.CreatedAt, &b.UpdatedAt,
 			&b.ShardName); err != nil {
 			return nil, false, fmt.Errorf("scan s3 bucket: %w", err)
 		}

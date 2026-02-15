@@ -115,9 +115,10 @@ func TestDatabaseService_GetByID_Success(t *testing.T) {
 		*(dest[4].(**string)) = &nodeID
 		*(dest[5].(*string)) = model.StatusActive
 		*(dest[6].(**string)) = nil // status_message
-		*(dest[7].(*time.Time)) = now
+		*(dest[7].(*string)) = ""  // suspend_reason
 		*(dest[8].(*time.Time)) = now
-		*(dest[9].(**string)) = &shardName
+		*(dest[9].(*time.Time)) = now
+		*(dest[10].(**string)) = &shardName
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -176,9 +177,10 @@ func TestDatabaseService_ListByTenant_Success(t *testing.T) {
 			*(dest[4].(**string)) = &nodeID
 			*(dest[5].(*string)) = model.StatusActive
 			*(dest[6].(**string)) = nil // status_message
-			*(dest[7].(*time.Time)) = now
+			*(dest[7].(*string)) = ""  // suspend_reason
 			*(dest[8].(*time.Time)) = now
-			*(dest[9].(**string)) = &shardName
+			*(dest[9].(*time.Time)) = now
+			*(dest[10].(**string)) = &shardName
 			return nil
 		},
 	)
@@ -231,9 +233,10 @@ func TestDatabaseService_ListByShard_Success(t *testing.T) {
 			*(dest[4].(**string)) = &nodeID
 			*(dest[5].(*string)) = model.StatusActive
 			*(dest[6].(**string)) = nil // status_message
-			*(dest[7].(*time.Time)) = now
+			*(dest[7].(*string)) = ""  // suspend_reason
 			*(dest[8].(*time.Time)) = now
-			*(dest[9].(**string)) = &shardName
+			*(dest[9].(*time.Time)) = now
+			*(dest[10].(**string)) = &shardName
 			return nil
 		},
 		func(dest ...any) error {
@@ -244,9 +247,10 @@ func TestDatabaseService_ListByShard_Success(t *testing.T) {
 			*(dest[4].(**string)) = &nodeID
 			*(dest[5].(*string)) = model.StatusPending
 			*(dest[6].(**string)) = nil // status_message
-			*(dest[7].(*time.Time)) = now
+			*(dest[7].(*string)) = ""  // suspend_reason
 			*(dest[8].(*time.Time)) = now
-			*(dest[9].(**string)) = &shardName
+			*(dest[9].(*time.Time)) = now
+			*(dest[10].(**string)) = &shardName
 			return nil
 		},
 	)

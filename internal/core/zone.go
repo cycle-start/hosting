@@ -60,12 +60,12 @@ func (s *ZoneService) Create(ctx context.Context, zone *model.Zone) error {
 func (s *ZoneService) GetByID(ctx context.Context, id string) (*model.Zone, error) {
 	var z model.Zone
 	err := s.db.QueryRow(ctx,
-		`SELECT z.id, z.brand_id, z.tenant_id, z.name, z.region_id, z.status, z.status_message, z.created_at, z.updated_at,
+		`SELECT z.id, z.brand_id, z.tenant_id, z.name, z.region_id, z.status, z.status_message, z.suspend_reason, z.created_at, z.updated_at,
 		        r.name
 		 FROM zones z
 		 JOIN regions r ON r.id = z.region_id
 		 WHERE z.id = $1`, id,
-	).Scan(&z.ID, &z.BrandID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.StatusMessage,
+	).Scan(&z.ID, &z.BrandID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.StatusMessage, &z.SuspendReason,
 		&z.CreatedAt, &z.UpdatedAt,
 		&z.RegionName)
 	if err != nil {
@@ -75,7 +75,7 @@ func (s *ZoneService) GetByID(ctx context.Context, id string) (*model.Zone, erro
 }
 
 func (s *ZoneService) List(ctx context.Context, params request.ListParams) ([]model.Zone, bool, error) {
-	query := `SELECT z.id, z.brand_id, z.tenant_id, z.name, z.region_id, z.status, z.status_message, z.created_at, z.updated_at, r.name FROM zones z JOIN regions r ON r.id = z.region_id WHERE true`
+	query := `SELECT z.id, z.brand_id, z.tenant_id, z.name, z.region_id, z.status, z.status_message, z.suspend_reason, z.created_at, z.updated_at, r.name FROM zones z JOIN regions r ON r.id = z.region_id WHERE true`
 	args := []any{}
 	argIdx := 1
 
@@ -126,7 +126,7 @@ func (s *ZoneService) List(ctx context.Context, params request.ListParams) ([]mo
 	var zones []model.Zone
 	for rows.Next() {
 		var z model.Zone
-		if err := rows.Scan(&z.ID, &z.BrandID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.StatusMessage,
+		if err := rows.Scan(&z.ID, &z.BrandID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.StatusMessage, &z.SuspendReason,
 			&z.CreatedAt, &z.UpdatedAt,
 			&z.RegionName); err != nil {
 			return nil, false, fmt.Errorf("scan zone: %w", err)

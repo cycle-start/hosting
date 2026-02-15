@@ -193,7 +193,8 @@ func UpdateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	}).Get(ctx, nil)
 }
 
-// SuspendTenantWorkflow suspends a tenant on all nodes in the tenant's shard.
+// SuspendTenantWorkflow suspends a tenant on all nodes in the tenant's shard
+// and cascades suspension to all child resources.
 func SuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -236,15 +237,73 @@ func SuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		}
 	}
 
-	// Set status to suspended.
-	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
+	// Set tenant status to suspended (already done by core service, but ensure consistency).
+	_ = workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
 		Table:  "tenants",
 		ID:     tenantID,
 		Status: model.StatusSuspended,
 	}).Get(ctx, nil)
+
+	// Cascade suspend to child webroots.
+	var webroots []model.Webroot
+	_ = workflow.ExecuteActivity(ctx, "ListWebrootsByTenantID", tenantID).Get(ctx, &webroots)
+	for _, wr := range webroots {
+		if wr.Status == model.StatusActive {
+			_ = workflow.ExecuteActivity(ctx, "SuspendResource", activity.SuspendResourceParams{
+				Table: "webroots", ID: wr.ID, Reason: tenant.SuspendReason,
+			}).Get(ctx, nil)
+		}
+	}
+
+	// Cascade suspend to child databases.
+	var databases []model.Database
+	_ = workflow.ExecuteActivity(ctx, "ListDatabasesByTenantID", tenantID).Get(ctx, &databases)
+	for _, db := range databases {
+		if db.Status == model.StatusActive {
+			_ = workflow.ExecuteActivity(ctx, "SuspendResource", activity.SuspendResourceParams{
+				Table: "databases", ID: db.ID, Reason: tenant.SuspendReason,
+			}).Get(ctx, nil)
+		}
+	}
+
+	// Cascade suspend to child valkey instances.
+	var valkeyInstances []model.ValkeyInstance
+	_ = workflow.ExecuteActivity(ctx, "ListValkeyInstancesByTenantID", tenantID).Get(ctx, &valkeyInstances)
+	for _, vi := range valkeyInstances {
+		if vi.Status == model.StatusActive {
+			_ = workflow.ExecuteActivity(ctx, "SuspendResource", activity.SuspendResourceParams{
+				Table: "valkey_instances", ID: vi.ID, Reason: tenant.SuspendReason,
+			}).Get(ctx, nil)
+		}
+	}
+
+	// Cascade suspend to child S3 buckets.
+	var s3Buckets []model.S3Bucket
+	_ = workflow.ExecuteActivity(ctx, "ListS3BucketsByTenantID", tenantID).Get(ctx, &s3Buckets)
+	for _, b := range s3Buckets {
+		if b.Status == model.StatusActive {
+			_ = workflow.ExecuteActivity(ctx, "SuspendResource", activity.SuspendResourceParams{
+				Table: "s3_buckets", ID: b.ID, Reason: tenant.SuspendReason,
+			}).Get(ctx, nil)
+		}
+	}
+
+	// Cascade suspend to child zones.
+	var zones []model.Zone
+	_ = workflow.ExecuteActivity(ctx, "ListZonesByTenantID", tenantID).Get(ctx, &zones)
+	for _, z := range zones {
+		if z.Status == model.StatusActive {
+			_ = workflow.ExecuteActivity(ctx, "SuspendResource", activity.SuspendResourceParams{
+				Table: "zones", ID: z.ID, Reason: tenant.SuspendReason,
+			}).Get(ctx, nil)
+		}
+	}
+
+	return nil
 }
 
-// UnsuspendTenantWorkflow unsuspends a tenant on all nodes in the tenant's shard.
+// UnsuspendTenantWorkflow unsuspends a tenant on all nodes in the tenant's shard
+// and cascades unsuspension to all child resources.
 func UnsuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -298,12 +357,67 @@ func UnsuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		}
 	}
 
-	// Set status to active.
-	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
-		Table:  "tenants",
-		ID:     tenantID,
-		Status: model.StatusActive,
+	// Set status to active and clear suspend reason.
+	_ = workflow.ExecuteActivity(ctx, "UnsuspendResource", activity.SuspendResourceParams{
+		Table: "tenants", ID: tenantID,
 	}).Get(ctx, nil)
+
+	// Cascade unsuspend to child webroots.
+	var webroots []model.Webroot
+	_ = workflow.ExecuteActivity(ctx, "ListWebrootsByTenantID", tenantID).Get(ctx, &webroots)
+	for _, wr := range webroots {
+		if wr.Status == model.StatusSuspended {
+			_ = workflow.ExecuteActivity(ctx, "UnsuspendResource", activity.SuspendResourceParams{
+				Table: "webroots", ID: wr.ID,
+			}).Get(ctx, nil)
+		}
+	}
+
+	// Cascade unsuspend to child databases.
+	var databases []model.Database
+	_ = workflow.ExecuteActivity(ctx, "ListDatabasesByTenantID", tenantID).Get(ctx, &databases)
+	for _, db := range databases {
+		if db.Status == model.StatusSuspended {
+			_ = workflow.ExecuteActivity(ctx, "UnsuspendResource", activity.SuspendResourceParams{
+				Table: "databases", ID: db.ID,
+			}).Get(ctx, nil)
+		}
+	}
+
+	// Cascade unsuspend to child valkey instances.
+	var valkeyInstances []model.ValkeyInstance
+	_ = workflow.ExecuteActivity(ctx, "ListValkeyInstancesByTenantID", tenantID).Get(ctx, &valkeyInstances)
+	for _, vi := range valkeyInstances {
+		if vi.Status == model.StatusSuspended {
+			_ = workflow.ExecuteActivity(ctx, "UnsuspendResource", activity.SuspendResourceParams{
+				Table: "valkey_instances", ID: vi.ID,
+			}).Get(ctx, nil)
+		}
+	}
+
+	// Cascade unsuspend to child S3 buckets.
+	var s3Buckets []model.S3Bucket
+	_ = workflow.ExecuteActivity(ctx, "ListS3BucketsByTenantID", tenantID).Get(ctx, &s3Buckets)
+	for _, b := range s3Buckets {
+		if b.Status == model.StatusSuspended {
+			_ = workflow.ExecuteActivity(ctx, "UnsuspendResource", activity.SuspendResourceParams{
+				Table: "s3_buckets", ID: b.ID,
+			}).Get(ctx, nil)
+		}
+	}
+
+	// Cascade unsuspend to child zones.
+	var zones []model.Zone
+	_ = workflow.ExecuteActivity(ctx, "ListZonesByTenantID", tenantID).Get(ctx, &zones)
+	for _, z := range zones {
+		if z.Status == model.StatusSuspended {
+			_ = workflow.ExecuteActivity(ctx, "UnsuspendResource", activity.SuspendResourceParams{
+				Table: "zones", ID: z.ID,
+			}).Get(ctx, nil)
+		}
+	}
+
+	return nil
 }
 
 // DeleteTenantWorkflow deletes a tenant from all nodes in the tenant's shard.

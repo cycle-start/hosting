@@ -247,11 +247,12 @@ func (s *SuspendTenantWorkflowTestSuite) TestSuccess() {
 	tenantID := "test-tenant-1"
 	shardID := "test-shard-1"
 	tenant := model.Tenant{
-		ID:      tenantID,
-		Name:    "t_test123456",
-		BrandID: "test-brand",
-		UID:     5001,
-		ShardID: &shardID,
+		ID:            tenantID,
+		Name:          "t_test123456",
+		BrandID:       "test-brand",
+		UID:           5001,
+		ShardID:       &shardID,
+		SuspendReason: "abuse",
 	}
 	nodes := []model.Node{
 		{ID: "node-1"},
@@ -263,6 +264,12 @@ func (s *SuspendTenantWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "tenants", ID: tenantID, Status: model.StatusSuspended,
 	}).Return(nil)
+	// Cascade activities — return empty lists (no children).
+	s.env.OnActivity("ListWebrootsByTenantID", mock.Anything, tenantID).Return([]model.Webroot{}, nil)
+	s.env.OnActivity("ListDatabasesByTenantID", mock.Anything, tenantID).Return([]model.Database{}, nil)
+	s.env.OnActivity("ListValkeyInstancesByTenantID", mock.Anything, tenantID).Return([]model.ValkeyInstance{}, nil)
+	s.env.OnActivity("ListS3BucketsByTenantID", mock.Anything, tenantID).Return([]model.S3Bucket{}, nil)
+	s.env.OnActivity("ListZonesByTenantID", mock.Anything, tenantID).Return([]model.Zone{}, nil)
 	s.env.ExecuteWorkflow(SuspendTenantWorkflow, tenantID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
@@ -337,9 +344,15 @@ func (s *UnsuspendTenantWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("UnsuspendTenant", mock.Anything, "t_test123456").Return(nil)
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "tenants", ID: tenantID, Status: model.StatusActive,
+	s.env.OnActivity("UnsuspendResource", mock.Anything, activity.SuspendResourceParams{
+		Table: "tenants", ID: tenantID,
 	}).Return(nil)
+	// Cascade activities — return empty lists (no children).
+	s.env.OnActivity("ListWebrootsByTenantID", mock.Anything, tenantID).Return([]model.Webroot{}, nil)
+	s.env.OnActivity("ListDatabasesByTenantID", mock.Anything, tenantID).Return([]model.Database{}, nil)
+	s.env.OnActivity("ListValkeyInstancesByTenantID", mock.Anything, tenantID).Return([]model.ValkeyInstance{}, nil)
+	s.env.OnActivity("ListS3BucketsByTenantID", mock.Anything, tenantID).Return([]model.S3Bucket{}, nil)
+	s.env.OnActivity("ListZonesByTenantID", mock.Anything, tenantID).Return([]model.Zone{}, nil)
 	s.env.ExecuteWorkflow(UnsuspendTenantWorkflow, tenantID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())

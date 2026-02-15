@@ -118,8 +118,9 @@ func TestWebrootService_GetByID_Success(t *testing.T) {
 		*(dest[8].(*bool)) = false
 		*(dest[9].(*string)) = model.StatusActive
 		*(dest[10].(**string)) = nil // status_message
-		*(dest[11].(*time.Time)) = now
+		*(dest[11].(*string)) = ""  // suspend_reason
 		*(dest[12].(*time.Time)) = now
+		*(dest[13].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -179,8 +180,9 @@ func TestWebrootService_ListByTenant_Success(t *testing.T) {
 			*(dest[8].(*bool)) = false
 			*(dest[9].(*string)) = model.StatusActive
 			*(dest[10].(**string)) = nil // status_message
-			*(dest[11].(*time.Time)) = now
+			*(dest[11].(*string)) = ""  // suspend_reason
 			*(dest[12].(*time.Time)) = now
+			*(dest[13].(*time.Time)) = now
 			return nil
 		},
 	)

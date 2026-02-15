@@ -50,13 +50,13 @@ func (s *DatabaseService) Create(ctx context.Context, database *model.Database) 
 func (s *DatabaseService) GetByID(ctx context.Context, id string) (*model.Database, error) {
 	var d model.Database
 	err := s.db.QueryRow(ctx,
-		`SELECT d.id, d.tenant_id, d.name, d.shard_id, d.node_id, d.status, d.status_message, d.created_at, d.updated_at,
+		`SELECT d.id, d.tenant_id, d.name, d.shard_id, d.node_id, d.status, d.status_message, d.suspend_reason, d.created_at, d.updated_at,
 		        s.name
 		 FROM databases d
 		 LEFT JOIN shards s ON s.id = d.shard_id
 		 WHERE d.id = $1`, id,
 	).Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID,
-		&d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt,
+		&d.Status, &d.StatusMessage, &d.SuspendReason, &d.CreatedAt, &d.UpdatedAt,
 		&d.ShardName)
 	if err != nil {
 		return nil, fmt.Errorf("get database %s: %w", id, err)
@@ -65,7 +65,7 @@ func (s *DatabaseService) GetByID(ctx context.Context, id string) (*model.Databa
 }
 
 func (s *DatabaseService) ListByTenant(ctx context.Context, tenantID string, params request.ListParams) ([]model.Database, bool, error) {
-	query := `SELECT d.id, d.tenant_id, d.name, d.shard_id, d.node_id, d.status, d.status_message, d.created_at, d.updated_at, s.name FROM databases d LEFT JOIN shards s ON s.id = d.shard_id WHERE d.tenant_id = $1`
+	query := `SELECT d.id, d.tenant_id, d.name, d.shard_id, d.node_id, d.status, d.status_message, d.suspend_reason, d.created_at, d.updated_at, s.name FROM databases d LEFT JOIN shards s ON s.id = d.shard_id WHERE d.tenant_id = $1`
 	args := []any{tenantID}
 	argIdx := 2
 
@@ -112,7 +112,7 @@ func (s *DatabaseService) ListByTenant(ctx context.Context, tenantID string, par
 	for rows.Next() {
 		var d model.Database
 		if err := rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID,
-			&d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt,
+			&d.Status, &d.StatusMessage, &d.SuspendReason, &d.CreatedAt, &d.UpdatedAt,
 			&d.ShardName); err != nil {
 			return nil, false, fmt.Errorf("scan database: %w", err)
 		}
@@ -130,7 +130,7 @@ func (s *DatabaseService) ListByTenant(ctx context.Context, tenantID string, par
 }
 
 func (s *DatabaseService) ListByShard(ctx context.Context, shardID string, limit int, cursor string) ([]model.Database, bool, error) {
-	query := `SELECT d.id, d.tenant_id, d.name, d.shard_id, d.node_id, d.status, d.status_message, d.created_at, d.updated_at, s.name FROM databases d LEFT JOIN shards s ON s.id = d.shard_id WHERE d.shard_id = $1`
+	query := `SELECT d.id, d.tenant_id, d.name, d.shard_id, d.node_id, d.status, d.status_message, d.suspend_reason, d.created_at, d.updated_at, s.name FROM databases d LEFT JOIN shards s ON s.id = d.shard_id WHERE d.shard_id = $1`
 	args := []any{shardID}
 	argIdx := 2
 
@@ -154,7 +154,7 @@ func (s *DatabaseService) ListByShard(ctx context.Context, shardID string, limit
 	for rows.Next() {
 		var d model.Database
 		if err := rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID,
-			&d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt,
+			&d.Status, &d.StatusMessage, &d.SuspendReason, &d.CreatedAt, &d.UpdatedAt,
 			&d.ShardName); err != nil {
 			return nil, false, fmt.Errorf("scan database: %w", err)
 		}

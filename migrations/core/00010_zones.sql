@@ -7,6 +7,7 @@ CREATE TABLE zones (
     region_id  TEXT NOT NULL REFERENCES regions(id),
     status     TEXT NOT NULL DEFAULT 'pending',
     status_message TEXT,
+    suspend_reason TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
