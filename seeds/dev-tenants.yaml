@@ -12,6 +12,8 @@ brands:
     secondary_ns: "ns2.acme-hosting.test"
     hostmaster_email: "hostmaster@acme-hosting.test"
     mail_hostname: "mail.acme-hosting.test"
+    dkim_selector: "default"
+    dkim_public_key: "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC3N1hMySxnOOaLmBUF7w8k+BO0qOt5Id9mA6rYwjMY+A2sM4H2JFZmGn8ESrmqnN+S0i8k0bMPPPFLHjOSUYMbx52l5Y5gYmxlHPwi5q+8B3h7cLBnwf6R2vuHdZ1GEmU/GJqNEt1kD/JhbmMm9UEymCjacaLJB0qfNR89qM3QIDAQAB"
     dmarc_policy: "v=DMARC1; p=none"
     allowed_clusters:
       - vm-cluster-1
@@ -34,6 +36,9 @@ tenants:
     shard: web-1
     sftp_enabled: true
     ssh_enabled: true
+    egress_rules:
+      - cidr: "0.0.0.0/0"
+        description: "Allow all IPv4 (dev)"
     ssh_keys:
       - name: dev-key
         public_key: "${SSH_PUBLIC_KEY}"
@@ -97,12 +102,20 @@ tenants:
           - command: 'bash -c ''exec php artisan reverb:start --host="[$HOST]" --port="$PORT"'''
             proxy_path: /app
           - command: "php artisan queue:work --sleep=1 --tries=3 --timeout=30"
+        cron_jobs:
+          - schedule: "*/5 * * * *"
+            command: "php artisan schedule:run"
+            timeout_seconds: 120
+            max_memory_mb: 256
     databases:
       - shard: db-1
         users:
           - suffix: _app
             password: dev-password-123
             privileges: [ALL]
+        access_rules:
+          - cidr: "192.168.1.0/24"
+            description: "Office network"
     valkey_instances:
       - shard: valkey-1
         max_memory_mb: 128
@@ -115,6 +128,9 @@ tenants:
       - shard: storage-1
         public: true
         quota_bytes: 10737418240
+    backups:
+      - type: web
+      - type: database
     email_accounts:
       - fqdn: acme.hosting.test
         address: info@acme.hosting.test

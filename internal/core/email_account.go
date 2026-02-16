@@ -97,6 +97,50 @@ func (s *EmailAccountService) ListByFQDN(ctx context.Context, fqdnID string, lim
 	return accounts, hasMore, nil
 }
 
+func (s *EmailAccountService) ListByTenant(ctx context.Context, tenantID string, limit int, cursor string) ([]model.EmailAccount, bool, error) {
+	query := `SELECT ea.id, ea.fqdn_id, ea.address, ea.display_name, ea.quota_bytes, ea.status, ea.status_message, ea.created_at, ea.updated_at
+		 FROM email_accounts ea
+		 JOIN fqdns f ON ea.fqdn_id = f.id
+		 JOIN webroots w ON f.webroot_id = w.id
+		 WHERE w.tenant_id = $1`
+	args := []any{tenantID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND ea.id > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY ea.id`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, false, fmt.Errorf("list email accounts for tenant %s: %w", tenantID, err)
+	}
+	defer rows.Close()
+
+	var accounts []model.EmailAccount
+	for rows.Next() {
+		var a model.EmailAccount
+		if err := rows.Scan(&a.ID, &a.FQDNID, &a.Address, &a.DisplayName, &a.QuotaBytes, &a.Status, &a.StatusMessage, &a.CreatedAt, &a.UpdatedAt); err != nil {
+			return nil, false, fmt.Errorf("scan email account: %w", err)
+		}
+		accounts = append(accounts, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, fmt.Errorf("iterate email accounts: %w", err)
+	}
+
+	hasMore := len(accounts) > limit
+	if hasMore {
+		accounts = accounts[:limit]
+	}
+	return accounts, hasMore, nil
+}
+
 func (s *EmailAccountService) Delete(ctx context.Context, id string) error {
 	var address string
 	err := s.db.QueryRow(ctx,

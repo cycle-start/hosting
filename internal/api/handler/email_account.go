@@ -22,6 +22,41 @@ func NewEmailAccount(services *core.Services) *EmailAccount {
 	return &EmailAccount{svc: services.EmailAccount, services: services}
 }
 
+// ListByTenant godoc
+//
+//	@Summary		List email accounts for a tenant
+//	@Description	Returns a paginated list of email accounts across all FQDNs belonging to the specified tenant.
+//	@Tags			Email Accounts
+//	@Security		ApiKeyAuth
+//	@Param			tenantID path string true "Tenant ID"
+//	@Param			limit query int false "Page size" default(50)
+//	@Param			cursor query string false "Pagination cursor"
+//	@Success		200 {object} response.PaginatedResponse{items=[]model.EmailAccount}
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants/{tenantID}/email-accounts [get]
+func (h *EmailAccount) ListByTenant(w http.ResponseWriter, r *http.Request) {
+	tenantID, err := request.RequireID(chi.URLParam(r, "tenantID"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	pg := request.ParsePagination(r)
+
+	accounts, hasMore, err := h.svc.ListByTenant(r.Context(), tenantID, pg.Limit, pg.Cursor)
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	var nextCursor string
+	if hasMore && len(accounts) > 0 {
+		nextCursor = accounts[len(accounts)-1].ID
+	}
+	response.WritePaginated(w, http.StatusOK, accounts, nextCursor, hasMore)
+}
+
 // ListByFQDN godoc
 //
 //	@Summary		List email accounts for an FQDN

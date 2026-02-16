@@ -51,6 +51,8 @@ type TenantDef struct {
 	ValkeyInstances []ValkeyInstanceDef `yaml:"valkey_instances"`
 	S3Buckets       []S3BucketDef       `yaml:"s3_buckets"`
 	EmailAccounts   []EmailAcctDef      `yaml:"email_accounts"`
+	EgressRules     []EgressRuleDef     `yaml:"egress_rules"`
+	Backups         []BackupDef         `yaml:"backups"`
 }
 
 type SSHKeyDef struct {
@@ -69,6 +71,7 @@ type WebrootDef struct {
 	FQDNs          []FQDNDef         `yaml:"fqdns"`
 	Fixture        *FixtureDef       `yaml:"fixture"`
 	Daemons        []DaemonDef       `yaml:"daemons"`
+	CronJobs       []CronJobDef      `yaml:"cron_jobs"`
 }
 
 type EnvVarDef struct {
@@ -100,8 +103,9 @@ type DaemonDef struct {
 }
 
 type DatabaseDef struct {
-	Shard string            `yaml:"shard"`
-	Users []DatabaseUserDef `yaml:"users"`
+	Shard       string                  `yaml:"shard"`
+	Users       []DatabaseUserDef       `yaml:"users"`
+	AccessRules []DatabaseAccessRuleDef `yaml:"access_rules"`
 }
 
 type DatabaseUserDef struct {
@@ -152,4 +156,26 @@ type EmailAutoReplyDef struct {
 	Subject string `yaml:"subject"`
 	Body    string `yaml:"body"`
 	Enabled bool   `yaml:"enabled"`
+}
+
+type EgressRuleDef struct {
+	CIDR        string `yaml:"cidr"`
+	Description string `yaml:"description"`
+}
+
+type DatabaseAccessRuleDef struct {
+	CIDR        string `yaml:"cidr"`
+	Description string `yaml:"description"`
+}
+
+type CronJobDef struct {
+	Schedule         string `yaml:"schedule"`
+	Command          string `yaml:"command"`
+	WorkingDirectory string `yaml:"working_directory"`
+	TimeoutSeconds   int    `yaml:"timeout_seconds"`
+	MaxMemoryMB      int    `yaml:"max_memory_mb"`
+}
+
+type BackupDef struct {
+	Type string `yaml:"type"` // "web" or "database"
 }

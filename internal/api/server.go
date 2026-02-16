@@ -600,6 +600,7 @@ func (s *Server) setupRoutes() {
 		// Email accounts
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireScope("email", "read"))
+			r.Get("/tenants/{tenantID}/email-accounts", emailAccount.ListByTenant)
 			r.Get("/fqdns/{fqdnID}/email-accounts", emailAccount.ListByFQDN)
 			r.Get("/email-accounts/{id}", emailAccount.Get)
 			r.Get("/email-accounts/{id}/aliases", emailAlias.ListByAccount)

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Pause, Play, Trash2, Plus, RotateCcw, Loader2, FolderOpen, Database as DatabaseIcon, Globe, Boxes, HardDrive, Key, Archive, AlertCircle, ScrollText } from 'lucide-react'
+import { Pause, Play, Trash2, Plus, RotateCcw, Loader2, FolderOpen, Database as DatabaseIcon, Globe, Boxes, HardDrive, Key, Archive, AlertCircle, ScrollText, Mail } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -20,7 +20,7 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { Breadcrumb } from '@/components/shared/breadcrumb'
 import { cn, formatDate } from '@/lib/utils'
 import {
-  useTenant, useTenantResourceSummary, useBrand, useWebroots, useDatabases, useValkeyInstances,
+  useTenant, useTenantResourceSummary, useBrand, useWebroots, useDatabases, useValkeyInstances, useTenantEmailAccounts,
   useS3Buckets,
   useSSHKeys, useBackups, useZones, useSuspendTenant, useUnsuspendTenant,
   useDeleteTenant, useCreateWebroot, useDeleteWebroot,
@@ -33,7 +33,7 @@ import {
   useRetryTenantFailed, useRetryWebroot, useRetryDatabase,
   useRetryValkeyInstance, useRetryS3Bucket, useRetrySSHKey, useRetryZone, useRetryBackup,
 } from '@/lib/hooks'
-import type { Webroot, Database, ValkeyInstance, S3Bucket, SSHKey, Backup, Zone, WebrootFormData, DatabaseFormData, ValkeyInstanceFormData, S3BucketFormData, SSHKeyFormData, ZoneFormData } from '@/lib/types'
+import type { Webroot, Database, ValkeyInstance, S3Bucket, SSHKey, Backup, Zone, EmailAccount, WebrootFormData, DatabaseFormData, ValkeyInstanceFormData, S3BucketFormData, SSHKeyFormData, ZoneFormData } from '@/lib/types'
 import { WebrootFields } from '@/components/forms/webroot-fields'
 import { DatabaseFields } from '@/components/forms/database-fields'
 import { ValkeyInstanceFields } from '@/components/forms/valkey-instance-fields'
@@ -44,7 +44,7 @@ import { LogViewer } from '@/components/shared/log-viewer'
 import { TenantLogViewer } from '@/components/shared/tenant-log-viewer'
 
 const defaultTab = 'webroots'
-const validTabs = ['webroots', 'databases', 'zones', 'valkey', 's3', 'sftp', 'backups', 'access-logs', 'platform-logs']
+const validTabs = ['webroots', 'databases', 'zones', 'valkey', 's3', 'sftp', 'email', 'backups', 'access-logs', 'platform-logs']
 
 function getTabFromHash() {
   const hash = window.location.hash.slice(1)
@@ -121,6 +121,7 @@ export function TenantDetailPage() {
   const { data: s3Data, isLoading: s3Loading } = useS3Buckets(id)
   const { data: sftpData, isLoading: sftpLoading } = useSSHKeys(id)
   const { data: backupsData, isLoading: backupsLoading } = useBackups(id)
+  const { data: emailData, isLoading: emailLoading } = useTenantEmailAccounts(id)
   const { data: zonesData, isLoading: zonesLoading } = useZones()
 
   const suspendMutation = useSuspendTenant()
@@ -610,6 +611,21 @@ export function TenantDetailPage() {
     },
   ]
 
+  const emailColumns: ColumnDef<EmailAccount>[] = [
+    {
+      accessorKey: 'address', header: 'Address',
+      cell: ({ row }) => <span className="font-medium">{row.original.address}</span>,
+    },
+    {
+      accessorKey: 'status', header: 'Status',
+      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    },
+    {
+      accessorKey: 'created_at', header: 'Created',
+      cell: ({ row }) => <span className="text-sm text-muted-foreground">{formatDate(row.original.created_at)}</span>,
+    },
+  ]
+
   return (
     <div className="space-y-6">
       <Breadcrumb segments={[
@@ -708,6 +724,7 @@ export function TenantDetailPage() {
           <TabsTrigger value="valkey">Valkey ({valkeyData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="s3">S3 Buckets ({s3Data?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="sftp">SSH Keys ({sftpData?.items?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="email"><Mail className="mr-1.5 h-4 w-4" /> Email ({emailData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="backups">Backups ({backupsData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="access-logs"><ScrollText className="mr-1.5 h-4 w-4" /> Access Logs</TabsTrigger>
           <TabsTrigger value="platform-logs"><ScrollText className="mr-1.5 h-4 w-4" /> Platform Logs</TabsTrigger>
@@ -793,6 +810,15 @@ export function TenantDetailPage() {
             <EmptyState icon={Key} title="No SSH keys" description="Add an SSH public key for access." action={{ label: 'Add Key', onClick: () => { resetForm(); setCreateSftpOpen(true) } }} />
           ) : (
             <DataTable columns={sftpColumns} data={sftpData?.items ?? []} loading={sftpLoading} emptyMessage="No SSH keys" />
+          )}
+        </TabsContent>
+
+        <TabsContent value="email">
+          {!emailLoading && (emailData?.items?.length ?? 0) === 0 ? (
+            <EmptyState icon={Mail} title="No email accounts" description="Email accounts are managed from the FQDN detail page." />
+          ) : (
+            <DataTable columns={emailColumns} data={emailData?.items ?? []} loading={emailLoading} searchColumn="address" searchPlaceholder="Search email accounts..."
+              onRowClick={(e) => navigate({ to: '/tenants/$id/email-accounts/$accountId', params: { id, accountId: e.id } })} />
           )}
         </TabsContent>
 

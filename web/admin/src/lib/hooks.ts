@@ -371,6 +371,14 @@ export function useUploadCertificate() {
 }
 
 // Email Accounts
+export function useTenantEmailAccounts(tenantId: string) {
+  return useQuery({
+    queryKey: ['tenant-email-accounts', tenantId],
+    queryFn: () => api.get<PaginatedResponse<EmailAccount>>(listPath(`/tenants/${tenantId}/email-accounts`)),
+    enabled: !!tenantId,
+  })
+}
+
 export function useEmailAccounts(fqdnId: string) {
   return useQuery({
     queryKey: ['email-accounts', fqdnId],

@@ -20,9 +20,11 @@ import (
 type tenantSeedCtx struct {
 	dbHost     string
 	dbName     string
+	dbID       string
 	dbUsername string
 	dbPassword string
 	fqdn       string
+	webrootID  string
 }
 
 func Seed(configPath string, timeout time.Duration) error {
@@ -251,6 +253,13 @@ func Seed(configPath string, timeout time.Duration) error {
 			}
 		}
 
+		// Create egress rules
+		if len(t.EgressRules) > 0 {
+			if err := seedEgressRules(client, tenantID, t.EgressRules, timeout); err != nil {
+				return fmt.Errorf("egress rules for tenant %q: %w", t.Name, err)
+			}
+		}
+
 		// Create databases (before webroots so DB info is available for fixture .env)
 		ctx := &tenantSeedCtx{}
 		for i, d := range t.Databases {
@@ -270,6 +279,11 @@ func Seed(configPath string, timeout time.Duration) error {
 				return fmt.Errorf("webroot #%d for tenant %q: %w", i+1, t.Name, err)
 			}
 
+			// Track first webroot ID for backups
+			if ctx.webrootID == "" {
+				ctx.webrootID = webrootID
+			}
+
 			// Deploy fixture if defined
 			if w.Fixture != nil {
 				if err := seedFixture(client, clusterID, tenantName, webrootName, w.Fixture, ctx, cfg.LBTrafficURL, ctx.fqdn, webNodeIPs, timeout); err != nil {
@@ -281,6 +295,13 @@ func Seed(configPath string, timeout time.Duration) error {
 			if len(w.Daemons) > 0 {
 				if err := seedDaemons(client, webrootID, w.Daemons, timeout); err != nil {
 					return fmt.Errorf("daemons for webroot #%d of tenant %q: %w", i+1, t.Name, err)
+				}
+			}
+
+			// Create cron jobs if defined
+			if len(w.CronJobs) > 0 {
+				if err := seedCronJobs(client, webrootID, w.CronJobs, timeout); err != nil {
+					return fmt.Errorf("cron jobs for webroot #%d of tenant %q: %w", i+1, t.Name, err)
 				}
 			}
 		}
@@ -304,6 +325,13 @@ func Seed(configPath string, timeout time.Duration) error {
 			}
 			if err := seedS3Bucket(client, tenantID, s, s3ShardID, timeout); err != nil {
 				return fmt.Errorf("s3 bucket #%d for tenant %q: %w", i+1, t.Name, err)
+			}
+		}
+
+		// Create backups
+		if len(t.Backups) > 0 {
+			if err := seedBackups(client, tenantID, t.Backups, ctx.webrootID, ctx.dbID, timeout); err != nil {
+				return fmt.Errorf("backups for tenant %q: %w", t.Name, err)
 			}
 		}
 
@@ -482,6 +510,9 @@ func seedDatabase(client *Client, tenantID string, def DatabaseDef, shardID stri
 
 	// Populate seed context with DB info.
 	ctx.dbName = dbName
+	if ctx.dbID == "" {
+		ctx.dbID = dbID
+	}
 
 	// Find DB host (first database node IP).
 	dbNodeIPs, err := findNodeIPsByRole(client, clusterID, "database")
@@ -519,6 +550,13 @@ func seedDatabase(client *Client, tenantID string, def DatabaseDef, shardID stri
 			return fmt.Errorf("wait for user %q: %w", username, err)
 		}
 		fmt.Printf("      User %q: active\n", username)
+	}
+
+	// Create access rules
+	if len(def.AccessRules) > 0 {
+		if err := seedDatabaseAccessRules(client, dbID, def.AccessRules, timeout); err != nil {
+			return fmt.Errorf("access rules: %w", err)
+		}
 	}
 
 	return nil
@@ -924,5 +962,137 @@ func seedEmailAutoReply(client *Client, emailAccountID string, def EmailAutoRepl
 	}
 	fmt.Printf("      Auto-reply: set\n")
 
+	return nil
+}
+
+func seedEgressRules(client *Client, tenantID string, rules []EgressRuleDef, timeout time.Duration) error {
+	for i, r := range rules {
+		fmt.Printf("  Creating egress rule %q...\n", r.CIDR)
+		resp, err := client.Post(fmt.Sprintf("/tenants/%s/egress-rules", tenantID), map[string]any{
+			"cidr":        r.CIDR,
+			"description": r.Description,
+		})
+		if err != nil {
+			return fmt.Errorf("create egress rule #%d: %w", i+1, err)
+		}
+
+		ruleID, err := extractID(resp)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("    Egress rule %s, waiting for active...\n", ruleID)
+		if err := client.WaitForStatus(fmt.Sprintf("/egress-rules/%s", ruleID), "active", timeout); err != nil {
+			return fmt.Errorf("wait for egress rule #%d: %w", i+1, err)
+		}
+		fmt.Printf("    Egress rule %s: active\n", ruleID)
+	}
+	return nil
+}
+
+func seedDatabaseAccessRules(client *Client, dbID string, rules []DatabaseAccessRuleDef, timeout time.Duration) error {
+	for i, r := range rules {
+		fmt.Printf("    Creating database access rule %q...\n", r.CIDR)
+		resp, err := client.Post(fmt.Sprintf("/databases/%s/access-rules", dbID), map[string]any{
+			"cidr":        r.CIDR,
+			"description": r.Description,
+		})
+		if err != nil {
+			return fmt.Errorf("create access rule #%d: %w", i+1, err)
+		}
+
+		ruleID, err := extractID(resp)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("      Access rule %s, waiting for active...\n", ruleID)
+		if err := client.WaitForStatus(fmt.Sprintf("/database-access-rules/%s", ruleID), "active", timeout); err != nil {
+			return fmt.Errorf("wait for access rule #%d: %w", i+1, err)
+		}
+		fmt.Printf("      Access rule %s: active\n", ruleID)
+	}
+	return nil
+}
+
+func seedCronJobs(client *Client, webrootID string, jobs []CronJobDef, timeout time.Duration) error {
+	for i, j := range jobs {
+		body := map[string]any{
+			"schedule": j.Schedule,
+			"command":  j.Command,
+		}
+		if j.WorkingDirectory != "" {
+			body["working_directory"] = j.WorkingDirectory
+		}
+		if j.TimeoutSeconds > 0 {
+			body["timeout_seconds"] = j.TimeoutSeconds
+		}
+		if j.MaxMemoryMB > 0 {
+			body["max_memory_mb"] = j.MaxMemoryMB
+		}
+
+		label := j.Command
+		if len(label) > 60 {
+			label = label[:60] + "..."
+		}
+		fmt.Printf("    Creating cron job #%d: %s\n", i+1, label)
+
+		resp, err := client.Post(fmt.Sprintf("/webroots/%s/cron-jobs", webrootID), body)
+		if err != nil {
+			return fmt.Errorf("create cron job #%d: %w", i+1, err)
+		}
+
+		jobID, err := extractID(resp)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("      Cron job %s, waiting for active...\n", jobID)
+		if err := client.WaitForStatus(fmt.Sprintf("/cron-jobs/%s", jobID), "active", timeout); err != nil {
+			return fmt.Errorf("wait for cron job #%d: %w", i+1, err)
+		}
+		fmt.Printf("      Cron job %s: active\n", jobID)
+	}
+	return nil
+}
+
+func seedBackups(client *Client, tenantID string, backups []BackupDef, webrootID, dbID string, timeout time.Duration) error {
+	for i, b := range backups {
+		var sourceID string
+		switch b.Type {
+		case "web":
+			if webrootID == "" {
+				return fmt.Errorf("backup #%d: type is 'web' but no webroot was created", i+1)
+			}
+			sourceID = webrootID
+		case "database":
+			if dbID == "" {
+				return fmt.Errorf("backup #%d: type is 'database' but no database was created", i+1)
+			}
+			sourceID = dbID
+		default:
+			return fmt.Errorf("backup #%d: unknown type %q", i+1, b.Type)
+		}
+
+		fmt.Printf("  Creating %s backup...\n", b.Type)
+		resp, err := client.Post(fmt.Sprintf("/tenants/%s/backups", tenantID), map[string]any{
+			"type":      b.Type,
+			"source_id": sourceID,
+		})
+		if err != nil {
+			return fmt.Errorf("create %s backup: %w", b.Type, err)
+		}
+
+		backupID, err := extractID(resp)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("    Backup %s, waiting for completed...\n", backupID)
+		if err := client.WaitForStatus(fmt.Sprintf("/backups/%s", backupID), "completed", timeout); err != nil {
+			return fmt.Errorf("wait for %s backup: %w", b.Type, err)
+		}
+		fmt.Printf("    Backup %s: completed\n", backupID)
+	}
 	return nil
 }
