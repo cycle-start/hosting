@@ -182,8 +182,12 @@ vm-up:
 vm-rebuild:
     just packer-all
     just vm-down
-    just vm-up
+    cd terraform && terraform apply -auto-approve
+    @echo "Waiting for k3s to be ready..."
+    @sleep 30
+    just vm-kubeconfig
     just vm-deploy
+    just vm-up
 
 # Destroy VMs
 vm-down:
@@ -236,6 +240,9 @@ vm-kubeconfig:
     scp -o StrictHostKeyChecking=no ubuntu@{{cp}}:/home/ubuntu/.kube/config /tmp/k3s-config
     sed -i 's/127.0.0.1/{{cp}}/g' /tmp/k3s-config
     sed -i 's/: default$/: hosting/g' /tmp/k3s-config
+    -kubectl config delete-context hosting 2>/dev/null
+    -kubectl config delete-cluster hosting 2>/dev/null
+    -kubectl config delete-user hosting 2>/dev/null
     KUBECONFIG=~/.kube/config:/tmp/k3s-config kubectl config view --flatten > /tmp/kube-merged && mv /tmp/kube-merged ~/.kube/config
     kubectl config use-context hosting
     @echo "Merged into ~/.kube/config as context 'hosting'"
