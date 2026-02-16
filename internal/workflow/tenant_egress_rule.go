@@ -48,7 +48,7 @@ func SyncEgressRulesWorkflow(ctx workflow.Context, tenantID string) error {
 
 	// Get nodes in the shard.
 	var nodes []model.Node
-	err = workflow.ExecuteActivity(ctx, "GetNodesByShardID", *tenant.ShardID).Get(ctx, &nodes)
+	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
 		_ = setResourceFailed(ctx, "tenant_egress_rules", tenantID, err)
 		return err
