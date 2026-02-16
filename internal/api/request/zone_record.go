@@ -1,7 +1,7 @@
 package request
 
 type CreateZoneRecord struct {
-	Type     string `json:"type" validate:"required,oneof=A AAAA CNAME MX TXT SRV NS CAA PTR"`
+	Type     string `json:"type" validate:"required,oneof=A AAAA CNAME MX TXT SRV NS CAA PTR ALIAS HTTPS SVCB TLSA DNSKEY DS NAPTR LOC SSHFP DNAME"`
 	Name     string `json:"name" validate:"required"`
 	Content  string `json:"content" validate:"required"`
 	TTL      int    `json:"ttl" validate:"omitempty,min=60,max=86400"`

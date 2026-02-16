@@ -545,10 +545,27 @@ export function useCreateZoneRecord() {
   })
 }
 
+export function useUpdateZoneRecord() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { id: string; content?: string; ttl?: number; priority?: number | null }) =>
+      api.put<ZoneRecord>(`/zone-records/${data.id}`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['zone-records'] }),
+  })
+}
+
 export function useDeleteZoneRecord() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => api.delete(`/zone-records/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['zone-records'] }),
+  })
+}
+
+export function useRetryZoneRecord() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/zone-records/${id}/retry`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['zone-records'] }),
   })
 }
