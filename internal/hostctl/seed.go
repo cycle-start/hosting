@@ -635,10 +635,11 @@ func seedFixture(_ *Client, _ string, tenantName, webrootName string, def *Fixtu
 	if def.SetupPath != "" && lbURL != "" {
 		setupURL := lbURL + def.SetupPath
 		fmt.Printf("    Running setup at %s (Host: %s)...\n", setupURL, fqdn)
-		if err := retrySetup(setupURL, fqdn, timeout); err != nil {
-			return fmt.Errorf("setup: %w", err)
+		if err := retrySetup(setupURL, fqdn, 30*time.Second); err != nil {
+			fmt.Printf("    WARNING: setup failed (non-fatal): %v\n", err)
+		} else {
+			fmt.Printf("    Setup complete\n")
 		}
-		fmt.Printf("    Setup complete\n")
 	}
 
 	return nil
@@ -659,6 +660,7 @@ func buildEnvContent(vars map[string]string) string {
 
 func retrySetup(url, host string, timeout time.Duration) error {
 	httpClient := &http.Client{
+		Timeout: 10 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},

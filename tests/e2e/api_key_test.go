@@ -18,9 +18,9 @@ func TestAPIKeyCRUD(t *testing.T) {
 	require.Equal(t, 201, resp.StatusCode, "create API key: %s", body)
 	keyData := parseJSON(t, body)
 	keyID := keyData["id"].(string)
-	rawKey := keyData["raw_key"].(string)
+	rawKey := keyData["key"].(string)
 	require.NotEmpty(t, keyID)
-	require.NotEmpty(t, rawKey, "raw_key should be returned on creation")
+	require.NotEmpty(t, rawKey, "key should be returned on creation")
 	t.Logf("created API key: %s", keyID)
 
 	t.Cleanup(func() { httpDelete(t, coreAPIURL+"/api-keys/"+keyID) })
@@ -55,7 +55,7 @@ func TestAPIKeyCRUD(t *testing.T) {
 
 	// Revoke API key.
 	resp, body = httpDelete(t, coreAPIURL+"/api-keys/"+keyID)
-	require.Equal(t, 200, resp.StatusCode, "revoke API key: %s", body)
+	require.Equal(t, 204, resp.StatusCode, "revoke API key: %s", body)
 	t.Logf("API key revoked")
 
 	// Verify revoked key cannot authenticate.
@@ -76,7 +76,7 @@ func TestAPIKeyScopeEnforcement(t *testing.T) {
 	require.Equal(t, 201, resp.StatusCode, "create read-only key: %s", body)
 	keyData := parseJSON(t, body)
 	keyID := keyData["id"].(string)
-	rawKey := keyData["raw_key"].(string)
+	rawKey := keyData["key"].(string)
 	t.Cleanup(func() { httpDelete(t, coreAPIURL+"/api-keys/"+keyID) })
 
 	// GET /tenants should succeed (tenants:read).

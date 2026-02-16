@@ -15,51 +15,76 @@ func NewDesiredStateService(db DB) *DesiredStateService {
 	return &DesiredStateService{db: db}
 }
 
-// GetForNode builds the complete desired state for a node.
+// GetForNode builds the complete desired state for a node across all its shard assignments.
 func (s *DesiredStateService) GetForNode(ctx context.Context, nodeID string) (*model.DesiredState, error) {
-	// Get node info including shard
-	var shardID, shardRole string
-	err := s.db.QueryRow(ctx, `
-		SELECT s.id, s.role FROM nodes n
-		JOIN shards s ON n.shard_id = s.id
-		WHERE n.id = $1`, nodeID).Scan(&shardID, &shardRole)
+	// Get all shard assignments for this node.
+	rows, err := s.db.Query(ctx, `
+		SELECT s.id, s.role
+		FROM node_shard_assignments nsa
+		JOIN shards s ON nsa.shard_id = s.id
+		WHERE nsa.node_id = $1
+		ORDER BY s.role`, nodeID)
 	if err != nil {
-		return nil, fmt.Errorf("get node shard info: %w", err)
+		return nil, fmt.Errorf("get node shard assignments: %w", err)
+	}
+	defer rows.Close()
+
+	type shardInfo struct {
+		id   string
+		role string
+	}
+	var shardInfos []shardInfo
+	for rows.Next() {
+		var si shardInfo
+		if err := rows.Scan(&si.id, &si.role); err != nil {
+			return nil, fmt.Errorf("scan shard info: %w", err)
+		}
+		shardInfos = append(shardInfos, si)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate shard assignments: %w", err)
 	}
 
 	ds := &model.DesiredState{
-		NodeID:    nodeID,
-		ShardID:   shardID,
-		ShardRole: shardRole,
+		NodeID: nodeID,
 	}
 
-	switch shardRole {
-	case "web":
-		if err := s.loadWebState(ctx, shardID, ds); err != nil {
-			return nil, fmt.Errorf("load web state: %w", err)
+	for _, si := range shardInfos {
+		ss := model.ShardState{
+			ShardID:   si.id,
+			ShardRole: si.role,
 		}
-	case "database":
-		if err := s.loadDatabaseState(ctx, shardID, ds); err != nil {
-			return nil, fmt.Errorf("load database state: %w", err)
+
+		switch si.role {
+		case "web":
+			if err := s.loadWebState(ctx, si.id, &ss); err != nil {
+				return nil, fmt.Errorf("load web state: %w", err)
+			}
+		case "database":
+			if err := s.loadDatabaseState(ctx, si.id, &ss); err != nil {
+				return nil, fmt.Errorf("load database state: %w", err)
+			}
+		case "valkey":
+			if err := s.loadValkeyState(ctx, si.id, &ss); err != nil {
+				return nil, fmt.Errorf("load valkey state: %w", err)
+			}
+		case "lb":
+			if err := s.loadLBState(ctx, si.id, &ss); err != nil {
+				return nil, fmt.Errorf("load lb state: %w", err)
+			}
+		case "storage":
+			if err := s.loadStorageState(ctx, si.id, &ss); err != nil {
+				return nil, fmt.Errorf("load storage state: %w", err)
+			}
 		}
-	case "valkey":
-		if err := s.loadValkeyState(ctx, shardID, ds); err != nil {
-			return nil, fmt.Errorf("load valkey state: %w", err)
-		}
-	case "lb":
-		if err := s.loadLBState(ctx, shardID, ds); err != nil {
-			return nil, fmt.Errorf("load lb state: %w", err)
-		}
-	case "storage":
-		if err := s.loadStorageState(ctx, shardID, ds); err != nil {
-			return nil, fmt.Errorf("load storage state: %w", err)
-		}
+
+		ds.Shards = append(ds.Shards, ss)
 	}
 
 	return ds, nil
 }
 
-func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, ds *model.DesiredState) error {
+func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, ss *model.ShardState) error {
 	// 1. Fetch all active/suspended tenants for this shard.
 	rows, err := s.db.Query(ctx, `
 		SELECT t.id, t.name, t.uid, t.sftp_enabled, t.ssh_enabled, t.status
@@ -235,13 +260,13 @@ func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, 
 			t.Webroots = append(t.Webroots, webroots[idx].webroot)
 		}
 		t.SSHKeys = sshKeysByTenant[t.ID]
-		ds.Tenants = append(ds.Tenants, *t)
+		ss.Tenants = append(ss.Tenants, *t)
 	}
 
 	return nil
 }
 
-func (s *DesiredStateService) loadDatabaseState(ctx context.Context, shardID string, ds *model.DesiredState) error {
+func (s *DesiredStateService) loadDatabaseState(ctx context.Context, shardID string, ss *model.ShardState) error {
 	rows, err := s.db.Query(ctx, `
 		SELECT id, name, status FROM databases
 		WHERE shard_id = $1 AND status = 'active'
@@ -274,7 +299,7 @@ func (s *DesiredStateService) loadDatabaseState(ctx context.Context, shardID str
 		}
 		userRows.Close()
 
-		ds.Databases = append(ds.Databases, d)
+		ss.Databases = append(ss.Databases, d)
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("iterate databases: %w", err)
@@ -282,7 +307,7 @@ func (s *DesiredStateService) loadDatabaseState(ctx context.Context, shardID str
 	return nil
 }
 
-func (s *DesiredStateService) loadValkeyState(ctx context.Context, shardID string, ds *model.DesiredState) error {
+func (s *DesiredStateService) loadValkeyState(ctx context.Context, shardID string, ss *model.ShardState) error {
 	rows, err := s.db.Query(ctx, `
 		SELECT id, name, port, password, max_memory_mb, status
 		FROM valkey_instances WHERE shard_id = $1 AND status = 'active'
@@ -315,7 +340,7 @@ func (s *DesiredStateService) loadValkeyState(ctx context.Context, shardID strin
 		}
 		userRows.Close()
 
-		ds.ValkeyInstances = append(ds.ValkeyInstances, vi)
+		ss.ValkeyInstances = append(ss.ValkeyInstances, vi)
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("iterate valkey instances: %w", err)
@@ -323,7 +348,7 @@ func (s *DesiredStateService) loadValkeyState(ctx context.Context, shardID strin
 	return nil
 }
 
-func (s *DesiredStateService) loadLBState(ctx context.Context, shardID string, ds *model.DesiredState) error {
+func (s *DesiredStateService) loadLBState(ctx context.Context, shardID string, ss *model.ShardState) error {
 	// For LB shards, get all FQDNs that point to web shards in the same cluster.
 	// The LB node serves all web shards in its cluster.
 	rows, err := s.db.Query(ctx, `
@@ -347,7 +372,7 @@ func (s *DesiredStateService) loadLBState(ctx context.Context, shardID string, d
 		if err := rows.Scan(&m.FQDN, &m.LBBackend); err != nil {
 			return fmt.Errorf("scan fqdn mapping: %w", err)
 		}
-		ds.FQDNMappings = append(ds.FQDNMappings, m)
+		ss.FQDNMappings = append(ss.FQDNMappings, m)
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("iterate fqdn mappings: %w", err)
@@ -355,7 +380,7 @@ func (s *DesiredStateService) loadLBState(ctx context.Context, shardID string, d
 	return nil
 }
 
-func (s *DesiredStateService) loadStorageState(ctx context.Context, shardID string, ds *model.DesiredState) error {
+func (s *DesiredStateService) loadStorageState(ctx context.Context, shardID string, ss *model.ShardState) error {
 	rows, err := s.db.Query(ctx, `
 		SELECT id, name, tenant_id, status FROM s3_buckets
 		WHERE shard_id = $1 AND status = 'active'
@@ -374,7 +399,7 @@ func (s *DesiredStateService) loadStorageState(ctx context.Context, shardID stri
 		if tenantID != nil {
 			b.TenantID = *tenantID
 		}
-		ds.S3Buckets = append(ds.S3Buckets, b)
+		ss.S3Buckets = append(ss.S3Buckets, b)
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("iterate s3 buckets: %w", err)

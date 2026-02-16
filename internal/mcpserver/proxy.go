@@ -107,17 +107,10 @@ func (p *ProxyHandler) Handler(op ToolOperation) server.ToolHandlerFunc {
 			httpReq.Header.Set("Content-Type", "application/json")
 		}
 
-		// Forward the API key from MCP session headers
-		apiKey := req.Header.Get("X-API-Key")
-		if apiKey == "" {
-			// Also check Authorization header (some MCP clients use Bearer)
-			auth := req.Header.Get("Authorization")
-			if strings.HasPrefix(auth, "Bearer ") {
-				apiKey = strings.TrimPrefix(auth, "Bearer ")
-			}
-		}
-		if apiKey != "" {
-			httpReq.Header.Set("X-API-Key", apiKey)
+		// Forward the API key from MCP session Authorization header
+		auth := req.Header.Get("Authorization")
+		if auth != "" {
+			httpReq.Header.Set("Authorization", auth)
 		}
 
 		p.logger.Debug().

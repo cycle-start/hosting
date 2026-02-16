@@ -29,6 +29,28 @@ func TestAuth_MissingKey(t *testing.T) {
 	assert.Equal(t, "missing API key", body["error"])
 }
 
+func TestExtractAPIKey(t *testing.T) {
+	tests := []struct {
+		name   string
+		header string
+		want   string
+	}{
+		{"bearer token", "Bearer hst_abc123", "hst_abc123"},
+		{"empty", "", ""},
+		{"no prefix", "hst_abc123", ""},
+		{"basic auth ignored", "Basic dXNlcjpwYXNz", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			if tt.header != "" {
+				req.Header.Set("Authorization", tt.header)
+			}
+			assert.Equal(t, tt.want, extractAPIKey(req))
+		})
+	}
+}
+
 func TestHashConsistency(t *testing.T) {
 	key := "test-api-key-12345"
 	hash := sha256.Sum256([]byte(key))

@@ -43,9 +43,13 @@ func TestNodeService_Create_Success(t *testing.T) {
 		UpdatedAt:  time.Now(),
 	}
 
+	// INSERT into nodes
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+	// loadShardAssignments query (returns empty)
+	emptyRows := newEmptyMockRows()
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(emptyRows, nil)
 
-	err := svc.Create(ctx, node)
+	err := svc.Create(ctx, node, nil)
 	require.NoError(t, err)
 	db.AssertExpectations(t)
 }
@@ -59,7 +63,7 @@ func TestNodeService_Create_DBError(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
 
-	err := svc.Create(ctx, node)
+	err := svc.Create(ctx, node, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "create node")
 	db.AssertExpectations(t)
@@ -74,27 +78,27 @@ func TestNodeService_GetByID_Success(t *testing.T) {
 
 	nodeID := "test-node-1"
 	clusterID := "test-cluster-1"
-	shardID := "test-shard-1"
 	now := time.Now().Truncate(time.Microsecond)
 
 	ipAddr := "10.0.0.10"
 	ip6Addr := "fd00::10"
-	shardIndex := 1
 	row := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = nodeID
 		*(dest[1].(*string)) = clusterID
-		*(dest[2].(**string)) = &shardID
-		*(dest[3].(**int)) = &shardIndex
-		*(dest[4].(*string)) = "node-1.example.com"
-		*(dest[5].(**string)) = &ipAddr
-		*(dest[6].(**string)) = &ip6Addr
-		*(dest[7].(*[]string)) = []string{"web", "db"}
-		*(dest[8].(*string)) = model.StatusActive
-		*(dest[9].(*time.Time)) = now
-		*(dest[10].(*time.Time)) = now
+		*(dest[2].(*string)) = "node-1.example.com"
+		*(dest[3].(**string)) = &ipAddr
+		*(dest[4].(**string)) = &ip6Addr
+		*(dest[5].(*[]string)) = []string{"web", "db"}
+		*(dest[6].(*string)) = model.StatusActive
+		*(dest[7].(*time.Time)) = now
+		*(dest[8].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
+
+	// loadShardAssignments query (returns empty)
+	emptyRows := newEmptyMockRows()
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(emptyRows, nil)
 
 	result, err := svc.GetByID(ctx, nodeID)
 	require.NoError(t, err)
@@ -135,46 +139,43 @@ func TestNodeService_ListByCluster_Success(t *testing.T) {
 
 	clusterID := "test-cluster-1"
 	id1, id2 := "test-node-1", "test-node-2"
-	shardID := "test-shard-1"
 	now := time.Now().Truncate(time.Microsecond)
 
-	shardIdx1 := 1
-	shardIdx2 := 2
 	rows := newMockRows(
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
 			*(dest[1].(*string)) = clusterID
-			*(dest[2].(**string)) = &shardID
-			*(dest[3].(**int)) = &shardIdx1
-			*(dest[4].(*string)) = "node-1"
+			*(dest[2].(*string)) = "node-1"
 			ip := "10.0.0.1"
 			ip6 := "::1"
-			*(dest[5].(**string)) = &ip
-			*(dest[6].(**string)) = &ip6
-			*(dest[7].(*[]string)) = []string{"web"}
-			*(dest[8].(*string)) = model.StatusActive
-			*(dest[9].(*time.Time)) = now
-			*(dest[10].(*time.Time)) = now
+			*(dest[3].(**string)) = &ip
+			*(dest[4].(**string)) = &ip6
+			*(dest[5].(*[]string)) = []string{"web"}
+			*(dest[6].(*string)) = model.StatusActive
+			*(dest[7].(*time.Time)) = now
+			*(dest[8].(*time.Time)) = now
 			return nil
 		},
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id2
 			*(dest[1].(*string)) = clusterID
-			*(dest[2].(**string)) = &shardID
-			*(dest[3].(**int)) = &shardIdx2
-			*(dest[4].(*string)) = "node-2"
+			*(dest[2].(*string)) = "node-2"
 			ip := "10.0.0.2"
 			ip6 := "::2"
-			*(dest[5].(**string)) = &ip
-			*(dest[6].(**string)) = &ip6
-			*(dest[7].(*[]string)) = []string{"db"}
-			*(dest[8].(*string)) = model.StatusActive
-			*(dest[9].(*time.Time)) = now
-			*(dest[10].(*time.Time)) = now
+			*(dest[3].(**string)) = &ip
+			*(dest[4].(**string)) = &ip6
+			*(dest[5].(*[]string)) = []string{"db"}
+			*(dest[6].(*string)) = model.StatusActive
+			*(dest[7].(*time.Time)) = now
+			*(dest[8].(*time.Time)) = now
 			return nil
 		},
 	)
-	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
+	// First call: ListByCluster query
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil).Once()
+	// Second call: batchLoadShardAssignments query (returns empty)
+	emptyRows := newEmptyMockRows()
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(emptyRows, nil).Once()
 
 	result, hasMore, err := svc.ListByCluster(ctx, clusterID, request.ListParams{Limit: 50})
 	require.NoError(t, err)
@@ -226,39 +227,37 @@ func TestNodeService_ListByShard_Success(t *testing.T) {
 	id1, id2 := "test-node-1", "test-node-2"
 	now := time.Now().Truncate(time.Microsecond)
 
-	shardIdx1 := 1
-	shardIdx2 := 2
 	rows := newMockRows(
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
 			*(dest[1].(*string)) = clusterID
-			*(dest[2].(**string)) = &shardID
-			*(dest[3].(**int)) = &shardIdx1
-			*(dest[4].(*string)) = "node-1"
+			*(dest[2].(*string)) = "node-1"
 			ip := "10.0.0.1"
 			ip6 := "::1"
-			*(dest[5].(**string)) = &ip
-			*(dest[6].(**string)) = &ip6
-			*(dest[7].(*[]string)) = []string{"web"}
-			*(dest[8].(*string)) = model.StatusActive
-			*(dest[9].(*time.Time)) = now
-			*(dest[10].(*time.Time)) = now
+			*(dest[3].(**string)) = &ip
+			*(dest[4].(**string)) = &ip6
+			*(dest[5].(*[]string)) = []string{"web"}
+			*(dest[6].(*string)) = model.StatusActive
+			*(dest[7].(*time.Time)) = now
+			*(dest[8].(*time.Time)) = now
+			*(dest[9].(*string)) = shardID
+			*(dest[10].(*int)) = 1
 			return nil
 		},
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id2
 			*(dest[1].(*string)) = clusterID
-			*(dest[2].(**string)) = &shardID
-			*(dest[3].(**int)) = &shardIdx2
-			*(dest[4].(*string)) = "node-2"
+			*(dest[2].(*string)) = "node-2"
 			ip := "10.0.0.2"
 			ip6 := "::2"
-			*(dest[5].(**string)) = &ip
-			*(dest[6].(**string)) = &ip6
-			*(dest[7].(*[]string)) = []string{"db"}
-			*(dest[8].(*string)) = model.StatusActive
-			*(dest[9].(*time.Time)) = now
-			*(dest[10].(*time.Time)) = now
+			*(dest[3].(**string)) = &ip
+			*(dest[4].(**string)) = &ip6
+			*(dest[5].(*[]string)) = []string{"db"}
+			*(dest[6].(*string)) = model.StatusActive
+			*(dest[7].(*time.Time)) = now
+			*(dest[8].(*time.Time)) = now
+			*(dest[9].(*string)) = shardID
+			*(dest[10].(*int)) = 2
 			return nil
 		},
 	)
@@ -339,8 +338,11 @@ func TestNodeService_Update_Success(t *testing.T) {
 	}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+	// loadShardAssignments query (returns empty)
+	emptyRows := newEmptyMockRows()
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(emptyRows, nil)
 
-	err := svc.Update(ctx, node)
+	err := svc.Update(ctx, node, nil)
 	require.NoError(t, err)
 	db.AssertExpectations(t)
 }
@@ -353,7 +355,7 @@ func TestNodeService_Update_DBError(t *testing.T) {
 	node := &model.Node{ID: "test-node-1"}
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
 
-	err := svc.Update(ctx, node)
+	err := svc.Update(ctx, node, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "update node")
 	db.AssertExpectations(t)

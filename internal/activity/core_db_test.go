@@ -196,39 +196,38 @@ func TestCoreDB_ListNodesByShard_Success(t *testing.T) {
 	id1, id2 := "test-node-1", "test-node-2"
 	now := time.Now().Truncate(time.Microsecond)
 
-	shardIdx1 := 1
-	shardIdx2 := 2
+	// New scan order: n.id, n.cluster_id, n.hostname, n.ip_address, n.ip6_address, n.roles, n.status, n.created_at, n.updated_at, nsa.shard_id, nsa.shard_index
 	rows := newMockRows(
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
 			*(dest[1].(*string)) = clusterID
-			*(dest[2].(**string)) = &shardID
-			*(dest[3].(**int)) = &shardIdx1
-			*(dest[4].(*string)) = "node-1"
+			*(dest[2].(*string)) = "node-1"
 			ip1 := "10.0.0.1"
 			ip61 := "::1"
-			*(dest[5].(**string)) = &ip1
-			*(dest[6].(**string)) = &ip61
-			*(dest[7].(*[]string)) = []string{"web"}
-			*(dest[8].(*string)) = model.StatusActive
-			*(dest[9].(*time.Time)) = now
-			*(dest[10].(*time.Time)) = now
+			*(dest[3].(**string)) = &ip1
+			*(dest[4].(**string)) = &ip61
+			*(dest[5].(*[]string)) = []string{"web"}
+			*(dest[6].(*string)) = model.StatusActive
+			*(dest[7].(*time.Time)) = now
+			*(dest[8].(*time.Time)) = now
+			*(dest[9].(*string)) = shardID
+			*(dest[10].(*int)) = 1
 			return nil
 		},
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id2
 			*(dest[1].(*string)) = clusterID
-			*(dest[2].(**string)) = &shardID
-			*(dest[3].(**int)) = &shardIdx2
-			*(dest[4].(*string)) = "node-2"
+			*(dest[2].(*string)) = "node-2"
 			ip2 := "10.0.0.2"
 			ip62 := "::2"
-			*(dest[5].(**string)) = &ip2
-			*(dest[6].(**string)) = &ip62
-			*(dest[7].(*[]string)) = []string{"db"}
-			*(dest[8].(*string)) = model.StatusActive
-			*(dest[9].(*time.Time)) = now
-			*(dest[10].(*time.Time)) = now
+			*(dest[3].(**string)) = &ip2
+			*(dest[4].(**string)) = &ip62
+			*(dest[5].(*[]string)) = []string{"db"}
+			*(dest[6].(*string)) = model.StatusActive
+			*(dest[7].(*time.Time)) = now
+			*(dest[8].(*time.Time)) = now
+			*(dest[9].(*string)) = shardID
+			*(dest[10].(*int)) = 2
 			return nil
 		},
 	)

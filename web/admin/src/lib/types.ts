@@ -41,11 +41,11 @@ export interface Shard {
 export interface Node {
   id: string
   cluster_id: string
-  shard_id?: string | null
   hostname: string
   ip_address?: string | null
   ip6_address?: string | null
   roles: string[]
+  shards?: { shard_id: string; shard_role: string; shard_index: number }[]
   status: string
   created_at: string
   updated_at: string
@@ -70,6 +70,7 @@ export interface Brand {
 
 export interface Tenant {
   id: string
+  name: string
   brand_id: string
   region_id: string
   cluster_id: string

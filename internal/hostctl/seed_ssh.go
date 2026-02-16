@@ -114,16 +114,21 @@ func findNodeIPsByRole(client *Client, clusterID, role string) ([]string, error)
 	}
 	var entries []nodeEntry
 	for _, n := range nodes {
-		if sid, _ := n["shard_id"].(string); sid == shardID {
-			if ip, ok := n["ip_address"].(string); ok && ip != "" {
-				if idx := strings.Index(ip, "/"); idx != -1 {
-					ip = ip[:idx]
+		shards, _ := n["shards"].([]any)
+		for _, s := range shards {
+			sm, _ := s.(map[string]any)
+			if sid, _ := sm["shard_id"].(string); sid == shardID {
+				if ip, ok := n["ip_address"].(string); ok && ip != "" {
+					if idx := strings.Index(ip, "/"); idx != -1 {
+						ip = ip[:idx]
+					}
+					si := 0
+					if v, ok := sm["shard_index"].(float64); ok {
+						si = int(v)
+					}
+					entries = append(entries, nodeEntry{ip: ip, shardIndex: si})
 				}
-				si := 0
-				if v, ok := n["shard_index"].(float64); ok {
-					si = int(v)
-				}
-				entries = append(entries, nodeEntry{ip: ip, shardIndex: si})
+				break
 			}
 		}
 	}

@@ -16,7 +16,10 @@ func TestJMAPClient_DeploySieveScript_Success(t *testing.T) {
 	var uploadCalled, jmapCalled bool
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+		user, pass, ok := r.BasicAuth()
+		assert.True(t, ok, "expected basic auth")
+		assert.Equal(t, "admin", user)
+		assert.Equal(t, "test-token", pass)
 
 		if r.URL.Path == "/jmap/upload/user@example.com/" {
 			uploadCalled = true
@@ -117,7 +120,10 @@ func TestJMAPClient_SetVacationResponse_Enable(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Equal(t, "/jmap", r.URL.Path)
-		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+		user, pass, ok := r.BasicAuth()
+		assert.True(t, ok, "expected basic auth")
+		assert.Equal(t, "admin", user)
+		assert.Equal(t, "test-token", pass)
 
 		var req map[string]any
 		json.NewDecoder(r.Body).Decode(&req)

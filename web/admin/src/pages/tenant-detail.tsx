@@ -630,12 +630,12 @@ export function TenantDetailPage() {
     <div className="space-y-6">
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
-        { label: tenant.id },
+        { label: tenant.name },
       ]} />
 
       <ResourceHeader
-        title={tenant.id}
-        subtitle={`UID: ${tenant.uid} | Brand: ${tenant.brand_id} | Region: ${tenant.region_name || tenant.region_id} | Cluster: ${tenant.cluster_name || tenant.cluster_id}`}
+        title={tenant.name}
+        subtitle={`UID: ${tenant.uid} | Brand: ${brand?.name || tenant.brand_id} | Region: ${tenant.region_name || tenant.region_id} | Cluster: ${tenant.cluster_name || tenant.cluster_id}`}
         status={tenant.status}
         actions={
           <div className="flex gap-2">
@@ -671,10 +671,9 @@ export function TenantDetailPage() {
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: 'SSH', hostname: `ssh.${tenant.id}.${brand.base_hostname}` },
-                { label: 'SFTP', hostname: `sftp.${tenant.id}.${brand.base_hostname}` },
-                { label: 'MySQL', hostname: `mysql.${tenant.id}.${brand.base_hostname}` },
-                { label: 'Web', hostname: `web.${tenant.id}.${brand.base_hostname}` },
+                { label: 'SSH', hostname: `ssh.${tenant.name}.${brand.base_hostname}` },
+                { label: 'SFTP', hostname: `sftp.${tenant.name}.${brand.base_hostname}` },
+                { label: 'MySQL', hostname: `mysql.${tenant.name}.${brand.base_hostname}` },
               ].map(svc => (
                 <div key={svc.label} className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground w-12">{svc.label}</span>
@@ -846,7 +845,7 @@ export function TenantDetailPage() {
 
       {/* Delete Tenant */}
       <ConfirmDialog open={deleteOpen} onOpenChange={setDeleteOpen} title="Delete Tenant"
-        description={`Are you sure you want to delete "${tenant.id}"? All associated resources will be removed.`}
+        description={`Are you sure you want to delete "${tenant.name}"? All associated resources will be removed.`}
         confirmLabel="Delete" variant="destructive" onConfirm={handleDelete} loading={deleteMutation.isPending} />
 
       {/* Delete Webroot */}

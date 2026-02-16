@@ -148,7 +148,7 @@ func (c *JMAPClient) uploadBlob(ctx context.Context, baseURL, adminToken, accoun
 	if err != nil {
 		return "", fmt.Errorf("upload blob request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+adminToken)
+	req.SetBasicAuth("admin", adminToken)
 	req.Header.Set("Content-Type", "application/octet-stream")
 
 	resp, err := c.httpClient.Do(req)
@@ -183,7 +183,7 @@ func (c *JMAPClient) jmapRequest(ctx context.Context, baseURL, adminToken string
 	if err != nil {
 		return nil, fmt.Errorf("jmap request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+adminToken)
+	req.SetBasicAuth("admin", adminToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)

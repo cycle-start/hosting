@@ -2,7 +2,12 @@ package model
 
 // DesiredState is the full desired state for a node, returned by the internal API.
 type DesiredState struct {
-	NodeID    string `json:"node_id"`
+	NodeID string       `json:"node_id"`
+	Shards []ShardState `json:"shards"`
+}
+
+// ShardState is the desired state for a single shard on a node.
+type ShardState struct {
 	ShardID   string `json:"shard_id"`
 	ShardRole string `json:"shard_role"`
 

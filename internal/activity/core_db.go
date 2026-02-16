@@ -335,7 +335,7 @@ func (a *CoreDB) GetShardByID(ctx context.Context, id string) (*model.Shard, err
 // GetNodesByClusterAndRole retrieves all nodes in a cluster with the specified role.
 func (a *CoreDB) GetNodesByClusterAndRole(ctx context.Context, clusterID string, role string) ([]model.Node, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, cluster_id, shard_id, shard_index, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at
+		`SELECT id, cluster_id, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at
 		 FROM nodes WHERE cluster_id = $1 AND $2 = ANY(roles) AND status = $3`, clusterID, role, model.StatusActive,
 	)
 	if err != nil {
@@ -346,7 +346,7 @@ func (a *CoreDB) GetNodesByClusterAndRole(ctx context.Context, clusterID string,
 	var nodes []model.Node
 	for rows.Next() {
 		var n model.Node
-		if err := rows.Scan(&n.ID, &n.ClusterID, &n.ShardID, &n.ShardIndex, &n.Hostname, &n.IPAddress, &n.IP6Address, &n.Roles, &n.Status, &n.CreatedAt, &n.UpdatedAt); err != nil {
+		if err := rows.Scan(&n.ID, &n.ClusterID, &n.Hostname, &n.IPAddress, &n.IP6Address, &n.Roles, &n.Status, &n.CreatedAt, &n.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan node row: %w", err)
 		}
 		nodes = append(nodes, n)
@@ -415,11 +415,15 @@ func (a *CoreDB) ListTenantsByShard(ctx context.Context, shardID string) ([]mode
 	return tenants, rows.Err()
 }
 
-// ListNodesByShard retrieves all nodes assigned to a shard.
+// ListNodesByShard retrieves all nodes assigned to a shard via the join table.
 func (a *CoreDB) ListNodesByShard(ctx context.Context, shardID string) ([]model.Node, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, cluster_id, shard_id, shard_index, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at
-		 FROM nodes WHERE shard_id = $1 ORDER BY hostname`, shardID,
+		`SELECT n.id, n.cluster_id, n.hostname, n.ip_address::text, n.ip6_address::text, n.roles, n.status, n.created_at, n.updated_at,
+		        nsa.shard_id, nsa.shard_index
+		 FROM nodes n
+		 JOIN node_shard_assignments nsa ON n.id = nsa.node_id
+		 WHERE nsa.shard_id = $1
+		 ORDER BY n.hostname`, shardID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list nodes by shard: %w", err)
@@ -429,9 +433,14 @@ func (a *CoreDB) ListNodesByShard(ctx context.Context, shardID string) ([]model.
 	var nodes []model.Node
 	for rows.Next() {
 		var n model.Node
-		if err := rows.Scan(&n.ID, &n.ClusterID, &n.ShardID, &n.ShardIndex, &n.Hostname, &n.IPAddress, &n.IP6Address, &n.Roles, &n.Status, &n.CreatedAt, &n.UpdatedAt); err != nil {
+		var joinShardID string
+		var joinShardIndex int
+		if err := rows.Scan(&n.ID, &n.ClusterID, &n.Hostname, &n.IPAddress, &n.IP6Address, &n.Roles, &n.Status, &n.CreatedAt, &n.UpdatedAt,
+			&joinShardID, &joinShardIndex); err != nil {
 			return nil, fmt.Errorf("scan node row: %w", err)
 		}
+		n.ShardID = &joinShardID
+		n.ShardIndex = &joinShardIndex
 		nodes = append(nodes, n)
 	}
 	return nodes, rows.Err()
@@ -463,9 +472,9 @@ func (a *CoreDB) GetTenantServicesByTenantID(ctx context.Context, tenantID strin
 func (a *CoreDB) GetNodeByID(ctx context.Context, id string) (*model.Node, error) {
 	var n model.Node
 	err := a.db.QueryRow(ctx,
-		`SELECT id, cluster_id, shard_id, shard_index, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at
+		`SELECT id, cluster_id, hostname, ip_address::text, ip6_address::text, roles, status, created_at, updated_at
 		 FROM nodes WHERE id = $1`, id,
-	).Scan(&n.ID, &n.ClusterID, &n.ShardID, &n.ShardIndex, &n.Hostname, &n.IPAddress, &n.IP6Address,
+	).Scan(&n.ID, &n.ClusterID, &n.Hostname, &n.IPAddress, &n.IP6Address,
 		&n.Roles, &n.Status, &n.CreatedAt, &n.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get node by id: %w", err)
@@ -606,9 +615,9 @@ func (a *CoreDB) CreateShard(ctx context.Context, s *model.Shard) error {
 // CreateNode inserts a new node record.
 func (a *CoreDB) CreateNode(ctx context.Context, n *model.Node) error {
 	_, err := a.db.Exec(ctx,
-		`INSERT INTO nodes (id, cluster_id, shard_id, shard_index, hostname, ip_address, ip6_address, roles, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-		n.ID, n.ClusterID, n.ShardID, n.ShardIndex, n.Hostname, n.IPAddress, n.IP6Address, n.Roles, n.Status, n.CreatedAt, n.UpdatedAt,
+		`INSERT INTO nodes (id, cluster_id, hostname, ip_address, ip6_address, roles, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		n.ID, n.ClusterID, n.Hostname, n.IPAddress, n.IP6Address, n.Roles, n.Status, n.CreatedAt, n.UpdatedAt,
 	)
 	return err
 }

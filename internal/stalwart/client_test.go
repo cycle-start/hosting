@@ -16,9 +16,20 @@ import (
 func TestClient_CreateDomain_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
-		assert.Equal(t, "/api/domain/example.com", r.URL.Path)
-		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
-		w.WriteHeader(http.StatusOK)
+		assert.Equal(t, "/api/principal", r.URL.Path)
+		user, pass, ok := r.BasicAuth()
+		assert.True(t, ok, "expected basic auth")
+		assert.Equal(t, "admin", user)
+		assert.Equal(t, "test-token", pass)
+
+		var payload map[string]any
+		err := json.NewDecoder(r.Body).Decode(&payload)
+		require.NoError(t, err)
+		assert.Equal(t, "domain", payload["type"])
+		assert.Equal(t, "example.com", payload["name"])
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"data":1}`))
 	}))
 	defer srv.Close()
 
@@ -46,8 +57,11 @@ func TestClient_CreateDomain_Error(t *testing.T) {
 func TestClient_DeleteDomain_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodDelete, r.Method)
-		assert.Equal(t, "/api/domain/example.com", r.URL.Path)
-		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+		assert.Equal(t, "/api/principal/example.com", r.URL.Path)
+		user, pass, ok := r.BasicAuth()
+		assert.True(t, ok, "expected basic auth")
+		assert.Equal(t, "admin", user)
+		assert.Equal(t, "test-token", pass)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -77,7 +91,10 @@ func TestClient_CreateAccount_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Equal(t, "/api/principal", r.URL.Path)
-		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+		user, pass, ok := r.BasicAuth()
+		assert.True(t, ok, "expected basic auth")
+		assert.Equal(t, "admin", user)
+		assert.Equal(t, "test-token", pass)
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 
 		var payload map[string]any
@@ -127,7 +144,10 @@ func TestClient_DeleteAccount_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodDelete, r.Method)
 		assert.Equal(t, "/api/principal/user@example.com", r.URL.Path)
-		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+		user, pass, ok := r.BasicAuth()
+		assert.True(t, ok, "expected basic auth")
+		assert.Equal(t, "admin", user)
+		assert.Equal(t, "test-token", pass)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -157,7 +177,10 @@ func TestClient_UpdateAccount_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPatch, r.Method)
 		assert.Equal(t, "/api/principal/user@example.com", r.URL.Path)
-		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+		user, pass, ok := r.BasicAuth()
+		assert.True(t, ok, "expected basic auth")
+		assert.Equal(t, "admin", user)
+		assert.Equal(t, "test-token", pass)
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 
 		var ops []PatchOp
@@ -201,7 +224,10 @@ func TestClient_GetAccount_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
 		assert.Equal(t, "/api/principal/user@example.com", r.URL.Path)
-		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+		user, pass, ok := r.BasicAuth()
+		assert.True(t, ok, "expected basic auth")
+		assert.Equal(t, "admin", user)
+		assert.Equal(t, "test-token", pass)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"name":        "user@example.com",

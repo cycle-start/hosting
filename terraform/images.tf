@@ -48,6 +48,15 @@ resource "libvirt_volume" "image_valkey" {
   }
 }
 
+resource "libvirt_volume" "image_email" {
+  name = "golden-email.qcow2"
+  pool = libvirt_pool.hosting.name
+  create = {
+    content = { url = "${var.image_dir}/email.qcow2" }
+    format  = "qcow2"
+  }
+}
+
 resource "libvirt_volume" "image_storage" {
   name = "golden-storage.qcow2"
   pool = libvirt_pool.hosting.name

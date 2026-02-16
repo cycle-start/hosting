@@ -16,6 +16,10 @@ resource "random_uuid" "valkey_node_id" {
   count = length(var.valkey_nodes)
 }
 
+resource "random_uuid" "email_node_id" {
+  count = length(var.email_nodes)
+}
+
 resource "random_uuid" "storage_node_id" {
   count = length(var.storage_nodes)
 }
@@ -60,7 +64,7 @@ resource "libvirt_volume" "dns_node" {
   count    = length(var.dns_nodes)
   name     = "${var.dns_nodes[count.index].name}.qcow2"
   pool     = libvirt_pool.hosting.name
-  capacity = 5368709120 # 5 GB
+  capacity = 10737418240 # 10 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
     path   = libvirt_volume.image_dns.path
@@ -72,10 +76,22 @@ resource "libvirt_volume" "valkey_node" {
   count    = length(var.valkey_nodes)
   name     = "${var.valkey_nodes[count.index].name}.qcow2"
   pool     = libvirt_pool.hosting.name
-  capacity = 5368709120 # 5 GB
+  capacity = 10737418240 # 10 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
     path   = libvirt_volume.image_valkey.path
+    format = { type = "qcow2" }
+  }
+}
+
+resource "libvirt_volume" "email_node" {
+  count    = length(var.email_nodes)
+  name     = "${var.email_nodes[count.index].name}.qcow2"
+  pool     = libvirt_pool.hosting.name
+  capacity = 10737418240 # 10 GB
+  target   = { format = { type = "qcow2" } }
+  backing_store = {
+    path   = libvirt_volume.image_email.path
     format = { type = "qcow2" }
   }
 }
@@ -249,6 +265,43 @@ resource "libvirt_volume" "valkey_node_seed" {
   }
 }
 
+resource "libvirt_cloudinit_disk" "email_node" {
+  count = length(var.email_nodes)
+  name  = "${var.email_nodes[count.index].name}-cloudinit.iso"
+  meta_data = yamlencode({
+    instance-id    = "i-${var.email_nodes[count.index].name}"
+    local-hostname = var.email_nodes[count.index].name
+  })
+  user_data = templatefile("${path.module}/cloud-init/email-node.yaml.tpl", {
+    hostname                = var.email_nodes[count.index].name
+    node_id                 = random_uuid.email_node_id[count.index].result
+    shard_name              = var.email_shard_name
+    temporal_address        = "${var.controlplane_ip}:${var.temporal_port}"
+    ssh_public_key          = file(pathexpand(var.ssh_public_key_path))
+    region_id               = var.region_id
+    cluster_id              = var.cluster_id
+    mail_hostname           = "mail.${var.base_domain}"
+    stalwart_admin_password = var.stalwart_admin_password
+  })
+  network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
+    ip_address = var.email_nodes[count.index].ip
+    gateway    = var.gateway_ip
+  })
+}
+
+resource "libvirt_volume" "email_node_seed" {
+  count = length(var.email_nodes)
+  name  = "${var.email_nodes[count.index].name}-seed.iso"
+  pool  = libvirt_pool.hosting.name
+  create = {
+    content = { url = libvirt_cloudinit_disk.email_node[count.index].path }
+  }
+  lifecycle {
+    replace_triggered_by = [libvirt_cloudinit_disk.email_node[count.index]]
+    ignore_changes       = [create]
+  }
+}
+
 resource "libvirt_cloudinit_disk" "storage_node" {
   count = length(var.storage_nodes)
   name  = "${var.storage_nodes[count.index].name}-cloudinit.iso"
@@ -260,7 +313,7 @@ resource "libvirt_cloudinit_disk" "storage_node" {
     hostname           = var.storage_nodes[count.index].name
     node_id            = random_uuid.storage_node_id[count.index].result
     shard_name         = var.storage_shard_name
-    temporal_address   = "${var.gateway_ip}:${var.temporal_port}"
+    temporal_address   = "${var.controlplane_ip}:${var.temporal_port}"
     ssh_public_key     = file(pathexpand(var.ssh_public_key_path))
     ip_address         = var.storage_nodes[count.index].ip
     s3_enabled         = true
@@ -514,6 +567,55 @@ resource "libvirt_domain" "valkey_node" {
           volume = {
             pool   = libvirt_pool.hosting.name
             volume = libvirt_volume.valkey_node_seed[count.index].name
+          }
+        }
+        driver = { type = "raw" }
+        target = { dev = "vdb", bus = "virtio" }
+      },
+    ]
+
+    interfaces = [{
+      type   = "network"
+      source = { network = { network = libvirt_network.hosting.name } }
+      model  = { type = "virtio" }
+    }]
+
+    consoles = [{
+      type   = "pty"
+      target = { type = "serial", port = "0" }
+    }]
+  }
+}
+
+resource "libvirt_domain" "email_node" {
+  count       = length(var.email_nodes)
+  name        = var.email_nodes[count.index].name
+  memory      = var.email_nodes[count.index].memory
+  memory_unit = "MiB"
+  vcpu        = var.email_nodes[count.index].vcpus
+  type        = "kvm"
+  running     = true
+  autostart   = true
+
+  os = { type = "hvm" }
+
+  devices = {
+    disks = [
+      {
+        source = {
+          volume = {
+            pool   = libvirt_pool.hosting.name
+            volume = libvirt_volume.email_node[count.index].name
+          }
+        }
+        driver = { type = "qcow2" }
+        target = { dev = "vda", bus = "virtio" }
+      },
+      {
+        source = {
+          volume = {
+            pool   = libvirt_pool.hosting.name
+            volume = libvirt_volume.email_node_seed[count.index].name
           }
         }
         driver = { type = "raw" }
@@ -865,6 +967,13 @@ locals {
       shard_name = var.valkey_shard_name
       role       = "valkey"
     }],
+    [for i, n in var.email_nodes : {
+      id         = random_uuid.email_node_id[i].result
+      name       = n.name
+      ip         = n.ip
+      shard_name = var.email_shard_name
+      role       = "email"
+    }],
     [for i, n in var.storage_nodes : {
       id         = random_uuid.storage_node_id[i].result
       name       = n.name
@@ -893,6 +1002,7 @@ locals {
     gateway_ip      = var.gateway_ip
     controlplane_ip = var.controlplane_ip
     base_domain     = var.base_domain
+    email_node_ip   = var.email_nodes[0].ip
   })
 
   # Group web nodes by shard for HAProxy backend generation.

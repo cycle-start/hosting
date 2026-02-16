@@ -122,48 +122,90 @@ func applyNodes(client *Client, clusterID string, def ClusterDef) error {
 		shardRoleMap[s.Name] = s.Role
 	}
 
-	// For each node, ensure it exists with the correct shard assignment.
+	// For each node, ensure it exists with the correct shard assignment(s).
 	for _, node := range def.Nodes {
-		role, ok := shardRoleMap[node.ShardName]
-		if !ok {
-			return fmt.Errorf("shard %q not found for node %s", node.ShardName, node.ID)
+		// Merge ShardName into ShardNames for backward compatibility.
+		shardNames := node.ShardNames
+		if len(shardNames) == 0 && node.ShardName != "" {
+			shardNames = []string{node.ShardName}
 		}
-		shardID := shardNameToID[node.ShardName]
+
+		// Resolve shard names to IDs and collect roles.
+		var shardIDs []string
+		roles := make(map[string]bool)
+		for _, name := range shardNames {
+			role, ok := shardRoleMap[name]
+			if !ok {
+				return fmt.Errorf("shard %q not found for node %s", name, node.ID)
+			}
+			shardIDs = append(shardIDs, shardNameToID[name])
+			roles[role] = true
+		}
+		roleList := make([]string, 0, len(roles))
+		for r := range roles {
+			roleList = append(roleList, r)
+		}
+
+		hostname := node.Hostname
+		if hostname == "" {
+			hostname = node.ID
+		}
 
 		// Try to find existing node by ID.
-		_, err := client.Get(fmt.Sprintf("/nodes/%s", node.ID))
+		existingResp, err := client.Get(fmt.Sprintf("/nodes/%s", node.ID))
 		if err == nil {
-			fmt.Printf("Node %s: exists (shard=%s)\n", node.ID, node.ShardName)
+			// Check if hostname needs updating.
+			var existing struct {
+				Hostname string `json:"hostname"`
+			}
+			if json.Unmarshal(existingResp.Body, &existing) == nil && existing.Hostname != hostname {
+				_, err := client.Put(fmt.Sprintf("/nodes/%s", node.ID), map[string]any{
+					"hostname": hostname,
+				})
+				if err != nil {
+					fmt.Printf("Node %s: warning: failed to update hostname: %v\n", hostname, err)
+				} else {
+					fmt.Printf("Node %s: updated hostname (was %q)\n", hostname, existing.Hostname)
+				}
+			} else {
+				fmt.Printf("Node %s: exists (shards=%v)\n", hostname, shardNames)
+			}
 			continue
 		}
 
-		// Create node with pre-assigned ID and shard.
+		// Create node with pre-assigned ID and shard(s).
 		_, err = client.Post(fmt.Sprintf("/clusters/%s/nodes", clusterID), map[string]any{
 			"id":         node.ID,
-			"hostname":   node.ID, // node-agent registers by ID
+			"hostname":   hostname,
 			"ip_address": node.IPAddress,
-			"shard_id":   shardID,
-			"roles":      []string{role},
+			"shard_ids":  shardIDs,
+			"roles":      roleList,
 		})
 		if err != nil {
-			return fmt.Errorf("create node %s: %w", node.ID, err)
+			return fmt.Errorf("create node %s: %w", hostname, err)
 		}
-		fmt.Printf("Node %s: created (shard=%s, ip=%s)\n", node.ID, node.ShardName, node.IPAddress)
+		fmt.Printf("Node %s: created (shards=%v, ip=%s)\n", hostname, shardNames, node.IPAddress)
 	}
 
 	// Trigger convergence for each shard that has nodes.
 	convergedShards := make(map[string]bool)
 	for _, node := range def.Nodes {
-		if convergedShards[node.ShardName] {
-			continue
+		shardNames := node.ShardNames
+		if len(shardNames) == 0 && node.ShardName != "" {
+			shardNames = []string{node.ShardName}
 		}
-		convergedShards[node.ShardName] = true
+		for _, name := range shardNames {
+			if convergedShards[name] {
+				continue
+			}
+			convergedShards[name] = true
 
-		shardID := shardNameToID[node.ShardName]
-		fmt.Printf("Converging shard %q...\n", node.ShardName)
-		_, err := client.Post(fmt.Sprintf("/shards/%s/converge", shardID), nil)
-		if err != nil {
-			fmt.Printf("  Warning: convergence failed for shard %q: %v\n", node.ShardName, err)
+			shardID := shardNameToID[name]
+			fmt.Printf("Converging shard %q...\n", name)
+			_, err := client.Post(fmt.Sprintf("/shards/%s/converge", shardID), nil)
+			if err != nil {
+				fmt.Printf("  Warning: convergence failed for shard %q: %v\n", name, err)
+			}
 		}
 	}
 
@@ -309,10 +351,13 @@ func printClusterSummary(client *Client, clusterID string) error {
 		return fmt.Errorf("parse nodes: %w", err)
 	}
 	var nodes []struct {
-		ID       string  `json:"id"`
-		ShardID  *string `json:"shard_id"`
-		Hostname string  `json:"hostname"`
-		Status   string  `json:"status"`
+		ID       string `json:"id"`
+		Hostname string `json:"hostname"`
+		Status   string `json:"status"`
+		Shards   []struct {
+			ShardID   string `json:"shard_id"`
+			ShardRole string `json:"shard_role"`
+		} `json:"shards"`
 	}
 	if err := json.Unmarshal(nodeItems, &nodes); err != nil {
 		return fmt.Errorf("parse nodes: %w", err)
@@ -321,10 +366,14 @@ func printClusterSummary(client *Client, clusterID string) error {
 	fmt.Println("\nNodes:")
 	for _, n := range nodes {
 		shardStr := "<none>"
-		if n.ShardID != nil {
-			shardStr = *n.ShardID
+		if len(n.Shards) > 0 {
+			roles := make([]string, len(n.Shards))
+			for i, s := range n.Shards {
+				roles[i] = s.ShardRole
+			}
+			shardStr = fmt.Sprintf("%v", roles)
 		}
-		fmt.Printf("  %-30s status=%-12s shard=%s id=%s\n", n.Hostname, n.Status, shardStr, n.ID)
+		fmt.Printf("  %-30s status=%-12s shards=%s id=%s\n", n.Hostname, n.Status, shardStr, n.ID)
 	}
 
 	return nil

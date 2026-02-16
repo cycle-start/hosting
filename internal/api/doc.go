@@ -4,7 +4,7 @@
 //	@version					1.0
 //	@description				Web hosting platform API
 //	@BasePath					/api/v1
-//	@securityDefinitions.apikey	ApiKeyAuth
+//	@securityDefinitions.apikey	BearerAuth
 //	@in							header
-//	@name						X-API-Key
+//	@name						Authorization
 package api

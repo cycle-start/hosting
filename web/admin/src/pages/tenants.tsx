@@ -48,6 +48,11 @@ export function TenantsPage() {
 
   const columns: ColumnDef<Tenant>[] = [
     {
+      accessorKey: 'name',
+      header: 'Name',
+      cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+    },
+    {
       accessorKey: 'id',
       header: 'ID',
       cell: ({ row }) => (
@@ -144,7 +149,7 @@ export function TenantsPage() {
           columns={columns}
           data={tenants}
           loading={isLoading}
-          searchColumn="id"
+          searchColumn="name"
           searchPlaceholder="Search tenants..."
           onRowClick={(t) => navigate({ to: '/tenants/$id', params: { id: t.id } })}
         />
@@ -154,7 +159,7 @@ export function TenantsPage() {
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         title="Delete Tenant"
-        description={`Are you sure you want to delete tenant "${deleteTarget?.id}"? All associated resources will be removed.`}
+        description={`Are you sure you want to delete tenant "${deleteTarget?.name}"? All associated resources will be removed.`}
         confirmLabel="Delete"
         variant="destructive"
         onConfirm={handleDelete}

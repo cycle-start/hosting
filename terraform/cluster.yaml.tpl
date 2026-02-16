@@ -14,7 +14,7 @@ cluster:
 %{ endif ~}
 %{ endfor ~}
   config:
-    stalwart_url: "http://${gateway_ip}:8082"
+    stalwart_url: "http://${email_node_ip}:8080"
     stalwart_token: "dev-token"
     mail_hostname: "mail.${base_domain}"
   spec:
@@ -41,6 +41,11 @@ cluster:
         role: valkey
         node_count: ${length([for n in nodes : n if n.shard_name == node.shard_name])}
 %{ endif ~}
+%{ if node.role == "email" && endswith(node.name, "node-0") ~}
+      - name: ${node.shard_name}
+        role: email
+        node_count: ${length([for n in nodes : n if n.shard_name == node.shard_name])}
+%{ endif ~}
 %{ if node.role == "storage" && endswith(node.name, "node-0") ~}
       - name: ${node.shard_name}
         role: storage
@@ -65,6 +70,7 @@ cluster:
   nodes:
 %{ for node in nodes ~}
     - id: ${node.id}
+      hostname: ${node.name}
       shard_name: ${node.shard_name}
       ip_address: "${node.ip}"
 %{ endfor ~}

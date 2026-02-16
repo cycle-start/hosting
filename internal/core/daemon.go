@@ -31,8 +31,9 @@ func (s *DaemonService) Create(ctx context.Context, daemon *model.Daemon) error 
 		var nodeID string
 		err = s.db.QueryRow(ctx,
 			`SELECT n.id FROM nodes n
+			 JOIN node_shard_assignments nsa ON nsa.node_id = n.id
 			 LEFT JOIN daemons d ON d.node_id = n.id
-			 WHERE n.shard_id = $1 AND n.status = 'active'
+			 WHERE nsa.shard_id = $1 AND n.status = 'active'
 			 GROUP BY n.id
 			 ORDER BY COUNT(d.id) ASC, n.id ASC
 			 LIMIT 1`, *shardID,

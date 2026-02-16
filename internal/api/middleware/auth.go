@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -25,11 +26,20 @@ type APIKeyIdentity struct {
 // APIKeyIDKey is kept for backward compatibility (audit logger).
 const APIKeyIDKey contextKey = "api_key_id"
 
-// Auth returns a middleware that validates the X-API-Key header against the api_keys table.
+// extractAPIKey extracts the API key from the Authorization: Bearer header.
+func extractAPIKey(r *http.Request) string {
+	auth := r.Header.Get("Authorization")
+	if strings.HasPrefix(auth, "Bearer ") {
+		return strings.TrimPrefix(auth, "Bearer ")
+	}
+	return ""
+}
+
+// Auth returns a middleware that validates the Authorization: Bearer header against the api_keys table.
 func Auth(pool *pgxpool.Pool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			key := r.Header.Get("X-API-Key")
+			key := extractAPIKey(r)
 			if key == "" {
 				response.WriteError(w, http.StatusUnauthorized, "missing API key")
 				return

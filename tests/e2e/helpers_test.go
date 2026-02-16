@@ -61,9 +61,9 @@ func apiKey() string {
 	return "hst_dev_e2e_test_key_00000000"
 }
 
-// setAPIKey adds the X-API-Key header to a request.
+// setAPIKey adds the Authorization: Bearer header to a request.
 func setAPIKey(req *http.Request) {
-	req.Header.Set("X-API-Key", apiKey())
+	req.Header.Set("Authorization", "Bearer "+apiKey())
 }
 
 // sshExec runs a command on a VM via SSH and returns stdout.
@@ -631,7 +631,7 @@ func httpDoWithKey(t *testing.T, method, url string, body interface{}, key strin
 		t.Fatalf("create %s request %s: %v", method, url, err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-API-Key", key)
+	req.Header.Set("Authorization", "Bearer "+key)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("%s %s: %v", method, url, err)

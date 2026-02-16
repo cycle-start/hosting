@@ -18,12 +18,22 @@ func NewClient() *Client {
 }
 
 func (c *Client) CreateDomain(ctx context.Context, baseURL, adminToken, domain string) error {
-	url := fmt.Sprintf("%s/api/domain/%s", baseURL, domain)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	payload := map[string]any{
+		"type": "domain",
+		"name": domain,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal create domain: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/principal", baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("create domain request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+adminToken)
+	req.SetBasicAuth("admin", adminToken)
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -32,19 +42,19 @@ func (c *Client) CreateDomain(ctx context.Context, baseURL, adminToken, domain s
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("create domain %s: status %d: %s", domain, resp.StatusCode, string(body))
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("create domain %s: status %d: %s", domain, resp.StatusCode, string(respBody))
 	}
 	return nil
 }
 
 func (c *Client) DeleteDomain(ctx context.Context, baseURL, adminToken, domain string) error {
-	url := fmt.Sprintf("%s/api/domain/%s", baseURL, domain)
+	url := fmt.Sprintf("%s/api/principal/%s", baseURL, domain)
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return fmt.Errorf("delete domain request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+adminToken)
+	req.SetBasicAuth("admin", adminToken)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -78,7 +88,7 @@ func (c *Client) CreateAccount(ctx context.Context, baseURL, adminToken string, 
 	if err != nil {
 		return fmt.Errorf("create account request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+adminToken)
+	req.SetBasicAuth("admin", adminToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
@@ -100,7 +110,7 @@ func (c *Client) DeleteAccount(ctx context.Context, baseURL, adminToken, address
 	if err != nil {
 		return fmt.Errorf("delete account request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+adminToken)
+	req.SetBasicAuth("admin", adminToken)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -126,7 +136,7 @@ func (c *Client) UpdateAccount(ctx context.Context, baseURL, adminToken, name st
 	if err != nil {
 		return fmt.Errorf("update account request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+adminToken)
+	req.SetBasicAuth("admin", adminToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
@@ -148,7 +158,7 @@ func (c *Client) GetAccount(ctx context.Context, baseURL, adminToken, address st
 	if err != nil {
 		return nil, fmt.Errorf("get account request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+adminToken)
+	req.SetBasicAuth("admin", adminToken)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

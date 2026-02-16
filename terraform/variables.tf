@@ -132,7 +132,7 @@ variable "dns_nodes" {
   type = list(object({
     name   = string
     ip     = string
-    memory = optional(number, 512)
+    memory = optional(number, 1024)
     vcpus  = optional(number, 1)
   }))
   default = [
@@ -153,7 +153,7 @@ variable "valkey_nodes" {
   type = list(object({
     name   = string
     ip     = string
-    memory = optional(number, 512)
+    memory = optional(number, 1024)
     vcpus  = optional(number, 1)
   }))
   default = [
@@ -165,6 +165,34 @@ variable "valkey_shard_name" {
   description = "Shard name for valkey nodes"
   type        = string
   default     = "valkey-1"
+}
+
+# --- Email nodes ---
+
+variable "email_nodes" {
+  description = "Email node definitions (runs Stalwart + node-agent)"
+  type = list(object({
+    name   = string
+    ip     = string
+    memory = optional(number, 1024)
+    vcpus  = optional(number, 2)
+  }))
+  default = [
+    { name = "email-1-node-0", ip = "10.10.10.80" },
+  ]
+}
+
+variable "email_shard_name" {
+  description = "Shard name for email nodes"
+  type        = string
+  default     = "email-1"
+}
+
+variable "stalwart_admin_password" {
+  description = "Stalwart fallback admin password"
+  type        = string
+  default     = "dev-token"
+  sensitive   = true
 }
 
 # --- Storage nodes (Ceph: S3/RGW + CephFS/MDS) ---

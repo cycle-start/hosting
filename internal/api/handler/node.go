@@ -88,11 +88,16 @@ func (h *Node) Create(w http.ResponseWriter, r *http.Request) {
 		nodeID = platform.NewID()
 	}
 
+	// Merge ShardID into ShardIDs for backward compatibility.
+	shardIDs := req.ShardIDs
+	if len(shardIDs) == 0 && req.ShardID != nil {
+		shardIDs = []string{*req.ShardID}
+	}
+
 	now := time.Now()
 	node := &model.Node{
 		ID:         nodeID,
 		ClusterID:  clusterID,
-		ShardID:    req.ShardID,
 		Hostname:   req.Hostname,
 		IPAddress:  req.IPAddress,
 		IP6Address: req.IP6Address,
@@ -102,7 +107,7 @@ func (h *Node) Create(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:  now,
 	}
 
-	if err := h.svc.Create(r.Context(), node); err != nil {
+	if err := h.svc.Create(r.Context(), node, shardIDs); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -178,9 +183,6 @@ func (h *Node) Update(w http.ResponseWriter, r *http.Request) {
 	if req.IP6Address != nil {
 		node.IP6Address = req.IP6Address
 	}
-	if req.ShardID != nil {
-		node.ShardID = req.ShardID
-	}
 	if req.Roles != nil {
 		node.Roles = req.Roles
 	}
@@ -188,7 +190,15 @@ func (h *Node) Update(w http.ResponseWriter, r *http.Request) {
 		node.Status = req.Status
 	}
 
-	if err := h.svc.Update(r.Context(), node); err != nil {
+	// Merge ShardID into ShardIDs for backward compatibility.
+	var shardIDs []string
+	if req.ShardIDs != nil {
+		shardIDs = req.ShardIDs
+	} else if req.ShardID != nil {
+		shardIDs = []string{*req.ShardID}
+	}
+
+	if err := h.svc.Update(r.Context(), node, shardIDs); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

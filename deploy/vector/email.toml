@@ -1,0 +1,25 @@
+# Additional Vector sources for email nodes (Stalwart).
+
+[sources.journald_stalwart]
+type = "journald"
+include_units = ["stalwart-mail"]
+
+[transforms.label_stalwart]
+type = "remap"
+inputs = ["journald_stalwart"]
+source = '''
+.service = "stalwart"
+.level = "info"
+'''
+
+[sinks.loki_email]
+type = "loki"
+inputs = ["label_stalwart"]
+endpoint = "http://10.10.10.2:3100"
+encoding.codec = "text"
+
+[sinks.loki_email.labels]
+service = "{{ service }}"
+hostname = "{{ host }}"
+level = "{{ level }}"
+job = "stalwart"

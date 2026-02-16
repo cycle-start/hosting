@@ -5,11 +5,16 @@ import (
 	"time"
 )
 
+// NodeShardAssignment represents a node's assignment to a shard.
+type NodeShardAssignment struct {
+	ShardID    string `json:"shard_id" db:"shard_id"`
+	ShardRole  string `json:"shard_role" db:"shard_role"`
+	ShardIndex int    `json:"shard_index" db:"shard_index"`
+}
+
 type Node struct {
 	ID           string     `json:"id" db:"id"`
 	ClusterID    string     `json:"cluster_id" db:"cluster_id"`
-	ShardID      *string    `json:"shard_id,omitempty" db:"shard_id"`
-	ShardIndex   *int       `json:"shard_index,omitempty" db:"shard_index"`
 	Hostname     string     `json:"hostname" db:"hostname"`
 	IPAddress    *string    `json:"ip_address,omitempty" db:"ip_address"`
 	IP6Address   *string    `json:"ip6_address,omitempty" db:"ip6_address"`
@@ -18,6 +23,14 @@ type Node struct {
 	LastHealthAt *time.Time `json:"last_health_at,omitempty" db:"last_health_at"`
 	CreatedAt    time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at" db:"updated_at"`
+
+	// Populated by GetByID and ListByCluster — all shard assignments for this node.
+	Shards []NodeShardAssignment `json:"shards,omitempty"`
+
+	// Transient fields — populated by ListByShard from the join row.
+	// Not stored in the nodes table; used by convergence workflows.
+	ShardID    *string `json:"shard_id,omitempty"`
+	ShardIndex *int    `json:"shard_index,omitempty"`
 }
 
 // NodeHealth represents the health report from a node agent.

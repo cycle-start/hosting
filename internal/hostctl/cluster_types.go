@@ -20,9 +20,11 @@ type ClusterDef struct {
 }
 
 type NodeDef struct {
-	ID        string `yaml:"id"`
-	ShardName string `yaml:"shard_name"`
-	IPAddress string `yaml:"ip_address"`
+	ID         string   `yaml:"id"`
+	Hostname   string   `yaml:"hostname"`
+	ShardName  string   `yaml:"shard_name"`
+	ShardNames []string `yaml:"shard_names"`
+	IPAddress  string   `yaml:"ip_address"`
 }
 
 type LBAddressDef struct {

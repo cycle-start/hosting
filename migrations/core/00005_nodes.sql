@@ -7,7 +7,6 @@ CREATE TABLE nodes (
     ip6_address INET,
     roles       TEXT[] NOT NULL DEFAULT '{}',
     grpc_address TEXT NOT NULL DEFAULT '',
-    shard_index INT,
     status      TEXT NOT NULL DEFAULT 'active',
     last_health_at TIMESTAMPTZ,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
