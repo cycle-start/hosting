@@ -3,7 +3,6 @@ CREATE TABLE tenant_egress_rules (
     id TEXT PRIMARY KEY,
     tenant_id TEXT NOT NULL REFERENCES tenants(id),
     cidr TEXT NOT NULL,
-    action TEXT NOT NULL DEFAULT 'deny',
     description TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'pending',
     status_message TEXT,

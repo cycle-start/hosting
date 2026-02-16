@@ -28,6 +28,8 @@ export function BrandsPage() {
   const [formPrimaryNS, setFormPrimaryNS] = useState('')
   const [formSecondaryNS, setFormSecondaryNS] = useState('')
   const [formHostmaster, setFormHostmaster] = useState('')
+  const [formMailHostname, setFormMailHostname] = useState('')
+  const [formDmarcPolicy, setFormDmarcPolicy] = useState('')
 
   const { data, isLoading } = useBrands()
   const createMutation = useCreateBrand()
@@ -76,11 +78,14 @@ export function BrandsPage() {
         primary_ns: formPrimaryNS,
         secondary_ns: formSecondaryNS,
         hostmaster_email: formHostmaster,
+        mail_hostname: formMailHostname || undefined,
+        dmarc_policy: formDmarcPolicy || undefined,
       })
       toast.success('Brand created')
       setCreateOpen(false)
       setFormName(''); setFormBaseHostname('')
       setFormPrimaryNS(''); setFormSecondaryNS(''); setFormHostmaster('')
+      setFormMailHostname(''); setFormDmarcPolicy('')
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Failed to create brand')
     }
@@ -152,6 +157,14 @@ export function BrandsPage() {
             <div className="space-y-2">
               <Label>Hostmaster Email</Label>
               <Input placeholder="e.g. hostmaster.acme.hosting" value={formHostmaster} onChange={(e) => setFormHostmaster(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Mail Hostname <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <Input placeholder="e.g. mail.acme.hosting" value={formMailHostname} onChange={(e) => setFormMailHostname(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>DMARC Policy <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <Input placeholder="e.g. v=DMARC1; p=none" value={formDmarcPolicy} onChange={(e) => setFormDmarcPolicy(e.target.value)} />
             </div>
           </div>
           <DialogFooter>

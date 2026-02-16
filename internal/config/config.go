@@ -48,6 +48,8 @@ type Config struct {
 	TenantLokiURL string // TENANT_LOKI_URL — Loki query endpoint for tenant logs (default: http://127.0.0.1:3101)
 
 	SecretEncryptionKey string // SECRET_ENCRYPTION_KEY — 32-byte AES-256 key, hex-encoded
+
+	InternalNetworkCIDR string // INTERNAL_NETWORK_CIDR — default 10.0.0.0/8, used for database ingress default
 }
 
 func Load() (*Config, error) {
@@ -82,6 +84,8 @@ func Load() (*Config, error) {
 		TenantLokiURL: getEnv("TENANT_LOKI_URL", "http://127.0.0.1:3101"),
 
 		SecretEncryptionKey: getEnv("SECRET_ENCRYPTION_KEY", ""),
+
+		InternalNetworkCIDR: getEnv("INTERNAL_NETWORK_CIDR", "10.0.0.0/8"),
 	}
 
 	return cfg, nil

@@ -9,7 +9,14 @@ Network access control provides two complementary features:
 
 ## Tenant Egress Rules
 
-Control which destination networks a tenant's processes can reach. Uses nftables with per-tenant chains.
+Control which destination networks a tenant's processes can reach. Uses nftables with per-tenant chains and a **whitelist model**.
+
+### Behavior
+
+- **No rules**: Tenant has unrestricted egress (default)
+- **Rules exist**: Only the specified CIDRs are allowed; all other egress is blocked
+
+Rules are always "allow" CIDRs. When any rules exist, a final `reject` entry is added at the end of the tenant's chain, blocking everything not explicitly allowed.
 
 ### API Endpoints
 
@@ -25,14 +32,12 @@ Control which destination networks a tenant's processes can reach. Uses nftables
 
 ```json
 {
-  "cidr": "10.0.0.0/8",
-  "action": "deny",
-  "description": "Block internal network"
+  "cidr": "93.184.216.0/24",
+  "description": "Allow CDN subnet"
 }
 ```
 
 - `cidr` — IPv4 or IPv6 CIDR (required)
-- `action` — `deny` or `allow` (required)
 - `description` — Human-readable description (optional)
 
 ### How It Works
@@ -45,21 +50,32 @@ Control which destination networks a tenant's processes can reach. Uses nftables
 
 ### nftables Structure
 
+With rules (whitelist — only specified CIDRs allowed):
+
 ```
 table inet tenant_egress {
     chain output {
         type filter hook output priority 1; policy accept;
         meta skuid 5000 jump tenant_5000
-        meta skuid 5001 jump tenant_5001
     }
     chain tenant_5000 {
-        ip daddr 10.0.0.0/8 reject
-        ip daddr 172.16.0.0/12 reject
+        ip daddr 93.184.216.0/24 accept
+        ip6 daddr 2001:db8::/32 accept
+        reject
     }
 }
 ```
 
-Default policy is `accept` — tenants without rules have unrestricted egress. Rules add specific deny or allow entries.
+Without rules (unrestricted — chain removed):
+
+```
+table inet tenant_egress {
+    chain output {
+        type filter hook output priority 1; policy accept;
+        # No jump rule for tenant 5000 — unrestricted
+    }
+}
+```
 
 ### Convergence
 
@@ -67,7 +83,13 @@ Egress rules are synced during shard convergence. The node agent rebuilds per-te
 
 ## Database Access Rules
 
-Control which source networks can connect to a database. When rules exist, MySQL users are recreated with host patterns matching the allowed CIDRs.
+Control which source networks can connect to a database. The default is **internal-only** — databases are only accessible from within the hosting network.
+
+### Default Behavior
+
+When no access rules exist, MySQL users are created with host patterns matching the internal network CIDR (default: `10.0.0.0/8`, configurable via `INTERNAL_NETWORK_CIDR`). This means databases are accessible from hosting infrastructure but not from the public internet.
+
+When rules are added, MySQL users get the internal host pattern **plus** each rule's CIDR pattern. Internal access is always preserved.
 
 ### API Endpoints
 
@@ -97,7 +119,7 @@ Control which source networks can connect to a database. When rules exist, MySQL
 2. On create/delete, the `SyncDatabaseAccessWorkflow` runs
 3. The workflow fetches all active rules and all active users for the database
 4. On the primary MySQL node, each user is dropped and recreated with host patterns matching the allowed CIDRs
-5. When no rules exist, users are created with `'%'` (any host)
+5. Internal network access (`10.%.%.%` by default) is always included
 
 ### CIDR to MySQL Host Pattern Conversion
 
@@ -110,12 +132,18 @@ Control which source networks can connect to a database. When rules exist, MySQL
 | `0.0.0.0/0` | `%` |
 | IPv6 CIDRs | Passed as-is (MySQL 8.0.23+ native support) |
 
-### Behavior
+### Behavior Summary
 
-- **No rules**: All users have host `'%'` (connections from any IP)
-- **Rules exist**: Each user gets one MySQL account per allowed CIDR
-- **Rule deleted (last one)**: Users revert to host `'%'`
+- **No rules**: Users have internal-only host pattern (e.g. `10.%.%.%`)
+- **Rules exist**: Users get internal host pattern + each rule's CIDR pattern
+- **Rule deleted (last one)**: Users revert to internal-only
 - Changes apply on the primary node only (MySQL replication handles secondaries)
+
+### Configuration
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| `INTERNAL_NETWORK_CIDR` | `10.0.0.0/8` | CIDR for internal network access. Converted to MySQL host pattern for default database access. |
 
 ## Authorization
 

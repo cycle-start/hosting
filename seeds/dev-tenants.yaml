@@ -11,6 +11,8 @@ brands:
     primary_ns: "ns1.acme-hosting.test"
     secondary_ns: "ns2.acme-hosting.test"
     hostmaster_email: "hostmaster@acme-hosting.test"
+    mail_hostname: "mail.acme-hosting.test"
+    dmarc_policy: "v=DMARC1; p=none"
     allowed_clusters:
       - vm-cluster-1
 

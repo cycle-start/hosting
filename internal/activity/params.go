@@ -364,7 +364,8 @@ type SyncEgressRulesParams struct {
 
 // SyncDatabaseUserHostsParams holds parameters for rebuilding MySQL user host patterns.
 type SyncDatabaseUserHostsParams struct {
-	DatabaseName string
-	Users        []model.DatabaseUser
-	AccessRules  []model.DatabaseAccessRule
+	DatabaseName    string
+	Users           []model.DatabaseUser
+	AccessRules     []model.DatabaseAccessRule
+	InternalNetworkCIDR string
 }

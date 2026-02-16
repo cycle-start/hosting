@@ -531,6 +531,8 @@ type ServiceHostnameEntry struct {
 
 // CreateServiceHostnameRecords creates DNS records for service hostnames
 // such as ssh.<tenant>.<base> and mysql.<tenant>.<base>.
+// Records are stored in both PowerDNS and core DB with managed_by=auto,
+// source_type=service-hostname.
 func (a *DNS) CreateServiceHostnameRecords(ctx context.Context, params ServiceHostnameParams) error {
 	zoneName, err := a.findZoneForFQDN(ctx, params.BaseHostname)
 	if err != nil {
@@ -549,24 +551,28 @@ func (a *DNS) CreateServiceHostnameRecords(ctx context.Context, params ServiceHo
 		hostname := fmt.Sprintf("%s.%s.%s", svc.Service, params.TenantName, params.BaseHostname)
 
 		if svc.IP != "" {
-			if err := a.powerdnsDB.WriteDNSRecord(ctx, WriteDNSRecordParams{
-				DomainID: domainID,
-				Name:     hostname,
-				Type:     "A",
-				Content:  svc.IP,
-				TTL:      300,
+			if err := a.createAutoRecord(ctx, autoRecordDef{
+				zoneName:   zoneName,
+				domainID:   domainID,
+				fqdn:       hostname,
+				recordType: "A",
+				content:    svc.IP,
+				ttl:        300,
+				sourceType: model.SourceTypeServiceHostname,
 			}); err != nil {
 				return fmt.Errorf("create service A record for %s: %w", hostname, err)
 			}
 		}
 
 		if svc.IP6 != "" {
-			if err := a.powerdnsDB.WriteDNSRecord(ctx, WriteDNSRecordParams{
-				DomainID: domainID,
-				Name:     hostname,
-				Type:     "AAAA",
-				Content:  svc.IP6,
-				TTL:      300,
+			if err := a.createAutoRecord(ctx, autoRecordDef{
+				zoneName:   zoneName,
+				domainID:   domainID,
+				fqdn:       hostname,
+				recordType: "AAAA",
+				content:    svc.IP6,
+				ttl:        300,
+				sourceType: model.SourceTypeServiceHostname,
 			}); err != nil {
 				return fmt.Errorf("create service AAAA record for %s: %w", hostname, err)
 			}

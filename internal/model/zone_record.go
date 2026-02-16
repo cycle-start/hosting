@@ -28,5 +28,6 @@ const (
 	SourceTypeEmailMX   = "email-mx"
 	SourceTypeEmailSPF  = "email-spf"
 	SourceTypeEmailDKIM = "email-dkim"
-	SourceTypeEmailDMARC = "email-dmarc"
+	SourceTypeEmailDMARC      = "email-dmarc"
+	SourceTypeServiceHostname = "service-hostname"
 )

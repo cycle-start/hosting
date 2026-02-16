@@ -1651,7 +1651,7 @@ func (a *CoreDB) SetTenantEgressRulesProvisioning(ctx context.Context, tenantID 
 // GetActiveEgressRules returns all active + provisioning egress rules for a tenant.
 func (a *CoreDB) GetActiveEgressRules(ctx context.Context, tenantID string) ([]model.TenantEgressRule, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, cidr, action, description, status, status_message, created_at, updated_at
+		`SELECT id, tenant_id, cidr, description, status, status_message, created_at, updated_at
 		 FROM tenant_egress_rules
 		 WHERE tenant_id = $1 AND status NOT IN ('deleting', 'deleted')
 		 ORDER BY id`, tenantID)
@@ -1663,7 +1663,7 @@ func (a *CoreDB) GetActiveEgressRules(ctx context.Context, tenantID string) ([]m
 	var rules []model.TenantEgressRule
 	for rows.Next() {
 		var r model.TenantEgressRule
-		if err := rows.Scan(&r.ID, &r.TenantID, &r.CIDR, &r.Action, &r.Description,
+		if err := rows.Scan(&r.ID, &r.TenantID, &r.CIDR, &r.Description,
 			&r.Status, &r.StatusMessage, &r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan egress rule: %w", err)
 		}

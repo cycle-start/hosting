@@ -17,3 +17,4 @@ data:
   CLUSTER_ID: {{ .Values.config.clusterId | quote }}
   LOKI_URL: {{ .Values.config.lokiUrl | quote }}
   TENANT_LOKI_URL: {{ .Values.config.tenantLokiUrl | quote }}
+  INTERNAL_NETWORK_CIDR: {{ .Values.config.internalNetworkCidr | quote }}

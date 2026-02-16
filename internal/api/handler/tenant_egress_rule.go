@@ -94,7 +94,6 @@ func (h *TenantEgressRule) Create(w http.ResponseWriter, r *http.Request) {
 		ID:          platform.NewID(),
 		TenantID:    tenantID,
 		CIDR:        req.CIDR,
-		Action:      req.Action,
 		Description: req.Description,
 		Status:      model.StatusPending,
 		CreatedAt:   now,

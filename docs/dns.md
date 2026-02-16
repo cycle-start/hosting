@@ -1,6 +1,6 @@
 # DNS Zones & Records
 
-DNS is powered by PowerDNS with zones and records managed through the core API. Zones are brand-scoped and backed by a PowerDNS database. The platform automatically creates DNS records when FQDNs are bound to webroots and when email accounts are created.
+DNS is powered by PowerDNS with zones and records managed through the core API. Zones are brand-scoped and backed by a PowerDNS database. The platform automatically creates DNS records when FQDNs are bound to webroots, when email accounts are created, and when tenants are provisioned (service hostnames).
 
 ## Zone Model
 
@@ -20,12 +20,13 @@ DNS is powered by PowerDNS with zones and records managed through the core API. 
 |-------|------|-------------|
 | `id` | string | UUID |
 | `zone_id` | string | Parent zone ID |
-| `type` | string | Record type: `A`, `AAAA`, `CNAME`, `MX`, `TXT`, `SRV`, `NS`, `CAA`, `PTR` |
+| `type` | string | Record type: `A`, `AAAA`, `CNAME`, `MX`, `TXT`, `SRV`, `NS`, `CAA`, `PTR`, `SOA`, `ALIAS`, `SSHFP`, `TLSA`, `LOC`, `NAPTR`, `HTTPS`, `SVCB`, `DNSKEY`, `DS`, `NSEC`, `NSEC3`, `RRSIG` |
 | `name` | string | Record name (FQDN) |
 | `content` | string | Record value |
 | `ttl` | int | TTL in seconds (default: 3600, range: 60-86400) |
 | `priority` | int | Priority (used for MX, SRV) |
-| `managed_by` | string | `user` or `platform` |
+| `managed_by` | string | `custom` or `auto` |
+| `source_type` | string | For auto records: `fqdn`, `email-mx`, `email-spf`, `email-dkim`, `email-dmarc`, `service-hostname` |
 | `source_fqdn_id` | string | FQDN that triggered auto-creation (nullable) |
 | `status` | string | Lifecycle status |
 
@@ -77,7 +78,7 @@ If `tenant_id` is provided, `brand_id` is derived from the tenant automatically.
 }
 ```
 
-Records created via the API are marked `managed_by: "user"`. TTL defaults to 3600 if not specified.
+Records created via the API are marked `managed_by: "custom"`. TTL defaults to 3600 if not specified.
 
 ## Zone Provisioning (CreateZoneWorkflow)
 
@@ -108,35 +109,49 @@ Delete is idempotent -- if the zone does not exist in PowerDNS, it skips straigh
 When an FQDN is bound to a webroot via `BindFQDNWorkflow`, the platform automatically creates DNS records:
 
 1. Walks up the domain hierarchy to find a matching zone (e.g., for `www.example.com` it checks `www.example.com`, then `example.com`, then `com`)
-2. If a matching zone exists and no user-managed A/AAAA records exist for the FQDN:
+2. If a matching zone exists and no custom A/AAAA records exist for the FQDN:
    - Creates **A records** pointing to the cluster's load balancer IPv4 addresses
    - Creates **AAAA records** pointing to the cluster's load balancer IPv6 addresses
    - TTL: 300 seconds
-3. Records are marked `managed_by: "platform"` with `source_fqdn_id` set to the originating FQDN
+3. Records are marked `managed_by: "auto"` with `source_type: "fqdn"` and `source_fqdn_id` set to the originating FQDN
 
-When an FQDN is unbound (`UnbindFQDNWorkflow`), the platform-managed A and AAAA records are automatically deleted.
+When an FQDN is unbound (`UnbindFQDNWorkflow`), the auto-managed A and AAAA records are automatically deleted.
 
-**User-managed records take precedence**: if a user has already created A/AAAA records for the FQDN, auto-DNS is skipped.
+**Custom records take precedence**: if a user has already created A/AAAA records for the FQDN, auto-DNS is skipped.
 
 ## Auto-Email DNS
 
 When an email account is created on an FQDN, the platform automatically creates:
 
-- **MX record**: `{mail_hostname}` with priority 10, TTL 300
-- **TXT record**: `v=spf1 mx ~all` (SPF), TTL 300
+- **MX record**: `{mail_hostname}` with priority 10, TTL 300 (`source_type: "email-mx"`)
+- **TXT record (SPF)**: `v=spf1 mx ~all`, TTL 300 (`source_type: "email-spf"`)
+- **TXT record (DKIM)**: DKIM key record if brand has `dkim_selector` and `dkim_public_key` (`source_type: "email-dkim"`)
+- **TXT record (DMARC)**: `_dmarc` TXT record if brand has `dmarc_policy` (`source_type: "email-dmarc"`)
 
-Both are marked `managed_by: "platform"`. When email is removed from an FQDN, MX and TXT records are cleaned up.
+All are marked `managed_by: "auto"`. When email is removed from an FQDN, records are cleaned up.
 
-## Platform-Managed vs User-Managed Records
+## Service Hostname DNS
 
-| Property | Platform-Managed | User-Managed |
-|----------|-----------------|--------------|
-| `managed_by` | `platform` | `user` |
-| Created by | FQDN binding / email workflows | API (`POST /zones/{id}/records`) |
+When a tenant is provisioned, the platform creates DNS records for service hostnames:
+
+- `ssh.{tenant}.{base_hostname}` -> web node IPs
+- `sftp.{tenant}.{base_hostname}` -> web node IPs
+- `mysql.{tenant}.{base_hostname}` -> database node IPs
+- `web.{tenant}.{base_hostname}` -> load balancer IPs
+
+These are marked `managed_by: "auto"` with `source_type: "service-hostname"` and stored in both core DB and PowerDNS.
+
+## Custom vs Auto-Managed Records
+
+| Property | Auto-Managed | Custom |
+|----------|-------------|--------|
+| `managed_by` | `auto` | `custom` |
+| `source_type` | `fqdn`, `email-mx`, `email-spf`, `email-dkim`, `email-dmarc`, `service-hostname` | null |
+| Created by | FQDN binding / email / tenant provisioning workflows | API (`POST /zones/{id}/records`) |
 | Editable via API | No | Yes |
 | Deletable via API | No | Yes |
 | Auto-cleaned | Yes (on FQDN unbind / email removal) | No |
-| `source_fqdn_id` | Set to originating FQDN ID | null |
+| `source_fqdn_id` | Set to originating FQDN ID (for FQDN/email records) | null |
 
 ## Tenant Reassignment
 
@@ -148,7 +163,3 @@ PUT /zones/{id}/tenant
 ```
 
 Pass `null` for `tenant_id` to detach the zone. This is a synchronous operation -- no Temporal workflow is triggered.
-
-## Service Hostname DNS
-
-The platform also creates DNS records for service hostnames like `ssh.{tenant}.{base_hostname}` and `mysql.{tenant}.{base_hostname}`, pointing to the appropriate node IPs. These are created as part of tenant provisioning workflows.

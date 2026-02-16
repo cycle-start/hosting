@@ -472,19 +472,24 @@ func (m *DatabaseManager) DeleteUser(ctx context.Context, dbName, username strin
 }
 
 // SyncUserHosts rebuilds MySQL user host patterns for all users of a database
-// based on the current access rules. When rules exist, each user gets one MySQL
-// account per allowed CIDR. When no rules exist, users get host '%' (any host).
-func (m *DatabaseManager) SyncUserHosts(ctx context.Context, dbName string, users []model.DatabaseUser, rules []model.DatabaseAccessRule) error {
+// based on the current access rules. Internal network access (internalCIDR) is
+// always preserved so the hosting platform itself can reach the database.
+// When no rules exist, only the internal network pattern is used (internal-only).
+// When rules exist, users get the internal pattern plus each rule's CIDR pattern.
+func (m *DatabaseManager) SyncUserHosts(ctx context.Context, dbName string, users []model.DatabaseUser, rules []model.DatabaseAccessRule, internalCIDR string) error {
 	if err := validateName(dbName); err != nil {
 		return err
 	}
 
+	// Internal network is always allowed.
+	internalHost := cidrToMySQLHost(internalCIDR)
+
 	// Determine the host patterns to use.
-	hosts := []string{"%"} // default: any host
-	if len(rules) > 0 {
-		hosts = make([]string, len(rules))
-		for i, rule := range rules {
-			hosts[i] = cidrToMySQLHost(rule.CIDR)
+	hosts := []string{internalHost}
+	for _, rule := range rules {
+		h := cidrToMySQLHost(rule.CIDR)
+		if h != internalHost {
+			hosts = append(hosts, h)
 		}
 	}
 

@@ -5,6 +5,7 @@ import { Pause, Play, Trash2, Plus, RotateCcw, Loader2, FolderOpen, Database as 
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -19,7 +20,7 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { Breadcrumb } from '@/components/shared/breadcrumb'
 import { cn, formatDate } from '@/lib/utils'
 import {
-  useTenant, useTenantResourceSummary, useWebroots, useDatabases, useValkeyInstances,
+  useTenant, useTenantResourceSummary, useBrand, useWebroots, useDatabases, useValkeyInstances,
   useS3Buckets,
   useSSHKeys, useBackups, useZones, useSuspendTenant, useUnsuspendTenant,
   useDeleteTenant, useCreateWebroot, useDeleteWebroot,
@@ -112,6 +113,7 @@ export function TenantDetailPage() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: tenant, isLoading } = useTenant(id)
+  const { data: brand } = useBrand(tenant?.brand_id ?? '')
   const { data: summary } = useTenantResourceSummary(id)
   const { data: webrootsData, isLoading: webrootsLoading } = useWebroots(id)
   const { data: databasesData, isLoading: databasesLoading } = useDatabases(id)
@@ -644,6 +646,30 @@ export function TenantDetailPage() {
         <span className="ml-4">Created: {formatDate(tenant.created_at)}</span>
         <span className="ml-4">SFTP: {tenant.sftp_enabled ? 'Enabled' : 'Disabled'}</span>
       </div>
+
+      {brand && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Service Hostnames</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'SSH', hostname: `ssh.${tenant.id}.${brand.base_hostname}` },
+                { label: 'SFTP', hostname: `sftp.${tenant.id}.${brand.base_hostname}` },
+                { label: 'MySQL', hostname: `mysql.${tenant.id}.${brand.base_hostname}` },
+                { label: 'Web', hostname: `web.${tenant.id}.${brand.base_hostname}` },
+              ].map(svc => (
+                <div key={svc.label} className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground w-12">{svc.label}</span>
+                  <code className="text-sm">{svc.hostname}</code>
+                  <CopyButton value={svc.hostname} />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {inFlight > 0 && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950 p-3">

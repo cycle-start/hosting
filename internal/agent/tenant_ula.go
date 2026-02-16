@@ -201,13 +201,22 @@ func isAddrAlreadyExists(output string) bool {
 }
 
 // SyncEgressRules applies all egress rules for a tenant via nftables.
-// Uses per-tenant chains with a jump from the main output chain.
+// Whitelist model: when rules exist, each CIDR gets an accept verdict, then a
+// final reject catches everything else. When no rules exist, the chain and jump
+// rule are removed so the default accept policy applies (unrestricted egress).
 func (m *TenantULAManager) SyncEgressRules(ctx context.Context, tenantUID int, rules []model.TenantEgressRule) error {
 	if err := m.ensureEgressTable(ctx); err != nil {
 		return err
 	}
 
 	chainName := fmt.Sprintf("tenant_%d", tenantUID)
+
+	if len(rules) == 0 {
+		// No rules — remove chain and jump rule to restore unrestricted egress.
+		m.removeEgressChain(ctx, tenantUID, chainName)
+		m.logger.Info().Int("uid", tenantUID).Msg("removed egress restrictions (no rules)")
+		return nil
+	}
 
 	// Create chain if it doesn't exist (idempotent).
 	if out, err := exec.CommandContext(ctx, "nft", "add", "chain", "inet", "tenant_egress", chainName).CombinedOutput(); err != nil {
@@ -219,30 +228,25 @@ func (m *TenantULAManager) SyncEgressRules(ctx context.Context, tenantUID int, r
 		return fmt.Errorf("nft flush egress chain: %s: %w", string(out), err)
 	}
 
-	// Add new rules via nft script.
-	if len(rules) > 0 {
-		var b strings.Builder
-		for _, rule := range rules {
-			addrMatch := "ip daddr"
-			if strings.Contains(rule.CIDR, ":") {
-				addrMatch = "ip6 daddr"
-			}
-			verdict := "reject"
-			if rule.Action == model.EgressActionAllow {
-				verdict = "accept"
-			}
-			b.WriteString(fmt.Sprintf("add rule inet tenant_egress %s %s %s %s\n", chainName, addrMatch, rule.CIDR, verdict))
+	// Add accept rules for each allowed CIDR, then a final reject.
+	var b strings.Builder
+	for _, rule := range rules {
+		addrMatch := "ip daddr"
+		if strings.Contains(rule.CIDR, ":") {
+			addrMatch = "ip6 daddr"
 		}
+		b.WriteString(fmt.Sprintf("add rule inet tenant_egress %s %s %s accept\n", chainName, addrMatch, rule.CIDR))
+	}
+	// Final reject — anything not matching an allowed CIDR is blocked.
+	b.WriteString(fmt.Sprintf("add rule inet tenant_egress %s reject\n", chainName))
 
-		cmd := exec.CommandContext(ctx, "nft", "-f", "-")
-		cmd.Stdin = strings.NewReader(b.String())
-		if out, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("nft add egress rules: %s: %w", string(out), err)
-		}
+	cmd := exec.CommandContext(ctx, "nft", "-f", "-")
+	cmd.Stdin = strings.NewReader(b.String())
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("nft add egress rules: %s: %w", string(out), err)
 	}
 
-	// Ensure jump rule exists. Check if one already exists by listing
-	// the output chain and looking for "jump tenant_N".
+	// Ensure jump rule exists.
 	listOut, _ := exec.CommandContext(ctx, "nft", "list", "chain", "inet", "tenant_egress", "output").CombinedOutput()
 	jumpTarget := fmt.Sprintf("jump %s", chainName)
 	if !strings.Contains(string(listOut), jumpTarget) {

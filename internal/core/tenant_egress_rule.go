@@ -19,9 +19,9 @@ func NewTenantEgressRuleService(db DB, tc temporalclient.Client) *TenantEgressRu
 
 func (s *TenantEgressRuleService) Create(ctx context.Context, rule *model.TenantEgressRule) error {
 	_, err := s.db.Exec(ctx,
-		`INSERT INTO tenant_egress_rules (id, tenant_id, cidr, action, description, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		rule.ID, rule.TenantID, rule.CIDR, rule.Action, rule.Description,
+		`INSERT INTO tenant_egress_rules (id, tenant_id, cidr, description, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		rule.ID, rule.TenantID, rule.CIDR, rule.Description,
 		rule.Status, rule.CreatedAt, rule.UpdatedAt,
 	)
 	if err != nil {
@@ -44,9 +44,9 @@ func (s *TenantEgressRuleService) Create(ctx context.Context, rule *model.Tenant
 func (s *TenantEgressRuleService) GetByID(ctx context.Context, id string) (*model.TenantEgressRule, error) {
 	var r model.TenantEgressRule
 	err := s.db.QueryRow(ctx,
-		`SELECT id, tenant_id, cidr, action, description, status, status_message, created_at, updated_at
+		`SELECT id, tenant_id, cidr, description, status, status_message, created_at, updated_at
 		 FROM tenant_egress_rules WHERE id = $1`, id,
-	).Scan(&r.ID, &r.TenantID, &r.CIDR, &r.Action, &r.Description,
+	).Scan(&r.ID, &r.TenantID, &r.CIDR, &r.Description,
 		&r.Status, &r.StatusMessage, &r.CreatedAt, &r.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get tenant egress rule %s: %w", id, err)
@@ -55,7 +55,7 @@ func (s *TenantEgressRuleService) GetByID(ctx context.Context, id string) (*mode
 }
 
 func (s *TenantEgressRuleService) ListByTenant(ctx context.Context, tenantID string, limit int, cursor string) ([]model.TenantEgressRule, bool, error) {
-	query := `SELECT id, tenant_id, cidr, action, description, status, status_message, created_at, updated_at FROM tenant_egress_rules WHERE tenant_id = $1`
+	query := `SELECT id, tenant_id, cidr, description, status, status_message, created_at, updated_at FROM tenant_egress_rules WHERE tenant_id = $1`
 	args := []any{tenantID}
 	argIdx := 2
 
@@ -78,7 +78,7 @@ func (s *TenantEgressRuleService) ListByTenant(ctx context.Context, tenantID str
 	var rules []model.TenantEgressRule
 	for rows.Next() {
 		var r model.TenantEgressRule
-		if err := rows.Scan(&r.ID, &r.TenantID, &r.CIDR, &r.Action, &r.Description,
+		if err := rows.Scan(&r.ID, &r.TenantID, &r.CIDR, &r.Description,
 			&r.Status, &r.StatusMessage, &r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan tenant egress rule: %w", err)
 		}

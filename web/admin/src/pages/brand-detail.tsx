@@ -27,6 +27,11 @@ export function BrandDetailPage() {
   const [editPrimaryNS, setEditPrimaryNS] = useState('')
   const [editSecondaryNS, setEditSecondaryNS] = useState('')
   const [editHostmaster, setEditHostmaster] = useState('')
+  const [editMailHostname, setEditMailHostname] = useState('')
+  const [editSpfIncludes, setEditSpfIncludes] = useState('')
+  const [editDkimSelector, setEditDkimSelector] = useState('')
+  const [editDkimPublicKey, setEditDkimPublicKey] = useState('')
+  const [editDmarcPolicy, setEditDmarcPolicy] = useState('')
   const [selectedRegion, setSelectedRegion] = useState('')
   const [addClusterId, setAddClusterId] = useState('')
 
@@ -57,6 +62,11 @@ export function BrandDetailPage() {
     setEditPrimaryNS(brand.primary_ns)
     setEditSecondaryNS(brand.secondary_ns)
     setEditHostmaster(brand.hostmaster_email)
+    setEditMailHostname(brand.mail_hostname ?? '')
+    setEditSpfIncludes(brand.spf_includes ?? '')
+    setEditDkimSelector(brand.dkim_selector ?? '')
+    setEditDkimPublicKey(brand.dkim_public_key ?? '')
+    setEditDmarcPolicy(brand.dmarc_policy ?? '')
     setEditing(true)
   }
 
@@ -69,6 +79,11 @@ export function BrandDetailPage() {
         primary_ns: editPrimaryNS,
         secondary_ns: editSecondaryNS,
         hostmaster_email: editHostmaster,
+        mail_hostname: editMailHostname || undefined,
+        spf_includes: editSpfIncludes || undefined,
+        dkim_selector: editDkimSelector || undefined,
+        dkim_public_key: editDkimPublicKey || undefined,
+        dmarc_policy: editDmarcPolicy || undefined,
       })
       toast.success('Brand updated')
       setEditing(false)
@@ -204,6 +219,61 @@ export function BrandDetailPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Created</p>
                 <p className="text-sm">{formatDate(brand.created_at)}</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Email DNS Configuration</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {editing ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Mail Hostname</Label>
+                <Input placeholder="e.g. mail.example.com" value={editMailHostname} onChange={(e) => setEditMailHostname(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>SPF Includes</Label>
+                <Input placeholder="e.g. _spf.google.com" value={editSpfIncludes} onChange={(e) => setEditSpfIncludes(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>DKIM Selector</Label>
+                <Input placeholder="e.g. default" value={editDkimSelector} onChange={(e) => setEditDkimSelector(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>DKIM Public Key</Label>
+                <Input placeholder="DKIM public key" value={editDkimPublicKey} onChange={(e) => setEditDkimPublicKey(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>DMARC Policy</Label>
+                <Input placeholder="e.g. v=DMARC1; p=none" value={editDmarcPolicy} onChange={(e) => setEditDmarcPolicy(e.target.value)} />
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Mail Hostname</p>
+                <p className="text-sm font-medium">{brand.mail_hostname || '-'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">SPF Includes</p>
+                <p className="text-sm font-medium">{brand.spf_includes || '-'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">DKIM Selector</p>
+                <p className="text-sm font-medium">{brand.dkim_selector || '-'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">DKIM Public Key</p>
+                <p className="text-sm font-medium truncate">{brand.dkim_public_key || '-'}</p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-sm text-muted-foreground">DMARC Policy</p>
+                <p className="text-sm font-medium">{brand.dmarc_policy || '-'}</p>
               </div>
             </div>
           )}

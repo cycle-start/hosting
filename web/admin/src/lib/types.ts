@@ -58,6 +58,11 @@ export interface Brand {
   primary_ns: string
   secondary_ns: string
   hostmaster_email: string
+  mail_hostname?: string
+  spf_includes?: string
+  dkim_selector?: string
+  dkim_public_key?: string
+  dmarc_policy?: string
   status: string
   created_at: string
   updated_at: string

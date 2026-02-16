@@ -46,7 +46,7 @@ export function useBrand(id: string) {
 export function useCreateBrand() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { name: string; base_hostname: string; primary_ns: string; secondary_ns: string; hostmaster_email: string }) =>
+    mutationFn: (data: { name: string; base_hostname: string; primary_ns: string; secondary_ns: string; hostmaster_email: string; mail_hostname?: string; spf_includes?: string; dkim_selector?: string; dkim_public_key?: string; dmarc_policy?: string }) =>
       api.post<Brand>('/brands', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['brands'] }),
   })
@@ -55,7 +55,7 @@ export function useCreateBrand() {
 export function useUpdateBrand() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { id: string; name?: string; base_hostname?: string; primary_ns?: string; secondary_ns?: string; hostmaster_email?: string }) =>
+    mutationFn: (data: { id: string; name?: string; base_hostname?: string; primary_ns?: string; secondary_ns?: string; hostmaster_email?: string; mail_hostname?: string; spf_includes?: string; dkim_selector?: string; dkim_public_key?: string; dmarc_policy?: string }) =>
       api.put<Brand>(`/brands/${data.id}`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['brands'] })

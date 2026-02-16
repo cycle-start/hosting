@@ -34,18 +34,15 @@ func TestFQDNFullStackBinding(t *testing.T) {
 	records := parsePaginatedItems(t, body)
 	var autoRecordCount int
 	for _, rec := range records {
-		if managedBy, _ := rec["managed_by"].(string); managedBy == "platform" {
+		if managedBy, _ := rec["managed_by"].(string); managedBy == "auto" {
 			if sourceFQDN, _ := rec["source_fqdn_id"].(string); sourceFQDN == fqdnID {
 				autoRecordCount++
 				t.Logf("auto record: type=%s name=%s", rec["type"], rec["name"])
 			}
 		}
 	}
-	if autoRecordCount > 0 {
-		t.Logf("found %d auto-created DNS records", autoRecordCount)
-	} else {
-		t.Logf("no auto DNS records found (may not be wired yet)")
-	}
+	require.Greater(t, autoRecordCount, 0, "expected at least one auto-created DNS record")
+	t.Logf("found %d auto-created DNS records", autoRecordCount)
 
 	// Verify DNS propagation (if DNS nodes available).
 	dnsNodeIPs := findNodeIPsByRole(t, clusterID, "dns")

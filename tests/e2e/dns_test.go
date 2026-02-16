@@ -161,10 +161,10 @@ func TestDNSAutoRecords(t *testing.T) {
 	records := parsePaginatedItems(t, body)
 	t.Logf("zone has %d records after FQDN bind", len(records))
 
-	// Look for platform-managed records pointing to this FQDN.
+	// Look for auto-managed records pointing to this FQDN.
 	var autoRecordCount int
 	for _, rec := range records {
-		if managedBy, _ := rec["managed_by"].(string); managedBy == "platform" {
+		if managedBy, _ := rec["managed_by"].(string); managedBy == "auto" {
 			if sourceFQDN, _ := rec["source_fqdn_id"].(string); sourceFQDN == fqdnID {
 				autoRecordCount++
 				t.Logf("auto record: type=%s name=%s content=%s", rec["type"], rec["name"], rec["content"])
@@ -172,11 +172,8 @@ func TestDNSAutoRecords(t *testing.T) {
 		}
 	}
 	// The platform should create at least one auto record (A or AAAA).
-	if autoRecordCount > 0 {
-		t.Logf("found %d auto-created DNS records for FQDN %s", autoRecordCount, fqdnID)
-	} else {
-		t.Logf("no auto-created DNS records found (auto-record creation may not be wired yet)")
-	}
+	require.Greater(t, autoRecordCount, 0, "expected at least one auto-created DNS record for FQDN %s", fqdnID)
+	t.Logf("found %d auto-created DNS records for FQDN %s", autoRecordCount, fqdnID)
 
 	// Step 6: Delete the FQDN.
 	resp, body = httpDelete(t, coreAPIURL+"/fqdns/"+fqdnID)
