@@ -16,6 +16,7 @@ cluster:
       - name: web-1
         role: web
         node_count: 2
+        lb_backend: shard-web-1
       - name: db-1
         role: database
         node_count: 2
