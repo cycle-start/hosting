@@ -7,10 +7,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	temporalclient "go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/interceptor"
 	"go.temporal.io/sdk/worker"
 
 	"github.com/edvin/hosting/internal/activity"
 	"github.com/edvin/hosting/internal/agent"
+	hostingworkflow "github.com/edvin/hosting/internal/workflow"
 	"github.com/edvin/hosting/internal/config"
 	"github.com/edvin/hosting/internal/logging"
 	"github.com/edvin/hosting/internal/metrics"
@@ -60,7 +62,9 @@ func main() {
 	defer tc.Close()
 
 	taskQueue := "node-" + cfg.NodeID
-	w := worker.New(tc, taskQueue, worker.Options{})
+	w := worker.New(tc, taskQueue, worker.Options{
+		Interceptors: []interceptor.WorkerInterceptor{&hostingworkflow.ErrorTypingInterceptor{}},
+	})
 
 	s3Mgr := agent.NewS3Manager(
 		logger,

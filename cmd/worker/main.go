@@ -13,6 +13,8 @@ import (
 	temporalclient "go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 
+	"go.temporal.io/sdk/interceptor"
+
 	"github.com/edvin/hosting/internal/activity"
 	"github.com/edvin/hosting/internal/config"
 	"github.com/edvin/hosting/internal/db"
@@ -69,7 +71,9 @@ func main() {
 	}
 	defer tc.Close()
 
-	w := worker.New(tc, taskQueue, worker.Options{})
+	w := worker.New(tc, taskQueue, worker.Options{
+		Interceptors: []interceptor.WorkerInterceptor{&workflow.ErrorTypingInterceptor{}},
+	})
 
 	// Register activities
 	coreDBActivities := activity.NewCoreDB(corePool)
