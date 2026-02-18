@@ -250,6 +250,16 @@ type CleanOrphanedConfigsResult struct {
 	Removed []string `json:"removed"`
 }
 
+// CleanOrphanedFPMPoolsInput holds parameters for cleaning orphaned PHP-FPM pool configs.
+type CleanOrphanedFPMPoolsInput struct {
+	ExpectedPools map[string]bool `json:"expected_pools"`
+}
+
+// CleanOrphanedFPMPoolsResult holds the result of cleaning orphaned PHP-FPM pool configs.
+type CleanOrphanedFPMPoolsResult struct {
+	Removed []string `json:"removed"`
+}
+
 // CreateCronJobParams holds parameters for creating a cron job on a node.
 type CreateCronJobParams struct {
 	ID               string

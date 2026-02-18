@@ -357,10 +357,34 @@ func (a *NodeLocal) CleanOrphanedConfigs(ctx context.Context, input CleanOrphane
 	return CleanOrphanedConfigsResult{Removed: removed}, nil
 }
 
+// CleanOrphanedFPMPools removes PHP-FPM pool configs not in the expected set.
+func (a *NodeLocal) CleanOrphanedFPMPools(ctx context.Context, input CleanOrphanedFPMPoolsInput) (CleanOrphanedFPMPoolsResult, error) {
+	a.logger.Info().Int("expected_count", len(input.ExpectedPools)).Msg("CleanOrphanedFPMPools")
+	phpMgr, ok := a.runtimes["php"].(*runtime.PHP)
+	if !ok {
+		return CleanOrphanedFPMPoolsResult{}, nil
+	}
+	removed, err := phpMgr.CleanOrphanedPools(input.ExpectedPools)
+	if err != nil {
+		return CleanOrphanedFPMPoolsResult{}, asNonRetryable(fmt.Errorf("clean orphaned fpm pools: %w", err))
+	}
+	return CleanOrphanedFPMPoolsResult{Removed: removed}, nil
+}
+
 // ReloadNginx tests and reloads the nginx configuration.
 func (a *NodeLocal) ReloadNginx(ctx context.Context) error {
 	a.logger.Info().Msg("ReloadNginx")
 	return asNonRetryable(a.nginx.Reload(ctx))
+}
+
+// ReloadPHPFPM gracefully reloads all PHP-FPM services.
+func (a *NodeLocal) ReloadPHPFPM(ctx context.Context) error {
+	a.logger.Info().Msg("ReloadPHPFPM")
+	phpMgr, ok := a.runtimes["php"].(*runtime.PHP)
+	if !ok {
+		return nil
+	}
+	return phpMgr.ReloadAll(ctx)
 }
 
 // --------------------------------------------------------------------------

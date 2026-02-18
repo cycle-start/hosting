@@ -135,8 +135,9 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		return []string{fmt.Sprintf("get shard desired state: %v", err)}
 	}
 
-	// Build the expected nginx config set and webroot entries from batch data.
+	// Build expected nginx config + FPM pool sets and webroot entries from batch data.
 	expectedConfigs := make(map[string]bool)
+	expectedPools := make(map[string]bool)
 	type webrootEntry struct {
 		tenant  model.Tenant
 		webroot model.Webroot
@@ -152,6 +153,8 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		for _, webroot := range state.Webroots[tenant.ID] {
 			confName := fmt.Sprintf("%s_%s.conf", tenant.Name, webroot.Name)
 			expectedConfigs[confName] = true
+			// FPM pool configs are per-tenant (not per-webroot).
+			expectedPools[tenant.Name+".conf"] = true
 			webrootEntries = append(webrootEntries, webrootEntry{
 				tenant:  tenant,
 				webroot: webroot,
@@ -160,18 +163,30 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		}
 	}
 
-	// Clean orphaned nginx configs on each node BEFORE creating webroots (parallel).
+	// Clean orphaned nginx configs and FPM pools on each node BEFORE creating webroots (parallel).
 	cleanErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
 		nodeCtx := nodeActivityCtx(gCtx, node.ID)
-		var result activity.CleanOrphanedConfigsResult
+
+		var nginxResult activity.CleanOrphanedConfigsResult
 		if err := workflow.ExecuteActivity(nodeCtx, "CleanOrphanedConfigs", activity.CleanOrphanedConfigsInput{
 			ExpectedConfigs: expectedConfigs,
-		}).Get(gCtx, &result); err != nil {
-			return fmt.Errorf("clean orphaned configs on node %s: %v", node.ID, err)
+		}).Get(gCtx, &nginxResult); err != nil {
+			return fmt.Errorf("clean orphaned nginx configs on node %s: %v", node.ID, err)
 		}
-		if len(result.Removed) > 0 {
-			logger.Warn("removed orphaned nginx configs", "node", node.ID, "removed", result.Removed)
+		if len(nginxResult.Removed) > 0 {
+			logger.Warn("removed orphaned nginx configs", "node", node.ID, "removed", nginxResult.Removed)
 		}
+
+		var fpmResult activity.CleanOrphanedFPMPoolsResult
+		if err := workflow.ExecuteActivity(nodeCtx, "CleanOrphanedFPMPools", activity.CleanOrphanedFPMPoolsInput{
+			ExpectedPools: expectedPools,
+		}).Get(gCtx, &fpmResult); err != nil {
+			return fmt.Errorf("clean orphaned fpm pools on node %s: %v", node.ID, err)
+		}
+		if len(fpmResult.Removed) > 0 {
+			logger.Warn("removed orphaned PHP-FPM pools", "node", node.ID, "removed", fpmResult.Removed)
+		}
+
 		return nil
 	})
 	errs = append(errs, cleanErrs...)
@@ -434,11 +449,14 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		}
 	}
 
-	// Reload nginx on all nodes (parallel).
+	// Reload nginx and PHP-FPM on all nodes (parallel).
 	reloadErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
 		nodeCtx := nodeActivityCtx(gCtx, node.ID)
 		if err := workflow.ExecuteActivity(nodeCtx, "ReloadNginx").Get(gCtx, nil); err != nil {
 			return fmt.Errorf("reload nginx on node %s: %v", node.ID, err)
+		}
+		if err := workflow.ExecuteActivity(nodeCtx, "ReloadPHPFPM").Get(gCtx, nil); err != nil {
+			return fmt.Errorf("reload php-fpm on node %s: %v", node.ID, err)
 		}
 		return nil
 	})

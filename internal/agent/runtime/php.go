@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"text/template"
 
 	"github.com/rs/zerolog"
@@ -262,6 +263,67 @@ func (p *PHP) Reload(ctx context.Context, webroot *WebrootInfo) error {
 // Remove removes the pool configuration and reloads PHP-FPM.
 func (p *PHP) Remove(ctx context.Context, webroot *WebrootInfo) error {
 	return p.Stop(ctx, webroot)
+}
+
+// ReloadAll reloads all installed PHP-FPM services by scanning /etc/php/*/fpm/.
+func (p *PHP) ReloadAll(ctx context.Context) error {
+	versionDirs, err := filepath.Glob("/etc/php/*/fpm")
+	if err != nil {
+		return fmt.Errorf("glob php fpm dirs: %w", err)
+	}
+	for _, dir := range versionDirs {
+		version := filepath.Base(filepath.Dir(dir))
+		service := fmt.Sprintf("php%s-fpm", version)
+		p.logger.Info().Str("service", service).Msg("reloading PHP-FPM")
+		if err := p.svcMgr.Signal(ctx, service, "USR2"); err != nil {
+			return fmt.Errorf("reload %s: %w", service, err)
+		}
+	}
+	return nil
+}
+
+// CleanOrphanedPools removes PHP-FPM pool configs that are not in the expected
+// set. It scans all /etc/php/*/fpm/pool.d/ directories. Returns the list of
+// removed filenames. Does NOT reload PHP-FPM (caller handles that).
+func (p *PHP) CleanOrphanedPools(expectedPools map[string]bool) ([]string, error) {
+	versionDirs, err := filepath.Glob("/etc/php/*/fpm/pool.d")
+	if err != nil {
+		return nil, fmt.Errorf("glob php pool dirs: %w", err)
+	}
+
+	var removed []string
+	for _, poolDir := range versionDirs {
+		entries, err := os.ReadDir(poolDir)
+		if err != nil {
+			continue
+		}
+
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			name := entry.Name()
+			if !strings.HasSuffix(name, ".conf") {
+				continue
+			}
+			// Skip the default www.conf pool.
+			if name == "www.conf" {
+				continue
+			}
+			if expectedPools[name] {
+				continue
+			}
+
+			confPath := filepath.Join(poolDir, name)
+			p.logger.Warn().Str("path", confPath).Str("filename", name).Msg("removing orphaned PHP-FPM pool config")
+			if err := os.Remove(confPath); err != nil {
+				return removed, fmt.Errorf("remove orphaned pool %s: %w", confPath, err)
+			}
+			removed = append(removed, confPath)
+		}
+	}
+
+	return removed, nil
 }
 
 func intOrDefault(pm *PHPPMConfig, getter func(*PHPPMConfig) *int, def int) int {
