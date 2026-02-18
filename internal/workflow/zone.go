@@ -115,11 +115,30 @@ func CreateZoneWorkflow(ctx workflow.Context, zoneID string) error {
 	}
 
 	// Set status to active.
-	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
+	err = workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
 		Table:  "zones",
 		ID:     zoneID,
 		Status: model.StatusActive,
 	}).Get(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	// Spawn pending child workflows in parallel.
+	var children []ChildWorkflowSpec
+
+	var records []model.ZoneRecord
+	_ = workflow.ExecuteActivity(ctx, "ListZoneRecordsByZoneID", zoneID).Get(ctx, &records)
+	for _, r := range records {
+		if r.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "CreateZoneRecordWorkflow", WorkflowID: fmt.Sprintf("create-zone-record-%s", r.ID), Arg: r.ID})
+		}
+	}
+
+	if errs := fanOutChildWorkflows(ctx, children); len(errs) > 0 {
+		workflow.GetLogger(ctx).Warn("child workflow failures", "errors", joinErrors(errs))
+	}
+	return nil
 }
 
 // DeleteZoneWorkflow removes a DNS zone from the PowerDNS database.

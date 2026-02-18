@@ -29,14 +29,12 @@ func (s *WebrootService) Create(ctx context.Context, webroot *model.Webroot) err
 		return fmt.Errorf("insert webroot: %w", err)
 	}
 
-	if err := signalProvision(ctx, s.tc, webroot.TenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, webroot.TenantID, model.ProvisionTask{
 		WorkflowName: "CreateWebrootWorkflow",
-		WorkflowID:   workflowID("webroot", webroot.Name, webroot.ID),
+		WorkflowID:   fmt.Sprintf("create-webroot-%s", webroot.ID),
 		Arg:          webroot.ID,
-		ResourceType: "webroot",
-		ResourceID:   webroot.ID,
 	}); err != nil {
-		return fmt.Errorf("start CreateWebrootWorkflow: %w", err)
+		return fmt.Errorf("signal CreateWebrootWorkflow: %w", err)
 	}
 
 	return nil
@@ -109,50 +107,41 @@ func (s *WebrootService) Update(ctx context.Context, webroot *model.Webroot) err
 		return fmt.Errorf("update webroot %s: %w", webroot.ID, err)
 	}
 
-	if err := signalProvision(ctx, s.tc, webroot.TenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, webroot.TenantID, model.ProvisionTask{
 		WorkflowName: "UpdateWebrootWorkflow",
 		WorkflowID:   workflowID("webroot", webroot.Name, webroot.ID),
 		Arg:          webroot.ID,
-		ResourceType: "webroot",
-		ResourceID:   webroot.ID,
 	}); err != nil {
-		return fmt.Errorf("start UpdateWebrootWorkflow: %w", err)
+		return fmt.Errorf("signal UpdateWebrootWorkflow: %w", err)
 	}
 
 	return nil
 }
 
 func (s *WebrootService) Delete(ctx context.Context, id string) error {
-	var name string
+	var name, tenantID string
 	err := s.db.QueryRow(ctx,
-		"UPDATE webroots SET status = $1, updated_at = now() WHERE id = $2 RETURNING name",
+		"UPDATE webroots SET status = $1, updated_at = now() WHERE id = $2 RETURNING name, tenant_id",
 		model.StatusDeleting, id,
-	).Scan(&name)
+	).Scan(&name, &tenantID)
 	if err != nil {
 		return fmt.Errorf("set webroot %s status to deleting: %w", id, err)
 	}
 
-	tenantID, err := resolveTenantIDFromWebroot(ctx, s.db, id)
-	if err != nil {
-		return fmt.Errorf("delete webroot: %w", err)
-	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteWebrootWorkflow",
 		WorkflowID:   workflowID("webroot", name, id),
 		Arg:          id,
-		ResourceType: "webroot",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start DeleteWebrootWorkflow: %w", err)
+		return fmt.Errorf("signal DeleteWebrootWorkflow: %w", err)
 	}
 
 	return nil
 }
 
 func (s *WebrootService) Retry(ctx context.Context, id string) error {
-	var status, name string
-	err := s.db.QueryRow(ctx, "SELECT status, name FROM webroots WHERE id = $1", id).Scan(&status, &name)
+	var status, name, tenantID string
+	err := s.db.QueryRow(ctx, "SELECT status, name, tenant_id FROM webroots WHERE id = $1", id).Scan(&status, &name, &tenantID)
 	if err != nil {
 		return fmt.Errorf("get webroot status: %w", err)
 	}
@@ -163,15 +152,9 @@ func (s *WebrootService) Retry(ctx context.Context, id string) error {
 	if err != nil {
 		return fmt.Errorf("set webroot %s status to provisioning: %w", id, err)
 	}
-	tenantID, err := resolveTenantIDFromWebroot(ctx, s.db, id)
-	if err != nil {
-		return fmt.Errorf("retry webroot: %w", err)
-	}
-	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateWebrootWorkflow",
 		WorkflowID:   workflowID("webroot", name, id),
 		Arg:          id,
-		ResourceType: "webroot",
-		ResourceID:   id,
 	})
 }

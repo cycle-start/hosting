@@ -46,6 +46,12 @@ func TestBackupService_Create_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
+
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
@@ -82,11 +88,18 @@ func TestBackupService_Create_WorkflowError(t *testing.T) {
 	backup := &model.Backup{ID: "test-backup-1", TenantID: "test-tenant-1"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
+
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Create(ctx, backup)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start CreateBackupWorkflow")
+	assert.Contains(t, err.Error(), "signal CreateBackupWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }
@@ -247,14 +260,16 @@ func TestBackupService_Delete_Success(t *testing.T) {
 
 	updateRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "web/mysite"
-		return nil
-	}}
-	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "test-tenant-1"
+		*(dest[1].(*string)) = "test-tenant-1"
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -292,19 +307,22 @@ func TestBackupService_Delete_WorkflowError(t *testing.T) {
 
 	updateRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "web/mysite"
-		return nil
-	}}
-	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "test-tenant-1"
+		*(dest[1].(*string)) = "test-tenant-1"
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
+
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Delete(ctx, "test-backup-1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start DeleteBackupWorkflow")
+	assert.Contains(t, err.Error(), "signal DeleteBackupWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }
@@ -335,7 +353,13 @@ func TestBackupService_Restore_Success(t *testing.T) {
 		*(dest[12].(*time.Time)) = now
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row).Once()
+
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -421,12 +445,19 @@ func TestBackupService_Restore_WorkflowError(t *testing.T) {
 		*(dest[12].(*time.Time)) = now
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row).Once()
+
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
+
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Restore(ctx, "test-backup-1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start RestoreBackupWorkflow")
+	assert.Contains(t, err.Error(), "signal RestoreBackupWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }

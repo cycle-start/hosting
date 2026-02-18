@@ -1772,3 +1772,289 @@ func (a *CoreDB) FinalizeDatabaseAccessRules(ctx context.Context, databaseID str
 	}
 	return nil
 }
+
+// ListSSHKeysByTenantID retrieves all SSH keys for a tenant.
+func (a *CoreDB) ListSSHKeysByTenantID(ctx context.Context, tenantID string) ([]model.SSHKey, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, tenant_id, name, public_key, fingerprint, status, status_message, created_at, updated_at
+		 FROM ssh_keys WHERE tenant_id = $1`, tenantID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list ssh keys by tenant: %w", err)
+	}
+	defer rows.Close()
+
+	var keys []model.SSHKey
+	for rows.Next() {
+		var k model.SSHKey
+		if err := rows.Scan(&k.ID, &k.TenantID, &k.Name, &k.PublicKey, &k.Fingerprint, &k.Status, &k.StatusMessage, &k.CreatedAt, &k.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan ssh key row: %w", err)
+		}
+		keys = append(keys, k)
+	}
+	return keys, rows.Err()
+}
+
+// ListBackupsByTenantID retrieves all backups for a tenant.
+func (a *CoreDB) ListBackupsByTenantID(ctx context.Context, tenantID string) ([]model.Backup, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, tenant_id, type, source_id, source_name, storage_path, size_bytes, status, status_message, started_at, completed_at, created_at, updated_at
+		 FROM backups WHERE tenant_id = $1`, tenantID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list backups by tenant: %w", err)
+	}
+	defer rows.Close()
+
+	var backups []model.Backup
+	for rows.Next() {
+		var b model.Backup
+		if err := rows.Scan(&b.ID, &b.TenantID, &b.Type, &b.SourceID, &b.SourceName, &b.StoragePath, &b.SizeBytes, &b.Status, &b.StatusMessage, &b.StartedAt, &b.CompletedAt, &b.CreatedAt, &b.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan backup row: %w", err)
+		}
+		backups = append(backups, b)
+	}
+	return backups, rows.Err()
+}
+
+// ListEgressRulesByTenantID retrieves all egress rules for a tenant.
+func (a *CoreDB) ListEgressRulesByTenantID(ctx context.Context, tenantID string) ([]model.TenantEgressRule, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, tenant_id, cidr, description, status, status_message, created_at, updated_at
+		 FROM tenant_egress_rules WHERE tenant_id = $1`, tenantID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list egress rules by tenant: %w", err)
+	}
+	defer rows.Close()
+
+	var rules []model.TenantEgressRule
+	for rows.Next() {
+		var r model.TenantEgressRule
+		if err := rows.Scan(&r.ID, &r.TenantID, &r.CIDR, &r.Description, &r.Status, &r.StatusMessage, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan egress rule row: %w", err)
+		}
+		rules = append(rules, r)
+	}
+	return rules, rows.Err()
+}
+
+// ListDatabaseAccessRulesByDatabaseID retrieves all access rules for a database.
+func (a *CoreDB) ListDatabaseAccessRulesByDatabaseID(ctx context.Context, databaseID string) ([]model.DatabaseAccessRule, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, database_id, cidr, description, status, status_message, created_at, updated_at
+		 FROM database_access_rules WHERE database_id = $1`, databaseID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list database access rules by database: %w", err)
+	}
+	defer rows.Close()
+
+	var rules []model.DatabaseAccessRule
+	for rows.Next() {
+		var r model.DatabaseAccessRule
+		if err := rows.Scan(&r.ID, &r.DatabaseID, &r.CIDR, &r.Description, &r.Status, &r.StatusMessage, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan database access rule row: %w", err)
+		}
+		rules = append(rules, r)
+	}
+	return rules, rows.Err()
+}
+
+// ListS3AccessKeysByBucketID retrieves all access keys for an S3 bucket.
+func (a *CoreDB) ListS3AccessKeysByBucketID(ctx context.Context, bucketID string) ([]model.S3AccessKey, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, s3_bucket_id, access_key_id, secret_access_key, permissions, status, status_message, created_at, updated_at
+		 FROM s3_access_keys WHERE s3_bucket_id = $1`, bucketID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list s3 access keys by bucket: %w", err)
+	}
+	defer rows.Close()
+
+	var keys []model.S3AccessKey
+	for rows.Next() {
+		var k model.S3AccessKey
+		if err := rows.Scan(&k.ID, &k.S3BucketID, &k.AccessKeyID, &k.SecretAccessKey, &k.Permissions, &k.Status, &k.StatusMessage, &k.CreatedAt, &k.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan s3 access key row: %w", err)
+		}
+		keys = append(keys, k)
+	}
+	return keys, rows.Err()
+}
+
+// ListDaemonsByWebrootID retrieves all daemons for a webroot.
+func (a *CoreDB) ListDaemonsByWebrootID(ctx context.Context, webrootID string) ([]model.Daemon, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, tenant_id, node_id, webroot_id, name, command, proxy_path, proxy_port, num_procs, stop_signal, stop_wait_secs, max_memory_mb, environment, enabled, status, status_message, created_at, updated_at
+		 FROM daemons WHERE webroot_id = $1`, webrootID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list daemons by webroot: %w", err)
+	}
+	defer rows.Close()
+
+	var daemons []model.Daemon
+	for rows.Next() {
+		var d model.Daemon
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.NodeID, &d.WebrootID, &d.Name, &d.Command, &d.ProxyPath, &d.ProxyPort, &d.NumProcs, &d.StopSignal, &d.StopWaitSecs, &d.MaxMemoryMB, &d.Environment, &d.Enabled, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan daemon row: %w", err)
+		}
+		daemons = append(daemons, d)
+	}
+	return daemons, rows.Err()
+}
+
+// ListCronJobsByWebrootID retrieves all cron jobs for a webroot.
+func (a *CoreDB) ListCronJobsByWebrootID(ctx context.Context, webrootID string) ([]model.CronJob, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, tenant_id, webroot_id, name, schedule, command, working_directory, enabled, timeout_seconds, max_memory_mb, consecutive_failures, max_failures, status, status_message, created_at, updated_at
+		 FROM cron_jobs WHERE webroot_id = $1`, webrootID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list cron jobs by webroot: %w", err)
+	}
+	defer rows.Close()
+
+	var jobs []model.CronJob
+	for rows.Next() {
+		var c model.CronJob
+		if err := rows.Scan(&c.ID, &c.TenantID, &c.WebrootID, &c.Name, &c.Schedule, &c.Command, &c.WorkingDirectory, &c.Enabled, &c.TimeoutSeconds, &c.MaxMemoryMB, &c.ConsecutiveFailures, &c.MaxFailures, &c.Status, &c.StatusMessage, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan cron job row: %w", err)
+		}
+		jobs = append(jobs, c)
+	}
+	return jobs, rows.Err()
+}
+
+// ListFQDNsByWebrootID retrieves all FQDNs for a webroot.
+func (a *CoreDB) ListFQDNsByWebrootID(ctx context.Context, webrootID string) ([]model.FQDN, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, fqdn, webroot_id, ssl_enabled, status, status_message, created_at, updated_at
+		 FROM fqdns WHERE webroot_id = $1`, webrootID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list fqdns by webroot: %w", err)
+	}
+	defer rows.Close()
+
+	var fqdns []model.FQDN
+	for rows.Next() {
+		var f model.FQDN
+		if err := rows.Scan(&f.ID, &f.FQDN, &f.WebrootID, &f.SSLEnabled, &f.Status, &f.StatusMessage, &f.CreatedAt, &f.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan fqdn row: %w", err)
+		}
+		fqdns = append(fqdns, f)
+	}
+	return fqdns, rows.Err()
+}
+
+// ListEmailAccountsByFQDNID retrieves all email accounts for an FQDN.
+func (a *CoreDB) ListEmailAccountsByFQDNID(ctx context.Context, fqdnID string) ([]model.EmailAccount, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, fqdn_id, address, display_name, quota_bytes, status, status_message, created_at, updated_at
+		 FROM email_accounts WHERE fqdn_id = $1`, fqdnID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list email accounts by fqdn: %w", err)
+	}
+	defer rows.Close()
+
+	var accounts []model.EmailAccount
+	for rows.Next() {
+		var a model.EmailAccount
+		if err := rows.Scan(&a.ID, &a.FQDNID, &a.Address, &a.DisplayName, &a.QuotaBytes, &a.Status, &a.StatusMessage, &a.CreatedAt, &a.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan email account row: %w", err)
+		}
+		accounts = append(accounts, a)
+	}
+	return accounts, rows.Err()
+}
+
+// ListEmailAliasesByAccountID retrieves all aliases for an email account.
+func (a *CoreDB) ListEmailAliasesByAccountID(ctx context.Context, accountID string) ([]model.EmailAlias, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, email_account_id, address, status, status_message, created_at, updated_at
+		 FROM email_aliases WHERE email_account_id = $1`, accountID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list email aliases by account: %w", err)
+	}
+	defer rows.Close()
+
+	var aliases []model.EmailAlias
+	for rows.Next() {
+		var al model.EmailAlias
+		if err := rows.Scan(&al.ID, &al.EmailAccountID, &al.Address, &al.Status, &al.StatusMessage, &al.CreatedAt, &al.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan email alias row: %w", err)
+		}
+		aliases = append(aliases, al)
+	}
+	return aliases, rows.Err()
+}
+
+// ListEmailForwardsByAccountID retrieves all forwards for an email account.
+func (a *CoreDB) ListEmailForwardsByAccountID(ctx context.Context, accountID string) ([]model.EmailForward, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, email_account_id, destination, keep_copy, status, status_message, created_at, updated_at
+		 FROM email_forwards WHERE email_account_id = $1`, accountID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list email forwards by account: %w", err)
+	}
+	defer rows.Close()
+
+	var forwards []model.EmailForward
+	for rows.Next() {
+		var f model.EmailForward
+		if err := rows.Scan(&f.ID, &f.EmailAccountID, &f.Destination, &f.KeepCopy, &f.Status, &f.StatusMessage, &f.CreatedAt, &f.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan email forward row: %w", err)
+		}
+		forwards = append(forwards, f)
+	}
+	return forwards, rows.Err()
+}
+
+// ListEmailAutoRepliesByAccountID retrieves all auto-replies for an email account.
+func (a *CoreDB) ListEmailAutoRepliesByAccountID(ctx context.Context, accountID string) ([]model.EmailAutoReply, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, email_account_id, subject, body, start_date, end_date, enabled, status, status_message, created_at, updated_at
+		 FROM email_autoreplies WHERE email_account_id = $1`, accountID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list email autoreplies by account: %w", err)
+	}
+	defer rows.Close()
+
+	var replies []model.EmailAutoReply
+	for rows.Next() {
+		var r model.EmailAutoReply
+		if err := rows.Scan(&r.ID, &r.EmailAccountID, &r.Subject, &r.Body, &r.StartDate, &r.EndDate, &r.Enabled, &r.Status, &r.StatusMessage, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan email autoreply row: %w", err)
+		}
+		replies = append(replies, r)
+	}
+	return replies, rows.Err()
+}
+
+// ListZoneRecordsByZoneID retrieves all zone records for a zone.
+func (a *CoreDB) ListZoneRecordsByZoneID(ctx context.Context, zoneID string) ([]model.ZoneRecord, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, zone_id, type, name, content, ttl, priority, managed_by, source_type, source_fqdn_id, status, status_message, created_at, updated_at
+		 FROM zone_records WHERE zone_id = $1`, zoneID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list zone records by zone: %w", err)
+	}
+	defer rows.Close()
+
+	var records []model.ZoneRecord
+	for rows.Next() {
+		var r model.ZoneRecord
+		if err := rows.Scan(&r.ID, &r.ZoneID, &r.Type, &r.Name, &r.Content, &r.TTL, &r.Priority, &r.ManagedBy, &r.SourceType, &r.SourceFQDNID, &r.Status, &r.StatusMessage, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan zone record row: %w", err)
+		}
+		records = append(records, r)
+	}
+	return records, rows.Err()
+}

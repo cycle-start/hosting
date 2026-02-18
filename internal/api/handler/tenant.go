@@ -114,217 +114,340 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	now := time.Now()
-	shardID := req.ShardID
-	tenant := &model.Tenant{
-		ID:        platform.NewID(),
-		Name:      platform.NewName("t_"),
-		BrandID:   req.BrandID,
-		RegionID:  req.RegionID,
-		ClusterID: req.ClusterID,
-		ShardID:   &shardID,
-		Status:    model.StatusPending,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	if req.SFTPEnabled != nil {
-		tenant.SFTPEnabled = *req.SFTPEnabled
-	}
-	if req.SSHEnabled != nil {
-		tenant.SSHEnabled = *req.SSHEnabled
-	}
-	if req.DiskQuotaBytes != nil {
-		tenant.DiskQuotaBytes = *req.DiskQuotaBytes
-	}
+	var tenant *model.Tenant
+	err = h.services.WithTx(r.Context(), func(tx *core.Services) error {
+		skipCtx := core.WithSkipWorkflow(r.Context())
 
-	if err := h.svc.Create(r.Context(), tenant); err != nil {
+		now := time.Now()
+		shardID := req.ShardID
+		tenant = &model.Tenant{
+			ID:        platform.NewID(),
+			Name:      platform.NewName("t_"),
+			BrandID:   req.BrandID,
+			RegionID:  req.RegionID,
+			ClusterID: req.ClusterID,
+			ShardID:   &shardID,
+			Status:    model.StatusPending,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		if req.SFTPEnabled != nil {
+			tenant.SFTPEnabled = *req.SFTPEnabled
+		}
+		if req.SSHEnabled != nil {
+			tenant.SSHEnabled = *req.SSHEnabled
+		}
+		if req.DiskQuotaBytes != nil {
+			tenant.DiskQuotaBytes = *req.DiskQuotaBytes
+		}
+
+		if err := tx.Tenant.Create(skipCtx, tenant); err != nil {
+			return err
+		}
+
+		// Nested zone creation
+		for _, zr := range req.Zones {
+			now2 := time.Now()
+			tenantID := tenant.ID
+			zone := &model.Zone{
+				ID:        platform.NewID(),
+				TenantID:  &tenantID,
+				Name:      zr.Name,
+				RegionID:  tenant.RegionID,
+				Status:    model.StatusPending,
+				CreatedAt: now2,
+				UpdatedAt: now2,
+			}
+			if err := tx.Zone.Create(skipCtx, zone); err != nil {
+				return fmt.Errorf("create zone %s: %w", zr.Name, err)
+			}
+		}
+
+		// Nested webroot creation
+		for _, wr := range req.Webroots {
+			now2 := time.Now()
+			runtimeConfig := wr.RuntimeConfig
+			if runtimeConfig == nil {
+				runtimeConfig = json.RawMessage(`{}`)
+			}
+			webroot := &model.Webroot{
+				ID:             platform.NewID(),
+				TenantID:       tenant.ID,
+				Name:           platform.NewName("web_"),
+				Runtime:        wr.Runtime,
+				RuntimeVersion: wr.RuntimeVersion,
+				RuntimeConfig:  runtimeConfig,
+				PublicFolder:   wr.PublicFolder,
+				EnvFileName:    wr.EnvFileName,
+				Status:         model.StatusPending,
+				CreatedAt:      now2,
+				UpdatedAt:      now2,
+			}
+			if wr.EnvShellSource != nil {
+				webroot.EnvShellSource = *wr.EnvShellSource
+			}
+			if err := tx.Webroot.Create(skipCtx, webroot); err != nil {
+				return fmt.Errorf("create webroot: %w", err)
+			}
+			if err := createNestedFQDNs(skipCtx, tx, webroot.ID, wr.FQDNs); err != nil {
+				return err
+			}
+
+			// Nested daemon creation
+			for _, dr := range wr.Daemons {
+				daemonName := platform.NewName("daemon_")
+				numProcs := dr.NumProcs
+				if numProcs == 0 {
+					numProcs = 1
+				}
+				var proxyPath *string
+				var proxyPort *int
+				if dr.ProxyPath != "" {
+					pp := dr.ProxyPath
+					proxyPath = &pp
+					port := core.ComputeDaemonPort(tenant.Name, webroot.Name, daemonName)
+					proxyPort = &port
+				}
+				now3 := time.Now()
+				daemon := &model.Daemon{
+					ID:           platform.NewID(),
+					TenantID:     tenant.ID,
+					WebrootID:    webroot.ID,
+					Name:         daemonName,
+					Command:      dr.Command,
+					ProxyPath:    proxyPath,
+					ProxyPort:    proxyPort,
+					NumProcs:     numProcs,
+					StopSignal:   "TERM",
+					StopWaitSecs: 30,
+					MaxMemoryMB:  512,
+					Environment:  make(map[string]string),
+					Enabled:      true,
+					Status:       model.StatusPending,
+					CreatedAt:    now3,
+					UpdatedAt:    now3,
+				}
+				if err := tx.Daemon.Create(skipCtx, daemon); err != nil {
+					return fmt.Errorf("create daemon %s: %w", daemonName, err)
+				}
+			}
+
+			// Nested cron job creation
+			for _, cr := range wr.CronJobs {
+				now3 := time.Now()
+				cronJob := &model.CronJob{
+					ID:               platform.NewID(),
+					TenantID:         tenant.ID,
+					WebrootID:        webroot.ID,
+					Name:             platform.NewName("cron_"),
+					Schedule:         cr.Schedule,
+					Command:          cr.Command,
+					WorkingDirectory: cr.WorkingDirectory,
+					Enabled:          false,
+					TimeoutSeconds:   3600,
+					MaxMemoryMB:      512,
+					Status:           model.StatusPending,
+					CreatedAt:        now3,
+					UpdatedAt:        now3,
+				}
+				if err := tx.CronJob.Create(skipCtx, cronJob); err != nil {
+					return fmt.Errorf("create cron job: %w", err)
+				}
+			}
+		}
+
+		// Nested database creation
+		for _, dr := range req.Databases {
+			now2 := time.Now()
+			tenantID := tenant.ID
+			dbShardID := dr.ShardID
+			dbName := platform.NewName("db_")
+			database := &model.Database{
+				ID:        platform.NewID(),
+				TenantID:  &tenantID,
+				Name:      dbName,
+				ShardID:   &dbShardID,
+				Status:    model.StatusPending,
+				CreatedAt: now2,
+				UpdatedAt: now2,
+			}
+			if err := tx.Database.Create(skipCtx, database); err != nil {
+				return fmt.Errorf("create database %s: %w", dbName, err)
+			}
+			for _, ur := range dr.Users {
+				now3 := time.Now()
+				user := &model.DatabaseUser{
+					ID:         platform.NewID(),
+					DatabaseID: database.ID,
+					Username:   ur.Username,
+					Password:   ur.Password,
+					Privileges: ur.Privileges,
+					Status:     model.StatusPending,
+					CreatedAt:  now3,
+					UpdatedAt:  now3,
+				}
+				if err := tx.DatabaseUser.Create(skipCtx, user); err != nil {
+					return fmt.Errorf("create database user %s: %w", ur.Username, err)
+				}
+			}
+
+			// Nested database access rule creation
+			for _, ar := range dr.AccessRules {
+				now3 := time.Now()
+				rule := &model.DatabaseAccessRule{
+					ID:          platform.NewID(),
+					DatabaseID:  database.ID,
+					CIDR:        ar.CIDR,
+					Description: ar.Description,
+					Status:      model.StatusPending,
+					CreatedAt:   now3,
+					UpdatedAt:   now3,
+				}
+				if err := tx.DatabaseAccessRule.Create(skipCtx, rule); err != nil {
+					return fmt.Errorf("create database access rule %s: %w", ar.CIDR, err)
+				}
+			}
+		}
+
+		// Nested valkey instance creation
+		for _, vr := range req.ValkeyInstances {
+			now2 := time.Now()
+			tenantID := tenant.ID
+			vShardID := vr.ShardID
+			maxMemoryMB := vr.MaxMemoryMB
+			if maxMemoryMB == 0 {
+				maxMemoryMB = 64
+			}
+			instance := &model.ValkeyInstance{
+				ID:          platform.NewID(),
+				TenantID:    &tenantID,
+				Name:        platform.NewName("kv_"),
+				ShardID:     &vShardID,
+				MaxMemoryMB: maxMemoryMB,
+				Password:    generatePassword(),
+				Status:      model.StatusPending,
+				CreatedAt:   now2,
+				UpdatedAt:   now2,
+			}
+			if err := tx.ValkeyInstance.Create(skipCtx, instance); err != nil {
+				return fmt.Errorf("create valkey instance: %w", err)
+			}
+			for _, ur := range vr.Users {
+				keyPattern := ur.KeyPattern
+				if keyPattern == "" {
+					keyPattern = "~*"
+				}
+				now3 := time.Now()
+				user := &model.ValkeyUser{
+					ID:               platform.NewID(),
+					ValkeyInstanceID: instance.ID,
+					Username:         ur.Username,
+					Password:         ur.Password,
+					Privileges:       ur.Privileges,
+					KeyPattern:       keyPattern,
+					Status:           model.StatusPending,
+					CreatedAt:        now3,
+					UpdatedAt:        now3,
+				}
+				if err := tx.ValkeyUser.Create(skipCtx, user); err != nil {
+					return fmt.Errorf("create valkey user %s: %w", ur.Username, err)
+				}
+			}
+		}
+
+		// Nested S3 bucket creation
+		for _, br := range req.S3Buckets {
+			now2 := time.Now()
+			tenantID := tenant.ID
+			s3ShardID := br.ShardID
+			bucket := &model.S3Bucket{
+				ID:        platform.NewID(),
+				TenantID:  &tenantID,
+				Name:      platform.NewName("s3_"),
+				ShardID:   &s3ShardID,
+				Status:    model.StatusPending,
+				CreatedAt: now2,
+				UpdatedAt: now2,
+			}
+			if br.Public != nil && *br.Public {
+				bucket.Public = true
+			}
+			if br.QuotaBytes != nil {
+				bucket.QuotaBytes = *br.QuotaBytes
+			}
+			if err := tx.S3Bucket.Create(skipCtx, bucket); err != nil {
+				return fmt.Errorf("create s3 bucket: %w", err)
+			}
+
+			// Nested S3 access key creation
+			for range br.AccessKeys {
+				now3 := time.Now()
+				key := &model.S3AccessKey{
+					ID:          platform.NewID(),
+					S3BucketID:  bucket.ID,
+					Permissions: "read-write",
+					Status:      model.StatusPending,
+					CreatedAt:   now3,
+					UpdatedAt:   now3,
+				}
+				if err := tx.S3AccessKey.Create(skipCtx, key); err != nil {
+					return fmt.Errorf("create s3 access key: %w", err)
+				}
+			}
+		}
+
+		// Nested SSH key creation
+		for _, kr := range req.SSHKeys {
+			fingerprint, err := parseSSHKey(kr.PublicKey)
+			if err != nil {
+				return fmt.Errorf("create SSH key %s: invalid SSH public key: %w", kr.Name, err)
+			}
+			now2 := time.Now()
+			key := &model.SSHKey{
+				ID:          platform.NewID(),
+				TenantID:    tenant.ID,
+				Name:        kr.Name,
+				PublicKey:   kr.PublicKey,
+				Fingerprint: fingerprint,
+				Status:      model.StatusPending,
+				CreatedAt:   now2,
+				UpdatedAt:   now2,
+			}
+			if err := tx.SSHKey.Create(skipCtx, key); err != nil {
+				return fmt.Errorf("create SSH key %s: %w", kr.Name, err)
+			}
+		}
+
+		// Nested egress rule creation
+		for _, er := range req.EgressRules {
+			now2 := time.Now()
+			rule := &model.TenantEgressRule{
+				ID:          platform.NewID(),
+				TenantID:    tenant.ID,
+				CIDR:        er.CIDR,
+				Description: er.Description,
+				Status:      model.StatusPending,
+				CreatedAt:   now2,
+				UpdatedAt:   now2,
+			}
+			if err := tx.TenantEgressRule.Create(skipCtx, rule); err != nil {
+				return fmt.Errorf("create egress rule %s: %w", er.CIDR, err)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	// Nested zone creation
-	for _, zr := range req.Zones {
-		now2 := time.Now()
-		tenantID := tenant.ID
-		zone := &model.Zone{
-			ID:        platform.NewID(),
-			TenantID:  &tenantID,
-			Name:      zr.Name,
-			RegionID:  tenant.RegionID,
-			Status:    model.StatusPending,
-			CreatedAt: now2,
-			UpdatedAt: now2,
-		}
-		if err := h.services.Zone.Create(r.Context(), zone); err != nil {
-			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create zone %s: %s", zr.Name, err.Error()))
-			return
-		}
-	}
-
-	// Nested webroot creation
-	for _, wr := range req.Webroots {
-		now2 := time.Now()
-		runtimeConfig := wr.RuntimeConfig
-		if runtimeConfig == nil {
-			runtimeConfig = json.RawMessage(`{}`)
-		}
-		webroot := &model.Webroot{
-			ID:             platform.NewID(),
-			TenantID:       tenant.ID,
-			Name:           platform.NewName("web_"),
-			Runtime:        wr.Runtime,
-			RuntimeVersion: wr.RuntimeVersion,
-			RuntimeConfig:  runtimeConfig,
-			PublicFolder:   wr.PublicFolder,
-			Status:         model.StatusPending,
-			CreatedAt:      now2,
-			UpdatedAt:      now2,
-		}
-		if err := h.services.Webroot.Create(r.Context(), webroot); err != nil {
-			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create webroot: %s", err.Error()))
-			return
-		}
-		if err := createNestedFQDNs(r.Context(), h.services, webroot.ID, wr.FQDNs); err != nil {
-			response.WriteError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-	}
-
-	// Nested database creation
-	for _, dr := range req.Databases {
-		now2 := time.Now()
-		tenantID := tenant.ID
-		dbShardID := dr.ShardID
-		dbName := platform.NewName("db_")
-		database := &model.Database{
-			ID:        platform.NewID(),
-			TenantID:  &tenantID,
-			Name:      dbName,
-			ShardID:   &dbShardID,
-			Status:    model.StatusPending,
-			CreatedAt: now2,
-			UpdatedAt: now2,
-		}
-		if err := h.services.Database.Create(r.Context(), database); err != nil {
-			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create database %s: %s", dbName, err.Error()))
-			return
-		}
-		for _, ur := range dr.Users {
-			now3 := time.Now()
-			user := &model.DatabaseUser{
-				ID:         platform.NewID(),
-				DatabaseID: database.ID,
-				Username:   ur.Username,
-				Password:   ur.Password,
-				Privileges: ur.Privileges,
-				Status:     model.StatusPending,
-				CreatedAt:  now3,
-				UpdatedAt:  now3,
-			}
-			if err := h.services.DatabaseUser.Create(r.Context(), user); err != nil {
-				response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create database user %s: %s", ur.Username, err.Error()))
-				return
-			}
-		}
-	}
-
-	// Nested valkey instance creation
-	for _, vr := range req.ValkeyInstances {
-		now2 := time.Now()
-		tenantID := tenant.ID
-		vShardID := vr.ShardID
-		maxMemoryMB := vr.MaxMemoryMB
-		if maxMemoryMB == 0 {
-			maxMemoryMB = 64
-		}
-		instance := &model.ValkeyInstance{
-			ID:          platform.NewID(),
-			TenantID:    &tenantID,
-			Name:        platform.NewName("kv_"),
-			ShardID:     &vShardID,
-			MaxMemoryMB: maxMemoryMB,
-			Password:    generatePassword(),
-			Status:      model.StatusPending,
-			CreatedAt:   now2,
-			UpdatedAt:   now2,
-		}
-		if err := h.services.ValkeyInstance.Create(r.Context(), instance); err != nil {
-			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create valkey instance: %s", err.Error()))
-			return
-		}
-		for _, ur := range vr.Users {
-			keyPattern := ur.KeyPattern
-			if keyPattern == "" {
-				keyPattern = "~*"
-			}
-			now3 := time.Now()
-			user := &model.ValkeyUser{
-				ID:               platform.NewID(),
-				ValkeyInstanceID: instance.ID,
-				Username:         ur.Username,
-				Password:         ur.Password,
-				Privileges:       ur.Privileges,
-				KeyPattern:       keyPattern,
-				Status:           model.StatusPending,
-				CreatedAt:        now3,
-				UpdatedAt:        now3,
-			}
-			if err := h.services.ValkeyUser.Create(r.Context(), user); err != nil {
-				response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create valkey user %s: %s", ur.Username, err.Error()))
-				return
-			}
-		}
-	}
-
-	// Nested S3 bucket creation
-	for _, br := range req.S3Buckets {
-		now2 := time.Now()
-		tenantID := tenant.ID
-		s3ShardID := br.ShardID
-		bucket := &model.S3Bucket{
-			ID:        platform.NewID(),
-			TenantID:  &tenantID,
-			Name:      platform.NewName("s3_"),
-			ShardID:   &s3ShardID,
-			Status:    model.StatusPending,
-			CreatedAt: now2,
-			UpdatedAt: now2,
-		}
-		if br.Public != nil && *br.Public {
-			bucket.Public = true
-		}
-		if br.QuotaBytes != nil {
-			bucket.QuotaBytes = *br.QuotaBytes
-		}
-		if err := h.services.S3Bucket.Create(r.Context(), bucket); err != nil {
-			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create s3 bucket: %s", err.Error()))
-			return
-		}
-	}
-
-	// Nested SSH key creation
-	for _, kr := range req.SSHKeys {
-		fingerprint, err := parseSSHKey(kr.PublicKey)
-		if err != nil {
-			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create SSH key %s: invalid SSH public key: %s", kr.Name, err.Error()))
-			return
-		}
-		now2 := time.Now()
-		key := &model.SSHKey{
-			ID:          platform.NewID(),
-			TenantID:    tenant.ID,
-			Name:        kr.Name,
-			PublicKey:   kr.PublicKey,
-			Fingerprint: fingerprint,
-			Status:      model.StatusPending,
-			CreatedAt:   now2,
-			UpdatedAt:   now2,
-		}
-		if err := h.services.SSHKey.Create(r.Context(), key); err != nil {
-			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create SSH key %s: %s", kr.Name, err.Error()))
-			return
-		}
-	}
+	// Commit succeeded — signal per-tenant entity workflow
+	_ = h.services.SignalProvision(r.Context(), tenant.ID, model.ProvisionTask{
+		WorkflowName: "CreateTenantWorkflow",
+		WorkflowID:   fmt.Sprintf("create-tenant-%s", tenant.ID),
+		Arg:          tenant.ID,
+	})
 
 	response.WriteJSON(w, http.StatusAccepted, tenant)
 }

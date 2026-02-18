@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"fmt"
 	"time"
 
 	"go.temporal.io/sdk/temporal"
@@ -94,11 +95,46 @@ func CreateEmailAccountWorkflow(ctx workflow.Context, accountID string) error {
 	}
 
 	// Set status to active.
-	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
+	err = workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
 		Table:  "email_accounts",
 		ID:     accountID,
 		Status: model.StatusActive,
 	}).Get(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	// Spawn pending child workflows in parallel.
+	var children []ChildWorkflowSpec
+
+	var aliases []model.EmailAlias
+	_ = workflow.ExecuteActivity(ctx, "ListEmailAliasesByAccountID", accountID).Get(ctx, &aliases)
+	for _, a := range aliases {
+		if a.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "CreateEmailAliasWorkflow", WorkflowID: fmt.Sprintf("create-email-alias-%s", a.ID), Arg: a.ID})
+		}
+	}
+
+	var forwards []model.EmailForward
+	_ = workflow.ExecuteActivity(ctx, "ListEmailForwardsByAccountID", accountID).Get(ctx, &forwards)
+	for _, f := range forwards {
+		if f.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "CreateEmailForwardWorkflow", WorkflowID: fmt.Sprintf("create-email-forward-%s", f.ID), Arg: f.ID})
+		}
+	}
+
+	var autoreplies []model.EmailAutoReply
+	_ = workflow.ExecuteActivity(ctx, "ListEmailAutoRepliesByAccountID", accountID).Get(ctx, &autoreplies)
+	for _, ar := range autoreplies {
+		if ar.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "UpdateEmailAutoReplyWorkflow", WorkflowID: fmt.Sprintf("update-email-autoreply-%s", ar.ID), Arg: ar.ID})
+		}
+	}
+
+	if errs := fanOutChildWorkflows(ctx, children); len(errs) > 0 {
+		workflow.GetLogger(ctx).Warn("child workflow failures", "errors", joinErrors(errs))
+	}
+	return nil
 }
 
 // DeleteEmailAccountWorkflow removes an email account from Stalwart.

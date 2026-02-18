@@ -56,19 +56,16 @@ func (s *S3AccessKeyService) Create(ctx context.Context, key *model.S3AccessKey)
 		return fmt.Errorf("insert s3 access key: %w", err)
 	}
 
-	tenantID, err := resolveTenantIDFromS3AccessKey(ctx, s.db, key.ID)
+	tenantID, err := resolveTenantIDFromS3Bucket(ctx, s.db, key.S3BucketID)
 	if err != nil {
-		return fmt.Errorf("create s3 access key: %w", err)
+		return fmt.Errorf("resolve tenant for s3 access key: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateS3AccessKeyWorkflow",
-		WorkflowID:   workflowID("s3-access-key", key.AccessKeyID, key.ID),
+		WorkflowID:   fmt.Sprintf("create-s3-access-key-%s", key.ID),
 		Arg:          key.ID,
-		ResourceType: "s3-access-key",
-		ResourceID:   key.ID,
 	}); err != nil {
-		return fmt.Errorf("start CreateS3AccessKeyWorkflow: %w", err)
+		return fmt.Errorf("signal CreateS3AccessKeyWorkflow: %w", err)
 	}
 
 	return nil
@@ -140,17 +137,14 @@ func (s *S3AccessKeyService) Delete(ctx context.Context, id string) error {
 
 	tenantID, err := resolveTenantIDFromS3AccessKey(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("delete s3 access key: %w", err)
+		return fmt.Errorf("resolve tenant for s3 access key: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteS3AccessKeyWorkflow",
 		WorkflowID:   workflowID("s3-access-key", accessKeyID, id),
 		Arg:          id,
-		ResourceType: "s3-access-key",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start DeleteS3AccessKeyWorkflow: %w", err)
+		return fmt.Errorf("signal DeleteS3AccessKeyWorkflow: %w", err)
 	}
 
 	return nil
@@ -171,13 +165,11 @@ func (s *S3AccessKeyService) Retry(ctx context.Context, id string) error {
 	}
 	tenantID, err := resolveTenantIDFromS3AccessKey(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("retry s3 access key: %w", err)
+		return fmt.Errorf("resolve tenant for s3 access key: %w", err)
 	}
-	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateS3AccessKeyWorkflow",
 		WorkflowID:   workflowID("s3-access-key", accessKeyID, id),
 		Arg:          id,
-		ResourceType: "s3-access-key",
-		ResourceID:   id,
 	})
 }

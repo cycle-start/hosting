@@ -47,6 +47,12 @@ func TestS3BucketService_Create_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
+
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
@@ -83,11 +89,11 @@ func TestS3BucketService_Create_WorkflowError(t *testing.T) {
 	bucket := &model.S3Bucket{ID: "test-bucket-1", Name: "my-bucket"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "CreateS3BucketWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+	tc.On("ExecuteWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Create(ctx, bucket)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start CreateS3BucketWorkflow")
+	assert.Contains(t, err.Error(), "signal CreateS3BucketWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }
@@ -229,12 +235,20 @@ func TestS3BucketService_Delete_Success(t *testing.T) {
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 
+	// resolveTenantIDFromS3Bucket
+	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		tid := "test-tenant-1"
-		*(dest[0].(**string)) = &tid
+		*(dest[0].(**string)) = &tenantID
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	// signalProvision tenant name lookup
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")

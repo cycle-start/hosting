@@ -44,14 +44,23 @@ func TestFQDNService_Create_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	wfRun := &temporalmocks.WorkflowRun{}
-	wfRun.On("GetID").Return("mock-wf-id")
-	wfRun.On("GetRunID").Return("mock-run-id")
+	// resolveTenantIDFromWebroot
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "test-tenant-1"
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	// signalProvision tenant name lookup
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
+
+	wfRun := &temporalmocks.WorkflowRun{}
+	wfRun.On("GetID").Return("mock-wf-id")
+	wfRun.On("GetRunID").Return("mock-run-id")
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Create(ctx, fqdn)
@@ -85,16 +94,19 @@ func TestFQDNService_Create_WorkflowError(t *testing.T) {
 	fqdn := &model.FQDN{ID: "test-fqdn-1", FQDN: "example.com"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+
+	// resolveTenantIDFromWebroot (returns empty => signalProvision uses ExecuteWorkflow)
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "test-tenant-1"
+		*(dest[0].(*string)) = ""
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
-	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
+
+	tc.On("ExecuteWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Create(ctx, fqdn)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start BindFQDNWorkflow")
+	assert.Contains(t, err.Error(), "signal BindFQDNWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }
@@ -245,12 +257,21 @@ func TestFQDNService_Delete_Success(t *testing.T) {
 		*(dest[0].(*string)) = "example.com"
 		return nil
 	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
+
+	// resolveTenantIDFromFQDN
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "test-tenant-1"
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	// signalProvision tenant name lookup
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -290,17 +311,27 @@ func TestFQDNService_Delete_WorkflowError(t *testing.T) {
 		*(dest[0].(*string)) = "example.com"
 		return nil
 	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
+
+	// resolveTenantIDFromFQDN
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "test-tenant-1"
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	// signalProvision tenant name lookup
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
+
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Delete(ctx, "test-fqdn-1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start UnbindFQDNWorkflow")
+	assert.Contains(t, err.Error(), "signal UnbindFQDNWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }

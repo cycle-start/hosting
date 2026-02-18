@@ -30,24 +30,16 @@ func (s *CertificateService) Upload(ctx context.Context, cert *model.Certificate
 		return fmt.Errorf("insert certificate: %w", err)
 	}
 
-	var fqdnName string
-	if err := s.db.QueryRow(ctx, "SELECT fqdn FROM fqdns WHERE id = $1", cert.FQDNID).Scan(&fqdnName); err != nil {
-		return fmt.Errorf("get fqdn name for certificate: %w", err)
-	}
-
 	tenantID, err := resolveTenantIDFromFQDN(ctx, s.db, cert.FQDNID)
 	if err != nil {
-		return fmt.Errorf("upload certificate: %w", err)
+		return fmt.Errorf("resolve tenant for certificate: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UploadCustomCertWorkflow",
-		WorkflowID:   workflowID("certificate", fqdnName, cert.ID),
+		WorkflowID:   fmt.Sprintf("create-certificate-%s", cert.ID),
 		Arg:          cert.ID,
-		ResourceType: "certificate",
-		ResourceID:   cert.ID,
 	}); err != nil {
-		return fmt.Errorf("start UploadCustomCertWorkflow: %w", err)
+		return fmt.Errorf("signal UploadCustomCertWorkflow: %w", err)
 	}
 
 	return nil
@@ -108,10 +100,10 @@ func (s *CertificateService) ListByFQDN(ctx context.Context, fqdnID string, limi
 }
 
 func (s *CertificateService) Retry(ctx context.Context, id string) error {
-	var status, fqdnID, fqdnName string
+	var status, fqdnName string
 	err := s.db.QueryRow(ctx,
-		"SELECT c.status, c.fqdn_id, f.fqdn FROM certificates c JOIN fqdns f ON f.id = c.fqdn_id WHERE c.id = $1", id,
-	).Scan(&status, &fqdnID, &fqdnName)
+		"SELECT c.status, f.fqdn FROM certificates c JOIN fqdns f ON f.id = c.fqdn_id WHERE c.id = $1", id,
+	).Scan(&status, &fqdnName)
 	if err != nil {
 		return fmt.Errorf("get certificate status: %w", err)
 	}
@@ -122,15 +114,13 @@ func (s *CertificateService) Retry(ctx context.Context, id string) error {
 	if err != nil {
 		return fmt.Errorf("set certificate %s status to provisioning: %w", id, err)
 	}
-	tenantID, err := resolveTenantIDFromFQDN(ctx, s.db, fqdnID)
+	tenantID, err := resolveTenantIDFromCertificate(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("retry certificate: %w", err)
+		return fmt.Errorf("resolve tenant for certificate: %w", err)
 	}
-	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UploadCustomCertWorkflow",
 		WorkflowID:   workflowID("certificate", fqdnName, id),
 		Arg:          id,
-		ResourceType: "certificate",
-		ResourceID:   id,
 	})
 }

@@ -30,17 +30,14 @@ func (s *FQDNService) Create(ctx context.Context, fqdn *model.FQDN) error {
 
 	tenantID, err := resolveTenantIDFromWebroot(ctx, s.db, fqdn.WebrootID)
 	if err != nil {
-		return fmt.Errorf("create fqdn: %w", err)
+		return fmt.Errorf("resolve tenant for fqdn: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "BindFQDNWorkflow",
-		WorkflowID:   workflowID("fqdn", fqdn.FQDN, fqdn.ID),
+		WorkflowID:   fmt.Sprintf("create-fqdn-%s", fqdn.ID),
 		Arg:          fqdn.ID,
-		ResourceType: "fqdn",
-		ResourceID:   fqdn.ID,
 	}); err != nil {
-		return fmt.Errorf("start BindFQDNWorkflow: %w", err)
+		return fmt.Errorf("signal BindFQDNWorkflow: %w", err)
 	}
 
 	return nil
@@ -112,17 +109,14 @@ func (s *FQDNService) Delete(ctx context.Context, id string) error {
 
 	tenantID, err := resolveTenantIDFromFQDN(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("delete fqdn: %w", err)
+		return fmt.Errorf("resolve tenant for fqdn: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UnbindFQDNWorkflow",
 		WorkflowID:   workflowID("fqdn", fqdnName, id),
 		Arg:          id,
-		ResourceType: "fqdn",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start UnbindFQDNWorkflow: %w", err)
+		return fmt.Errorf("signal UnbindFQDNWorkflow: %w", err)
 	}
 
 	return nil
@@ -143,13 +137,11 @@ func (s *FQDNService) Retry(ctx context.Context, id string) error {
 	}
 	tenantID, err := resolveTenantIDFromFQDN(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("retry fqdn: %w", err)
+		return fmt.Errorf("resolve tenant for fqdn: %w", err)
 	}
-	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateFQDNWorkflow",
 		WorkflowID:   workflowID("fqdn", fqdnName, id),
 		Arg:          id,
-		ResourceType: "fqdn",
-		ResourceID:   id,
 	})
 }

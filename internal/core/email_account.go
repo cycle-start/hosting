@@ -29,17 +29,14 @@ func (s *EmailAccountService) Create(ctx context.Context, a *model.EmailAccount)
 
 	tenantID, err := resolveTenantIDFromFQDN(ctx, s.db, a.FQDNID)
 	if err != nil {
-		return fmt.Errorf("create email account: %w", err)
+		return fmt.Errorf("resolve tenant for email account: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateEmailAccountWorkflow",
-		WorkflowID:   workflowID("email-account", a.Address, a.ID),
+		WorkflowID:   fmt.Sprintf("create-email-account-%s", a.ID),
 		Arg:          a.ID,
-		ResourceType: "email-account",
-		ResourceID:   a.ID,
 	}); err != nil {
-		return fmt.Errorf("start CreateEmailAccountWorkflow: %w", err)
+		return fmt.Errorf("signal CreateEmailAccountWorkflow: %w", err)
 	}
 
 	return nil
@@ -153,17 +150,14 @@ func (s *EmailAccountService) Delete(ctx context.Context, id string) error {
 
 	tenantID, err := resolveTenantIDFromEmailAccount(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("delete email account: %w", err)
+		return fmt.Errorf("resolve tenant for email account: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteEmailAccountWorkflow",
 		WorkflowID:   workflowID("email-account", address, id),
 		Arg:          id,
-		ResourceType: "email-account",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start DeleteEmailAccountWorkflow: %w", err)
+		return fmt.Errorf("signal DeleteEmailAccountWorkflow: %w", err)
 	}
 
 	return nil
@@ -184,13 +178,11 @@ func (s *EmailAccountService) Retry(ctx context.Context, id string) error {
 	}
 	tenantID, err := resolveTenantIDFromEmailAccount(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("retry email account: %w", err)
+		return fmt.Errorf("resolve tenant for email account: %w", err)
 	}
-	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateEmailAccountWorkflow",
 		WorkflowID:   workflowID("email-account", address, id),
 		Arg:          id,
-		ResourceType: "email-account",
-		ResourceID:   id,
 	})
 }

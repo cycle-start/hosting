@@ -47,6 +47,12 @@ func TestZoneService_Create_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
+
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
@@ -83,11 +89,11 @@ func TestZoneService_Create_WorkflowError(t *testing.T) {
 	zone := &model.Zone{ID: "test-zone-1", BrandID: "test-brand", Name: "example.com"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "CreateZoneWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+	tc.On("ExecuteWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Create(ctx, zone)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start CreateZoneWorkflow")
+	assert.Contains(t, err.Error(), "signal CreateZoneWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }
@@ -251,13 +257,22 @@ func TestZoneService_Delete_Success(t *testing.T) {
 		*(dest[0].(*string)) = "example.com"
 		return nil
 	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
+
+	// resolveTenantIDFromZone
+	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		tid := "test-tenant-1"
-		*(dest[0].(**string)) = &tid
+		*(dest[0].(**string)) = &tenantID
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	// signalProvision tenant name lookup
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -297,19 +312,28 @@ func TestZoneService_Delete_WorkflowError(t *testing.T) {
 		*(dest[0].(*string)) = "example.com"
 		return nil
 	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
+
+	// resolveTenantIDFromZone
+	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		tid := "test-tenant-1"
-		*(dest[0].(**string)) = &tid
+		*(dest[0].(**string)) = &tenantID
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	// signalProvision tenant name lookup
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Delete(ctx, "test-zone-1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start DeleteZoneWorkflow")
+	assert.Contains(t, err.Error(), "signal DeleteZoneWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }

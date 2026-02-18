@@ -53,8 +53,8 @@ func (s *WebrootEnvVarService) List(ctx context.Context, webrootID string) ([]mo
 // ListDecrypted returns all env vars for a webroot with secrets decrypted.
 // Used internally for convergence/desired state.
 func (s *WebrootEnvVarService) ListDecrypted(ctx context.Context, webrootID string) ([]model.WebrootEnvVar, error) {
-	tenantID, err := resolveTenantIDFromWebroot(ctx, s.db, webrootID)
-	if err != nil {
+	var tenantID string
+	if err := s.db.QueryRow(ctx, "SELECT tenant_id FROM webroots WHERE id = $1", webrootID).Scan(&tenantID); err != nil {
 		return nil, fmt.Errorf("resolve tenant: %w", err)
 	}
 
@@ -90,8 +90,8 @@ func (s *WebrootEnvVarService) ListDecrypted(ctx context.Context, webrootID stri
 
 // BulkSet replaces all env vars for a webroot. Secrets are encrypted before storage.
 func (s *WebrootEnvVarService) BulkSet(ctx context.Context, webrootID string, vars []model.WebrootEnvVar) error {
-	tenantID, err := resolveTenantIDFromWebroot(ctx, s.db, webrootID)
-	if err != nil {
+	var tenantID string
+	if err := s.db.QueryRow(ctx, "SELECT tenant_id FROM webroots WHERE id = $1", webrootID).Scan(&tenantID); err != nil {
 		return fmt.Errorf("resolve tenant: %w", err)
 	}
 
@@ -129,14 +129,12 @@ func (s *WebrootEnvVarService) BulkSet(ctx context.Context, webrootID string, va
 	if err != nil {
 		return fmt.Errorf("get webroot for workflow: %w", err)
 	}
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateWebrootWorkflow",
 		WorkflowID:   workflowID("webroot-env", webroot.Name, webrootID),
 		Arg:          webrootID,
-		ResourceType: "webroot",
-		ResourceID:   webrootID,
 	}); err != nil {
-		return fmt.Errorf("start UpdateWebrootWorkflow: %w", err)
+		return fmt.Errorf("signal UpdateWebrootWorkflow: %w", err)
 	}
 
 	return nil
@@ -156,20 +154,18 @@ func (s *WebrootEnvVarService) DeleteByName(ctx context.Context, webrootID, name
 	// Trigger re-convergence.
 	tenantID, err := resolveTenantIDFromWebroot(ctx, s.db, webrootID)
 	if err != nil {
-		return fmt.Errorf("resolve tenant: %w", err)
+		return fmt.Errorf("resolve tenant for env var: %w", err)
 	}
 	webroot, err := s.getWebrootByID(ctx, webrootID)
 	if err != nil {
 		return fmt.Errorf("get webroot for workflow: %w", err)
 	}
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateWebrootWorkflow",
 		WorkflowID:   workflowID("webroot-env", webroot.Name, webrootID),
 		Arg:          webrootID,
-		ResourceType: "webroot",
-		ResourceID:   webrootID,
 	}); err != nil {
-		return fmt.Errorf("start UpdateWebrootWorkflow: %w", err)
+		return fmt.Errorf("signal UpdateWebrootWorkflow: %w", err)
 	}
 
 	return nil

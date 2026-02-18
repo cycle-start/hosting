@@ -50,16 +50,19 @@ func TestCertificateService_Upload_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	fqdnRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "example.com"
-		return nil
-	}}
+	// resolveTenantIDFromFQDN
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "test-tenant-1"
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(fqdnRow).Once()
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	// signalProvision tenant name lookup
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -87,16 +90,19 @@ func TestCertificateService_Upload_SetsTypeToCustom(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	fqdnRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "example.com"
-		return nil
-	}}
+	// resolveTenantIDFromFQDN
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "test-tenant-1"
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(fqdnRow).Once()
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	// signalProvision tenant name lookup
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -135,21 +141,26 @@ func TestCertificateService_Upload_WorkflowError(t *testing.T) {
 	cert := &model.Certificate{ID: "test-cert-1", FQDNID: "test-fqdn-1"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	fqdnRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "example.com"
-		return nil
-	}}
+
+	// resolveTenantIDFromFQDN
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "test-tenant-1"
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(fqdnRow).Once()
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	// signalProvision tenant name lookup
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
+
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Upload(ctx, cert)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start UploadCustomCertWorkflow")
+	assert.Contains(t, err.Error(), "signal UploadCustomCertWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }

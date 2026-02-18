@@ -80,11 +80,46 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	}
 
 	// Set status to active.
-	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
+	err = workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
 		Table:  "webroots",
 		ID:     webrootID,
 		Status: model.StatusActive,
 	}).Get(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	// Spawn pending child workflows in parallel.
+	var children []ChildWorkflowSpec
+
+	var fqdns []model.FQDN
+	_ = workflow.ExecuteActivity(ctx, "ListFQDNsByWebrootID", webrootID).Get(ctx, &fqdns)
+	for _, f := range fqdns {
+		if f.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "BindFQDNWorkflow", WorkflowID: fmt.Sprintf("create-fqdn-%s", f.ID), Arg: f.ID})
+		}
+	}
+
+	var daemons []model.Daemon
+	_ = workflow.ExecuteActivity(ctx, "ListDaemonsByWebrootID", webrootID).Get(ctx, &daemons)
+	for _, d := range daemons {
+		if d.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "CreateDaemonWorkflow", WorkflowID: fmt.Sprintf("create-daemon-%s", d.ID), Arg: d.ID})
+		}
+	}
+
+	var cronJobs []model.CronJob
+	_ = workflow.ExecuteActivity(ctx, "ListCronJobsByWebrootID", webrootID).Get(ctx, &cronJobs)
+	for _, c := range cronJobs {
+		if c.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "CreateCronJobWorkflow", WorkflowID: fmt.Sprintf("create-cron-job-%s", c.ID), Arg: c.ID})
+		}
+	}
+
+	if errs := fanOutChildWorkflows(ctx, children); len(errs) > 0 {
+		workflow.GetLogger(ctx).Warn("child workflow failures", "errors", joinErrors(errs))
+	}
+	return nil
 }
 
 // UpdateWebrootWorkflow updates a webroot on all nodes in the tenant's shard.

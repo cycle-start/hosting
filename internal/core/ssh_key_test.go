@@ -46,6 +46,12 @@ func TestSSHKeyService_Create_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
+
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
@@ -82,11 +88,18 @@ func TestSSHKeyService_Create_WorkflowError(t *testing.T) {
 	key := &model.SSHKey{ID: "test-key-1", TenantID: "test-tenant-1"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
+
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Create(ctx, key)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start AddSSHKeyWorkflow")
+	assert.Contains(t, err.Error(), "signal AddSSHKeyWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }
@@ -240,15 +253,16 @@ func TestSSHKeyService_Delete_Success(t *testing.T) {
 
 	updateRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "my-key"
+		*(dest[1].(*string)) = "test-tenant-1"
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 
-	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "test-tenant-1"
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -286,20 +300,22 @@ func TestSSHKeyService_Delete_WorkflowError(t *testing.T) {
 
 	updateRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "my-key"
+		*(dest[1].(*string)) = "test-tenant-1"
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 
-	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "test-tenant-1"
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
+
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Delete(ctx, "test-key-1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start RemoveSSHKeyWorkflow")
+	assert.Contains(t, err.Error(), "signal RemoveSSHKeyWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }

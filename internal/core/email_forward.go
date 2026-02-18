@@ -29,17 +29,14 @@ func (s *EmailForwardService) Create(ctx context.Context, f *model.EmailForward)
 
 	tenantID, err := resolveTenantIDFromEmailAccount(ctx, s.db, f.EmailAccountID)
 	if err != nil {
-		return fmt.Errorf("create email forward: %w", err)
+		return fmt.Errorf("resolve tenant for email forward: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateEmailForwardWorkflow",
-		WorkflowID:   workflowID("email-forward", f.Destination, f.ID),
+		WorkflowID:   fmt.Sprintf("create-email-forward-%s", f.ID),
 		Arg:          f.ID,
-		ResourceType: "email-forward",
-		ResourceID:   f.ID,
 	}); err != nil {
-		return fmt.Errorf("start CreateEmailForwardWorkflow: %w", err)
+		return fmt.Errorf("signal CreateEmailForwardWorkflow: %w", err)
 	}
 
 	return nil
@@ -109,17 +106,14 @@ func (s *EmailForwardService) Delete(ctx context.Context, id string) error {
 
 	tenantID, err := resolveTenantIDFromEmailForward(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("delete email forward: %w", err)
+		return fmt.Errorf("resolve tenant for email forward: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteEmailForwardWorkflow",
 		WorkflowID:   workflowID("email-forward", destination, id),
 		Arg:          id,
-		ResourceType: "email-forward",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start DeleteEmailForwardWorkflow: %w", err)
+		return fmt.Errorf("signal DeleteEmailForwardWorkflow: %w", err)
 	}
 
 	return nil
@@ -140,13 +134,11 @@ func (s *EmailForwardService) Retry(ctx context.Context, id string) error {
 	}
 	tenantID, err := resolveTenantIDFromEmailForward(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("retry email forward: %w", err)
+		return fmt.Errorf("resolve tenant for email forward: %w", err)
 	}
-	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateEmailForwardWorkflow",
 		WorkflowID:   workflowID("email-forward", destination, id),
 		Arg:          id,
-		ResourceType: "email-forward",
-		ResourceID:   id,
 	})
 }

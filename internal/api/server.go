@@ -128,6 +128,13 @@ func (s *Server) setupRoutes() {
 		apiKey := handler.NewAPIKey(s.services.APIKey)
 		internalNode := handler.NewInternalNode(s.services.DesiredState, s.services.NodeHealth, s.services.CronJob)
 
+		// Workflow await (admin-only, blocks until workflow completes)
+		workflow := handler.NewWorkflow(s.temporalClient)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequirePlatformAdmin())
+			r.Get("/workflows/{workflowID}/await", workflow.Await)
+		})
+
 		// Platform-admin-only endpoints (require brands: ["*"])
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequirePlatformAdmin())

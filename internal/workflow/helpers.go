@@ -100,6 +100,45 @@ func dbShardPrimary(ctx workflow.Context, shardID string) (primaryID string, nod
 	return "", nodes, fmt.Errorf("shard %s has no nodes", shardID)
 }
 
+// ChildWorkflowSpec describes a child workflow to be spawned in parallel.
+type ChildWorkflowSpec struct {
+	WorkflowName string
+	WorkflowID   string
+	Arg          any
+}
+
+// fanOutChildWorkflows spawns all children in parallel and collects errors.
+// Returns nil if all succeeded, or the collected error strings if any failed.
+func fanOutChildWorkflows(ctx workflow.Context, children []ChildWorkflowSpec) []string {
+	if len(children) == 0 {
+		return nil
+	}
+
+	mu := workflow.NewMutex(ctx)
+	wg := workflow.NewWaitGroup(ctx)
+	var errs []string
+
+	for _, child := range children {
+		child := child // capture
+		wg.Add(1)
+		workflow.Go(ctx, func(gCtx workflow.Context) {
+			defer wg.Done()
+			childCtx := workflow.WithChildOptions(gCtx, workflow.ChildWorkflowOptions{
+				WorkflowID: child.WorkflowID,
+				TaskQueue:  "hosting-tasks",
+			})
+			if err := workflow.ExecuteChildWorkflow(childCtx, child.WorkflowName, child.Arg).Get(gCtx, nil); err != nil {
+				_ = mu.Lock(gCtx)
+				errs = append(errs, fmt.Sprintf("%s(%s): %v", child.WorkflowName, child.WorkflowID, err))
+				mu.Unlock()
+			}
+		})
+	}
+
+	wg.Wait(ctx)
+	return errs
+}
+
 // nodeActivityCtx returns a workflow context that routes activity execution
 // to a specific node's Temporal task queue. Activities dispatched with this
 // context will be picked up by the node-agent worker running on that node.

@@ -135,6 +135,12 @@ func TestValkeyInstanceMigrate_Success(t *testing.T) {
 	}}
 	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
 
+	tenantNameRow := &handlerMockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
+
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")

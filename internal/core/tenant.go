@@ -35,14 +35,12 @@ func (s *TenantService) Create(ctx context.Context, tenant *model.Tenant) error 
 		return fmt.Errorf("insert tenant: %w", err)
 	}
 
-	if err := signalProvision(ctx, s.tc, tenant.ID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenant.ID, model.ProvisionTask{
 		WorkflowName: "CreateTenantWorkflow",
-		WorkflowID:   fmt.Sprintf("tenant-%s", tenant.ID),
+		WorkflowID:   fmt.Sprintf("create-tenant-%s", tenant.ID),
 		Arg:          tenant.ID,
-		ResourceType: "tenant",
-		ResourceID:   tenant.ID,
 	}); err != nil {
-		return fmt.Errorf("start CreateTenantWorkflow: %w", err)
+		return fmt.Errorf("signal CreateTenantWorkflow: %w", err)
 	}
 
 	return nil
@@ -187,14 +185,12 @@ func (s *TenantService) Update(ctx context.Context, tenant *model.Tenant) error 
 		return fmt.Errorf("update tenant %s: %w", tenant.ID, err)
 	}
 
-	if err := signalProvision(ctx, s.tc, tenant.ID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenant.ID, model.ProvisionTask{
 		WorkflowName: "UpdateTenantWorkflow",
-		WorkflowID:   fmt.Sprintf("tenant-%s", tenant.ID),
+		WorkflowID:   fmt.Sprintf("update-tenant-%s", tenant.ID),
 		Arg:          tenant.ID,
-		ResourceType: "tenant",
-		ResourceID:   tenant.ID,
 	}); err != nil {
-		return fmt.Errorf("start UpdateTenantWorkflow: %w", err)
+		return fmt.Errorf("signal UpdateTenantWorkflow: %w", err)
 	}
 
 	return nil
@@ -209,14 +205,12 @@ func (s *TenantService) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("set tenant %s status to deleting: %w", id, err)
 	}
 
-	if err := signalProvision(ctx, s.tc, id, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, id, model.ProvisionTask{
 		WorkflowName: "DeleteTenantWorkflow",
-		WorkflowID:   fmt.Sprintf("tenant-%s", id),
+		WorkflowID:   fmt.Sprintf("delete-tenant-%s", id),
 		Arg:          id,
-		ResourceType: "tenant",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start DeleteTenantWorkflow: %w", err)
+		return fmt.Errorf("signal DeleteTenantWorkflow: %w", err)
 	}
 
 	return nil
@@ -231,14 +225,12 @@ func (s *TenantService) Suspend(ctx context.Context, id string, reason string) e
 		return fmt.Errorf("set tenant %s status to suspended: %w", id, err)
 	}
 
-	if err := signalProvision(ctx, s.tc, id, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, id, model.ProvisionTask{
 		WorkflowName: "SuspendTenantWorkflow",
-		WorkflowID:   fmt.Sprintf("tenant-%s", id),
+		WorkflowID:   fmt.Sprintf("suspend-tenant-%s", id),
 		Arg:          id,
-		ResourceType: "tenant",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start SuspendTenantWorkflow: %w", err)
+		return fmt.Errorf("signal SuspendTenantWorkflow: %w", err)
 	}
 
 	return nil
@@ -253,14 +245,12 @@ func (s *TenantService) Unsuspend(ctx context.Context, id string) error {
 		return fmt.Errorf("set tenant %s status to pending: %w", id, err)
 	}
 
-	if err := signalProvision(ctx, s.tc, id, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, id, model.ProvisionTask{
 		WorkflowName: "UnsuspendTenantWorkflow",
-		WorkflowID:   fmt.Sprintf("tenant-%s", id),
+		WorkflowID:   fmt.Sprintf("unsuspend-tenant-%s", id),
 		Arg:          id,
-		ResourceType: "tenant",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start UnsuspendTenantWorkflow: %w", err)
+		return fmt.Errorf("signal UnsuspendTenantWorkflow: %w", err)
 	}
 
 	return nil
@@ -275,7 +265,7 @@ func (s *TenantService) Migrate(ctx context.Context, id string, targetShardID st
 		return fmt.Errorf("set tenant %s status to provisioning: %w", id, err)
 	}
 
-	if err := signalProvision(ctx, s.tc, id, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, id, model.ProvisionTask{
 		WorkflowName: "MigrateTenantWorkflow",
 		WorkflowID:   fmt.Sprintf("migrate-tenant-%s", id),
 		Arg: MigrateTenantParams{
@@ -284,10 +274,8 @@ func (s *TenantService) Migrate(ctx context.Context, id string, targetShardID st
 			MigrateZones:  migrateZones,
 			MigrateFQDNs:  migrateFQDNs,
 		},
-		ResourceType: "tenant",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start MigrateTenantWorkflow: %w", err)
+		return fmt.Errorf("signal MigrateTenantWorkflow: %w", err)
 	}
 
 	return nil
@@ -447,12 +435,10 @@ func (s *TenantService) Retry(ctx context.Context, id string) error {
 	if err != nil {
 		return fmt.Errorf("set tenant %s status to provisioning: %w", id, err)
 	}
-	return signalProvision(ctx, s.tc, id, model.ProvisionTask{
+	return signalProvision(ctx, s.tc, s.db, id, model.ProvisionTask{
 		WorkflowName: "CreateTenantWorkflow",
-		WorkflowID:   fmt.Sprintf("tenant-%s", id),
+		WorkflowID:   fmt.Sprintf("retry-tenant-%s", id),
 		Arg:          id,
-		ResourceType: "tenant",
-		ResourceID:   id,
 	})
 }
 
@@ -524,14 +510,12 @@ func (s *TenantService) RetryFailed(ctx context.Context, tenantID string) (int, 
 			if err != nil {
 				return count, fmt.Errorf("set %s %s to provisioning: %w", spec.table, item.id, err)
 			}
-			if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+			if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 				WorkflowName: spec.workflowName,
 				WorkflowID:   workflowID(spec.workflowPrefix, item.name, item.id),
 				Arg:          item.id,
-				ResourceType: spec.workflowPrefix,
-				ResourceID:   item.id,
 			}); err != nil {
-				return count, fmt.Errorf("start %s for %s: %w", spec.workflowName, item.id, err)
+				return count, fmt.Errorf("signal %s for %s: %w", spec.workflowName, item.id, err)
 			}
 			count++
 		}
@@ -548,14 +532,12 @@ func (s *TenantService) RetryFailed(ctx context.Context, tenantID string) (int, 
 		if err != nil {
 			return count, fmt.Errorf("set tenant to provisioning: %w", err)
 		}
-		if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+		if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 			WorkflowName: "CreateTenantWorkflow",
-			WorkflowID:   fmt.Sprintf("tenant-%s", tenantID),
+			WorkflowID:   fmt.Sprintf("retry-tenant-%s", tenantID),
 			Arg:          tenantID,
-			ResourceType: "tenant",
-			ResourceID:   tenantID,
 		}); err != nil {
-			return count, fmt.Errorf("start CreateTenantWorkflow: %w", err)
+			return count, fmt.Errorf("signal CreateTenantWorkflow: %w", err)
 		}
 		count++
 	}

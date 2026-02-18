@@ -49,17 +49,14 @@ func (s *EmailAutoReplyService) Upsert(ctx context.Context, ar *model.EmailAutoR
 
 	tenantID, err := resolveTenantIDFromEmailAccount(ctx, s.db, ar.EmailAccountID)
 	if err != nil {
-		return fmt.Errorf("upsert email autoreply: %w", err)
+		return fmt.Errorf("resolve tenant for email autoreply: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateEmailAutoReplyWorkflow",
-		WorkflowID:   workflowID("email-autoreply", ar.Subject, actualID),
+		WorkflowID:   fmt.Sprintf("create-email-autoreply-%s", actualID),
 		Arg:          actualID,
-		ResourceType: "email-autoreply",
-		ResourceID:   actualID,
 	}); err != nil {
-		return fmt.Errorf("start UpdateEmailAutoReplyWorkflow: %w", err)
+		return fmt.Errorf("signal UpdateEmailAutoReplyWorkflow: %w", err)
 	}
 
 	return nil
@@ -96,17 +93,14 @@ func (s *EmailAutoReplyService) Delete(ctx context.Context, accountID string) er
 
 	tenantID, err := resolveTenantIDFromEmailAccount(ctx, s.db, accountID)
 	if err != nil {
-		return fmt.Errorf("delete email autoreply: %w", err)
+		return fmt.Errorf("resolve tenant for email autoreply: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteEmailAutoReplyWorkflow",
 		WorkflowID:   workflowID("email-autoreply", subject, id),
 		Arg:          id,
-		ResourceType: "email-autoreply",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start DeleteEmailAutoReplyWorkflow: %w", err)
+		return fmt.Errorf("signal DeleteEmailAutoReplyWorkflow: %w", err)
 	}
 
 	return nil
@@ -125,15 +119,13 @@ func (s *EmailAutoReplyService) Retry(ctx context.Context, id string) error {
 	if err != nil {
 		return fmt.Errorf("set email autoreply %s status to provisioning: %w", id, err)
 	}
-	tenantID, err := resolveTenantIDFromEmailAccount(ctx, s.db, accountID)
+	tenantID, err := resolveTenantIDFromEmailAutoReply(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("retry email autoreply: %w", err)
+		return fmt.Errorf("resolve tenant for email autoreply: %w", err)
 	}
-	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateEmailAutoReplyWorkflow",
 		WorkflowID:   workflowID("email-autoreply", subject, id),
 		Arg:          id,
-		ResourceType: "email-autoreply",
-		ResourceID:   id,
 	})
 }

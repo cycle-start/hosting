@@ -29,14 +29,12 @@ func (s *BackupService) Create(ctx context.Context, backup *model.Backup) error 
 		return fmt.Errorf("insert backup: %w", err)
 	}
 
-	if err := signalProvision(ctx, s.tc, backup.TenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, backup.TenantID, model.ProvisionTask{
 		WorkflowName: "CreateBackupWorkflow",
-		WorkflowID:   workflowID("backup-create", backup.Type+"/"+backup.SourceName, backup.ID),
+		WorkflowID:   fmt.Sprintf("create-backup-%s", backup.ID),
 		Arg:          backup.ID,
-		ResourceType: "backup",
-		ResourceID:   backup.ID,
 	}); err != nil {
-		return fmt.Errorf("start CreateBackupWorkflow: %w", err)
+		return fmt.Errorf("signal CreateBackupWorkflow: %w", err)
 	}
 
 	return nil
@@ -99,28 +97,21 @@ func (s *BackupService) ListByTenant(ctx context.Context, tenantID string, limit
 }
 
 func (s *BackupService) Delete(ctx context.Context, id string) error {
-	var name string
+	var name, tenantID string
 	err := s.db.QueryRow(ctx,
-		"UPDATE backups SET status = $1, updated_at = now() WHERE id = $2 RETURNING type || '/' || source_name",
+		"UPDATE backups SET status = $1, updated_at = now() WHERE id = $2 RETURNING type || '/' || source_name, tenant_id",
 		model.StatusDeleting, id,
-	).Scan(&name)
+	).Scan(&name, &tenantID)
 	if err != nil {
 		return fmt.Errorf("set backup %s status to deleting: %w", id, err)
 	}
 
-	tenantID, err := resolveTenantIDFromBackup(ctx, s.db, id)
-	if err != nil {
-		return fmt.Errorf("delete backup: %w", err)
-	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteBackupWorkflow",
 		WorkflowID:   workflowID("backup-delete", name, id),
 		Arg:          id,
-		ResourceType: "backup",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start DeleteBackupWorkflow: %w", err)
+		return fmt.Errorf("signal DeleteBackupWorkflow: %w", err)
 	}
 
 	return nil
@@ -136,22 +127,20 @@ func (s *BackupService) Restore(ctx context.Context, id string) error {
 		return fmt.Errorf("backup %s is not active (status: %s)", id, backup.Status)
 	}
 
-	if err := signalProvision(ctx, s.tc, backup.TenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, backup.TenantID, model.ProvisionTask{
 		WorkflowName: "RestoreBackupWorkflow",
 		WorkflowID:   workflowID("backup-restore", backup.Type+"/"+backup.SourceName, id),
 		Arg:          id,
-		ResourceType: "backup",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start RestoreBackupWorkflow: %w", err)
+		return fmt.Errorf("signal RestoreBackupWorkflow: %w", err)
 	}
 
 	return nil
 }
 
 func (s *BackupService) Retry(ctx context.Context, id string) error {
-	var status, name string
-	err := s.db.QueryRow(ctx, "SELECT status, type || '/' || source_name FROM backups WHERE id = $1", id).Scan(&status, &name)
+	var status, name, tenantID string
+	err := s.db.QueryRow(ctx, "SELECT status, type || '/' || source_name, tenant_id FROM backups WHERE id = $1", id).Scan(&status, &name, &tenantID)
 	if err != nil {
 		return fmt.Errorf("get backup status: %w", err)
 	}
@@ -162,15 +151,9 @@ func (s *BackupService) Retry(ctx context.Context, id string) error {
 	if err != nil {
 		return fmt.Errorf("set backup %s status to provisioning: %w", id, err)
 	}
-	tenantID, err := resolveTenantIDFromBackup(ctx, s.db, id)
-	if err != nil {
-		return fmt.Errorf("retry backup: %w", err)
-	}
-	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateBackupWorkflow",
 		WorkflowID:   workflowID("backup-create", name, id),
 		Arg:          id,
-		ResourceType: "backup",
-		ResourceID:   id,
 	})
 }

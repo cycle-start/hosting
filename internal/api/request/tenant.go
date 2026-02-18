@@ -15,6 +15,7 @@ type CreateTenant struct {
 	ValkeyInstances []CreateValkeyInstanceNested `json:"valkey_instances" validate:"omitempty,dive"`
 	S3Buckets       []CreateS3BucketNested       `json:"s3_buckets" validate:"omitempty,dive"`
 	SSHKeys         []CreateSSHKeyNested         `json:"ssh_keys" validate:"omitempty,dive"`
+	EgressRules     []CreateEgressRuleNested     `json:"egress_rules" validate:"omitempty,dive"`
 }
 
 type UpdateTenant struct {

@@ -30,17 +30,14 @@ func (s *DatabaseAccessRuleService) Create(ctx context.Context, rule *model.Data
 
 	tenantID, err := resolveTenantIDFromDatabase(ctx, s.db, rule.DatabaseID)
 	if err != nil {
-		return fmt.Errorf("create database access rule: %w", err)
+		return fmt.Errorf("resolve tenant for database access rule: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "SyncDatabaseAccessWorkflow",
-		WorkflowID:   workflowID("db-access-rule", rule.CIDR, rule.ID),
+		WorkflowID:   fmt.Sprintf("create-db-access-rule-%s", rule.ID),
 		Arg:          rule.DatabaseID,
-		ResourceType: "database-access-rule",
-		ResourceID:   rule.ID,
 	}); err != nil {
-		return fmt.Errorf("start SyncDatabaseAccessWorkflow: %w", err)
+		return fmt.Errorf("signal SyncDatabaseAccessWorkflow: %w", err)
 	}
 
 	return nil
@@ -110,19 +107,16 @@ func (s *DatabaseAccessRuleService) Delete(ctx context.Context, id string) error
 		return fmt.Errorf("set database access rule %s status to deleting: %w", id, err)
 	}
 
-	tenantID, err := resolveTenantIDFromDatabase(ctx, s.db, databaseID)
+	tenantID, err := resolveTenantIDFromDatabaseAccessRule(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("delete database access rule: %w", err)
+		return fmt.Errorf("resolve tenant for database access rule: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "SyncDatabaseAccessWorkflow",
 		WorkflowID:   workflowID("db-access-rule-del", id, id),
 		Arg:          databaseID,
-		ResourceType: "database-access-rule",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start SyncDatabaseAccessWorkflow: %w", err)
+		return fmt.Errorf("signal SyncDatabaseAccessWorkflow: %w", err)
 	}
 
 	return nil
@@ -141,15 +135,13 @@ func (s *DatabaseAccessRuleService) Retry(ctx context.Context, id string) error 
 	if err != nil {
 		return fmt.Errorf("set database access rule %s status to provisioning: %w", id, err)
 	}
-	tenantID, err := resolveTenantIDFromDatabase(ctx, s.db, databaseID)
+	tenantID, err := resolveTenantIDFromDatabaseAccessRule(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("retry database access rule: %w", err)
+		return fmt.Errorf("resolve tenant for database access rule: %w", err)
 	}
-	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "SyncDatabaseAccessWorkflow",
 		WorkflowID:   workflowID("db-access-rule-retry", id, id),
 		Arg:          databaseID,
-		ResourceType: "database-access-rule",
-		ResourceID:   id,
 	})
 }

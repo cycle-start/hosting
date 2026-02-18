@@ -31,6 +31,16 @@ func callbackURLFromCtx(ctx context.Context) string {
 	return ""
 }
 
+// skipWorkflowKey is a context key that suppresses workflow execution.
+// Used during transactional nested creation so that child resources
+// don't start their own workflows — the parent workflow spawns them instead.
+type skipWorkflowKey struct{}
+
+// WithSkipWorkflow returns a context that causes signalProvision to be a no-op.
+func WithSkipWorkflow(ctx context.Context) context.Context {
+	return context.WithValue(ctx, skipWorkflowKey{}, true)
+}
+
 // workflowID builds a human-readable Temporal workflow ID from a resource type
 // prefix, a human-readable name, and the resource's unique ID.
 // Example: workflowID("database", "mydb", "917090fc-ab8e-4943-bc5d-4fb511551e5d")
@@ -46,28 +56,18 @@ func workflowID(prefix, name, id string) string {
 	return fmt.Sprintf("%s-%s-%s", prefix, name, short)
 }
 
-// signalProvision enqueues a provisioning task into the per-tenant
-// orchestrator workflow. If the workflow is not running, it is started
-// automatically via SignalWithStartWorkflow.
-//
-// When tenantID is empty (e.g. unassigned databases/zones/valkey instances),
-// the task is executed directly as a standalone workflow.
-func signalProvision(ctx context.Context, tc temporalclient.Client, tenantID string, task model.ProvisionTask) error {
-	if url := callbackURLFromCtx(ctx); url != "" {
-		task.CallbackURL = url
+// signalProvision routes a workflow task through the per-tenant entity workflow.
+// It uses SignalWithStartWorkflow to ensure sequential execution of all
+// tenant-related workflows. If the context has WithSkipWorkflow set, this is a
+// no-op. If tenantID is empty (for unassigned resources like tenant-less zones),
+// the workflow is started directly without per-tenant serialization.
+func signalProvision(ctx context.Context, tc temporalclient.Client, db DB, tenantID string, task model.ProvisionTask) error {
+	if v, _ := ctx.Value(skipWorkflowKey{}).(bool); v {
+		return nil
 	}
 
 	if tenantID == "" {
-		if task.CallbackURL != "" {
-			// Route through orchestrator so callback fires after child completes.
-			orchID := fmt.Sprintf("standalone-provision-%s", task.WorkflowID)
-			_, err := tc.SignalWithStartWorkflow(ctx, orchID, model.ProvisionSignalName, task,
-				temporalclient.StartWorkflowOptions{
-					ID:        orchID,
-					TaskQueue: taskQueue,
-				}, "TenantProvisionWorkflow")
-			return err
-		}
+		// No tenant — start workflow directly.
 		_, err := tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
 			ID:        task.WorkflowID,
 			TaskQueue: taskQueue,
@@ -75,218 +75,186 @@ func signalProvision(ctx context.Context, tc temporalclient.Client, tenantID str
 		return err
 	}
 
-	workflowID := fmt.Sprintf("tenant-provision-%s", tenantID)
-	_, err := tc.SignalWithStartWorkflow(ctx, workflowID, model.ProvisionSignalName, task,
+	// Resolve tenant name for deterministic workflow ID.
+	var tenantName string
+	if err := db.QueryRow(ctx, "SELECT name FROM tenants WHERE id = $1", tenantID).Scan(&tenantName); err != nil {
+		return fmt.Errorf("resolve tenant name: %w", err)
+	}
+
+	wfID := fmt.Sprintf("tenant-%s", tenantName)
+	_, err := tc.SignalWithStartWorkflow(ctx, wfID, model.ProvisionSignalName, task,
 		temporalclient.StartWorkflowOptions{
-			ID:        workflowID,
+			ID:        wfID,
 			TaskQueue: taskQueue,
-		}, "TenantProvisionWorkflow")
+		},
+		"TenantProvisionWorkflow",
+	)
 	return err
 }
 
-// --- tenant_id resolution helpers ---
-//
-// These resolve the owning tenant for resources at various nesting levels.
-// For nullable tenant_id columns (databases, zones, valkey_instances),
-// an empty string is returned when the tenant is unassigned.
+// startWorkflow directly executes a Temporal workflow without per-tenant
+// serialization. Used for non-tenant-scoped workflows (shard convergence, etc.).
+func startWorkflow(ctx context.Context, tc temporalclient.Client, workflowName, wfID string, arg any) error {
+	if v, _ := ctx.Value(skipWorkflowKey{}).(bool); v {
+		return nil
+	}
+	_, err := tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
+		ID:        wfID,
+		TaskQueue: taskQueue,
+	}, workflowName, arg)
+	return err
+}
+
+// --- Tenant ID resolvers ---
+// These resolve the owning tenant ID for resources that don't have a direct
+// tenant_id column, by following foreign key relationships.
 
 func resolveTenantIDFromWebroot(ctx context.Context, db DB, webrootID string) (string, error) {
-	var tenantID string
-	err := db.QueryRow(ctx, "SELECT tenant_id FROM webroots WHERE id = $1", webrootID).Scan(&tenantID)
-	if err != nil {
-		return "", fmt.Errorf("resolve tenant from webroot %s: %w", webrootID, err)
-	}
-	return tenantID, nil
+	var id string
+	err := db.QueryRow(ctx, "SELECT tenant_id FROM webroots WHERE id = $1", webrootID).Scan(&id)
+	return id, err
 }
 
 func resolveTenantIDFromFQDN(ctx context.Context, db DB, fqdnID string) (string, error) {
-	var tenantID string
-	err := db.QueryRow(ctx,
-		"SELECT w.tenant_id FROM fqdns f JOIN webroots w ON w.id = f.webroot_id WHERE f.id = $1",
-		fqdnID).Scan(&tenantID)
-	if err != nil {
-		return "", fmt.Errorf("resolve tenant from fqdn %s: %w", fqdnID, err)
-	}
-	return tenantID, nil
+	var id string
+	err := db.QueryRow(ctx, "SELECT w.tenant_id FROM webroots w JOIN fqdns f ON f.webroot_id = w.id WHERE f.id = $1", fqdnID).Scan(&id)
+	return id, err
 }
 
 func resolveTenantIDFromDatabase(ctx context.Context, db DB, databaseID string) (string, error) {
-	var tenantID *string
-	err := db.QueryRow(ctx, "SELECT tenant_id FROM databases WHERE id = $1", databaseID).Scan(&tenantID)
+	var id *string
+	err := db.QueryRow(ctx, "SELECT tenant_id FROM databases WHERE id = $1", databaseID).Scan(&id)
 	if err != nil {
-		return "", fmt.Errorf("resolve tenant from database %s: %w", databaseID, err)
+		return "", err
 	}
-	if tenantID == nil {
+	if id == nil {
 		return "", nil
 	}
-	return *tenantID, nil
+	return *id, nil
 }
 
 func resolveTenantIDFromDatabaseUser(ctx context.Context, db DB, userID string) (string, error) {
-	var tenantID *string
-	err := db.QueryRow(ctx,
-		"SELECT d.tenant_id FROM database_users du JOIN databases d ON d.id = du.database_id WHERE du.id = $1",
-		userID).Scan(&tenantID)
+	var id *string
+	err := db.QueryRow(ctx, "SELECT d.tenant_id FROM databases d JOIN database_users du ON du.database_id = d.id WHERE du.id = $1", userID).Scan(&id)
 	if err != nil {
-		return "", fmt.Errorf("resolve tenant from database user %s: %w", userID, err)
+		return "", err
 	}
-	if tenantID == nil {
+	if id == nil {
 		return "", nil
 	}
-	return *tenantID, nil
+	return *id, nil
 }
 
-func resolveTenantIDFromZone(ctx context.Context, db DB, zoneID string) (string, error) {
-	var tenantID *string
-	err := db.QueryRow(ctx, "SELECT tenant_id FROM zones WHERE id = $1", zoneID).Scan(&tenantID)
+func resolveTenantIDFromDatabaseAccessRule(ctx context.Context, db DB, ruleID string) (string, error) {
+	var id *string
+	err := db.QueryRow(ctx, "SELECT d.tenant_id FROM databases d JOIN database_access_rules dar ON dar.database_id = d.id WHERE dar.id = $1", ruleID).Scan(&id)
 	if err != nil {
-		return "", fmt.Errorf("resolve tenant from zone %s: %w", zoneID, err)
+		return "", err
 	}
-	if tenantID == nil {
+	if id == nil {
 		return "", nil
 	}
-	return *tenantID, nil
-}
-
-func resolveTenantIDFromZoneRecord(ctx context.Context, db DB, recordID string) (string, error) {
-	var tenantID *string
-	err := db.QueryRow(ctx,
-		"SELECT z.tenant_id FROM zone_records zr JOIN zones z ON z.id = zr.zone_id WHERE zr.id = $1",
-		recordID).Scan(&tenantID)
-	if err != nil {
-		return "", fmt.Errorf("resolve tenant from zone record %s: %w", recordID, err)
-	}
-	if tenantID == nil {
-		return "", nil
-	}
-	return *tenantID, nil
+	return *id, nil
 }
 
 func resolveTenantIDFromValkeyInstance(ctx context.Context, db DB, instanceID string) (string, error) {
-	var tenantID *string
-	err := db.QueryRow(ctx, "SELECT tenant_id FROM valkey_instances WHERE id = $1", instanceID).Scan(&tenantID)
+	var id *string
+	err := db.QueryRow(ctx, "SELECT tenant_id FROM valkey_instances WHERE id = $1", instanceID).Scan(&id)
 	if err != nil {
-		return "", fmt.Errorf("resolve tenant from valkey instance %s: %w", instanceID, err)
+		return "", err
 	}
-	if tenantID == nil {
+	if id == nil {
 		return "", nil
 	}
-	return *tenantID, nil
+	return *id, nil
 }
 
 func resolveTenantIDFromValkeyUser(ctx context.Context, db DB, userID string) (string, error) {
-	var tenantID *string
-	err := db.QueryRow(ctx,
-		"SELECT vi.tenant_id FROM valkey_users vu JOIN valkey_instances vi ON vi.id = vu.valkey_instance_id WHERE vu.id = $1",
-		userID).Scan(&tenantID)
+	var id *string
+	err := db.QueryRow(ctx, "SELECT vi.tenant_id FROM valkey_instances vi JOIN valkey_users vu ON vu.valkey_instance_id = vi.id WHERE vu.id = $1", userID).Scan(&id)
 	if err != nil {
-		return "", fmt.Errorf("resolve tenant from valkey user %s: %w", userID, err)
+		return "", err
 	}
-	if tenantID == nil {
+	if id == nil {
 		return "", nil
 	}
-	return *tenantID, nil
-}
-
-func resolveTenantIDFromSSHKey(ctx context.Context, db DB, keyID string) (string, error) {
-	var tenantID string
-	err := db.QueryRow(ctx, "SELECT tenant_id FROM ssh_keys WHERE id = $1", keyID).Scan(&tenantID)
-	if err != nil {
-		return "", fmt.Errorf("resolve tenant from SSH key %s: %w", keyID, err)
-	}
-	return tenantID, nil
-}
-
-func resolveTenantIDFromBackup(ctx context.Context, db DB, backupID string) (string, error) {
-	var tenantID string
-	err := db.QueryRow(ctx, "SELECT tenant_id FROM backups WHERE id = $1", backupID).Scan(&tenantID)
-	if err != nil {
-		return "", fmt.Errorf("resolve tenant from backup %s: %w", backupID, err)
-	}
-	return tenantID, nil
-}
-
-func resolveTenantIDFromEmailAccount(ctx context.Context, db DB, accountID string) (string, error) {
-	var tenantID string
-	err := db.QueryRow(ctx,
-		`SELECT w.tenant_id FROM email_accounts ea
-		 JOIN fqdns f ON f.id = ea.fqdn_id
-		 JOIN webroots w ON w.id = f.webroot_id
-		 WHERE ea.id = $1`, accountID).Scan(&tenantID)
-	if err != nil {
-		return "", fmt.Errorf("resolve tenant from email account %s: %w", accountID, err)
-	}
-	return tenantID, nil
-}
-
-func resolveTenantIDFromEmailAlias(ctx context.Context, db DB, aliasID string) (string, error) {
-	var tenantID string
-	err := db.QueryRow(ctx,
-		`SELECT w.tenant_id FROM email_aliases al
-		 JOIN email_accounts ea ON ea.id = al.email_account_id
-		 JOIN fqdns f ON f.id = ea.fqdn_id
-		 JOIN webroots w ON w.id = f.webroot_id
-		 WHERE al.id = $1`, aliasID).Scan(&tenantID)
-	if err != nil {
-		return "", fmt.Errorf("resolve tenant from email alias %s: %w", aliasID, err)
-	}
-	return tenantID, nil
-}
-
-func resolveTenantIDFromEmailForward(ctx context.Context, db DB, forwardID string) (string, error) {
-	var tenantID string
-	err := db.QueryRow(ctx,
-		`SELECT w.tenant_id FROM email_forwards ef
-		 JOIN email_accounts ea ON ea.id = ef.email_account_id
-		 JOIN fqdns f ON f.id = ea.fqdn_id
-		 JOIN webroots w ON w.id = f.webroot_id
-		 WHERE ef.id = $1`, forwardID).Scan(&tenantID)
-	if err != nil {
-		return "", fmt.Errorf("resolve tenant from email forward %s: %w", forwardID, err)
-	}
-	return tenantID, nil
+	return *id, nil
 }
 
 func resolveTenantIDFromS3Bucket(ctx context.Context, db DB, bucketID string) (string, error) {
-	var tenantID *string
-	err := db.QueryRow(ctx, "SELECT tenant_id FROM s3_buckets WHERE id = $1", bucketID).Scan(&tenantID)
+	var id *string
+	err := db.QueryRow(ctx, "SELECT tenant_id FROM s3_buckets WHERE id = $1", bucketID).Scan(&id)
 	if err != nil {
-		return "", fmt.Errorf("resolve tenant from s3 bucket %s: %w", bucketID, err)
+		return "", err
 	}
-	if tenantID == nil {
+	if id == nil {
 		return "", nil
 	}
-	return *tenantID, nil
-}
-
-func resolveTenantIDFromCronJob(ctx context.Context, db DB, cronJobID string) (string, error) {
-	var tenantID string
-	err := db.QueryRow(ctx, "SELECT tenant_id FROM cron_jobs WHERE id = $1", cronJobID).Scan(&tenantID)
-	if err != nil {
-		return "", fmt.Errorf("resolve tenant from cron job %s: %w", cronJobID, err)
-	}
-	return tenantID, nil
-}
-
-func resolveTenantIDFromDaemon(ctx context.Context, db DB, daemonID string) (string, error) {
-	var tenantID string
-	err := db.QueryRow(ctx, "SELECT tenant_id FROM daemons WHERE id = $1", daemonID).Scan(&tenantID)
-	if err != nil {
-		return "", fmt.Errorf("resolve tenant from daemon %s: %w", daemonID, err)
-	}
-	return tenantID, nil
+	return *id, nil
 }
 
 func resolveTenantIDFromS3AccessKey(ctx context.Context, db DB, keyID string) (string, error) {
-	var tenantID *string
-	err := db.QueryRow(ctx,
-		"SELECT b.tenant_id FROM s3_access_keys k JOIN s3_buckets b ON b.id = k.s3_bucket_id WHERE k.id = $1",
-		keyID).Scan(&tenantID)
+	var id *string
+	err := db.QueryRow(ctx, "SELECT b.tenant_id FROM s3_buckets b JOIN s3_access_keys k ON k.s3_bucket_id = b.id WHERE k.id = $1", keyID).Scan(&id)
 	if err != nil {
-		return "", fmt.Errorf("resolve tenant from s3 access key %s: %w", keyID, err)
+		return "", err
 	}
-	if tenantID == nil {
+	if id == nil {
 		return "", nil
 	}
-	return *tenantID, nil
+	return *id, nil
+}
+
+func resolveTenantIDFromEmailAccount(ctx context.Context, db DB, accountID string) (string, error) {
+	var id string
+	err := db.QueryRow(ctx, "SELECT w.tenant_id FROM webroots w JOIN fqdns f ON f.webroot_id = w.id JOIN email_accounts ea ON ea.fqdn_id = f.id WHERE ea.id = $1", accountID).Scan(&id)
+	return id, err
+}
+
+func resolveTenantIDFromEmailAlias(ctx context.Context, db DB, aliasID string) (string, error) {
+	var id string
+	err := db.QueryRow(ctx, "SELECT w.tenant_id FROM webroots w JOIN fqdns f ON f.webroot_id = w.id JOIN email_accounts ea ON ea.fqdn_id = f.id JOIN email_aliases al ON al.email_account_id = ea.id WHERE al.id = $1", aliasID).Scan(&id)
+	return id, err
+}
+
+func resolveTenantIDFromEmailForward(ctx context.Context, db DB, forwardID string) (string, error) {
+	var id string
+	err := db.QueryRow(ctx, "SELECT w.tenant_id FROM webroots w JOIN fqdns f ON f.webroot_id = w.id JOIN email_accounts ea ON ea.fqdn_id = f.id JOIN email_forwards ef ON ef.email_account_id = ea.id WHERE ef.id = $1", forwardID).Scan(&id)
+	return id, err
+}
+
+func resolveTenantIDFromEmailAutoReply(ctx context.Context, db DB, autoReplyID string) (string, error) {
+	var id string
+	err := db.QueryRow(ctx, "SELECT w.tenant_id FROM webroots w JOIN fqdns f ON f.webroot_id = w.id JOIN email_accounts ea ON ea.fqdn_id = f.id JOIN email_autoreplies ar ON ar.email_account_id = ea.id WHERE ar.id = $1", autoReplyID).Scan(&id)
+	return id, err
+}
+
+func resolveTenantIDFromCertificate(ctx context.Context, db DB, certID string) (string, error) {
+	var id string
+	err := db.QueryRow(ctx, "SELECT w.tenant_id FROM webroots w JOIN fqdns f ON f.webroot_id = w.id JOIN certificates c ON c.fqdn_id = f.id WHERE c.id = $1", certID).Scan(&id)
+	return id, err
+}
+
+func resolveTenantIDFromZone(ctx context.Context, db DB, zoneID string) (string, error) {
+	var id *string
+	err := db.QueryRow(ctx, "SELECT tenant_id FROM zones WHERE id = $1", zoneID).Scan(&id)
+	if err != nil {
+		return "", err
+	}
+	if id == nil {
+		return "", nil
+	}
+	return *id, nil
+}
+
+func resolveTenantIDFromZoneRecord(ctx context.Context, db DB, recordID string) (string, error) {
+	var id *string
+	err := db.QueryRow(ctx, "SELECT z.tenant_id FROM zones z JOIN zone_records zr ON zr.zone_id = z.id WHERE zr.id = $1", recordID).Scan(&id)
+	if err != nil {
+		return "", err
+	}
+	if id == nil {
+		return "", nil
+	}
+	return *id, nil
 }

@@ -107,11 +107,87 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	}
 
 	// Set status to active.
-	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
+	err = workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
 		Table:  "tenants",
 		ID:     tenantID,
 		Status: model.StatusActive,
 	}).Get(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	// Spawn pending child workflows in parallel.
+	var children []ChildWorkflowSpec
+
+	var webroots []model.Webroot
+	_ = workflow.ExecuteActivity(ctx, "ListWebrootsByTenantID", tenantID).Get(ctx, &webroots)
+	for _, w := range webroots {
+		if w.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "CreateWebrootWorkflow", WorkflowID: fmt.Sprintf("create-webroot-%s", w.ID), Arg: w.ID})
+		}
+	}
+
+	var databases []model.Database
+	_ = workflow.ExecuteActivity(ctx, "ListDatabasesByTenantID", tenantID).Get(ctx, &databases)
+	for _, d := range databases {
+		if d.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "CreateDatabaseWorkflow", WorkflowID: fmt.Sprintf("create-database-%s", d.ID), Arg: d.ID})
+		}
+	}
+
+	var zones []model.Zone
+	_ = workflow.ExecuteActivity(ctx, "ListZonesByTenantID", tenantID).Get(ctx, &zones)
+	for _, z := range zones {
+		if z.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "CreateZoneWorkflow", WorkflowID: fmt.Sprintf("create-zone-%s", z.ID), Arg: z.ID})
+		}
+	}
+
+	var valkeyInstances []model.ValkeyInstance
+	_ = workflow.ExecuteActivity(ctx, "ListValkeyInstancesByTenantID", tenantID).Get(ctx, &valkeyInstances)
+	for _, vi := range valkeyInstances {
+		if vi.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "CreateValkeyInstanceWorkflow", WorkflowID: fmt.Sprintf("create-valkey-instance-%s", vi.ID), Arg: vi.ID})
+		}
+	}
+
+	var s3Buckets []model.S3Bucket
+	_ = workflow.ExecuteActivity(ctx, "ListS3BucketsByTenantID", tenantID).Get(ctx, &s3Buckets)
+	for _, b := range s3Buckets {
+		if b.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "CreateS3BucketWorkflow", WorkflowID: fmt.Sprintf("create-s3-bucket-%s", b.ID), Arg: b.ID})
+		}
+	}
+
+	var sshKeys []model.SSHKey
+	_ = workflow.ExecuteActivity(ctx, "ListSSHKeysByTenantID", tenantID).Get(ctx, &sshKeys)
+	for _, k := range sshKeys {
+		if k.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "AddSSHKeyWorkflow", WorkflowID: fmt.Sprintf("add-ssh-key-%s", k.ID), Arg: k.ID})
+		}
+	}
+
+	var egressRules []model.TenantEgressRule
+	_ = workflow.ExecuteActivity(ctx, "ListEgressRulesByTenantID", tenantID).Get(ctx, &egressRules)
+	for _, er := range egressRules {
+		if er.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "SyncEgressRulesWorkflow", WorkflowID: fmt.Sprintf("sync-egress-%s", tenantID), Arg: tenantID})
+			break // Only need ONE sync for all egress rules
+		}
+	}
+
+	var backups []model.Backup
+	_ = workflow.ExecuteActivity(ctx, "ListBackupsByTenantID", tenantID).Get(ctx, &backups)
+	for _, b := range backups {
+		if b.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "CreateBackupWorkflow", WorkflowID: fmt.Sprintf("create-backup-%s", b.ID), Arg: b.ID})
+		}
+	}
+
+	if errs := fanOutChildWorkflows(ctx, children); len(errs) > 0 {
+		workflow.GetLogger(ctx).Warn("child workflow failures", "errors", joinErrors(errs))
+	}
+	return nil
 }
 
 // UpdateTenantWorkflow updates a tenant on all nodes in the tenant's shard.

@@ -47,6 +47,12 @@ func TestDatabaseService_Create_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
+
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
@@ -83,11 +89,11 @@ func TestDatabaseService_Create_WorkflowError(t *testing.T) {
 	database := &model.Database{ID: "test-database-1", Name: "mydb"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "CreateDatabaseWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+	tc.On("ExecuteWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Create(ctx, database)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start CreateDatabaseWorkflow")
+	assert.Contains(t, err.Error(), "signal CreateDatabaseWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }
@@ -331,12 +337,20 @@ func TestDatabaseService_Delete_Success(t *testing.T) {
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 
+	// resolveTenantIDFromDatabase
+	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		tid := "test-tenant-1"
-		*(dest[0].(**string)) = &tid
+		*(dest[0].(**string)) = &tenantID
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	// signalProvision tenant name lookup
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -378,18 +392,26 @@ func TestDatabaseService_Delete_WorkflowError(t *testing.T) {
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 
+	// resolveTenantIDFromDatabase
+	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		tid := "test-tenant-1"
-		*(dest[0].(**string)) = &tid
+		*(dest[0].(**string)) = &tenantID
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	// signalProvision tenant name lookup
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Delete(ctx, "test-database-1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start DeleteDatabaseWorkflow")
+	assert.Contains(t, err.Error(), "signal DeleteDatabaseWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }

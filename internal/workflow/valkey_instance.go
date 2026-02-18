@@ -72,11 +72,30 @@ func CreateValkeyInstanceWorkflow(ctx workflow.Context, instanceID string) error
 	}
 
 	// Set status to active.
-	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
+	err = workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
 		Table:  "valkey_instances",
 		ID:     instanceID,
 		Status: model.StatusActive,
 	}).Get(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	// Spawn pending child workflows in parallel.
+	var children []ChildWorkflowSpec
+
+	var users []model.ValkeyUser
+	_ = workflow.ExecuteActivity(ctx, "ListValkeyUsersByInstanceID", instanceID).Get(ctx, &users)
+	for _, u := range users {
+		if u.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "CreateValkeyUserWorkflow", WorkflowID: fmt.Sprintf("create-valkey-user-%s", u.ID), Arg: u.ID})
+		}
+	}
+
+	if errs := fanOutChildWorkflows(ctx, children); len(errs) > 0 {
+		workflow.GetLogger(ctx).Warn("child workflow failures", "errors", joinErrors(errs))
+	}
+	return nil
 }
 
 // DeleteValkeyInstanceWorkflow deletes a Valkey instance from the node agent.

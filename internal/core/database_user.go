@@ -30,17 +30,14 @@ func (s *DatabaseUserService) Create(ctx context.Context, user *model.DatabaseUs
 
 	tenantID, err := resolveTenantIDFromDatabase(ctx, s.db, user.DatabaseID)
 	if err != nil {
-		return fmt.Errorf("create database user: %w", err)
+		return fmt.Errorf("resolve tenant for database user: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateDatabaseUserWorkflow",
-		WorkflowID:   workflowID("database-user", user.Username, user.ID),
+		WorkflowID:   fmt.Sprintf("create-database-user-%s", user.ID),
 		Arg:          user.ID,
-		ResourceType: "database-user",
-		ResourceID:   user.ID,
 	}); err != nil {
-		return fmt.Errorf("start CreateDatabaseUserWorkflow: %w", err)
+		return fmt.Errorf("signal CreateDatabaseUserWorkflow: %w", err)
 	}
 
 	return nil
@@ -110,19 +107,16 @@ func (s *DatabaseUserService) Update(ctx context.Context, user *model.DatabaseUs
 		return fmt.Errorf("update database user %s: %w", user.ID, err)
 	}
 
-	tenantID, err := resolveTenantIDFromDatabase(ctx, s.db, user.DatabaseID)
+	tenantID, err := resolveTenantIDFromDatabaseUser(ctx, s.db, user.ID)
 	if err != nil {
-		return fmt.Errorf("update database user: %w", err)
+		return fmt.Errorf("resolve tenant for database user: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateDatabaseUserWorkflow",
 		WorkflowID:   workflowID("database-user", user.Username, user.ID),
 		Arg:          user.ID,
-		ResourceType: "database-user",
-		ResourceID:   user.ID,
 	}); err != nil {
-		return fmt.Errorf("start UpdateDatabaseUserWorkflow: %w", err)
+		return fmt.Errorf("signal UpdateDatabaseUserWorkflow: %w", err)
 	}
 
 	return nil
@@ -140,17 +134,14 @@ func (s *DatabaseUserService) Delete(ctx context.Context, id string) error {
 
 	tenantID, err := resolveTenantIDFromDatabaseUser(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("delete database user: %w", err)
+		return fmt.Errorf("resolve tenant for database user: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteDatabaseUserWorkflow",
 		WorkflowID:   workflowID("database-user", username, id),
 		Arg:          id,
-		ResourceType: "database-user",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start DeleteDatabaseUserWorkflow: %w", err)
+		return fmt.Errorf("signal DeleteDatabaseUserWorkflow: %w", err)
 	}
 
 	return nil
@@ -171,13 +162,11 @@ func (s *DatabaseUserService) Retry(ctx context.Context, id string) error {
 	}
 	tenantID, err := resolveTenantIDFromDatabaseUser(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("retry database user: %w", err)
+		return fmt.Errorf("resolve tenant for database user: %w", err)
 	}
-	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateDatabaseUserWorkflow",
 		WorkflowID:   workflowID("database-user", username, id),
 		Arg:          id,
-		ResourceType: "database-user",
-		ResourceID:   id,
 	})
 }

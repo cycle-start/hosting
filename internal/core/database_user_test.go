@@ -45,12 +45,20 @@ func TestDatabaseUserService_Create_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	// resolveTenantIDFromDatabase
+	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		tid := "test-tenant-1"
-		*(dest[0].(**string)) = &tid
+		*(dest[0].(**string)) = &tenantID
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	// signalProvision tenant name lookup
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -89,18 +97,18 @@ func TestDatabaseUserService_Create_WorkflowError(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	// resolveTenantIDFromDatabase (nil tenant => signalProvision uses ExecuteWorkflow)
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		tid := "test-tenant-1"
-		*(dest[0].(**string)) = &tid
+		*(dest[0].(**string)) = nil
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
 
-	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
+	tc.On("ExecuteWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Create(ctx, user)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start CreateDatabaseUserWorkflow")
+	assert.Contains(t, err.Error(), "signal CreateDatabaseUserWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }
@@ -240,12 +248,20 @@ func TestDatabaseUserService_Update_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	// resolveTenantIDFromDatabaseUser
+	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		tid := "test-tenant-1"
-		*(dest[0].(**string)) = &tid
+		*(dest[0].(**string)) = &tenantID
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	// signalProvision tenant name lookup
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -282,18 +298,18 @@ func TestDatabaseUserService_Update_WorkflowError(t *testing.T) {
 	user := &model.DatabaseUser{ID: "test-dbuser-1"}
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	// resolveTenantIDFromDatabaseUser (nil tenant => signalProvision uses ExecuteWorkflow)
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		tid := "test-tenant-1"
-		*(dest[0].(**string)) = &tid
+		*(dest[0].(**string)) = nil
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
 
-	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
+	tc.On("ExecuteWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Update(ctx, user)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start UpdateDatabaseUserWorkflow")
+	assert.Contains(t, err.Error(), "signal UpdateDatabaseUserWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }
@@ -314,12 +330,20 @@ func TestDatabaseUserService_Delete_Success(t *testing.T) {
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 
+	// resolveTenantIDFromDatabaseUser
+	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		tid := "test-tenant-1"
-		*(dest[0].(**string)) = &tid
+		*(dest[0].(**string)) = &tenantID
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	// signalProvision tenant name lookup
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -361,18 +385,26 @@ func TestDatabaseUserService_Delete_WorkflowError(t *testing.T) {
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 
+	// resolveTenantIDFromDatabaseUser
+	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		tid := "test-tenant-1"
-		*(dest[0].(**string)) = &tid
+		*(dest[0].(**string)) = &tenantID
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+
+	// signalProvision tenant name lookup
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Delete(ctx, "test-dbuser-1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start DeleteDatabaseUserWorkflow")
+	assert.Contains(t, err.Error(), "signal DeleteDatabaseUserWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }

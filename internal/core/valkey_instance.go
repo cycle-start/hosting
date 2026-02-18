@@ -49,15 +49,12 @@ func (s *ValkeyInstanceService) Create(ctx context.Context, instance *model.Valk
 	if instance.TenantID != nil {
 		tenantID = *instance.TenantID
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateValkeyInstanceWorkflow",
-		WorkflowID:   workflowID("valkey-instance", instance.Name, instance.ID),
+		WorkflowID:   fmt.Sprintf("create-valkey-instance-%s", instance.ID),
 		Arg:          instance.ID,
-		ResourceType: "valkey-instance",
-		ResourceID:   instance.ID,
 	}); err != nil {
-		return fmt.Errorf("start CreateValkeyInstanceWorkflow: %w", err)
+		return fmt.Errorf("signal CreateValkeyInstanceWorkflow: %w", err)
 	}
 
 	return nil
@@ -134,17 +131,14 @@ func (s *ValkeyInstanceService) Delete(ctx context.Context, id string) error {
 
 	tenantID, err := resolveTenantIDFromValkeyInstance(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("delete valkey instance: %w", err)
+		return fmt.Errorf("resolve tenant for valkey instance %s: %w", id, err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteValkeyInstanceWorkflow",
 		WorkflowID:   workflowID("valkey-instance", name, id),
 		Arg:          id,
-		ResourceType: "valkey-instance",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start DeleteValkeyInstanceWorkflow: %w", err)
+		return fmt.Errorf("signal DeleteValkeyInstanceWorkflow: %w", err)
 	}
 
 	return nil
@@ -162,20 +156,17 @@ func (s *ValkeyInstanceService) Migrate(ctx context.Context, id string, targetSh
 
 	tenantID, err := resolveTenantIDFromValkeyInstance(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("migrate valkey instance: %w", err)
+		return fmt.Errorf("resolve tenant for valkey instance %s: %w", id, err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "MigrateValkeyInstanceWorkflow",
 		WorkflowID:   workflowID("migrate-valkey-instance", name, id),
 		Arg: MigrateValkeyInstanceParams{
 			InstanceID:    id,
 			TargetShardID: targetShardID,
 		},
-		ResourceType: "valkey-instance",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start MigrateValkeyInstanceWorkflow: %w", err)
+		return fmt.Errorf("signal MigrateValkeyInstanceWorkflow: %w", err)
 	}
 
 	return nil
@@ -207,13 +198,11 @@ func (s *ValkeyInstanceService) Retry(ctx context.Context, id string) error {
 	}
 	tenantID, err := resolveTenantIDFromValkeyInstance(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("retry valkey instance: %w", err)
+		return fmt.Errorf("resolve tenant for valkey instance %s: %w", id, err)
 	}
-	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateValkeyInstanceWorkflow",
 		WorkflowID:   workflowID("valkey-instance", name, id),
 		Arg:          id,
-		ResourceType: "valkey-instance",
-		ResourceID:   id,
 	})
 }

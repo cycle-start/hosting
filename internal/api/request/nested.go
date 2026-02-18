@@ -15,7 +15,11 @@ type CreateWebrootNested struct {
 	RuntimeVersion string             `json:"runtime_version" validate:"required"`
 	RuntimeConfig  json.RawMessage    `json:"runtime_config"`
 	PublicFolder   string             `json:"public_folder"`
+	EnvFileName    string             `json:"env_file_name"`
+	EnvShellSource *bool              `json:"env_shell_source"`
 	FQDNs          []CreateFQDNNested `json:"fqdns" validate:"omitempty,dive"`
+	Daemons        []CreateDaemonNested  `json:"daemons" validate:"omitempty,dive"`
+	CronJobs       []CreateCronJobNested `json:"cron_jobs" validate:"omitempty,dive"`
 }
 
 type CreateFQDNNested struct {
@@ -51,8 +55,9 @@ type CreateEmailAutoReplyNested struct {
 }
 
 type CreateDatabaseNested struct {
-	ShardID string                     `json:"shard_id" validate:"required"`
-	Users   []CreateDatabaseUserNested `json:"users" validate:"omitempty,dive"`
+	ShardID     string                           `json:"shard_id" validate:"required"`
+	Users       []CreateDatabaseUserNested       `json:"users" validate:"omitempty,dive"`
+	AccessRules []CreateDatabaseAccessRuleNested `json:"access_rules" validate:"omitempty,dive"`
 }
 
 type CreateDatabaseUserNested struct {
@@ -75,12 +80,38 @@ type CreateValkeyUserNested struct {
 }
 
 type CreateS3BucketNested struct {
-	ShardID    string `json:"shard_id" validate:"required"`
-	Public     *bool  `json:"public"`
-	QuotaBytes *int64 `json:"quota_bytes"`
+	ShardID    string                   `json:"shard_id" validate:"required"`
+	Public     *bool                    `json:"public"`
+	QuotaBytes *int64                   `json:"quota_bytes"`
+	AccessKeys []CreateS3AccessKeyNested `json:"access_keys" validate:"omitempty,dive"`
 }
 
 type CreateSSHKeyNested struct {
 	Name      string `json:"name" validate:"required,min=1,max=255"`
 	PublicKey string `json:"public_key" validate:"required"`
+}
+
+type CreateEgressRuleNested struct {
+	CIDR        string `json:"cidr" validate:"required"`
+	Description string `json:"description"`
+}
+
+type CreateDatabaseAccessRuleNested struct {
+	CIDR        string `json:"cidr" validate:"required"`
+	Description string `json:"description"`
+}
+
+type CreateS3AccessKeyNested struct{}
+
+type CreateDaemonNested struct {
+	Command   string `json:"command" validate:"required"`
+	ProxyPath string `json:"proxy_path"`
+	NumProcs  int    `json:"num_procs"`
+	ProxyPort int    `json:"proxy_port"`
+}
+
+type CreateCronJobNested struct {
+	Schedule         string `json:"schedule" validate:"required"`
+	Command          string `json:"command" validate:"required"`
+	WorkingDirectory string `json:"working_directory"`
 }

@@ -65,11 +65,39 @@ func CreateDatabaseWorkflow(ctx workflow.Context, databaseID string) error {
 	}
 
 	// Set status to active.
-	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
+	err = workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
 		Table:  "databases",
 		ID:     databaseID,
 		Status: model.StatusActive,
 	}).Get(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	// Spawn pending child workflows in parallel.
+	var children []ChildWorkflowSpec
+
+	var users []model.DatabaseUser
+	_ = workflow.ExecuteActivity(ctx, "ListDatabaseUsersByDatabaseID", databaseID).Get(ctx, &users)
+	for _, u := range users {
+		if u.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "CreateDatabaseUserWorkflow", WorkflowID: fmt.Sprintf("create-database-user-%s", u.ID), Arg: u.ID})
+		}
+	}
+
+	var accessRules []model.DatabaseAccessRule
+	_ = workflow.ExecuteActivity(ctx, "ListDatabaseAccessRulesByDatabaseID", databaseID).Get(ctx, &accessRules)
+	for _, ar := range accessRules {
+		if ar.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "SyncDatabaseAccessWorkflow", WorkflowID: fmt.Sprintf("sync-db-access-%s", databaseID), Arg: databaseID})
+			break // Only need ONE sync
+		}
+	}
+
+	if errs := fanOutChildWorkflows(ctx, children); len(errs) > 0 {
+		workflow.GetLogger(ctx).Warn("child workflow failures", "errors", joinErrors(errs))
+	}
+	return nil
 }
 
 // DeleteDatabaseWorkflow deletes a database from the node agent.

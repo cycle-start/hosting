@@ -31,17 +31,14 @@ func (s *ZoneRecordService) Create(ctx context.Context, record *model.ZoneRecord
 
 	tenantID, err := resolveTenantIDFromZone(ctx, s.db, record.ZoneID)
 	if err != nil {
-		return fmt.Errorf("create zone record: %w", err)
+		return fmt.Errorf("resolve tenant for zone record: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateZoneRecordWorkflow",
-		WorkflowID:   workflowID("zone-record", record.Name+"/"+record.Type, record.ID),
+		WorkflowID:   fmt.Sprintf("create-zone-record-%s", record.ID),
 		Arg:          record.ID,
-		ResourceType: "zone-record",
-		ResourceID:   record.ID,
 	}); err != nil {
-		return fmt.Errorf("start CreateZoneRecordWorkflow: %w", err)
+		return fmt.Errorf("signal CreateZoneRecordWorkflow: %w", err)
 	}
 
 	return nil
@@ -113,19 +110,16 @@ func (s *ZoneRecordService) Update(ctx context.Context, record *model.ZoneRecord
 		return fmt.Errorf("update zone record %s: %w", record.ID, err)
 	}
 
-	tenantID, err := resolveTenantIDFromZone(ctx, s.db, record.ZoneID)
+	tenantID, err := resolveTenantIDFromZoneRecord(ctx, s.db, record.ID)
 	if err != nil {
-		return fmt.Errorf("update zone record: %w", err)
+		return fmt.Errorf("resolve tenant for zone record: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateZoneRecordWorkflow",
 		WorkflowID:   workflowID("zone-record", record.Name+"/"+record.Type, record.ID),
 		Arg:          record.ID,
-		ResourceType: "zone-record",
-		ResourceID:   record.ID,
 	}); err != nil {
-		return fmt.Errorf("start UpdateZoneRecordWorkflow: %w", err)
+		return fmt.Errorf("signal UpdateZoneRecordWorkflow: %w", err)
 	}
 
 	return nil
@@ -143,17 +137,14 @@ func (s *ZoneRecordService) Delete(ctx context.Context, id string) error {
 
 	tenantID, err := resolveTenantIDFromZoneRecord(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("delete zone record: %w", err)
+		return fmt.Errorf("resolve tenant for zone record: %w", err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteZoneRecordWorkflow",
 		WorkflowID:   workflowID("zone-record", name, id),
 		Arg:          id,
-		ResourceType: "zone-record",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start DeleteZoneRecordWorkflow: %w", err)
+		return fmt.Errorf("signal DeleteZoneRecordWorkflow: %w", err)
 	}
 
 	return nil
@@ -174,13 +165,11 @@ func (s *ZoneRecordService) Retry(ctx context.Context, id string) error {
 	}
 	tenantID, err := resolveTenantIDFromZoneRecord(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("retry zone record: %w", err)
+		return fmt.Errorf("resolve tenant for zone record: %w", err)
 	}
-	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateZoneRecordWorkflow",
 		WorkflowID:   workflowID("zone-record", name, id),
 		Arg:          id,
-		ResourceType: "zone-record",
-		ResourceID:   id,
 	})
 }

@@ -48,6 +48,12 @@ func TestWebrootService_Create_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
+
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
@@ -84,11 +90,11 @@ func TestWebrootService_Create_WorkflowError(t *testing.T) {
 	webroot := &model.Webroot{ID: "test-webroot-1", Name: "my-site"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "CreateWebrootWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+	tc.On("ExecuteWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Create(ctx, webroot)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start CreateWebrootWorkflow")
+	assert.Contains(t, err.Error(), "signal CreateWebrootWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }
@@ -230,7 +236,7 @@ func TestWebrootService_Update_Success(t *testing.T) {
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "UpdateWebrootWorkflow", mock.Anything).Return(wfRun, nil)
+	tc.On("ExecuteWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Update(ctx, webroot)
 	require.NoError(t, err)
@@ -261,11 +267,11 @@ func TestWebrootService_Update_WorkflowError(t *testing.T) {
 
 	webroot := &model.Webroot{ID: "test-webroot-1"}
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-	tc.On("ExecuteWorkflow", ctx, mock.Anything, "UpdateWebrootWorkflow", mock.Anything).Return(nil, errors.New("temporal down"))
+	tc.On("ExecuteWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Update(ctx, webroot)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start UpdateWebrootWorkflow")
+	assert.Contains(t, err.Error(), "signal UpdateWebrootWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }
@@ -282,18 +288,20 @@ func TestWebrootService_Delete_Success(t *testing.T) {
 
 	updateRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "my-site"
+		*(dest[1].(*string)) = "test-tenant-1"
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
+
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
-	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "test-tenant-1"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
 	err := svc.Delete(ctx, webrootID)
@@ -327,19 +335,22 @@ func TestWebrootService_Delete_WorkflowError(t *testing.T) {
 
 	updateRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "my-site"
+		*(dest[1].(*string)) = "test-tenant-1"
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
-	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "test-tenant-1"
+
+	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "t_testtenant01"
 		return nil
 	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
+
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
 	err := svc.Delete(ctx, "test-webroot-1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "start DeleteWebrootWorkflow")
+	assert.Contains(t, err.Error(), "signal DeleteWebrootWorkflow")
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
 }

@@ -123,11 +123,30 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 	}
 
 	// Set status to active.
-	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
+	err = workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
 		Table:  "fqdns",
 		ID:     fqdnID,
 		Status: model.StatusActive,
 	}).Get(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	// Spawn pending child workflows in parallel.
+	var children []ChildWorkflowSpec
+
+	var emailAccounts []model.EmailAccount
+	_ = workflow.ExecuteActivity(ctx, "ListEmailAccountsByFQDNID", fqdnID).Get(ctx, &emailAccounts)
+	for _, ea := range emailAccounts {
+		if ea.Status == model.StatusPending {
+			children = append(children, ChildWorkflowSpec{WorkflowName: "CreateEmailAccountWorkflow", WorkflowID: fmt.Sprintf("create-email-account-%s", ea.ID), Arg: ea.ID})
+		}
+	}
+
+	if errs := fanOutChildWorkflows(ctx, children); len(errs) > 0 {
+		workflow.GetLogger(ctx).Warn("child workflow failures", "errors", joinErrors(errs))
+	}
+	return nil
 }
 
 // UnbindFQDNWorkflow removes an FQDN binding, cleaning up DNS records.

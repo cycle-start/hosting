@@ -33,15 +33,12 @@ func (s *S3BucketService) Create(ctx context.Context, bucket *model.S3Bucket) er
 	if bucket.TenantID != nil {
 		tenantID = *bucket.TenantID
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateS3BucketWorkflow",
-		WorkflowID:   workflowID("s3-bucket", bucket.Name, bucket.ID),
+		WorkflowID:   fmt.Sprintf("create-s3-bucket-%s", bucket.ID),
 		Arg:          bucket.ID,
-		ResourceType: "s3-bucket",
-		ResourceID:   bucket.ID,
 	}); err != nil {
-		return fmt.Errorf("start CreateS3BucketWorkflow: %w", err)
+		return fmt.Errorf("signal CreateS3BucketWorkflow: %w", err)
 	}
 
 	return nil
@@ -157,17 +154,14 @@ func (s *S3BucketService) Update(ctx context.Context, id string, public *bool, q
 
 	tenantID, err := resolveTenantIDFromS3Bucket(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("update s3 bucket: %w", err)
+		return fmt.Errorf("resolve tenant for s3 bucket %s: %w", id, err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateS3BucketWorkflow",
 		WorkflowID:   workflowID("s3-bucket", name, id),
 		Arg:          id,
-		ResourceType: "s3-bucket",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start UpdateS3BucketWorkflow: %w", err)
+		return fmt.Errorf("signal UpdateS3BucketWorkflow: %w", err)
 	}
 
 	return nil
@@ -185,17 +179,14 @@ func (s *S3BucketService) Delete(ctx context.Context, id string) error {
 
 	tenantID, err := resolveTenantIDFromS3Bucket(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("delete s3 bucket: %w", err)
+		return fmt.Errorf("resolve tenant for s3 bucket %s: %w", id, err)
 	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteS3BucketWorkflow",
 		WorkflowID:   workflowID("s3-bucket", name, id),
 		Arg:          id,
-		ResourceType: "s3-bucket",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start DeleteS3BucketWorkflow: %w", err)
+		return fmt.Errorf("signal DeleteS3BucketWorkflow: %w", err)
 	}
 
 	return nil
@@ -216,13 +207,11 @@ func (s *S3BucketService) Retry(ctx context.Context, id string) error {
 	}
 	tenantID, err := resolveTenantIDFromS3Bucket(ctx, s.db, id)
 	if err != nil {
-		return fmt.Errorf("retry s3 bucket: %w", err)
+		return fmt.Errorf("resolve tenant for s3 bucket %s: %w", id, err)
 	}
-	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateS3BucketWorkflow",
 		WorkflowID:   workflowID("s3-bucket", name, id),
 		Arg:          id,
-		ResourceType: "s3-bucket",
-		ResourceID:   id,
 	})
 }

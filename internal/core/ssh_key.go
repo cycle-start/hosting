@@ -31,14 +31,12 @@ func (s *SSHKeyService) Create(ctx context.Context, key *model.SSHKey) error {
 		return fmt.Errorf("insert SSH key: %w", err)
 	}
 
-	if err := signalProvision(ctx, s.tc, key.TenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, key.TenantID, model.ProvisionTask{
 		WorkflowName: "AddSSHKeyWorkflow",
-		WorkflowID:   workflowID("ssh-key", key.Name, key.ID),
+		WorkflowID:   fmt.Sprintf("create-ssh-key-%s", key.ID),
 		Arg:          key.ID,
-		ResourceType: "ssh-key",
-		ResourceID:   key.ID,
 	}); err != nil {
-		return fmt.Errorf("start AddSSHKeyWorkflow: %w", err)
+		return fmt.Errorf("signal AddSSHKeyWorkflow: %w", err)
 	}
 
 	return nil
@@ -102,36 +100,29 @@ func (s *SSHKeyService) ListByTenant(ctx context.Context, tenantID string, limit
 
 // Delete sets the key status to deleting and starts the removal workflow.
 func (s *SSHKeyService) Delete(ctx context.Context, id string) error {
-	var name string
+	var name, tenantID string
 	err := s.db.QueryRow(ctx,
-		"UPDATE ssh_keys SET status = $1, updated_at = now() WHERE id = $2 RETURNING name",
+		"UPDATE ssh_keys SET status = $1, updated_at = now() WHERE id = $2 RETURNING name, tenant_id",
 		model.StatusDeleting, id,
-	).Scan(&name)
+	).Scan(&name, &tenantID)
 	if err != nil {
 		return fmt.Errorf("set SSH key %s status to deleting: %w", id, err)
 	}
 
-	tenantID, err := resolveTenantIDFromSSHKey(ctx, s.db, id)
-	if err != nil {
-		return fmt.Errorf("delete SSH key: %w", err)
-	}
-
-	if err := signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "RemoveSSHKeyWorkflow",
 		WorkflowID:   workflowID("ssh-key", name, id),
 		Arg:          id,
-		ResourceType: "ssh-key",
-		ResourceID:   id,
 	}); err != nil {
-		return fmt.Errorf("start RemoveSSHKeyWorkflow: %w", err)
+		return fmt.Errorf("signal RemoveSSHKeyWorkflow: %w", err)
 	}
 
 	return nil
 }
 
 func (s *SSHKeyService) Retry(ctx context.Context, id string) error {
-	var status, name string
-	err := s.db.QueryRow(ctx, "SELECT status, name FROM ssh_keys WHERE id = $1", id).Scan(&status, &name)
+	var status, name, tenantID string
+	err := s.db.QueryRow(ctx, "SELECT status, name, tenant_id FROM ssh_keys WHERE id = $1", id).Scan(&status, &name, &tenantID)
 	if err != nil {
 		return fmt.Errorf("get SSH key status: %w", err)
 	}
@@ -142,15 +133,9 @@ func (s *SSHKeyService) Retry(ctx context.Context, id string) error {
 	if err != nil {
 		return fmt.Errorf("set SSH key %s status to provisioning: %w", id, err)
 	}
-	tenantID, err := resolveTenantIDFromSSHKey(ctx, s.db, id)
-	if err != nil {
-		return fmt.Errorf("retry SSH key: %w", err)
-	}
-	return signalProvision(ctx, s.tc, tenantID, model.ProvisionTask{
+	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "AddSSHKeyWorkflow",
 		WorkflowID:   workflowID("ssh-key", name, id),
 		Arg:          id,
-		ResourceType: "ssh-key",
-		ResourceID:   id,
 	})
 }

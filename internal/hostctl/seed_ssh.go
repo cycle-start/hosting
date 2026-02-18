@@ -1,12 +1,14 @@
 package hostctl
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"sort"
 	"strings"
+	"time"
 )
 
 // sshKeyPath returns the path to the SSH private key.
@@ -33,7 +35,11 @@ func sshPublicKeyContent() (string, error) {
 }
 
 // sshExec runs a command on a remote host via SSH as the ubuntu user.
+// Times out after 60 seconds.
 func sshExec(ip, cmd string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
 	args := []string{
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null",
@@ -42,7 +48,10 @@ func sshExec(ip, cmd string) (string, error) {
 		"ubuntu@" + ip,
 		cmd,
 	}
-	out, err := exec.Command("ssh", args...).CombinedOutput()
+	out, err := exec.CommandContext(ctx, "ssh", args...).CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return "", fmt.Errorf("ssh %s: timed out after 60s running %q", ip, cmd)
+	}
 	if err != nil {
 		return "", fmt.Errorf("ssh %s %q: %w\n%s", ip, cmd, err, string(out))
 	}
@@ -50,7 +59,11 @@ func sshExec(ip, cmd string) (string, error) {
 }
 
 // scpFile copies a local file to a remote host via SCP.
+// Times out after 60 seconds.
 func scpFile(ip, localPath, remotePath string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
 	args := []string{
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null",
@@ -59,7 +72,10 @@ func scpFile(ip, localPath, remotePath string) error {
 		localPath,
 		"ubuntu@" + ip + ":" + remotePath,
 	}
-	out, err := exec.Command("scp", args...).CombinedOutput()
+	out, err := exec.CommandContext(ctx, "scp", args...).CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return fmt.Errorf("scp to %s:%s: timed out after 60s", ip, remotePath)
+	}
 	if err != nil {
 		return fmt.Errorf("scp to %s:%s: %w\n%s", ip, remotePath, err, string(out))
 	}
