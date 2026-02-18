@@ -115,7 +115,7 @@ func (h *Audit) List(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.pool.Query(r.Context(), query, args...)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 	defer rows.Close()
@@ -124,7 +124,7 @@ func (h *Audit) List(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var l AuditLog
 		if err := rows.Scan(&l.ID, &l.APIKeyID, &l.Method, &l.Path, &l.ResourceType, &l.ResourceID, &l.StatusCode, &l.RequestBody, &l.CreatedAt); err != nil {
-			response.WriteError(w, http.StatusInternalServerError, err.Error())
+			response.WriteServiceError(w, err)
 			return
 		}
 		logs = append(logs, l)

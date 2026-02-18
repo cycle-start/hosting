@@ -44,7 +44,7 @@ func (h *ZoneRecord) ListByZone(w http.ResponseWriter, r *http.Request) {
 
 	records, hasMore, err := h.svc.ListByZone(r.Context(), zoneID, pg.Limit, pg.Cursor)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -101,7 +101,7 @@ func (h *ZoneRecord) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Create(r.Context(), record); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -183,7 +183,7 @@ func (h *ZoneRecord) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Update(r.Context(), record); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -219,7 +219,7 @@ func (h *ZoneRecord) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Delete(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -244,7 +244,7 @@ func (h *ZoneRecord) Retry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)

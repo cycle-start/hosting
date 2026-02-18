@@ -46,7 +46,7 @@ func (h *ClusterLBAddressHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	addrs, hasMore, err := h.service.ListByCluster(r.Context(), clusterID, pg.Limit, pg.Cursor)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -82,7 +82,7 @@ func (h *ClusterLBAddressHandler) Create(w http.ResponseWriter, r *http.Request)
 	}
 	addr, err := h.service.Create(r.Context(), clusterID, req.Address, req.Label)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusCreated, addr)
@@ -131,7 +131,7 @@ func (h *ClusterLBAddressHandler) Delete(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if err := h.service.Delete(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

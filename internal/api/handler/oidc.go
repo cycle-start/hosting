@@ -37,13 +37,13 @@ func (h *OIDC) Discovery(w http.ResponseWriter, _ *http.Request) {
 //	@Router			/oidc/jwks [get]
 func (h *OIDC) JWKS(w http.ResponseWriter, r *http.Request) {
 	if err := h.svc.EnsureSigningKey(r.Context()); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
 	jwks, err := h.svc.JWKS()
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -70,7 +70,7 @@ func (h *OIDC) JWKS(w http.ResponseWriter, r *http.Request) {
 //	@Router			/oidc/authorize [get]
 func (h *OIDC) Authorize(w http.ResponseWriter, r *http.Request) {
 	if err := h.svc.EnsureSigningKey(r.Context()); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -101,7 +101,7 @@ func (h *OIDC) Authorize(w http.ResponseWriter, r *http.Request) {
 	// Create auth code.
 	code, err := h.svc.CreateAuthCode(r.Context(), clientID, session.TenantID, redirectURI, scope, nonce)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 

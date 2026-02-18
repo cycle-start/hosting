@@ -47,7 +47,7 @@ func (h *Node) ListByCluster(w http.ResponseWriter, r *http.Request) {
 
 	nodes, hasMore, err := h.svc.ListByCluster(r.Context(), clusterID, params)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -108,7 +108,7 @@ func (h *Node) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Create(r.Context(), node, shardIDs); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -199,7 +199,7 @@ func (h *Node) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Update(r.Context(), node, shardIDs); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -225,7 +225,7 @@ func (h *Node) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Delete(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 

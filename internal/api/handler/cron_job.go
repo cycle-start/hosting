@@ -59,7 +59,7 @@ func (h *CronJob) ListByWebroot(w http.ResponseWriter, r *http.Request) {
 
 	cronJobs, hasMore, err := h.svc.ListByWebroot(r.Context(), webrootID, pg.Limit, pg.Cursor)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -148,7 +148,7 @@ func (h *CronJob) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Create(r.Context(), cronJob); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -247,7 +247,7 @@ func (h *CronJob) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Update(r.Context(), cronJob); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -282,7 +282,7 @@ func (h *CronJob) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Delete(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -317,7 +317,7 @@ func (h *CronJob) Enable(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Enable(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -352,7 +352,7 @@ func (h *CronJob) Disable(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Disable(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -387,7 +387,7 @@ func (h *CronJob) Retry(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Retry(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 

@@ -45,7 +45,7 @@ func (h *DatabaseAccessRule) ListByDatabase(w http.ResponseWriter, r *http.Reque
 
 	rules, hasMore, err := h.svc.ListByDatabase(r.Context(), databaseID, pg.Limit, pg.Cursor)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -93,7 +93,7 @@ func (h *DatabaseAccessRule) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Create(r.Context(), rule); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -146,7 +146,7 @@ func (h *DatabaseAccessRule) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Delete(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -171,7 +171,7 @@ func (h *DatabaseAccessRule) Retry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)

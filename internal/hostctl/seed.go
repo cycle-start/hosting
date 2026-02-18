@@ -645,22 +645,21 @@ func seedFixture(tenantName, webrootName string, def *FixtureDef, ctx *tenantSee
 
 	webrootPath := fmt.Sprintf("/var/www/storage/%s/webroots/%s", tenantName, webrootName)
 
-	// Upload and extract tarball on each web node as the tenant user (no chown needed).
-	for _, ip := range webNodeIPs {
-		fmt.Printf("    Uploading fixture to %s:%s...\n", ip, webrootPath)
-		if err := scpFile(ip, def.Tarball, "/tmp/seed-fixture.tar.gz"); err != nil {
-			return fmt.Errorf("scp to %s: %w", ip, err)
-		}
-		// Extract as the tenant user so files are owned correctly without chown.
-		if _, err := sshExec(ip, fmt.Sprintf(
-			"sudo -u %s tar -xzf /tmp/seed-fixture.tar.gz -C %s && sudo -u %s chmod -R 775 %s/storage %s/bootstrap/cache 2>/dev/null; rm -f /tmp/seed-fixture.tar.gz",
-			tenantName, webrootPath,
-			tenantName, webrootPath, webrootPath,
-		)); err != nil {
-			return fmt.Errorf("extract on %s: %w", ip, err)
-		}
-		fmt.Printf("    Fixture extracted on %s\n", ip)
+	// Upload and extract tarball on the first web node only (CephFS is shared across nodes).
+	firstIP := webNodeIPs[0]
+	fmt.Printf("    Uploading fixture to %s:%s...\n", firstIP, webrootPath)
+	if err := scpFile(firstIP, def.Tarball, "/tmp/seed-fixture.tar.gz"); err != nil {
+		return fmt.Errorf("scp to %s: %w", firstIP, err)
 	}
+	// Extract as the tenant user so files are owned correctly without chown.
+	if _, err := sshExec(firstIP, fmt.Sprintf(
+		"sudo -u %s tar -xzf /tmp/seed-fixture.tar.gz -C %s && sudo -u %s chmod -R 775 %s/storage %s/bootstrap/cache 2>/dev/null; rm -f /tmp/seed-fixture.tar.gz",
+		tenantName, webrootPath,
+		tenantName, webrootPath, webrootPath,
+	)); err != nil {
+		return fmt.Errorf("extract on %s: %w", firstIP, err)
+	}
+	fmt.Printf("    Fixture extracted on %s\n", firstIP)
 
 	// Generate APP_KEY if needed.
 	keyBytes := make([]byte, 32)
@@ -681,19 +680,17 @@ func seedFixture(tenantName, webrootName string, def *FixtureDef, ctx *tenantSee
 		resolved[k] = v
 	}
 
-	// Write .env to each web node.
+	// Write .env on the first web node (CephFS is shared).
 	envContent := buildEnvContent(resolved)
-	for _, ip := range webNodeIPs {
-		fmt.Printf("    Writing .env on %s...\n", ip)
-		if _, err := sshExec(ip, fmt.Sprintf(
-			"cat <<'ENVEOF' | sudo tee %s/.env > /dev/null\n%sENVEOF",
-			webrootPath, envContent,
-		)); err != nil {
-			return fmt.Errorf("write .env on %s: %w", ip, err)
-		}
-		if _, err := sshExec(ip, fmt.Sprintf("sudo chown %s:%s %s/.env", tenantName, tenantName, webrootPath)); err != nil {
-			return fmt.Errorf("chown .env on %s: %w", ip, err)
-		}
+	fmt.Printf("    Writing .env on %s...\n", firstIP)
+	if _, err := sshExec(firstIP, fmt.Sprintf(
+		"cat <<'ENVEOF' | sudo tee %s/.env > /dev/null\n%sENVEOF",
+		webrootPath, envContent,
+	)); err != nil {
+		return fmt.Errorf("write .env on %s: %w", firstIP, err)
+	}
+	if _, err := sshExec(firstIP, fmt.Sprintf("sudo chown %s:%s %s/.env", tenantName, tenantName, webrootPath)); err != nil {
+		return fmt.Errorf("chown .env on %s: %w", firstIP, err)
 	}
 
 	// Add /etc/hosts entry if requested.

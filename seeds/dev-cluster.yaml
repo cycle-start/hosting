@@ -1,11 +1,11 @@
-api_url: http://localhost:8090/api/v1
+api_url: http://10.10.10.2:8090/api/v1
 # API key loaded from HOSTING_API_KEY env var
 
 region:
   name: dev
 
 cluster:
-  name: dev-cluster-1
+  name: vm-cluster-1
   lb_addresses:
     - address: "10.10.10.70"
   spec:
@@ -18,9 +18,15 @@ cluster:
         node_count: 2
       - name: db-1
         role: database
+        node_count: 2
+      - name: dns-1
+        role: dns
         node_count: 1
       - name: valkey-1
         role: valkey
+        node_count: 1
+      - name: email-1
+        role: email
         node_count: 1
       - name: storage-1
         role: storage
@@ -28,64 +34,47 @@ cluster:
     infrastructure:
       haproxy: false
       powerdns: true
-
-hosts:
-  - hostname: host-1.dev.local
-    ip_address: 172.20.0.10
-    docker_host: unix:///var/run/docker.sock
-    capacity:
-      max_nodes: 10
-    roles: [web, database, valkey]
-
-node_profiles:
-  - name: web-node
-    role: web
-    image: hosting-web:latest
-    network_mode: host
-    privileged: true
-    env:
-      NGINX_CONFIG_DIR: /etc/nginx
-      WEB_STORAGE_DIR: /var/www
-      CERT_DIR: /etc/ssl/hosting
-      SHARD_NAME: web-1
-    resources:
-      memory_mb: 2048
-      cpu_shares: 1024
-    health_check:
-      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  - name: database-node
-    role: database
-    image: hosting-database:latest
-    network_mode: host
-    privileged: true
-    env:
-      MYSQL_DSN: "root:rootpass@tcp(127.0.0.1:3306)/"
-    resources:
-      memory_mb: 2048
-      cpu_shares: 1024
-    health_check:
-      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  - name: valkey-node
-    role: valkey
-    image: hosting-valkey:latest
-    network_mode: host
-    privileged: true
-    env:
-      VALKEY_CONFIG_DIR: /etc/valkey
-      VALKEY_DATA_DIR: /var/lib/valkey
-    resources:
-      memory_mb: 1024
-      cpu_shares: 512
-    health_check:
-      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+  nodes:
+    # Web nodes
+    - id: f580a6e6-cf0d-39d1-c10c-4cbcd5b512e3
+      hostname: web-1-node-0
+      ip_address: "10.10.10.10"
+      shard_name: web-1
+    - id: 2525d784-249b-6fb4-581d-d2c25037c9c8
+      hostname: web-1-node-1
+      ip_address: "10.10.10.11"
+      shard_name: web-1
+    # Database nodes
+    - id: 26134fb0-cc2f-6399-8008-34b07948ef91
+      hostname: db-1-node-0
+      ip_address: "10.10.10.20"
+      shard_name: db-1
+    - id: d10680f6-135f-48c1-26e4-dc06658ae40c
+      hostname: db-1-node-1
+      ip_address: "10.10.10.21"
+      shard_name: db-1
+    # DNS node
+    - id: 9cf71884-e0fd-7908-7baa-acd5fba4c8fa
+      hostname: dns-1-node-0
+      ip_address: "10.10.10.30"
+      shard_name: dns-1
+    # Valkey node
+    - id: 520edc70-bae8-f70f-17e1-dba1ad132eb6
+      hostname: valkey-1-node-0
+      ip_address: "10.10.10.40"
+      shard_name: valkey-1
+    # Email node
+    - id: db4526cd-8888-aa46-f0c6-65c386e142a4
+      hostname: email-1-node-0
+      ip_address: "10.10.10.60"
+      shard_name: email-1
+    # Storage (S3/Ceph) node
+    - id: e6fe1f68-c027-4dbc-4290-f702853369d7
+      hostname: storage-1-node-0
+      ip_address: "10.10.10.50"
+      shard_name: storage-1
+    # LB node
+    - id: a5f46464-fb18-3f19-c336-543af134df6e
+      hostname: lb-1-node-0
+      ip_address: "10.10.10.70"
+      shard_name: lb-1

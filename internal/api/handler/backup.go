@@ -51,7 +51,7 @@ func (h *Backup) ListByTenant(w http.ResponseWriter, r *http.Request) {
 
 	backups, hasMore, err := h.svc.ListByTenant(r.Context(), tenantID, pg.Limit, pg.Cursor)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -124,7 +124,7 @@ func (h *Backup) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Create(r.Context(), backup); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -190,7 +190,7 @@ func (h *Backup) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Delete(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -225,7 +225,7 @@ func (h *Backup) Restore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Restore(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -258,7 +258,7 @@ func (h *Backup) Retry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)

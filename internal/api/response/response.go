@@ -2,7 +2,10 @@ package response
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func WriteJSON(w http.ResponseWriter, status int, v any) {
@@ -18,6 +21,17 @@ type ErrorResponse struct {
 
 func WriteError(w http.ResponseWriter, status int, message string) {
 	WriteJSON(w, status, ErrorResponse{Error: message})
+}
+
+// WriteServiceError maps well-known service errors to appropriate HTTP status
+// codes. Falls back to 500 Internal Server Error for unrecognized errors.
+func WriteServiceError(w http.ResponseWriter, err error) {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		WriteError(w, http.StatusConflict, err.Error())
+		return
+	}
+	WriteError(w, http.StatusInternalServerError, err.Error())
 }
 
 // PaginatedResponse wraps a list with pagination metadata.

@@ -38,7 +38,7 @@ func (h *WebrootEnvVar) List(w http.ResponseWriter, r *http.Request) {
 
 	vars, err := h.svc.List(r.Context(), webrootID)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -95,7 +95,7 @@ func (h *WebrootEnvVar) Set(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.BulkSet(r.Context(), webrootID, vars); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -126,7 +126,7 @@ func (h *WebrootEnvVar) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.DeleteByName(r.Context(), webrootID, name); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 

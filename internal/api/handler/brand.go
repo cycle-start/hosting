@@ -40,7 +40,7 @@ func (h *Brand) List(w http.ResponseWriter, r *http.Request) {
 
 	brands, hasMore, err := h.svc.List(r.Context(), params)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -88,7 +88,7 @@ func (h *Brand) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Create(r.Context(), brand); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -186,7 +186,7 @@ func (h *Brand) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Update(r.Context(), brand); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -212,7 +212,7 @@ func (h *Brand) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Delete(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -239,7 +239,7 @@ func (h *Brand) ListClusters(w http.ResponseWriter, r *http.Request) {
 
 	clusterIDs, err := h.svc.ListClusters(r.Context(), id)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 	if clusterIDs == nil {
@@ -275,7 +275,7 @@ func (h *Brand) SetClusters(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.SetClusters(r.Context(), id, req.ClusterIDs); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 

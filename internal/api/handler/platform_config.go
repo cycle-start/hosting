@@ -28,7 +28,7 @@ func NewPlatformConfig(svc *core.PlatformConfigService) *PlatformConfig {
 func (h *PlatformConfig) Get(w http.ResponseWriter, r *http.Request) {
 	configs, err := h.svc.GetAll(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -55,14 +55,14 @@ func (h *PlatformConfig) Update(w http.ResponseWriter, r *http.Request) {
 
 	for key, value := range body {
 		if err := h.svc.Set(r.Context(), key, value); err != nil {
-			response.WriteError(w, http.StatusInternalServerError, err.Error())
+			response.WriteServiceError(w, err)
 			return
 		}
 	}
 
 	configs, err := h.svc.GetAll(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 

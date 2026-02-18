@@ -47,7 +47,7 @@ func (h *Search) Search(w http.ResponseWriter, r *http.Request) {
 
 	results, err := h.svc.Search(r.Context(), q, limit)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 	if results == nil {

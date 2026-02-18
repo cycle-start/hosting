@@ -60,7 +60,7 @@ func (h *Tenant) List(w http.ResponseWriter, r *http.Request) {
 
 	tenants, hasMore, err := h.svc.List(r.Context(), params)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -97,7 +97,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 	// Validate cluster is in brand's allowed list (if any).
 	allowedClusters, err := h.services.Brand.ListClusters(r.Context(), req.BrandID)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 	if len(allowedClusters) > 0 {
@@ -438,7 +438,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -532,7 +532,7 @@ func (h *Tenant) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Update(r.Context(), tenant); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -562,7 +562,7 @@ func (h *Tenant) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Delete(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -605,7 +605,7 @@ func (h *Tenant) Suspend(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Suspend(r.Context(), id, req.Reason); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -635,7 +635,7 @@ func (h *Tenant) Unsuspend(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Unsuspend(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -666,7 +666,7 @@ func (h *Tenant) ResourceSummary(w http.ResponseWriter, r *http.Request) {
 
 	summary, err := h.svc.ResourceSummary(r.Context(), id)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -703,7 +703,7 @@ func (h *Tenant) Migrate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Migrate(r.Context(), id, req.TargetShardID, req.MigrateZones, req.MigrateFQDNs); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -731,7 +731,7 @@ func (h *Tenant) Retry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
@@ -759,7 +759,7 @@ func (h *Tenant) RetryFailed(w http.ResponseWriter, r *http.Request) {
 	}
 	count, err := h.svc.RetryFailed(r.Context(), id)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusAccepted, map[string]any{"status": "retrying", "count": count})

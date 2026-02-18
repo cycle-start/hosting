@@ -42,7 +42,7 @@ func (h *OIDCClient) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.CreateClient(r.Context(), req.ID, req.Secret, req.Name, req.RedirectURIs); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 

@@ -43,7 +43,7 @@ func (h *APIKey) Create(w http.ResponseWriter, r *http.Request) {
 
 	key, rawKey, err := h.svc.Create(r.Context(), req.Name, req.Scopes, req.Brands)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -75,7 +75,7 @@ func (h *APIKey) List(w http.ResponseWriter, r *http.Request) {
 
 	keys, hasMore, err := h.svc.List(r.Context(), pg.Limit, pg.Cursor)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -167,7 +167,7 @@ func (h *APIKey) Revoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Revoke(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 

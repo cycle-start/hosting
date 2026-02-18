@@ -37,7 +37,7 @@ func (h *Region) List(w http.ResponseWriter, r *http.Request) {
 
 	regions, hasMore, err := h.svc.List(r.Context(), pg.Limit, pg.Cursor)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -81,7 +81,7 @@ func (h *Region) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Create(r.Context(), region); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -155,7 +155,7 @@ func (h *Region) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Update(r.Context(), region); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -181,7 +181,7 @@ func (h *Region) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Delete(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -212,7 +212,7 @@ func (h *Region) ListRuntimes(w http.ResponseWriter, r *http.Request) {
 
 	runtimes, hasMore, err := h.svc.ListRuntimes(r.Context(), id, pg.Limit, pg.Cursor)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -256,7 +256,7 @@ func (h *Region) AddRuntime(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.AddRuntime(r.Context(), rt); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -289,7 +289,7 @@ func (h *Region) RemoveRuntime(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.RemoveRuntime(r.Context(), id, req.Runtime, req.Version); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 

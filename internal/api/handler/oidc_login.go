@@ -37,13 +37,13 @@ func (h *OIDCLogin) CreateLoginSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.oidcSvc.EnsureSigningKey(r.Context()); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
 	session, err := h.oidcSvc.CreateLoginSession(r.Context(), id)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 

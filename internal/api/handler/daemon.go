@@ -42,7 +42,7 @@ func (h *Daemon) ListByWebroot(w http.ResponseWriter, r *http.Request) {
 
 	daemons, hasMore, err := h.svc.ListByWebroot(r.Context(), webrootID, pg.Limit, pg.Cursor)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -151,7 +151,7 @@ func (h *Daemon) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Create(r.Context(), daemon); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -247,7 +247,7 @@ func (h *Daemon) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Update(r.Context(), daemon); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -271,7 +271,7 @@ func (h *Daemon) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Delete(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -295,7 +295,7 @@ func (h *Daemon) Enable(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Enable(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -319,7 +319,7 @@ func (h *Daemon) Disable(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Disable(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -343,7 +343,7 @@ func (h *Daemon) Retry(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Retry(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 

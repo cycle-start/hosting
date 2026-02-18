@@ -56,7 +56,7 @@ func (h *Database) ListByTenant(w http.ResponseWriter, r *http.Request) {
 
 	databases, hasMore, err := h.svc.ListByTenant(r.Context(), tenantID, params)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -110,7 +110,7 @@ func (h *Database) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Create(r.Context(), database); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -203,7 +203,7 @@ func (h *Database) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Delete(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -247,7 +247,7 @@ func (h *Database) Migrate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Migrate(r.Context(), id, req.TargetShardID); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -291,13 +291,13 @@ func (h *Database) ReassignTenant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.ReassignTenant(r.Context(), id, req.TenantID); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
 	database, err = h.svc.GetByID(r.Context(), id)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -332,7 +332,7 @@ func (h *Database) Retry(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)

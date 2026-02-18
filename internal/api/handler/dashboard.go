@@ -27,7 +27,7 @@ func NewDashboard(svc *core.DashboardService) *Dashboard {
 func (h *Dashboard) Stats(w http.ResponseWriter, r *http.Request) {
 	stats, err := h.svc.Stats(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 

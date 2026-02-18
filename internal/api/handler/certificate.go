@@ -44,7 +44,7 @@ func (h *Certificate) ListByFQDN(w http.ResponseWriter, r *http.Request) {
 
 	certs, hasMore, err := h.svc.ListByFQDN(r.Context(), fqdnID, pg.Limit, pg.Cursor)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -97,7 +97,7 @@ func (h *Certificate) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Upload(r.Context(), cert); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -123,7 +123,7 @@ func (h *Certificate) Retry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)

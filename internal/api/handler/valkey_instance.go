@@ -51,7 +51,7 @@ func (h *ValkeyInstance) ListByTenant(w http.ResponseWriter, r *http.Request) {
 
 	instances, hasMore, err := h.svc.ListByTenant(r.Context(), tenantID, pg.Limit, pg.Cursor)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -114,7 +114,7 @@ func (h *ValkeyInstance) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Create(r.Context(), instance); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -210,7 +210,7 @@ func (h *ValkeyInstance) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Delete(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -254,7 +254,7 @@ func (h *ValkeyInstance) Migrate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Migrate(r.Context(), id, req.TargetShardID); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -298,13 +298,13 @@ func (h *ValkeyInstance) ReassignTenant(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := h.svc.ReassignTenant(r.Context(), id, req.TenantID); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
 	instance, err = h.svc.GetByID(r.Context(), id)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -340,7 +340,7 @@ func (h *ValkeyInstance) Retry(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)

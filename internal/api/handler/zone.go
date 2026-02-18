@@ -57,7 +57,7 @@ func (h *Zone) List(w http.ResponseWriter, r *http.Request) {
 
 	zones, hasMore, err := h.svc.List(r.Context(), params)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -119,7 +119,7 @@ func (h *Zone) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Create(r.Context(), zone); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -198,7 +198,7 @@ func (h *Zone) Update(w http.ResponseWriter, r *http.Request) {
 	zone.TenantID = req.TenantID
 
 	if err := h.svc.Update(r.Context(), zone); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -228,7 +228,7 @@ func (h *Zone) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Delete(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -265,13 +265,13 @@ func (h *Zone) ReassignTenant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.ReassignTenant(r.Context(), id, req.TenantID); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
 	zone, err := h.svc.GetByID(r.Context(), id)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 
@@ -299,7 +299,7 @@ func (h *Zone) Retry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, err.Error())
+		response.WriteServiceError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
