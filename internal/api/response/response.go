@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -27,8 +28,24 @@ func WriteError(w http.ResponseWriter, status int, message string) {
 // codes. Falls back to 500 Internal Server Error for unrecognized errors.
 func WriteServiceError(w http.ResponseWriter, err error) {
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		WriteError(w, http.StatusConflict, err.Error())
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case "23505": // unique_violation
+			WriteError(w, http.StatusConflict, err.Error())
+			return
+		case "23503": // foreign_key_violation
+			WriteError(w, http.StatusBadRequest, err.Error())
+			return
+		case "23502": // not_null_violation
+			WriteError(w, http.StatusBadRequest, err.Error())
+			return
+		case "23514": // check_violation
+			WriteError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		WriteError(w, http.StatusNotFound, err.Error())
 		return
 	}
 	WriteError(w, http.StatusInternalServerError, err.Error())
