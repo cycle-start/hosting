@@ -24,14 +24,28 @@ func NewAPIKeyService(db DB) *APIKeyService {
 // Create generates a new API key, stores the hash, and returns the model along
 // with the raw key string. The raw key must be shown to the user exactly once.
 func (s *APIKeyService) Create(ctx context.Context, name string, scopes, brands []string) (*model.APIKey, string, error) {
-	id := platform.NewID()
-
 	// Generate a random 32-byte key.
 	rawBytes := make([]byte, 32)
 	if _, err := rand.Read(rawBytes); err != nil {
 		return nil, "", fmt.Errorf("generate api key: %w", err)
 	}
 	rawKey := "hst_" + hex.EncodeToString(rawBytes) // 68 chars total
+
+	return s.createWithKey(ctx, name, rawKey, scopes, brands)
+}
+
+// CreateWithRawKey stores an API key with a caller-provided raw key value.
+// Used for well-known dev/test keys where the raw value must be deterministic.
+func (s *APIKeyService) CreateWithRawKey(ctx context.Context, name, rawKey string, scopes, brands []string) (*model.APIKey, error) {
+	key, _, err := s.createWithKey(ctx, name, rawKey, scopes, brands)
+	if err != nil {
+		return nil, err
+	}
+	return key, nil
+}
+
+func (s *APIKeyService) createWithKey(ctx context.Context, name, rawKey string, scopes, brands []string) (*model.APIKey, string, error) {
+	id := platform.NewID()
 
 	hash := sha256.Sum256([]byte(rawKey))
 	keyHash := hex.EncodeToString(hash[:])

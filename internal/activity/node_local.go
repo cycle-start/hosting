@@ -357,6 +357,16 @@ func (a *NodeLocal) CleanOrphanedConfigs(ctx context.Context, input CleanOrphane
 	return CleanOrphanedConfigsResult{Removed: removed}, nil
 }
 
+// CleanOrphanedDaemonConfigs removes supervisor daemon configs not in the expected set.
+func (a *NodeLocal) CleanOrphanedDaemonConfigs(ctx context.Context, input CleanOrphanedDaemonConfigsInput) (CleanOrphanedDaemonConfigsResult, error) {
+	a.logger.Info().Int("expected_count", len(input.ExpectedConfigs)).Msg("CleanOrphanedDaemonConfigs")
+	removed, err := a.daemon.CleanOrphanedConfigs(input.ExpectedConfigs)
+	if err != nil {
+		return CleanOrphanedDaemonConfigsResult{}, asNonRetryable(fmt.Errorf("clean orphaned daemon configs: %w", err))
+	}
+	return CleanOrphanedDaemonConfigsResult{Removed: removed}, nil
+}
+
 // CleanOrphanedFPMPools removes PHP-FPM pool configs not in the expected set.
 func (a *NodeLocal) CleanOrphanedFPMPools(ctx context.Context, input CleanOrphanedFPMPoolsInput) (CleanOrphanedFPMPoolsResult, error) {
 	a.logger.Info().Int("expected_count", len(input.ExpectedPools)).Msg("CleanOrphanedFPMPools")
@@ -369,6 +379,17 @@ func (a *NodeLocal) CleanOrphanedFPMPools(ctx context.Context, input CleanOrphan
 		return CleanOrphanedFPMPoolsResult{}, asNonRetryable(fmt.Errorf("clean orphaned fpm pools: %w", err))
 	}
 	return CleanOrphanedFPMPoolsResult{Removed: removed}, nil
+}
+
+// RestartSupervisord restarts the supervisord service via systemctl.
+// This is needed after removing stale daemon configs that prevented supervisord from starting.
+func (a *NodeLocal) RestartSupervisord(ctx context.Context) error {
+	a.logger.Info().Msg("RestartSupervisord")
+	cmd := exec.CommandContext(ctx, "systemctl", "restart", "supervisor")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return asNonRetryable(fmt.Errorf("restart supervisor: %s: %w", string(output), err))
+	}
+	return nil
 }
 
 // ReloadNginx tests and reloads the nginx configuration.

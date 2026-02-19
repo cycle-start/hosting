@@ -33,7 +33,7 @@ class ApiClient {
     }
     const key = this.getApiKey()
     if (key) {
-      headers['X-API-Key'] = key
+      headers['Authorization'] = `Bearer ${key}`
     }
 
     const res = await fetch(`${this.baseUrl}${path}`, {

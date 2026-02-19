@@ -109,6 +109,17 @@ migrate-status:
 create-api-key name:
     CORE_DATABASE_URL="postgres://hosting:hosting@{{cp}}:5432/hosting_core?sslmode=disable" go run ./cmd/core-api create-api-key --name {{name}}
 
+# Create the well-known dev API key (used by seed configs and e2e tests)
+create-dev-key:
+    CORE_DATABASE_URL="postgres://hosting:hosting@{{cp}}:5432/hosting_core?sslmode=disable" go run ./cmd/core-api create-api-key --name dev --raw-key hst_dev_e2e_test_key_00000000
+
+# Register cluster topology (regions, clusters, shards, nodes) with the platform
+cluster-apply:
+    go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml
+
+# Full bootstrap after DB reset: migrate, create dev key, register cluster, seed tenants
+bootstrap: migrate create-dev-key cluster-apply seed
+
 # Generate Temporal mTLS certificates
 gen-certs:
     bash scripts/gen-temporal-certs.sh
@@ -162,7 +173,7 @@ packer-role role: build-node-agent
 # Create VMs with Terraform and register them with the platform
 # (Requires golden images — run `just packer-all` first)
 vm-up:
-    @if ! sudo virsh net-info hosting 2>/dev/null | grep -q 'Active:.*yes'; then \
+    @if sudo virsh net-info hosting 2>/dev/null | grep -q 'Active:.*no'; then \
         echo "Starting libvirt network 'hosting'..."; \
         sudo virsh net-start hosting; \
     fi
@@ -199,7 +210,13 @@ vm-ssh name:
 
 # --- k3s Control Plane ---
 
-# Build Docker images and deploy to k3s VM
+# Rebuild and deploy a single image to k3s (e.g. just vm-deploy-one admin-ui)
+vm-deploy-one name:
+    docker build --no-cache -t hosting-{{name}}:latest -f docker/{{name}}.Dockerfile .
+    docker save hosting-{{name}}:latest | ssh -o StrictHostKeyChecking=no ubuntu@{{cp}} "sudo k3s ctr images import -"
+    kubectl --context hosting rollout restart deployment/hosting-{{name}}
+
+# Build all Docker images and deploy to k3s VM
 vm-deploy:
     # Build Docker images
     docker build -t hosting-core-api:latest -f docker/core-api.Dockerfile .

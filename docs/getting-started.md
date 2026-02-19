@@ -64,52 +64,43 @@ route add 10.10.10.0 mask 255.255.255.0 <WSL2_IP>
 
 After this, all services are accessible from the Windows browser. See [Local Networking](local-networking.md) for details.
 
-### 4. Create an API key
+### 4. Bootstrap: create API key, register cluster, seed data
 
 ```bash
-just create-api-key admin
+just bootstrap
 ```
 
-This creates a hashed API key in the database and prints the plaintext key once. Save it in `.env` as `HOSTING_API_KEY=hst_...` — it's used by `hostctl` commands, the admin UI, and API requests.
+This single command runs three steps:
 
-### 5. Seed test data
+1. **`create-dev-key`** — creates a well-known dev API key (`hst_dev_e2e_test_key_00000000`) in the database. This key is used by seed configs, `hostctl cluster apply`, and e2e tests.
+2. **`cluster-apply`** — registers the cluster topology (regions, clusters, shards, nodes) with the platform via `hostctl cluster apply`.
+3. **`seed`** — creates test data: a brand ("Acme Hosting"), DNS zone, tenant with webroots, databases, Valkey, S3, email, and a Laravel fixture app.
 
-```bash
-go run ./cmd/hostctl seed -f seeds/dev-tenants.yaml
-```
+You can also run each step individually: `just create-dev-key`, `just cluster-apply`, `just seed`.
 
-This creates:
-- A brand ("Acme Hosting") with DNS nameservers under `hosting.test`
-- A DNS zone (`hosting.test`)
-- A tenant on the web shard (auto-generated name like `t_a7k3m9x2p1`)
-- A webroot with PHP 8.5 runtime and FQDNs (`acme.hosting.test`, `www.acme.hosting.test`)
-- A MySQL database with a user
-- A Valkey (Redis) instance with a user
-- An S3 bucket and email accounts
-
-All resource names are auto-generated with prefixes (`t_`, `web_`, `db_`, `kv_`, `s3_`). See [Resource Naming](resource-naming.md) for details.
-
-### 6. Verify
+### 5. Verify
 
 ```bash
 # Admin UI
 open http://admin.hosting.test
 
 # Core API
-curl -s -H "X-API-Key: hst_..." http://api.hosting.test/api/v1/tenants | jq
+curl -s -H "Authorization: Bearer hst_dev_e2e_test_key_00000000" https://api.hosting.test/api/v1/tenants | jq
 
 # Temporal UI
 open http://temporal.hosting.test
 
-# Tenant site (after seeding — add host entry for 10.10.10.2)
-curl http://acme.hosting.test
+# Tenant site (after seeding — add host entry for 10.10.10.70)
+curl -k https://acme.hosting.test
 ```
 
-### 7. Run e2e tests
+### 6. Run e2e tests
 
 ```bash
 just test-e2e
 ```
+
+The e2e tests use the well-known dev API key by default — no `HOSTING_API_KEY` env var needed.
 
 ## Teardown
 
@@ -123,15 +114,15 @@ just forward-stop
 
 ## Resetting the database
 
-If migrations have changed since your database was created (e.g. columns added to existing migration files), reset and re-migrate:
+If migrations have changed since your database was created (e.g. columns added to existing migration files), reset and re-bootstrap:
 
 ```bash
 just reset-db
 just migrate
-just create-api-key admin
-# Update .env with new key, then re-seed:
-go run ./cmd/hostctl seed -f seeds/dev-tenants.yaml
+just bootstrap
 ```
+
+`bootstrap` re-creates the dev API key, registers the cluster, and seeds test data — no manual key copying needed.
 
 If VMs are in a bad state and `reset-db` fails, do a full rebuild instead (see below).
 
@@ -143,28 +134,27 @@ If VMs are in a bad state and `reset-db` fails, do a full rebuild instead (see b
 just vm-deploy
 ```
 
-This rebuilds all Docker images, imports them into k3s, and restarts the deployments.
+This rebuilds all Docker images, imports them into k3s, and restarts the deployments. If you also reset the database, follow up with `just migrate && just bootstrap`.
 
 **Node agent changes** (anything under `internal/agent/`, `internal/activity/`):
 
-Node agents are baked into golden images. Either rebuild images and recreate VMs:
-
-```bash
-just vm-rebuild
-just migrate
-just create-api-key admin
-# Update .env, then re-seed
-```
-
-Or for a quick update without rebuilding images:
+For a quick update without rebuilding golden images:
 
 ```bash
 just build-node-agent
 # SCP to each node VM and restart:
 for ip in 10.10.10.{10,11,20,30,40,50}; do
   scp bin/node-agent ubuntu@$ip:/tmp/node-agent
-  ssh ubuntu@$ip "sudo mv /tmp/node-agent /usr/local/bin/node-agent && sudo systemctl restart node-agent"
+  ssh ubuntu@$ip "sudo cp /tmp/node-agent /opt/hosting/bin/node-agent && sudo systemctl restart node-agent"
 done
+```
+
+For a full rebuild (new golden images + VMs):
+
+```bash
+just vm-rebuild
+just migrate
+just bootstrap
 ```
 
 ## Project layout
@@ -219,8 +209,12 @@ The control plane runs on a k3s single-node cluster (controlplane VM at `10.10.1
 ```bash
 just --list                    # Show all available commands
 just test                      # Run unit tests
+just test-e2e                  # Run e2e tests
 just lint                      # Run linter
 just vm-deploy                 # Rebuild and redeploy to k3s
+just bootstrap                 # Create dev key + register cluster + seed data
+just cluster-apply             # Register cluster topology only
+just seed                      # Seed test data only
 just vm-pods                   # Show k3s pod status
 just vm-log hosting-core-api   # Tail logs for a deployment
 just vm-ssh web-1-node-0       # SSH into a VM

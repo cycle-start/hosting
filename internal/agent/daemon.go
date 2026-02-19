@@ -189,6 +189,49 @@ func (m *DaemonManager) Remove(ctx context.Context, info *DaemonInfo) error {
 	return m.supervisorctl(ctx, "update")
 }
 
+// CleanOrphanedConfigs removes supervisor daemon config files from /etc/supervisor/conf.d/
+// that are not in the expected set. expectedConfigs is a set of config filenames
+// (e.g. "daemon-tenantName-daemonName.conf"). Returns the list of removed filenames.
+// Does NOT reload supervisord (caller handles that).
+func (m *DaemonManager) CleanOrphanedConfigs(expectedConfigs map[string]bool) ([]string, error) {
+	confDir := "/etc/supervisor/conf.d"
+
+	entries, err := os.ReadDir(confDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read supervisor conf.d dir: %w", err)
+	}
+
+	var removed []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		name := entry.Name()
+
+		// Only consider daemon-*.conf files managed by us.
+		if !strings.HasPrefix(name, "daemon-") || !strings.HasSuffix(name, ".conf") {
+			continue
+		}
+
+		if expectedConfigs[name] {
+			continue
+		}
+
+		confPath := filepath.Join(confDir, name)
+		m.logger.Warn().Str("path", confPath).Msg("removing orphaned supervisor daemon config")
+		if err := os.Remove(confPath); err != nil && !os.IsNotExist(err) {
+			return removed, fmt.Errorf("remove %s: %w", confPath, err)
+		}
+		removed = append(removed, name)
+	}
+
+	return removed, nil
+}
+
 // supervisorctl executes a supervisorctl command.
 func (m *DaemonManager) supervisorctl(ctx context.Context, args ...string) error {
 	cmd := exec.CommandContext(ctx, "supervisorctl", args...)

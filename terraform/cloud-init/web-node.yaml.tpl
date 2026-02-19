@@ -138,5 +138,7 @@ runcmd:
   # Verify the mount is active before starting the node-agent.
   - mountpoint -q /var/www/storage || (echo "FATAL: CephFS not mounted" && exit 1)
   # Create tenant0 dummy interface for ULA addresses.
+  - modprobe dummy
+  - echo dummy > /etc/modules-load.d/dummy.conf
   - systemctl restart systemd-networkd
   - systemctl start node-agent

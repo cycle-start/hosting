@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -174,9 +175,21 @@ func (m *TenantManager) createUser(ctx context.Context, name string, uid int32) 
 	killCmd := exec.CommandContext(ctx, "pkill", "-9", "-u", staleUser)
 	_ = killCmd.Run() // Ignore error — no processes is fine.
 
-	delCmd := exec.CommandContext(ctx, "userdel", staleUser)
-	if delOutput, err := delCmd.CombinedOutput(); err != nil {
-		return status.Errorf(codes.Internal, "userdel stale user %s failed: %s: %v", staleUser, string(delOutput), err)
+	// Wait for killed processes to be reaped before userdel.
+	for i := 0; i < 10; i++ {
+		delCmd := exec.CommandContext(ctx, "userdel", staleUser)
+		delOutput, err := delCmd.CombinedOutput()
+		if err == nil {
+			break
+		}
+		if !strings.Contains(string(delOutput), "currently used by process") {
+			return status.Errorf(codes.Internal, "userdel stale user %s failed: %s: %v", staleUser, string(delOutput), err)
+		}
+		if i == 9 {
+			return status.Errorf(codes.Internal, "userdel stale user %s failed after retries: %s: %v", staleUser, string(delOutput), err)
+		}
+		m.logger.Debug().Str("stale_user", staleUser).Int("attempt", i+1).Msg("waiting for processes to exit before userdel")
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	// Retry useradd.
@@ -263,18 +276,32 @@ func (m *TenantManager) Delete(ctx context.Context, name string) error {
 	m.logger.Info().Str("tenant", name).Msg("deleting tenant user")
 
 	// Kill all processes owned by the user.
-	killCmd := exec.CommandContext(ctx, "pkill", "-u", name)
+	killCmd := exec.CommandContext(ctx, "pkill", "-9", "-u", name)
 	m.logger.Debug().Strs("cmd", killCmd.Args).Msg("executing pkill")
 	_ = killCmd.Run()
 
 	// Remove the user (no -r since home is on CephFS, not local).
 	// Treat "does not exist" as success — idempotent.
-	cmd := exec.CommandContext(ctx, "userdel", name)
-	m.logger.Debug().Strs("cmd", cmd.Args).Msg("executing userdel")
-	if output, err := cmd.CombinedOutput(); err != nil {
-		if !strings.Contains(string(output), "does not exist") {
-			return status.Errorf(codes.Internal, "userdel failed for %s: %s: %v", name, string(output), err)
+	// Retry if processes haven't been reaped yet.
+	for i := 0; i < 10; i++ {
+		cmd := exec.CommandContext(ctx, "userdel", name)
+		m.logger.Debug().Strs("cmd", cmd.Args).Msg("executing userdel")
+		output, err := cmd.CombinedOutput()
+		if err == nil {
+			break
 		}
+		outStr := string(output)
+		if strings.Contains(outStr, "does not exist") {
+			break
+		}
+		if !strings.Contains(outStr, "currently used by process") {
+			return status.Errorf(codes.Internal, "userdel failed for %s: %s: %v", name, outStr, err)
+		}
+		if i == 9 {
+			return status.Errorf(codes.Internal, "userdel failed for %s after retries: %s: %v", name, outStr, err)
+		}
+		m.logger.Debug().Str("tenant", name).Int("attempt", i+1).Msg("waiting for processes to exit before userdel")
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	// Remove the CephFS directory tree.

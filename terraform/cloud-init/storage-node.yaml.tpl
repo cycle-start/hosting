@@ -65,6 +65,7 @@ write_files:
 
       mkdir -p "/var/lib/ceph/mon/ceph-$HOST"
       chown ceph:ceph "/var/lib/ceph/mon/ceph-$HOST"
+      chown ceph:ceph /tmp/ceph.mon.keyring /tmp/monmap
       sudo -u ceph ceph-mon --mkfs -i "$HOST" \
         --monmap /tmp/monmap --keyring /tmp/ceph.mon.keyring
 

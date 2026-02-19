@@ -106,11 +106,12 @@ func main() {
 func createAPIKey(args []string) {
 	fs := flag.NewFlagSet("create-api-key", flag.ExitOnError)
 	name := fs.String("name", "", "Name for the API key (required)")
+	rawKey := fs.String("raw-key", "", "Use a specific key value instead of generating a random one (for dev/test)")
 	fs.Parse(args)
 
 	if *name == "" {
 		fmt.Fprintln(os.Stderr, "error: --name is required")
-		fmt.Fprintln(os.Stderr, "usage: core-api create-api-key --name <name>")
+		fmt.Fprintln(os.Stderr, "usage: core-api create-api-key --name <name> [--raw-key <key>]")
 		os.Exit(1)
 	}
 
@@ -131,15 +132,26 @@ func createAPIKey(args []string) {
 	defer pool.Close()
 
 	svc := core.NewAPIKeyService(pool)
-	key, rawKey, err := svc.Create(ctx, *name, nil, nil)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: failed to create API key: %v\n", err)
-		os.Exit(1)
-	}
 
-	fmt.Printf("API key created successfully.\n\n")
-	fmt.Printf("  Name:   %s\n", key.Name)
-	fmt.Printf("  ID:     %s\n", key.ID)
-	fmt.Printf("  Key:    %s\n\n", rawKey)
-	fmt.Printf("Save this key — it will not be shown again.\n")
+	if *rawKey != "" {
+		key, err := svc.CreateWithRawKey(ctx, *name, *rawKey, nil, nil)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: failed to create API key: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("API key created successfully.\n\n")
+		fmt.Printf("  Name:   %s\n", key.Name)
+		fmt.Printf("  Key:    %s\n\n", *rawKey)
+	} else {
+		key, generatedKey, err := svc.Create(ctx, *name, nil, nil)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: failed to create API key: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("API key created successfully.\n\n")
+		fmt.Printf("  Name:   %s\n", key.Name)
+		fmt.Printf("  ID:     %s\n", key.ID)
+		fmt.Printf("  Key:    %s\n\n", generatedKey)
+		fmt.Printf("Save this key — it will not be shown again.\n")
+	}
 }

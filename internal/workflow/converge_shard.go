@@ -135,9 +135,10 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		return []string{fmt.Sprintf("get shard desired state: %v", err)}
 	}
 
-	// Build expected nginx config + FPM pool sets and webroot entries from batch data.
+	// Build expected nginx config, FPM pool, and daemon config sets from batch data.
 	expectedConfigs := make(map[string]bool)
 	expectedPools := make(map[string]bool)
+	expectedDaemonConfigs := make(map[string]bool)
 	type webrootEntry struct {
 		tenant  model.Tenant
 		webroot model.Webroot
@@ -160,6 +161,12 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				webroot: webroot,
 				fqdns:   state.FQDNs[webroot.ID],
 			})
+			// Daemon configs: daemon-{tenantName}-{daemonName}.conf
+			for _, daemon := range state.Daemons[webroot.ID] {
+				if daemon.Status == model.StatusActive {
+					expectedDaemonConfigs[fmt.Sprintf("daemon-%s-%s.conf", tenant.Name, daemon.Name)] = true
+				}
+			}
 		}
 	}
 
@@ -185,6 +192,21 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		}
 		if len(fpmResult.Removed) > 0 {
 			logger.Warn("removed orphaned PHP-FPM pools", "node", node.ID, "removed", fpmResult.Removed)
+		}
+
+		var daemonResult activity.CleanOrphanedDaemonConfigsResult
+		if err := workflow.ExecuteActivity(nodeCtx, "CleanOrphanedDaemonConfigs", activity.CleanOrphanedDaemonConfigsInput{
+			ExpectedConfigs: expectedDaemonConfigs,
+		}).Get(gCtx, &daemonResult); err != nil {
+			return fmt.Errorf("clean orphaned daemon configs on node %s: %v", node.ID, err)
+		}
+		if len(daemonResult.Removed) > 0 {
+			logger.Warn("removed orphaned supervisor daemon configs", "node", node.ID, "removed", daemonResult.Removed)
+			// Restart supervisord to recover from crash-loop caused by stale configs
+			// referencing non-existent users.
+			if err := workflow.ExecuteActivity(nodeCtx, "RestartSupervisord").Get(gCtx, nil); err != nil {
+				return fmt.Errorf("restart supervisord on node %s: %v", node.ID, err)
+			}
 		}
 
 		return nil

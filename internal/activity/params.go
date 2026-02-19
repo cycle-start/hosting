@@ -260,6 +260,16 @@ type CleanOrphanedFPMPoolsResult struct {
 	Removed []string `json:"removed"`
 }
 
+// CleanOrphanedDaemonConfigsInput holds parameters for cleaning orphaned supervisor daemon configs.
+type CleanOrphanedDaemonConfigsInput struct {
+	ExpectedConfigs map[string]bool `json:"expected_configs"`
+}
+
+// CleanOrphanedDaemonConfigsResult holds the result of cleaning orphaned supervisor daemon configs.
+type CleanOrphanedDaemonConfigsResult struct {
+	Removed []string `json:"removed"`
+}
+
 // CreateCronJobParams holds parameters for creating a cron job on a node.
 type CreateCronJobParams struct {
 	ID               string
