@@ -205,6 +205,9 @@ vm-rebuild:
     @sleep 30
     just vm-kubeconfig
     just vm-deploy
+    just migrate
+    just create-dev-key
+    just create-agent-key
     just vm-up
 
 # Destroy VMs
