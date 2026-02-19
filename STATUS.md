@@ -289,12 +289,13 @@ Names are `{prefix}{10-char-random}`, globally unique, auto-generated on creatio
 - **LLM Investigation Agent:** Autonomous incident responder powered by self-hosted LLM (vLLM + Qwen 72B)
   - **Smart scheduling (leader-follower):** Incidents grouped by type; leader investigated first, resolution hints passed to followers to avoid redundant investigation
   - **Per-type concurrency:** Configurable via `platform_config` (`agent.concurrency.<type>`) — e.g., disk_pressure can fan out widely while replication_lag stays conservative
+  - **Live admin chat:** Send messages to the agent during active investigation — injected into LLM conversation between turns, auto-polling UI with visual distinction (admin blue, agent orange)
   - Multi-turn conversation loop with 11 tools (read infrastructure, trigger convergence, resolve/escalate)
   - Tool calls execute via HTTP to core API (same auth as external users)
   - Every step recorded as `incident_event` for full observability
   - Configurable system prompt via `platform_config`
   - Feature-flagged (`AGENT_ENABLED`), concurrency-capped (`AGENT_MAX_CONCURRENT`, `AGENT_FOLLOWER_CONCURRENT`)
-  - See `docs/agent-control-plane.md` for full architecture documentation
+  - See `docs/incident-management.md` for full documentation
 
 ### Extended E2E Tests
 
