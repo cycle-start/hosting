@@ -123,7 +123,7 @@ runcmd:
   # Fetch the CephFS client keyring from the storage node (retry up to 5 minutes).
   - |
     for i in $(seq 1 60); do
-      scp -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
+      scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
         ubuntu@${storage_node_ip}:/etc/ceph/ceph.client.web.keyring \
         /etc/ceph/ceph.client.web.keyring && break
       echo "Waiting for storage node CephFS keyring (attempt $i/60)..."

@@ -7,6 +7,9 @@ cp := "10.10.10.2"
 # LB VM IP (HAProxy for tenant traffic).
 lb := "10.10.10.70"
 
+# SSH options for dev VMs — skip host key checking entirely since VMs get new keys on every rebuild.
+ssh_opts := "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+
 # Default: show available commands
 default:
     @just --list
@@ -140,7 +143,7 @@ db-mysql:
 
 # Check Ceph cluster health
 ceph-status:
-    ssh -o StrictHostKeyChecking=no ubuntu@10.10.10.50 "sudo ceph -s"
+    ssh {{ssh_opts}} ubuntu@10.10.10.50 "sudo ceph -s"
 
 # Update HAProxy map entry (e.g. just lb-set www.example.com shard-web-a)
 lb-set fqdn backend:
@@ -206,14 +209,14 @@ vm-down:
 
 # SSH into a VM (e.g. just vm-ssh web-1-node-0)
 vm-ssh name:
-    ssh -o StrictHostKeyChecking=no ubuntu@$(cd terraform && terraform output -json 2>/dev/null | python3 -c "import sys,json; o=json.load(sys.stdin); d={}; [d.update(v['value']) for k,v in o.items() if k.endswith('_ips')]; print(d['{{name}}'])")
+    ssh {{ssh_opts}} ubuntu@$(cd terraform && terraform output -json 2>/dev/null | python3 -c "import sys,json; o=json.load(sys.stdin); d={}; [d.update(v['value']) for k,v in o.items() if k.endswith('_ips')]; print(d['{{name}}'])")
 
 # --- k3s Control Plane ---
 
 # Rebuild and deploy a single image to k3s (e.g. just vm-deploy-one admin-ui)
 vm-deploy-one name:
     docker build --no-cache -t hosting-{{name}}:latest -f docker/{{name}}.Dockerfile .
-    docker save hosting-{{name}}:latest | ssh -o StrictHostKeyChecking=no ubuntu@{{cp}} "sudo k3s ctr images import -"
+    docker save hosting-{{name}}:latest | ssh {{ssh_opts}} ubuntu@{{cp}} "sudo k3s ctr images import -"
     kubectl --context hosting rollout restart deployment/hosting-{{name}}
 
 # Build all Docker images and deploy to k3s VM
@@ -225,7 +228,7 @@ vm-deploy:
     docker build -t hosting-mcp-server:latest -f docker/mcp-server.Dockerfile .
     # Import into k3s containerd
     docker save hosting-core-api:latest hosting-worker:latest hosting-admin-ui:latest hosting-mcp-server:latest | \
-      ssh -o StrictHostKeyChecking=no ubuntu@{{cp}} "sudo k3s ctr images import -"
+      ssh {{ssh_opts}} ubuntu@{{cp}} "sudo k3s ctr images import -"
     # Apply infra manifests (includes Traefik config and Ingress)
     kubectl --context hosting apply -f deploy/k3s/
     # Deploy SSL certs (mkcert if available, otherwise self-signed)
@@ -253,8 +256,8 @@ vm-deploy:
 # Fetch kubeconfig from controlplane VM and merge into ~/.kube/config
 vm-kubeconfig:
     mkdir -p ~/.kube
-    ssh -o StrictHostKeyChecking=no ubuntu@{{cp}} "sudo cp /etc/rancher/k3s/k3s.yaml /home/ubuntu/.kube/config && sudo chown ubuntu:ubuntu /home/ubuntu/.kube/config"
-    scp -o StrictHostKeyChecking=no ubuntu@{{cp}}:/home/ubuntu/.kube/config /tmp/k3s-config
+    ssh {{ssh_opts}} ubuntu@{{cp}} "mkdir -p /home/ubuntu/.kube && sudo cp /etc/rancher/k3s/k3s.yaml /home/ubuntu/.kube/config && sudo chown ubuntu:ubuntu /home/ubuntu/.kube/config"
+    scp {{ssh_opts}} ubuntu@{{cp}}:/home/ubuntu/.kube/config /tmp/k3s-config
     sed -i 's/127.0.0.1/{{cp}}/g' /tmp/k3s-config
     sed -i 's/: default$/: hosting/g' /tmp/k3s-config
     -kubectl config delete-context hosting 2>/dev/null
@@ -294,12 +297,12 @@ ssl-init:
       --dry-run=client -o yaml | kubectl --context hosting -n kube-system apply -f -
     # Deploy to LB VM HAProxy
     cat /tmp/hosting-cert.pem /tmp/hosting-key.pem > /tmp/hosting.pem
-    scp -o StrictHostKeyChecking=no /tmp/hosting.pem ubuntu@{{lb}}:/tmp/hosting.pem
-    ssh -o StrictHostKeyChecking=no ubuntu@{{lb}} "sudo cp /tmp/hosting.pem /etc/haproxy/certs/hosting.pem && sudo systemctl reload haproxy"
+    scp {{ssh_opts}} /tmp/hosting.pem ubuntu@{{lb}}:/tmp/hosting.pem
+    ssh {{ssh_opts}} ubuntu@{{lb}} "sudo cp /tmp/hosting.pem /etc/haproxy/certs/hosting.pem && sudo systemctl reload haproxy"
     # Deploy to DB Admin VM nginx
-    scp -o StrictHostKeyChecking=no /tmp/hosting-cert.pem ubuntu@10.10.10.60:/tmp/dbadmin.pem
-    scp -o StrictHostKeyChecking=no /tmp/hosting-key.pem ubuntu@10.10.10.60:/tmp/dbadmin-key.pem
-    ssh -o StrictHostKeyChecking=no ubuntu@10.10.10.60 "sudo mkdir -p /etc/nginx/certs && sudo cp /tmp/dbadmin.pem /etc/nginx/certs/dbadmin.pem && sudo cp /tmp/dbadmin-key.pem /etc/nginx/certs/dbadmin-key.pem && sudo systemctl reload nginx"
+    scp {{ssh_opts}} /tmp/hosting-cert.pem ubuntu@10.10.10.60:/tmp/dbadmin.pem
+    scp {{ssh_opts}} /tmp/hosting-key.pem ubuntu@10.10.10.60:/tmp/dbadmin-key.pem
+    ssh {{ssh_opts}} ubuntu@10.10.10.60 "sudo mkdir -p /etc/nginx/certs && sudo cp /tmp/dbadmin.pem /etc/nginx/certs/dbadmin.pem && sudo cp /tmp/dbadmin-key.pem /etc/nginx/certs/dbadmin-key.pem && sudo systemctl reload nginx"
     rm /tmp/hosting-cert.pem /tmp/hosting-key.pem /tmp/hosting.pem
     @echo "Trusted SSL certs installed on Traefik, LB VM, and DB Admin VM. Visit https://admin.hosting.test"
 
@@ -323,12 +326,12 @@ _ssl-deploy:
       --dry-run=client -o yaml | kubectl --context hosting -n kube-system apply -f -
     # Deploy to LB VM HAProxy (skip if not reachable)
     cat /tmp/hosting-cert.pem /tmp/hosting-key.pem > /tmp/hosting.pem
-    scp -o StrictHostKeyChecking=no -o ConnectTimeout=3 /tmp/hosting.pem ubuntu@{{lb}}:/tmp/hosting.pem && \
-      ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 ubuntu@{{lb}} "sudo cp /tmp/hosting.pem /etc/haproxy/certs/hosting.pem && sudo systemctl reload haproxy" || true
+    scp {{ssh_opts}} -o ConnectTimeout=3 /tmp/hosting.pem ubuntu@{{lb}}:/tmp/hosting.pem && \
+      ssh {{ssh_opts}} -o ConnectTimeout=3 ubuntu@{{lb}} "sudo cp /tmp/hosting.pem /etc/haproxy/certs/hosting.pem && sudo systemctl reload haproxy" || true
     # Deploy to DB Admin VM nginx (skip if not reachable)
-    scp -o StrictHostKeyChecking=no -o ConnectTimeout=3 /tmp/hosting-cert.pem ubuntu@10.10.10.60:/tmp/dbadmin.pem && \
-      scp -o StrictHostKeyChecking=no -o ConnectTimeout=3 /tmp/hosting-key.pem ubuntu@10.10.10.60:/tmp/dbadmin-key.pem && \
-      ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 ubuntu@10.10.10.60 "sudo mkdir -p /etc/nginx/certs && sudo cp /tmp/dbadmin.pem /etc/nginx/certs/dbadmin.pem && sudo cp /tmp/dbadmin-key.pem /etc/nginx/certs/dbadmin-key.pem && sudo systemctl reload nginx" || true
+    scp {{ssh_opts}} -o ConnectTimeout=3 /tmp/hosting-cert.pem ubuntu@10.10.10.60:/tmp/dbadmin.pem && \
+      scp {{ssh_opts}} -o ConnectTimeout=3 /tmp/hosting-key.pem ubuntu@10.10.10.60:/tmp/dbadmin-key.pem && \
+      ssh {{ssh_opts}} -o ConnectTimeout=3 ubuntu@10.10.10.60 "sudo mkdir -p /etc/nginx/certs && sudo cp /tmp/dbadmin.pem /etc/nginx/certs/dbadmin.pem && sudo cp /tmp/dbadmin-key.pem /etc/nginx/certs/dbadmin-key.pem && sudo systemctl reload nginx" || true
     rm -f /tmp/hosting-cert.pem /tmp/hosting-key.pem /tmp/hosting.pem
 
 # --- Networking ---

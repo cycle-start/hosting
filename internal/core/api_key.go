@@ -36,12 +36,36 @@ func (s *APIKeyService) Create(ctx context.Context, name string, scopes, brands 
 
 // CreateWithRawKey stores an API key with a caller-provided raw key value.
 // Used for well-known dev/test keys where the raw value must be deterministic.
+// Idempotent — silently succeeds if the key already exists.
 func (s *APIKeyService) CreateWithRawKey(ctx context.Context, name, rawKey string, scopes, brands []string) (*model.APIKey, error) {
-	key, _, err := s.createWithKey(ctx, name, rawKey, scopes, brands)
-	if err != nil {
-		return nil, err
+	id := platform.NewID()
+
+	hash := sha256.Sum256([]byte(rawKey))
+	keyHash := hex.EncodeToString(hash[:])
+	keyPrefix := rawKey[:12]
+
+	if scopes == nil {
+		scopes = []string{"*:*"}
 	}
-	return key, nil
+	if brands == nil {
+		brands = []string{"*"}
+	}
+
+	_, err := s.db.Exec(ctx,
+		`INSERT INTO api_keys (id, name, key_hash, key_prefix, scopes, brands, created_at) VALUES ($1, $2, $3, $4, $5, $6, now()) ON CONFLICT (key_hash) DO NOTHING`,
+		id, name, keyHash, keyPrefix, scopes, brands,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("insert api key: %w", err)
+	}
+
+	return &model.APIKey{
+		ID:        id,
+		Name:      name,
+		KeyPrefix: keyPrefix,
+		Scopes:    scopes,
+		Brands:    brands,
+	}, nil
 }
 
 func (s *APIKeyService) createWithKey(ctx context.Context, name, rawKey string, scopes, brands []string) (*model.APIKey, string, error) {
