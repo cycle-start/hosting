@@ -90,18 +90,19 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 			return err
 		}
 
-		// Step 3: Place the challenge file on all shard nodes.
-		for _, node := range fctx.Nodes {
-			nodeCtx := nodeActivityCtx(ctx, node.ID)
-			err = workflow.ExecuteActivity(nodeCtx, "PlaceHTTP01Challenge", activity.PlaceHTTP01ChallengeParams{
+		// Step 3: Place the challenge file on all shard nodes (parallel).
+		placeErrs := fanOutNodes(ctx, fctx.Nodes, func(gCtx workflow.Context, node model.Node) error {
+			nodeCtx := nodeActivityCtx(gCtx, node.ID)
+			return workflow.ExecuteActivity(nodeCtx, "PlaceHTTP01Challenge", activity.PlaceHTTP01ChallengeParams{
 				WebrootPath: webrootPath,
 				Token:       challengeResult.Token,
 				KeyAuth:     challengeResult.KeyAuth,
-			}).Get(ctx, nil)
-			if err != nil {
-				_ = setResourceFailed(ctx, "certificates", certID, err)
-				return err
-			}
+			}).Get(gCtx, nil)
+		})
+		if len(placeErrs) > 0 {
+			combinedErr := fmt.Errorf("place challenge errors: %s", joinErrors(placeErrs))
+			_ = setResourceFailed(ctx, "certificates", certID, combinedErr)
+			return combinedErr
 		}
 
 		// Step 4: Tell the ACME server we're ready.
@@ -110,14 +111,15 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 			AccountKey:   orderResult.AccountKey,
 		}).Get(ctx, nil)
 		if err != nil {
-			// Best-effort cleanup of challenge files.
-			for _, node := range fctx.Nodes {
-				nodeCtx := nodeActivityCtx(ctx, node.ID)
+			// Best-effort cleanup of challenge files (parallel).
+			_ = fanOutNodes(ctx, fctx.Nodes, func(gCtx workflow.Context, node model.Node) error {
+				nodeCtx := nodeActivityCtx(gCtx, node.ID)
 				_ = workflow.ExecuteActivity(nodeCtx, "CleanupHTTP01Challenge", activity.CleanupHTTP01ChallengeParams{
 					WebrootPath: webrootPath,
 					Token:       challengeResult.Token,
-				}).Get(ctx, nil)
-			}
+				}).Get(gCtx, nil)
+				return nil
+			})
 			_ = setResourceFailed(ctx, "certificates", certID, err)
 			return err
 		}
@@ -145,13 +147,14 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 			AccountKey: orderResult.AccountKey,
 		}).Get(ctx, &cleanupChallenge)
 
-		for _, node := range fctx.Nodes {
-			nodeCtx := nodeActivityCtx(ctx, node.ID)
+		_ = fanOutNodes(ctx, fctx.Nodes, func(gCtx workflow.Context, node model.Node) error {
+			nodeCtx := nodeActivityCtx(gCtx, node.ID)
 			_ = workflow.ExecuteActivity(nodeCtx, "CleanupHTTP01Challenge", activity.CleanupHTTP01ChallengeParams{
 				WebrootPath: webrootPath,
 				Token:       cleanupChallenge.Token,
-			}).Get(ctx, nil)
-		}
+			}).Get(gCtx, nil)
+			return nil
+		})
 	}
 
 	// Step 7: Store the real certificate data.
@@ -168,19 +171,20 @@ func ProvisionLECertWorkflow(ctx workflow.Context, fqdnID string) error {
 		return err
 	}
 
-	// Step 8: Install the certificate on each node in the shard.
-	for _, node := range fctx.Nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "InstallCertificate", activity.InstallCertificateParams{
+	// Step 8: Install the certificate on each node in the shard (parallel).
+	installErrs := fanOutNodes(ctx, fctx.Nodes, func(gCtx workflow.Context, node model.Node) error {
+		nodeCtx := nodeActivityCtx(gCtx, node.ID)
+		return workflow.ExecuteActivity(nodeCtx, "InstallCertificate", activity.InstallCertificateParams{
 			FQDN:     fctx.FQDN.FQDN,
 			CertPEM:  finalizeResult.CertPEM,
 			KeyPEM:   finalizeResult.KeyPEM,
 			ChainPEM: finalizeResult.ChainPEM,
-		}).Get(ctx, nil)
-		if err != nil {
-			_ = setResourceFailed(ctx, "certificates", certID, err)
-			return err
-		}
+		}).Get(gCtx, nil)
+	})
+	if len(installErrs) > 0 {
+		combinedErr := fmt.Errorf("install cert errors: %s", joinErrors(installErrs))
+		_ = setResourceFailed(ctx, "certificates", certID, combinedErr)
+		return combinedErr
 	}
 
 	// Step 9: Deactivate other certificates for this FQDN.
@@ -252,19 +256,20 @@ func UploadCustomCertWorkflow(ctx workflow.Context, certID string) error {
 		return noShardErr
 	}
 
-	// Install the certificate on each node in the shard.
-	for _, node := range fctx.Nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "InstallCertificate", activity.InstallCertificateParams{
+	// Install the certificate on each node in the shard (parallel).
+	installErrs := fanOutNodes(ctx, fctx.Nodes, func(gCtx workflow.Context, node model.Node) error {
+		nodeCtx := nodeActivityCtx(gCtx, node.ID)
+		return workflow.ExecuteActivity(nodeCtx, "InstallCertificate", activity.InstallCertificateParams{
 			FQDN:     fctx.FQDN.FQDN,
 			CertPEM:  cert.CertPEM,
 			KeyPEM:   cert.KeyPEM,
 			ChainPEM: cert.ChainPEM,
-		}).Get(ctx, nil)
-		if err != nil {
-			_ = setResourceFailed(ctx, "certificates", certID, err)
-			return err
-		}
+		}).Get(gCtx, nil)
+	})
+	if len(installErrs) > 0 {
+		combinedErr := fmt.Errorf("install cert errors: %s", joinErrors(installErrs))
+		_ = setResourceFailed(ctx, "certificates", certID, combinedErr)
+		return combinedErr
 	}
 
 	// Deactivate other certificates for this FQDN.
@@ -308,15 +313,16 @@ func RenewLECertWorkflow(ctx workflow.Context) error {
 	logger := workflow.GetLogger(ctx)
 	logger.Info("found expiring LE certificates", "count", len(certsToRenew))
 
+	var children []ChildWorkflowSpec
 	for _, cert := range certsToRenew {
-		childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
-			WorkflowID: "renew-le-cert-" + cert.ID,
+		children = append(children, ChildWorkflowSpec{
+			WorkflowName: "ProvisionLECertWorkflow",
+			WorkflowID:   "renew-le-cert-" + cert.ID,
+			Arg:          cert.FQDNID,
 		})
-		err := workflow.ExecuteChildWorkflow(childCtx, ProvisionLECertWorkflow, cert.FQDNID).Get(ctx, nil)
-		if err != nil {
-			logger.Error("failed to renew certificate", "certID", cert.ID, "fqdnID", cert.FQDNID, "error", err)
-			// Continue renewing other certs even if one fails.
-		}
+	}
+	if errs := fanOutChildWorkflows(ctx, children); len(errs) > 0 {
+		logger.Error("cert renewal failures", "errors", joinErrors(errs))
 	}
 
 	return nil

@@ -109,17 +109,18 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 		}
 	}
 
-	// Update the LB map entry on all LB nodes.
-	for _, lbNode := range fctx.LBNodes {
-		lbCtx := nodeActivityCtx(ctx, lbNode.ID)
-		err = workflow.ExecuteActivity(lbCtx, "SetLBMapEntry", activity.SetLBMapEntryParams{
+	// Update the LB map entry on all LB nodes (parallel).
+	lbErrs := fanOutNodes(ctx, fctx.LBNodes, func(gCtx workflow.Context, lbNode model.Node) error {
+		lbCtx := nodeActivityCtx(gCtx, lbNode.ID)
+		return workflow.ExecuteActivity(lbCtx, "SetLBMapEntry", activity.SetLBMapEntryParams{
 			FQDN:      fctx.FQDN.FQDN,
 			LBBackend: fctx.Shard.LBBackend,
-		}).Get(ctx, nil)
-		if err != nil {
-			_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
-			return err
-		}
+		}).Get(gCtx, nil)
+	})
+	if len(lbErrs) > 0 {
+		combinedErr := fmt.Errorf("set LB map errors: %s", joinErrors(lbErrs))
+		_ = setResourceFailed(ctx, "fqdns", fqdnID, combinedErr)
+		return combinedErr
 	}
 
 	// Set status to active.
@@ -208,9 +209,9 @@ func UnbindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 			})
 		}
 
-		for _, node := range fctx.Nodes {
-			nodeCtx := nodeActivityCtx(ctx, node.ID)
-			err = workflow.ExecuteActivity(nodeCtx, "UpdateWebroot", activity.UpdateWebrootParams{
+		unbindErrs := fanOutNodes(ctx, fctx.Nodes, func(gCtx workflow.Context, node model.Node) error {
+			nodeCtx := nodeActivityCtx(gCtx, node.ID)
+			return workflow.ExecuteActivity(nodeCtx, "UpdateWebroot", activity.UpdateWebrootParams{
 				ID:             fctx.Webroot.ID,
 				TenantName:     fctx.Tenant.Name,
 				Name:           fctx.Webroot.Name,
@@ -219,24 +220,26 @@ func UnbindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 				RuntimeConfig:  string(fctx.Webroot.RuntimeConfig),
 				PublicFolder:   fctx.Webroot.PublicFolder,
 				FQDNs:          fqdnParams,
-			}).Get(ctx, nil)
-			if err != nil {
-				_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
-				return err
-			}
+			}).Get(gCtx, nil)
+		})
+		if len(unbindErrs) > 0 {
+			combinedErr := fmt.Errorf("unbind fqdn errors: %s", joinErrors(unbindErrs))
+			_ = setResourceFailed(ctx, "fqdns", fqdnID, combinedErr)
+			return combinedErr
 		}
 	}
 
-	// Delete the LB map entry on all LB nodes.
-	for _, lbNode := range fctx.LBNodes {
-		lbCtx := nodeActivityCtx(ctx, lbNode.ID)
-		err = workflow.ExecuteActivity(lbCtx, "DeleteLBMapEntry", activity.DeleteLBMapEntryParams{
+	// Delete the LB map entry on all LB nodes (parallel).
+	lbErrs := fanOutNodes(ctx, fctx.LBNodes, func(gCtx workflow.Context, lbNode model.Node) error {
+		lbCtx := nodeActivityCtx(gCtx, lbNode.ID)
+		return workflow.ExecuteActivity(lbCtx, "DeleteLBMapEntry", activity.DeleteLBMapEntryParams{
 			FQDN: fctx.FQDN.FQDN,
-		}).Get(ctx, nil)
-		if err != nil {
-			_ = setResourceFailed(ctx, "fqdns", fqdnID, err)
-			return err
-		}
+		}).Get(gCtx, nil)
+	})
+	if len(lbErrs) > 0 {
+		combinedErr := fmt.Errorf("delete LB map errors: %s", joinErrors(lbErrs))
+		_ = setResourceFailed(ctx, "fqdns", fqdnID, combinedErr)
+		return combinedErr
 	}
 
 	// Set status to deleted.

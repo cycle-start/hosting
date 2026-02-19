@@ -57,15 +57,16 @@ func CleanupOldBackupsWorkflow(ctx workflow.Context, retentionDays int) error {
 	logger := workflow.GetLogger(ctx)
 	logger.Info("found old backups to clean up", "count", len(oldBackups))
 
+	var children []ChildWorkflowSpec
 	for _, backup := range oldBackups {
-		childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
-			WorkflowID: "cleanup-backup-" + backup.ID,
+		children = append(children, ChildWorkflowSpec{
+			WorkflowName: "DeleteBackupWorkflow",
+			WorkflowID:   "cleanup-backup-" + backup.ID,
+			Arg:          backup.ID,
 		})
-		err := workflow.ExecuteChildWorkflow(childCtx, DeleteBackupWorkflow, backup.ID).Get(ctx, nil)
-		if err != nil {
-			logger.Error("failed to delete old backup", "backupID", backup.ID, "error", err)
-			// Continue deleting other backups even if one fails.
-		}
+	}
+	if errs := fanOutChildWorkflows(ctx, children); len(errs) > 0 {
+		logger.Error("backup cleanup failures", "errors", joinErrors(errs))
 	}
 
 	return nil

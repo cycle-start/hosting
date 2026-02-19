@@ -168,10 +168,10 @@ func UpdateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 		return noShardErr
 	}
 
-	// Update webroot on each node in the shard.
-	for _, node := range wctx.Nodes {
-		nodeCtx := nodeActivityCtx(ctx, node.ID)
-		err = workflow.ExecuteActivity(nodeCtx, "UpdateWebroot", activity.UpdateWebrootParams{
+	// Update webroot on each node in the shard (parallel).
+	errs := fanOutNodes(ctx, wctx.Nodes, func(gCtx workflow.Context, node model.Node) error {
+		nodeCtx := nodeActivityCtx(gCtx, node.ID)
+		return workflow.ExecuteActivity(nodeCtx, "UpdateWebroot", activity.UpdateWebrootParams{
 			ID:             wctx.Webroot.ID,
 			TenantName:     wctx.Tenant.Name,
 			Name:           wctx.Webroot.Name,
@@ -182,11 +182,12 @@ func UpdateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 			EnvFileName:    wctx.Webroot.EnvFileName,
 			EnvShellSource: wctx.Webroot.EnvShellSource,
 			FQDNs:          fqdnParams,
-		}).Get(ctx, nil)
-		if err != nil {
-			_ = setResourceFailed(ctx, "webroots", webrootID, err)
-			return err
-		}
+		}).Get(gCtx, nil)
+	})
+	if len(errs) > 0 {
+		combinedErr := fmt.Errorf("update webroot errors: %s", joinErrors(errs))
+		_ = setResourceFailed(ctx, "webroots", webrootID, combinedErr)
+		return combinedErr
 	}
 
 	// Set status to active.
