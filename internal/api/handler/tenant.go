@@ -680,7 +680,7 @@ func (h *Tenant) ResourceSummary(w http.ResponseWriter, r *http.Request) {
 //	@Tags			Tenants
 //	@Security		ApiKeyAuth
 //	@Param			id path string true "Tenant ID"
-//	@Success		200 {object} response.ItemsResponse{items=[]model.ResourceUsage}
+//	@Success		200 {object} response.PaginatedResponse{items=[]model.ResourceUsage}
 //	@Failure		400 {object} response.ErrorResponse
 //	@Failure		500 {object} response.ErrorResponse
 //	@Router			/tenants/{id}/resource-usage [get]
