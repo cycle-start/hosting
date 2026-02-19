@@ -77,7 +77,7 @@ func CreateS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 	}
 
 	// RGW is cluster-wide, so we only need to execute on the first node.
-	internalName := tenant.Name + "--" + bucket.Name
+	internalName := tenant.Name + "-" + bucket.Name
 	nodeCtx := nodeActivityCtx(ctx, nodes[0].ID)
 
 	err = workflow.ExecuteActivity(nodeCtx, "CreateS3Bucket", activity.CreateS3BucketParams{
@@ -172,7 +172,7 @@ func UpdateS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 		return fmt.Errorf("no nodes found in S3 shard %s", *bucket.ShardID)
 	}
 
-	internalName := tenant.Name + "--" + bucket.Name
+	internalName := tenant.Name + "-" + bucket.Name
 	nodeCtx := nodeActivityCtx(ctx, nodes[0].ID)
 
 	err = workflow.ExecuteActivity(nodeCtx, "UpdateS3BucketPolicy", activity.UpdateS3BucketPolicyParams{
@@ -246,7 +246,7 @@ func DeleteS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 		return noNodesErr
 	}
 
-	internalName := tenant.Name + "--" + bucket.Name
+	internalName := tenant.Name + "-" + bucket.Name
 	nodeCtx := nodeActivityCtx(ctx, nodes[0].ID)
 
 	err = workflow.ExecuteActivity(nodeCtx, "DeleteS3Bucket", activity.DeleteS3BucketParams{

@@ -113,7 +113,7 @@ func (s *Server) setupRoutes() {
 		database := handler.NewDatabase(s.services.Database, s.services.DatabaseUser, s.services.Tenant)
 		dbUser := handler.NewDatabaseUser(s.services.DatabaseUser, s.services.Database)
 		valkeyInstance := handler.NewValkeyInstance(s.services.ValkeyInstance, s.services.ValkeyUser, s.services.Tenant)
-		valkeyUser := handler.NewValkeyUser(s.services.ValkeyUser)
+		valkeyUser := handler.NewValkeyUser(s.services.ValkeyUser, s.services.ValkeyInstance)
 		s3Bucket := handler.NewS3Bucket(s.services.S3Bucket, s.services.S3AccessKey, s.services.Tenant)
 		s3AccessKey := handler.NewS3AccessKey(s.services.S3AccessKey)
 		sshKey := handler.NewSSHKey(s.services.SSHKey, s.services.Tenant)

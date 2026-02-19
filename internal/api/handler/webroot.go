@@ -117,7 +117,7 @@ func (h *Webroot) Create(w http.ResponseWriter, r *http.Request) {
 	webroot := &model.Webroot{
 		ID:             platform.NewID(),
 		TenantID:       tenantID,
-		Name:           platform.NewName("web_"),
+		Name:           platform.NewName("w"),
 		Runtime:        req.Runtime,
 		RuntimeVersion: req.RuntimeVersion,
 		RuntimeConfig:  runtimeConfig,

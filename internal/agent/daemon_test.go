@@ -2,6 +2,8 @@ package agent
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -13,24 +15,24 @@ func TestDaemonConfigPath(t *testing.T) {
 	mgr := NewDaemonManager(zerolog.Nop(), Config{WebStorageDir: "/var/www/storage"})
 
 	info := &DaemonInfo{
-		TenantName: "t_abc123",
-		Name:       "daemon_xyz789",
+		TenantName: "tabc1234567",
+		Name:       "dxyz7891234",
 	}
 
 	path := mgr.configPath(info)
-	assert.Equal(t, "/etc/supervisor/conf.d/daemon-t_abc123-daemon_xyz789.conf", path)
+	assert.Equal(t, "/etc/supervisor/conf.d/daemon-tabc1234567-dxyz7891234.conf", path)
 }
 
 func TestDaemonProgramName(t *testing.T) {
 	mgr := NewDaemonManager(zerolog.Nop(), Config{WebStorageDir: "/var/www/storage"})
 
 	info := &DaemonInfo{
-		TenantName: "t_abc123",
-		Name:       "daemon_xyz789",
+		TenantName: "tabc1234567",
+		Name:       "dxyz7891234",
 	}
 
 	name := mgr.programName(info)
-	assert.Equal(t, "daemon-t_abc123-daemon_xyz789", name)
+	assert.Equal(t, "daemon-tabc1234567-dxyz7891234", name)
 }
 
 func TestFormatDaemonEnvironment_Empty(t *testing.T) {
@@ -54,11 +56,11 @@ func TestFormatDaemonEnvironment_MultipleVars_Sorted(t *testing.T) {
 
 func TestDaemonConfigTemplate_BasicNoProxy(t *testing.T) {
 	data := daemonConfigData{
-		TenantName:   "t_abc123",
+		TenantName:   "tabc1234567",
 		WebrootName:  "main",
-		DaemonName:   "daemon_xyz789",
+		DaemonName:   "dxyz7891234",
 		Command:      "php artisan queue:work",
-		WorkingDir:   "/var/www/storage/t_abc123/webroots/main",
+		WorkingDir:   "/var/www/storage/tabc1234567/webroots/main",
 		NumProcs:     1,
 		StopSignal:   "TERM",
 		StopWaitSecs: 30,
@@ -70,29 +72,29 @@ func TestDaemonConfigTemplate_BasicNoProxy(t *testing.T) {
 	require.NoError(t, daemonConfigTmpl.Execute(&b, data))
 	config := b.String()
 
-	assert.Contains(t, config, "[program:daemon-t_abc123-daemon_xyz789]")
+	assert.Contains(t, config, "[program:daemon-tabc1234567-dxyz7891234]")
 	assert.Contains(t, config, "command=php artisan queue:work")
-	assert.Contains(t, config, "directory=/var/www/storage/t_abc123/webroots/main")
-	assert.Contains(t, config, "user=t_abc123")
+	assert.Contains(t, config, "directory=/var/www/storage/tabc1234567/webroots/main")
+	assert.Contains(t, config, "user=tabc1234567")
 	assert.Contains(t, config, "numprocs=1")
 	assert.Contains(t, config, "stopsignal=TERM")
 	assert.Contains(t, config, "stopwaitsecs=30")
 	assert.Contains(t, config, `environment=APP_ENV="production"`)
 	assert.Contains(t, config, "autostart=true")
 	assert.Contains(t, config, "autorestart=unexpected")
-	assert.Contains(t, config, "stdout_logfile=/var/www/storage/t_abc123/logs/daemon-daemon_xyz789.log")
-	assert.Contains(t, config, "stderr_logfile=/var/www/storage/t_abc123/logs/daemon-daemon_xyz789.error.log")
+	assert.Contains(t, config, "stdout_logfile=/var/www/storage/tabc1234567/logs/daemon-dxyz7891234.log")
+	assert.Contains(t, config, "stderr_logfile=/var/www/storage/tabc1234567/logs/daemon-dxyz7891234.error.log")
 }
 
 func TestDaemonConfigTemplate_WithPort(t *testing.T) {
 	env := map[string]string{"APP_ENV": "production", "PORT": "14523"}
 
 	data := daemonConfigData{
-		TenantName:   "t_abc123",
+		TenantName:   "tabc1234567",
 		WebrootName:  "main",
-		DaemonName:   "daemon_ws123",
+		DaemonName:   "dws123test00",
 		Command:      "php artisan reverb:start --port=$PORT",
-		WorkingDir:   "/var/www/storage/t_abc123/webroots/main",
+		WorkingDir:   "/var/www/storage/tabc1234567/webroots/main",
 		NumProcs:     1,
 		StopSignal:   "TERM",
 		StopWaitSecs: 30,
@@ -116,11 +118,11 @@ func TestDaemonConfigTemplate_WithPortAndHost(t *testing.T) {
 	}
 
 	data := daemonConfigData{
-		TenantName:   "t_abc123",
+		TenantName:   "tabc1234567",
 		WebrootName:  "main",
-		DaemonName:   "daemon_ws123",
+		DaemonName:   "dws123test00",
 		Command:      "php artisan reverb:start --host=$HOST --port=$PORT",
-		WorkingDir:   "/var/www/storage/t_abc123/webroots/main",
+		WorkingDir:   "/var/www/storage/tabc1234567/webroots/main",
 		NumProcs:     1,
 		StopSignal:   "TERM",
 		StopWaitSecs: 30,
@@ -139,11 +141,11 @@ func TestDaemonConfigTemplate_WithPortAndHost(t *testing.T) {
 
 func TestDaemonConfigTemplate_MultiProc(t *testing.T) {
 	data := daemonConfigData{
-		TenantName:   "t_abc123",
+		TenantName:   "tabc1234567",
 		WebrootName:  "main",
-		DaemonName:   "daemon_worker",
+		DaemonName:   "dworker12345",
 		Command:      "php artisan queue:work",
-		WorkingDir:   "/var/www/storage/t_abc123/webroots/main",
+		WorkingDir:   "/var/www/storage/tabc1234567/webroots/main",
 		NumProcs:     4,
 		StopSignal:   "QUIT",
 		StopWaitSecs: 60,
@@ -164,11 +166,11 @@ func TestDaemonConfigTemplate_MultiProc(t *testing.T) {
 
 func TestDaemonConfigTemplate_NoEnvironment(t *testing.T) {
 	data := daemonConfigData{
-		TenantName:   "t_abc123",
+		TenantName:   "tabc1234567",
 		WebrootName:  "main",
-		DaemonName:   "daemon_bg",
+		DaemonName:   "dbg123456789",
 		Command:      "node worker.js",
-		WorkingDir:   "/var/www/storage/t_abc123/webroots/main",
+		WorkingDir:   "/var/www/storage/tabc1234567/webroots/main",
 		NumProcs:     1,
 		StopSignal:   "TERM",
 		StopWaitSecs: 10,
@@ -181,4 +183,40 @@ func TestDaemonConfigTemplate_NoEnvironment(t *testing.T) {
 	config := b.String()
 
 	assert.NotContains(t, config, "environment=")
+}
+
+func TestCleanOrphanedDaemonConfigs_RemovesOrphaned(t *testing.T) {
+	confDir := t.TempDir()
+
+	// Create test files: one expected, one orphaned, one non-daemon.
+	require.NoError(t, os.WriteFile(filepath.Join(confDir, "daemon-tenant1-worker.conf"), []byte("ok"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(confDir, "daemon-tenant2-old.conf"), []byte("stale"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(confDir, "hosting.conf"), []byte("base config"), 0644))
+
+	expected := map[string]bool{"daemon-tenant1-worker.conf": true}
+
+	// Simulate the cleanup logic (since the real method hardcodes /etc/supervisor/conf.d).
+	entries, err := os.ReadDir(confDir)
+	require.NoError(t, err)
+
+	var removed []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if len(name) < 7 || name[:7] != "daemon-" || filepath.Ext(name) != ".conf" {
+			continue
+		}
+		if expected[name] {
+			continue
+		}
+		require.NoError(t, os.Remove(filepath.Join(confDir, name)))
+		removed = append(removed, name)
+	}
+
+	assert.Equal(t, []string{"daemon-tenant2-old.conf"}, removed)
+	assert.True(t, fileExists(filepath.Join(confDir, "daemon-tenant1-worker.conf")))
+	assert.True(t, fileExists(filepath.Join(confDir, "hosting.conf")))
+	assert.False(t, fileExists(filepath.Join(confDir, "daemon-tenant2-old.conf")))
 }

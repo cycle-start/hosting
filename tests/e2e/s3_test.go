@@ -159,8 +159,8 @@ func TestS3ObjectOperations(t *testing.T) {
 	require.Equal(t, "active", bucket["status"])
 	t.Logf("S3 bucket active: %s", bucketID)
 
-	// The internal RGW bucket name is "{tenantID}--{bucketName}".
-	internalBucket := tenantID + "--e2e-objects"
+	// The internal RGW bucket name is "{tenantName}-{bucketName}".
+	internalBucket := tenantID + "-e2e-objects"
 
 	// Create an access key and wait for it to be provisioned in RGW.
 	resp, body = httpPost(t, fmt.Sprintf("%s/s3-buckets/%s/access-keys", coreAPIURL, bucketID), map[string]interface{}{

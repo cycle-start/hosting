@@ -98,7 +98,7 @@ func (h *Database) Create(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	shardID := req.ShardID
-	dbName := platform.NewName("db_")
+	dbName := platform.NewName("db")
 	database := &model.Database{
 		ID:        platform.NewID(),
 		TenantID:  &tenantID,

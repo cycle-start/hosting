@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/edvin/hosting/internal/api/request"
@@ -13,11 +15,12 @@ import (
 )
 
 type ValkeyUser struct {
-	svc *core.ValkeyUserService
+	svc         *core.ValkeyUserService
+	instanceSvc *core.ValkeyInstanceService
 }
 
-func NewValkeyUser(svc *core.ValkeyUserService) *ValkeyUser {
-	return &ValkeyUser{svc: svc}
+func NewValkeyUser(svc *core.ValkeyUserService, instanceSvc *core.ValkeyInstanceService) *ValkeyUser {
+	return &ValkeyUser{svc: svc, instanceSvc: instanceSvc}
 }
 
 // ListByInstance godoc
@@ -80,6 +83,17 @@ func (h *ValkeyUser) Create(w http.ResponseWriter, r *http.Request) {
 	var req request.CreateValkeyUser
 	if err := request.Decode(r, &req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Validate username starts with parent instance name.
+	instance, err := h.instanceSvc.GetByID(r.Context(), instanceID)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if !strings.HasPrefix(req.Username, instance.Name) {
+		response.WriteError(w, http.StatusBadRequest, fmt.Sprintf("username %q must start with instance name %q", req.Username, instance.Name))
 		return
 	}
 

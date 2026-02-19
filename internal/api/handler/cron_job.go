@@ -135,7 +135,7 @@ func (h *CronJob) Create(w http.ResponseWriter, r *http.Request) {
 		ID:               platform.NewID(),
 		TenantID:         webroot.TenantID,
 		WebrootID:        webrootID,
-		Name:             platform.NewName("cron_"),
+		Name:             platform.NewName("cj"),
 		Schedule:         req.Schedule,
 		Command:          req.Command,
 		WorkingDirectory: req.WorkingDirectory,

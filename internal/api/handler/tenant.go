@@ -122,7 +122,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 		shardID := req.ShardID
 		tenant = &model.Tenant{
 			ID:        platform.NewID(),
-			Name:      platform.NewName("t_"),
+			Name:      platform.NewName("t"),
 			BrandID:   req.BrandID,
 			RegionID:  req.RegionID,
 			ClusterID: req.ClusterID,
@@ -173,7 +173,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 			webroot := &model.Webroot{
 				ID:             platform.NewID(),
 				TenantID:       tenant.ID,
-				Name:           platform.NewName("web_"),
+				Name:           platform.NewName("w"),
 				Runtime:        wr.Runtime,
 				RuntimeVersion: wr.RuntimeVersion,
 				RuntimeConfig:  runtimeConfig,
@@ -195,7 +195,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 
 			// Nested daemon creation
 			for _, dr := range wr.Daemons {
-				daemonName := platform.NewName("daemon_")
+				daemonName := platform.NewName("d")
 				numProcs := dr.NumProcs
 				if numProcs == 0 {
 					numProcs = 1
@@ -239,7 +239,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 					ID:               platform.NewID(),
 					TenantID:         tenant.ID,
 					WebrootID:        webroot.ID,
-					Name:             platform.NewName("cron_"),
+					Name:             platform.NewName("cj"),
 					Schedule:         cr.Schedule,
 					Command:          cr.Command,
 					WorkingDirectory: cr.WorkingDirectory,
@@ -261,7 +261,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 			now2 := time.Now()
 			tenantID := tenant.ID
 			dbShardID := dr.ShardID
-			dbName := platform.NewName("db_")
+			dbName := platform.NewName("db")
 			database := &model.Database{
 				ID:        platform.NewID(),
 				TenantID:  &tenantID,
@@ -321,7 +321,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 			instance := &model.ValkeyInstance{
 				ID:          platform.NewID(),
 				TenantID:    &tenantID,
-				Name:        platform.NewName("kv_"),
+				Name:        platform.NewName("kv"),
 				ShardID:     &vShardID,
 				MaxMemoryMB: maxMemoryMB,
 				Password:    generatePassword(),
@@ -363,7 +363,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 			bucket := &model.S3Bucket{
 				ID:        platform.NewID(),
 				TenantID:  &tenantID,
-				Name:      platform.NewName("s3_"),
+				Name:      platform.NewName("s3"),
 				ShardID:   &s3ShardID,
 				Status:    model.StatusPending,
 				CreatedAt: now2,

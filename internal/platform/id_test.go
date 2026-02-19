@@ -28,12 +28,13 @@ func TestNewName_Format(t *testing.T) {
 		prefix   string
 		expected *regexp.Regexp
 	}{
-		{"t_", regexp.MustCompile(`^t_[a-z0-9]{10}$`)},
-		{"db_", regexp.MustCompile(`^db_[a-z0-9]{10}$`)},
-		{"kv_", regexp.MustCompile(`^kv_[a-z0-9]{10}$`)},
-		{"s3_", regexp.MustCompile(`^s3_[a-z0-9]{10}$`)},
-		{"web_", regexp.MustCompile(`^web_[a-z0-9]{10}$`)},
-		{"cron_", regexp.MustCompile(`^cron_[a-z0-9]{10}$`)},
+		{"t", regexp.MustCompile(`^t[a-z0-9]{10}$`)},
+		{"db", regexp.MustCompile(`^db[a-z0-9]{10}$`)},
+		{"kv", regexp.MustCompile(`^kv[a-z0-9]{10}$`)},
+		{"s3", regexp.MustCompile(`^s3[a-z0-9]{10}$`)},
+		{"w", regexp.MustCompile(`^w[a-z0-9]{10}$`)},
+		{"cj", regexp.MustCompile(`^cj[a-z0-9]{10}$`)},
+		{"d", regexp.MustCompile(`^d[a-z0-9]{10}$`)},
 	}
 	for _, tt := range tests {
 		name := NewName(tt.prefix)
@@ -44,7 +45,7 @@ func TestNewName_Format(t *testing.T) {
 func TestNewName_ReturnsUniqueValues(t *testing.T) {
 	seen := make(map[string]bool, 100)
 	for i := 0; i < 100; i++ {
-		name := NewName("t_")
+		name := NewName("t")
 		assert.False(t, seen[name], "duplicate name generated: %s", name)
 		seen[name] = true
 	}

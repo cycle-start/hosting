@@ -121,7 +121,7 @@ func (h *Daemon) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	daemonName := platform.NewName("daemon_")
+	daemonName := platform.NewName("d")
 
 	// Compute proxy port if proxy_path is set
 	var proxyPort *int
