@@ -15,6 +15,7 @@ write_files:
       TEMPORAL_ADDRESS=${temporal_address}
       NODE_ID=${node_id}
       SHARD_NAME=${shard_name}
+      INIT_SYSTEM=systemd
       MYSQL_DSN=root@tcp(127.0.0.1:3306)/
       REGION_ID=${region_id}
       CLUSTER_ID=${cluster_id}

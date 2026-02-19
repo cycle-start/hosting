@@ -150,10 +150,15 @@ write_files:
       ceph osd pool create cephfs_metadata 16
       ceph fs new cephfs cephfs_metadata cephfs_data
 
-      # Create web client keyring for web nodes to mount CephFS
-      ceph auth get-or-create client.web \
-        mon 'allow r' osd 'allow rw pool=cephfs_data' mds 'allow rw' \
-        > /etc/ceph/ceph.client.web.keyring
+      # Import the pre-generated web client key (shared with web nodes via Terraform).
+      cat > /etc/ceph/ceph.client.web.keyring << KEYRING
+[client.web]
+	key = ${ceph_web_key}
+	caps mon = "allow r"
+	caps osd = "allow rw pool=cephfs_data"
+	caps mds = "allow rw"
+KEYRING
+      ceph auth import -i /etc/ceph/ceph.client.web.keyring
 
       echo "CephFS setup complete."
 %{ endif ~}
@@ -163,6 +168,7 @@ write_files:
       TEMPORAL_ADDRESS=${temporal_address}
       NODE_ID=${node_id}
       SHARD_NAME=${shard_name}
+      INIT_SYSTEM=systemd
       RGW_ENDPOINT=http://localhost:7480
       REGION_ID=${region_id}
       CLUSTER_ID=${cluster_id}

@@ -15,6 +15,7 @@ write_files:
       TEMPORAL_ADDRESS=${temporal_address}
       NODE_ID=${node_id}
       SHARD_NAME=${shard_name}
+      INIT_SYSTEM=systemd
       VALKEY_CONFIG_DIR=/etc/valkey
       VALKEY_DATA_DIR=/var/lib/valkey
       REGION_ID=${region_id}

@@ -55,17 +55,61 @@ func joinErrors(errs []string) string {
 	return msg
 }
 
-// setResourceFailed is a helper to set a resource status to failed with an error message.
-// It returns any error but callers typically ignore it since the primary
-// error is more important.
+// setResourceFailed sets a resource status to failed with an error message and
+// creates an incident so the failure is visible and tracked. Errors from
+// incident creation are logged but do not affect the return value.
 func setResourceFailed(ctx workflow.Context, table string, id string, err error) error {
 	msg := err.Error()
-	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
+	statusErr := workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
 		Table:         table,
 		ID:            id,
 		Status:        model.StatusFailed,
 		StatusMessage: &msg,
 	}).Get(ctx, nil)
+
+	// Create an incident — deduped by resource so repeated failures don't spam.
+	resType := strings.TrimSuffix(table, "s") // "tenants" -> "tenant"
+	createIncident(ctx, activity.CreateIncidentParams{
+		DedupeKey:    fmt.Sprintf("provisioning_failed:%s:%s", table, id),
+		Type:         "provisioning_failed",
+		Severity:     "warning",
+		Title:        fmt.Sprintf("%s provisioning failed", resType),
+		Detail:       msg,
+		ResourceType: &resType,
+		ResourceID:   &id,
+		Source:       "workflow",
+	})
+
+	return statusErr
+}
+
+// createIncident fires a CreateIncident activity. Errors are logged but not propagated
+// to avoid failing the calling workflow due to incident tracking issues.
+// For newly created critical incidents, a webhook notification is also sent.
+func createIncident(ctx workflow.Context, params activity.CreateIncidentParams) {
+	var result activity.CreateIncidentResult
+	err := workflow.ExecuteActivity(ctx, "CreateIncident", params).Get(ctx, &result)
+	if err != nil {
+		workflow.GetLogger(ctx).Warn("failed to create incident",
+			"dedupe_key", params.DedupeKey, "error", err)
+		return
+	}
+
+	// Fire webhook for newly created critical/warning incidents.
+	if result.Created && (params.Severity == "critical" || params.Severity == "warning") {
+		inc := model.Incident{
+			ID:           result.ID,
+			Type:         params.Type,
+			Severity:     params.Severity,
+			Status:       model.IncidentOpen,
+			Title:        params.Title,
+			Detail:       params.Detail,
+			Source:       params.Source,
+			ResourceType: params.ResourceType,
+			ResourceID:   params.ResourceID,
+		}
+		sendIncidentWebhook(ctx, inc, params.Severity)
+	}
 }
 
 // dbShardPrimary returns the primary node ID and the full node list for a DB shard.
@@ -148,9 +192,9 @@ func nodeActivityCtx(ctx workflow.Context, nodeID string) workflow.Context {
 		StartToCloseTimeout:    2 * time.Minute,
 		ScheduleToCloseTimeout: 10 * time.Minute,
 		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts:    5,
+			MaximumAttempts:    0, // unlimited — bounded by ScheduleToCloseTimeout
 			InitialInterval:    5 * time.Second,
-			MaximumInterval:    30 * time.Second,
+			MaximumInterval:    1 * time.Minute,
 			BackoffCoefficient: 2.0,
 		},
 	})

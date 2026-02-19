@@ -124,17 +124,25 @@ func findNodeIPsByRole(t *testing.T, clusterID, role string) []string {
 	}
 	var entries []nodeEntry
 	for _, n := range nodes {
-		if sid, _ := n["shard_id"].(string); sid == shardID {
-			if ip, ok := n["ip_address"].(string); ok && ip != "" {
-				// Strip CIDR suffix if present (e.g., "10.10.10.50/32" -> "10.10.10.50").
-				if idx := strings.Index(ip, "/"); idx != -1 {
-					ip = ip[:idx]
-				}
+		ip, _ := n["ip_address"].(string)
+		if ip == "" {
+			continue
+		}
+		// Strip CIDR suffix if present (e.g., "10.10.10.50/32" -> "10.10.10.50").
+		if idx := strings.Index(ip, "/"); idx != -1 {
+			ip = ip[:idx]
+		}
+		// Nodes listed by cluster have a "shards" array of assignments.
+		shards, _ := n["shards"].([]interface{})
+		for _, s := range shards {
+			sa, _ := s.(map[string]interface{})
+			if sid, _ := sa["shard_id"].(string); sid == shardID {
 				si := 0
-				if v, ok := n["shard_index"].(float64); ok {
+				if v, ok := sa["shard_index"].(float64); ok {
 					si = int(v)
 				}
 				entries = append(entries, nodeEntry{ip: ip, shardIndex: si})
+				break
 			}
 		}
 	}
@@ -399,6 +407,39 @@ func waitForStatus(t *testing.T, url, wantStatus string, timeout time.Duration) 
 
 	t.Fatalf("timed out waiting for status %q at %s (last status=%q, body=%s)", wantStatus, url, lastStatus, lastBody)
 	return nil
+}
+
+// deleteBrandByName deletes an existing brand by name if it exists. Used to
+// clean up stale brands from previous failed test runs.
+func deleteBrandByName(t *testing.T, name string) {
+	t.Helper()
+	resp, body := httpGet(t, coreAPIURL+"/brands")
+	if resp.StatusCode != 200 {
+		return
+	}
+	brands := parsePaginatedItems(t, body)
+	for _, b := range brands {
+		if n, _ := b["name"].(string); n == name {
+			id, _ := b["id"].(string)
+			if id != "" {
+				httpDelete(t, coreAPIURL+"/brands/"+id)
+			}
+			return
+		}
+	}
+}
+
+// resolveClusterID returns the UUID of the first cluster in the first region.
+// Most tests just need "the" cluster ID; this avoids hard-coding the name.
+func resolveClusterID(t *testing.T) string {
+	t.Helper()
+	regionID := findFirstRegionID(t)
+	cluster := findFirstCluster(t, regionID)
+	id, ok := cluster["id"].(string)
+	if !ok || id == "" {
+		t.Fatal("first cluster has no id")
+	}
+	return id
 }
 
 // findFirstRegionID returns the ID of the first region from the API.

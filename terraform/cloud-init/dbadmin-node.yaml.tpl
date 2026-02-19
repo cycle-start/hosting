@@ -90,6 +90,7 @@ write_files:
       TEMPORAL_ADDRESS=${temporal_address}
       NODE_ID=${node_id}
       SHARD_NAME=${shard_name}
+      INIT_SYSTEM=systemd
       CLOUDBEAVER_ENDPOINT=http://localhost:8978
       REGION_ID=${region_id}
       CLUSTER_ID=${cluster_id}

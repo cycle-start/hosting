@@ -56,7 +56,7 @@ func TestPlatformE2E(t *testing.T) {
 	})
 
 	t.Run("shared_storage", func(t *testing.T) {
-		ips := findNodeIPsByRole(t, clusterName, "web")
+		ips := findNodeIPsByRole(t, resolveClusterID(t), "web")
 		if len(ips) < 2 {
 			t.Skip("need at least 2 web nodes to test shared storage")
 		}
@@ -80,7 +80,7 @@ func TestPlatformE2E(t *testing.T) {
 	})
 
 	t.Run("web_traffic", func(t *testing.T) {
-		ips := findNodeIPsByRole(t, clusterName, "web")
+		ips := findNodeIPsByRole(t, resolveClusterID(t), "web")
 		nodeIP := ips[0]
 		t.Logf("writing index.php to web node %s", nodeIP)
 

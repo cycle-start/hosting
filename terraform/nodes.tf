@@ -34,6 +34,12 @@ resource "random_uuid" "lb_node_id" {
 
 resource "random_uuid" "ceph_fsid" {}
 
+# Pre-generated CephFS client key — injected into both storage and web nodes
+# so web nodes don't need to SCP the keyring from the storage node.
+resource "random_id" "ceph_web_key" {
+  byte_length = 16
+}
+
 # --- Volumes (backed by golden images) ---
 
 resource "libvirt_volume" "web_node" {
@@ -136,6 +142,7 @@ resource "libvirt_cloudinit_disk" "web_node" {
     region_id        = var.region_id
     cluster_id       = var.cluster_id
     ceph_fsid        = random_uuid.ceph_fsid.result
+    ceph_web_key     = random_id.ceph_web_key.b64_std
     core_api_url     = "http://${var.controlplane_ip}:8090/api/v1"
     core_api_token   = var.core_api_token
   })
@@ -321,6 +328,7 @@ resource "libvirt_cloudinit_disk" "storage_node" {
     region_id          = var.region_id
     cluster_id         = var.cluster_id
     ceph_fsid          = random_uuid.ceph_fsid.result
+    ceph_web_key       = random_id.ceph_web_key.b64_std
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.storage_nodes[count.index].ip

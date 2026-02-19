@@ -36,10 +36,15 @@ func TestBackupWebroot(t *testing.T) {
 	t.Logf("webroot active")
 
 	// Write a test file on a web node.
-	ips := findNodeIPsByRole(t, clusterName, "web")
+	ips := findNodeIPsByRole(t, resolveClusterID(t), "web")
 	nodeIP := ips[0]
-	tenantName := "e2e-backup-web"
-	testFilePath := fmt.Sprintf("/var/www/storage/%s/backup-site/public/backup-test.txt", tenantName)
+
+	// Fetch actual tenant name (auto-generated, not the label).
+	resp, body = httpGet(t, coreAPIURL+"/tenants/"+tenantID)
+	require.Equal(t, 200, resp.StatusCode, "get tenant: %s", body)
+	tenantData := parseJSON(t, body)
+	tenantName := tenantData["name"].(string)
+	testFilePath := fmt.Sprintf("/var/www/storage/%s/webroots/backup-site/public/backup-test.txt", tenantName)
 	originalContent := "original-backup-content"
 	sshExec(t, nodeIP, fmt.Sprintf("sudo mkdir -p $(dirname %s) && echo '%s' | sudo tee %s", testFilePath, originalContent, testFilePath))
 	t.Logf("wrote test file on node %s", nodeIP)

@@ -15,6 +15,7 @@ write_files:
       TEMPORAL_ADDRESS=${temporal_address}
       NODE_ID=${node_id}
       SHARD_NAME=${shard_name}
+      INIT_SYSTEM=systemd
       NGINX_CONFIG_DIR=/etc/nginx
       WEB_STORAGE_DIR=/var/www/storage
       CERT_DIR=/etc/ssl/hosting
@@ -35,6 +36,10 @@ write_files:
       auth cluster required = cephx
       auth service required = cephx
       auth client required = cephx
+
+  - path: /etc/ceph/ceph.client.web.secret
+    permissions: '0600'
+    content: "${ceph_web_key}"
 
   - path: /etc/systemd/system/var-www-storage.mount
     content: |
@@ -124,23 +129,18 @@ write_files:
       }
 
 runcmd:
-  # Fetch the CephFS client keyring from the storage node (retry up to 5 minutes).
+  # Wait for the CephFS mount to succeed (storage node needs time to boot and
+  # create the CephFS filesystem). Retry mount for up to 5 minutes.
+  - systemctl daemon-reload
   - |
     for i in $(seq 1 60); do
-      scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
-        ubuntu@${storage_node_ip}:/etc/ceph/ceph.client.web.keyring \
-        /etc/ceph/ceph.client.web.keyring && break
-      echo "Waiting for storage node CephFS keyring (attempt $i/60)..."
+      systemctl start var-www-storage.mount && mountpoint -q /var/www/storage && break
+      echo "Waiting for CephFS mount (attempt $i/60)..."
       sleep 5
     done
-  # Extract the base64 secret for the kernel CephFS client.
-  - grep 'key = ' /etc/ceph/ceph.client.web.keyring | awk '{print $3}' > /etc/ceph/ceph.client.web.secret
-  - chmod 600 /etc/ceph/ceph.client.web.secret /etc/ceph/ceph.client.web.keyring
-  # Mount CephFS via systemd.
-  - systemctl daemon-reload
-  - systemctl enable --now var-www-storage.mount
-  # Verify the mount is active before starting the node-agent.
-  - mountpoint -q /var/www/storage || (echo "FATAL: CephFS not mounted" && exit 1)
+  - systemctl enable var-www-storage.mount
+  # Verify mount succeeded.
+  - "mountpoint -q /var/www/storage || { echo 'FATAL: CephFS not mounted'; exit 1; }"
   # Ensure tenant0 dummy interface is up (module loaded by systemd-modules-load
   # from /etc/modules-load.d/dummy.conf, interface created by systemd-networkd
   # from /etc/systemd/network/50-tenant0.netdev).

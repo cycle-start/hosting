@@ -275,17 +275,32 @@ func (m *TenantManager) Delete(ctx context.Context, name string) error {
 
 	m.logger.Info().Str("tenant", name).Msg("deleting tenant user")
 
-	// Kill all processes owned by the user.
-	killCmd := exec.CommandContext(ctx, "pkill", "-9", "-u", name)
-	m.logger.Debug().Strs("cmd", killCmd.Args).Msg("executing pkill")
-	_ = killCmd.Run()
+	// Remove PHP-FPM pool configs and reload so FPM stops spawning workers
+	// as this user. Also handles any other per-tenant FPM pool config.
+	pools, _ := filepath.Glob("/etc/php/*/fpm/pool.d/" + name + ".conf")
+	for _, pool := range pools {
+		m.logger.Debug().Str("pool", pool).Msg("removing PHP-FPM pool config")
+		os.Remove(pool)
+	}
+	if len(pools) > 0 {
+		// Reload all PHP-FPM versions to drop the pool.
+		versions, _ := filepath.Glob("/etc/php/*/fpm")
+		for _, dir := range versions {
+			version := filepath.Base(filepath.Dir(dir))
+			_ = exec.CommandContext(ctx, "systemctl", "reload", "php"+version+"-fpm").Run()
+		}
+		// Give FPM a moment to terminate pool workers.
+		time.Sleep(500 * time.Millisecond)
+	}
 
-	// Remove the user (no -r since home is on CephFS, not local).
-	// Treat "does not exist" as success — idempotent.
-	// Retry if processes haven't been reaped yet.
+	// Kill all processes owned by the user and remove. Retry because
+	// other runtimes (daemons, workers) may take a moment to exit.
 	for i := 0; i < 10; i++ {
+		killCmd := exec.CommandContext(ctx, "pkill", "-9", "-u", name)
+		_ = killCmd.Run() // Ignore error — no processes is fine.
+		time.Sleep(500 * time.Millisecond)
+
 		cmd := exec.CommandContext(ctx, "userdel", name)
-		m.logger.Debug().Strs("cmd", cmd.Args).Msg("executing userdel")
 		output, err := cmd.CombinedOutput()
 		if err == nil {
 			break
@@ -300,8 +315,7 @@ func (m *TenantManager) Delete(ctx context.Context, name string) error {
 		if i == 9 {
 			return status.Errorf(codes.Internal, "userdel failed for %s after retries: %s: %v", name, outStr, err)
 		}
-		m.logger.Debug().Str("tenant", name).Int("attempt", i+1).Msg("waiting for processes to exit before userdel")
-		time.Sleep(500 * time.Millisecond)
+		m.logger.Debug().Str("tenant", name).Int("attempt", i+1).Msg("re-killing processes before userdel retry")
 	}
 
 	// Remove the CephFS directory tree.

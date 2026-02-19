@@ -7,11 +7,12 @@ import (
 )
 
 func TestBrandCRUD(t *testing.T) {
-	brandID := "e2e-brand-crud"
+	// Clean up stale brand from previous failed runs.
+	deleteBrandByName(t, "E2E CRUD Brand")
+	deleteBrandByName(t, "E2E CRUD Brand Updated")
 
 	// Create brand.
 	resp, body := httpPost(t, coreAPIURL+"/brands", map[string]interface{}{
-		"id":               brandID,
 		"name":             "E2E CRUD Brand",
 		"base_hostname":    "crud.hosting.test",
 		"primary_ns":       "ns1.crud.hosting.test",
@@ -19,6 +20,8 @@ func TestBrandCRUD(t *testing.T) {
 		"hostmaster_email": "hostmaster@crud.hosting.test",
 	})
 	require.Equal(t, 201, resp.StatusCode, "create brand: %s", body)
+	brand := parseJSON(t, body)
+	brandID := brand["id"].(string)
 	t.Logf("created brand: %s", brandID)
 
 	t.Cleanup(func() {
@@ -28,7 +31,7 @@ func TestBrandCRUD(t *testing.T) {
 	// Get brand.
 	resp, body = httpGet(t, coreAPIURL+"/brands/"+brandID)
 	require.Equal(t, 200, resp.StatusCode, body)
-	brand := parseJSON(t, body)
+	brand = parseJSON(t, body)
 	require.Equal(t, brandID, brand["id"])
 	require.Equal(t, "E2E CRUD Brand", brand["name"])
 
@@ -55,8 +58,9 @@ func TestBrandCRUD(t *testing.T) {
 	require.True(t, found, "brand %s not found in list", brandID)
 
 	// Set allowed clusters.
+	clusterID := resolveClusterID(t)
 	resp, body = httpPut(t, coreAPIURL+"/brands/"+brandID+"/clusters", map[string]interface{}{
-		"cluster_ids": []string{clusterName},
+		"cluster_ids": []string{clusterID},
 	})
 	require.Equal(t, 200, resp.StatusCode, "set clusters: %s", body)
 	t.Logf("brand clusters set")
@@ -74,27 +78,34 @@ func TestBrandCRUD(t *testing.T) {
 }
 
 func TestBrandIsolation(t *testing.T) {
-	// Create two brands.
-	brandAID := "e2e-iso-brand-a"
-	brandBID := "e2e-iso-brand-b"
+	// Clean up stale brands from previous failed runs.
+	brandNames := []string{"E2E Iso Brand A", "E2E Iso Brand B"}
+	for _, name := range brandNames {
+		deleteBrandByName(t, name)
+	}
 
-	for _, bid := range []string{brandAID, brandBID} {
+	// Create two brands.
+	brandIDs := make([]string, 2)
+	brandHostnames := []string{"iso-a.hosting.test", "iso-b.hosting.test"}
+
+	for i, name := range brandNames {
 		resp, body := httpPost(t, coreAPIURL+"/brands", map[string]interface{}{
-			"id":               bid,
-			"name":             "Isolation " + bid,
-			"base_hostname":    bid + ".hosting.test",
-			"primary_ns":       "ns1." + bid + ".hosting.test",
-			"secondary_ns":     "ns2." + bid + ".hosting.test",
-			"hostmaster_email": "hostmaster@" + bid + ".hosting.test",
+			"name":             name,
+			"base_hostname":    brandHostnames[i],
+			"primary_ns":       "ns1." + brandHostnames[i],
+			"secondary_ns":     "ns2." + brandHostnames[i],
+			"hostmaster_email": "hostmaster@" + brandHostnames[i],
 		})
-		if resp.StatusCode == 200 {
-			continue // already exists
-		}
-		require.Equal(t, 201, resp.StatusCode, "create brand %s: %s", bid, body)
+		require.Equal(t, 201, resp.StatusCode, "create brand %s: %s", name, body)
+		brand := parseJSON(t, body)
+		brandIDs[i] = brand["id"].(string)
+		bid := brandIDs[i]
 		t.Cleanup(func() {
 			httpDelete(t, coreAPIURL+"/brands/"+bid)
 		})
 	}
+	brandAID := brandIDs[0]
+	brandBID := brandIDs[1]
 
 	// Set cluster access for both brands.
 	regionID := findFirstRegionID(t)
@@ -116,7 +127,7 @@ func TestBrandIsolation(t *testing.T) {
 	})
 	require.Equal(t, 201, resp.StatusCode, "create key A: %s", body)
 	keyAData := parseJSON(t, body)
-	keyA := keyAData["raw_key"].(string)
+	keyA := keyAData["key"].(string)
 	keyAID := keyAData["id"].(string)
 	t.Cleanup(func() { httpDelete(t, coreAPIURL+"/api-keys/"+keyAID) })
 
@@ -127,7 +138,7 @@ func TestBrandIsolation(t *testing.T) {
 	})
 	require.Equal(t, 201, resp.StatusCode, "create key B: %s", body)
 	keyBData := parseJSON(t, body)
-	keyB := keyBData["raw_key"].(string)
+	keyB := keyBData["key"].(string)
 	keyBID := keyBData["id"].(string)
 	t.Cleanup(func() { httpDelete(t, coreAPIURL+"/api-keys/"+keyBID) })
 

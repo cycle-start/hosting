@@ -125,35 +125,6 @@ func CheckReplicationHealthWorkflow(ctx workflow.Context) error {
 	return nil
 }
 
-// createIncident fires a CreateIncident activity. Errors are logged but not propagated
-// to avoid failing the health check workflow due to incident tracking issues.
-// For newly created critical incidents, a webhook notification is also sent.
-func createIncident(ctx workflow.Context, params activity.CreateIncidentParams) {
-	var result activity.CreateIncidentResult
-	err := workflow.ExecuteActivity(ctx, "CreateIncident", params).Get(ctx, &result)
-	if err != nil {
-		workflow.GetLogger(ctx).Warn("failed to create incident",
-			"dedupe_key", params.DedupeKey, "error", err)
-		return
-	}
-
-	// Fire webhook for newly created critical incidents.
-	if result.Created && params.Severity == "critical" {
-		inc := model.Incident{
-			ID:           result.ID,
-			Type:         params.Type,
-			Severity:     params.Severity,
-			Status:       model.IncidentOpen,
-			Title:        params.Title,
-			Detail:       params.Detail,
-			Source:       params.Source,
-			ResourceType: params.ResourceType,
-			ResourceID:   params.ResourceID,
-		}
-		sendIncidentWebhook(ctx, inc, "critical")
-	}
-}
-
 // autoResolveIncidents fires an AutoResolveIncidents activity. Errors are logged but not propagated.
 func autoResolveIncidents(ctx workflow.Context, params activity.AutoResolveIncidentsParams) {
 	var count int

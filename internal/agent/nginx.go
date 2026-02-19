@@ -328,6 +328,11 @@ func (m *NginxManager) RemoveConfig(tenantName, webrootName string) error {
 func (m *NginxManager) Reload(ctx context.Context) error {
 	m.logger.Info().Msg("testing and reloading nginx")
 
+	// Ensure log directories exist for all site configs. Orphaned configs
+	// from deleted tenants can cause nginx -t to fail with "No such file or
+	// directory" for their access_log/error_log paths.
+	m.ensureLogDirs()
+
 	// Test configuration first. Config errors are non-retryable (FailedPrecondition)
 	// since they require a code/config fix, not a retry.
 	testCmd := exec.CommandContext(ctx, "nginx", "-t")
@@ -446,6 +451,28 @@ func (m *NginxManager) CleanOrphanedConfigs(expectedConfigs map[string]bool) ([]
 	}
 
 	return removed, nil
+}
+
+// ensureLogDirs scans site configs in sites-enabled and creates any missing
+// log directories referenced by access_log / error_log directives.
+func (m *NginxManager) ensureLogDirs() {
+	sitesDir := filepath.Join(m.configDir, "sites-enabled")
+	entries, err := os.ReadDir(sitesDir)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".conf") {
+			continue
+		}
+		// Webroot configs are named {tenant}_{webroot}.conf.
+		baseName := strings.TrimSuffix(entry.Name(), ".conf")
+		if idx := strings.Index(baseName, "_"); idx > 0 {
+			tenantName := baseName[:idx]
+			logDir := filepath.Join(m.logDir, tenantName)
+			_ = os.MkdirAll(logDir, 0755)
+		}
+	}
 }
 
 // fileExists returns true if the given path exists and is a regular file.
