@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { ShieldAlert } from 'lucide-react'
-import { useCapabilityGaps, useUpdateCapabilityGap } from '@/lib/hooks'
+import { useCapabilityGaps, useUpdateCapabilityGap, useGapIncidents } from '@/lib/hooks'
 import type { CapabilityGap } from '@/lib/types'
 import { formatRelative } from '@/lib/utils'
 import { DataTable } from '@/components/shared/data-table'
@@ -23,7 +23,58 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Card, CardContent } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { MoreHorizontal } from 'lucide-react'
+
+function GapIncidentsDialog({ gapId, toolName, open, onOpenChange }: { gapId: string; toolName: string; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { data, isLoading } = useGapIncidents(open ? gapId : '')
+
+  const incidents = data?.items ?? []
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Incidents linked to {toolName}</DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <Skeleton className="h-32 w-full" />
+        ) : incidents.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">No incidents linked to this gap.</p>
+        ) : (
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {incidents.map((inc) => (
+              <Card key={inc.id}>
+                <CardContent className="py-3 px-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <a href={`/incidents/${inc.id}`} className="text-sm font-medium hover:underline">{inc.title}</a>
+                        <StatusBadge status={inc.status} />
+                        <StatusBadge status={inc.severity} />
+                      </div>
+                      <p className="text-xs text-muted-foreground">{inc.type} | {inc.source}</p>
+                    </div>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {formatRelative(inc.created_at)}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 export function CapabilityGapsPage() {
   const [status, setStatus] = useState('')
@@ -35,6 +86,7 @@ export function CapabilityGapsPage() {
   } as Record<string, string>)
 
   const updateMutation = useUpdateCapabilityGap()
+  const [incidentsGap, setIncidentsGap] = useState<{ id: string; tool_name: string } | null>(null)
 
   const gaps = data?.items ?? []
 
@@ -95,6 +147,11 @@ export function CapabilityGapsPage() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={() => setIncidentsGap({ id: row.original.id, tool_name: row.original.tool_name })}
+            >
+              View Incidents
+            </DropdownMenuItem>
             {row.original.status === 'open' && (
               <>
                 <DropdownMenuItem
@@ -169,6 +226,15 @@ export function CapabilityGapsPage() {
           loading={isLoading}
           searchColumn="tool_name"
           searchPlaceholder="Search gaps..."
+        />
+      )}
+
+      {incidentsGap && (
+        <GapIncidentsDialog
+          gapId={incidentsGap.id}
+          toolName={incidentsGap.tool_name}
+          open={!!incidentsGap}
+          onOpenChange={(open) => { if (!open) setIncidentsGap(null) }}
         />
       )}
     </div>

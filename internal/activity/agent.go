@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"go.temporal.io/sdk/activity"
@@ -29,6 +30,45 @@ func NewAgentActivities(db DB, llmClient *llm.Client, tools *llm.Registry, maxTu
 		tools:    tools,
 		maxTurns: maxTurns,
 	}
+}
+
+// GetAgentConfig returns agent configuration from platform_config with defaults.
+// Keys checked: agent.system_prompt, agent.concurrency.<type> (e.g. agent.concurrency.disk_pressure).
+type AgentConfig struct {
+	SystemPrompt       string         `json:"system_prompt"`
+	TypeConcurrency    map[string]int `json:"type_concurrency"`
+}
+
+func (a *AgentActivities) GetAgentConfig(ctx context.Context) (*AgentConfig, error) {
+	cfg := &AgentConfig{
+		SystemPrompt:    DefaultSystemPrompt,
+		TypeConcurrency: map[string]int{},
+	}
+
+	rows, err := a.db.Query(ctx,
+		`SELECT key, value FROM platform_config WHERE key LIKE 'agent.%'`)
+	if err != nil {
+		return cfg, nil // non-fatal, use defaults
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
+			continue
+		}
+		switch {
+		case key == "agent.system_prompt" && value != "":
+			cfg.SystemPrompt = value
+		case len(key) > len("agent.concurrency."):
+			typeName := key[len("agent.concurrency."):]
+			if n, err := strconv.Atoi(value); err == nil && n > 0 {
+				cfg.TypeConcurrency[typeName] = n
+			}
+		}
+	}
+
+	return cfg, nil
 }
 
 // GetAgentSystemPrompt returns the system prompt from platform_config, or the default.
@@ -153,13 +193,15 @@ func (a *AgentActivities) AssembleIncidentContext(ctx context.Context, incidentI
 type InvestigateIncidentParams struct {
 	SystemPrompt    string           `json:"system_prompt"`
 	IncidentContext *IncidentContext  `json:"incident_context"`
+	Hints           string           `json:"hints,omitempty"`
 }
 
 // InvestigateIncidentResult holds the outcome of the investigation.
 type InvestigateIncidentResult struct {
-	Outcome string `json:"outcome"` // "resolved", "escalated", "max_turns"
-	Turns   int    `json:"turns"`
-	Summary string `json:"summary"`
+	Outcome        string `json:"outcome"` // "resolved", "escalated", "max_turns"
+	Turns          int    `json:"turns"`
+	Summary        string `json:"summary"`
+	ResolutionHint string `json:"resolution_hint,omitempty"`
 }
 
 // InvestigateIncident runs the multi-turn LLM investigation loop.
@@ -174,8 +216,21 @@ func (a *AgentActivities) InvestigateIncident(ctx context.Context, params Invest
 		{Role: "user", Content: fmt.Sprintf("Investigate the following incident:\n\n%s", string(incidentJSON))},
 	}
 
+	// Inject hints from a previously resolved similar incident.
+	if params.Hints != "" {
+		messages = append(messages, llm.Message{
+			Role: "user",
+			Content: fmt.Sprintf("A similar incident of the same type was recently investigated and resolved. "+
+				"Use this as a starting point — the same approach may apply:\n\n%s", params.Hints),
+		})
+	}
+
 	tools := a.tools.Tools()
 	incidentID := params.IncidentContext.Incident.ID
+
+	// Track tool calls for building resolution hints.
+	var toolHistory []toolCallRecord
+	var resolveArgs string
 
 	for turn := 1; turn <= a.maxTurns; turn++ {
 		activity.RecordHeartbeat(ctx, fmt.Sprintf("turn %d/%d", turn, a.maxTurns))
@@ -222,6 +277,11 @@ func (a *AgentActivities) InvestigateIncident(ctx context.Context, params Invest
 				ToolCallID: tc.ID,
 			})
 
+			// Track for resolution hint building.
+			toolHistory = append(toolHistory, toolCallRecord{
+				Name: tc.Function.Name, Args: tc.Function.Arguments, Result: result,
+			})
+
 			// Record tool call as an event.
 			metadata, _ := json.Marshal(map[string]any{
 				"tool":      tc.Function.Name,
@@ -234,6 +294,7 @@ func (a *AgentActivities) InvestigateIncident(ctx context.Context, params Invest
 			if llm.IsTerminal(tc.Function.Name) {
 				if tc.Function.Name == "resolve_incident" {
 					outcome = "resolved"
+					resolveArgs = tc.Function.Arguments
 				} else {
 					outcome = "escalated"
 				}
@@ -241,11 +302,19 @@ func (a *AgentActivities) InvestigateIncident(ctx context.Context, params Invest
 		}
 
 		if outcome != "" {
-			return &InvestigateIncidentResult{
+			result := &InvestigateIncidentResult{
 				Outcome: outcome,
 				Turns:   turn,
 				Summary: fmt.Sprintf("Investigation completed after %d turns: %s", turn, outcome),
-			}, nil
+			}
+			if outcome == "resolved" {
+				result.ResolutionHint = buildResolutionHint(
+					params.IncidentContext.Incident.Type,
+					params.IncidentContext.Incident.Title,
+					resolveArgs, toolHistory,
+				)
+			}
+			return result, nil
 		}
 	}
 
@@ -257,6 +326,49 @@ func (a *AgentActivities) InvestigateIncident(ctx context.Context, params Invest
 		Turns:   a.maxTurns,
 		Summary: "Agent reached maximum investigation turns",
 	}, nil
+}
+
+// buildResolutionHint creates a structured summary of how an incident was resolved,
+// suitable for passing as context to similar incidents.
+func buildResolutionHint(incidentType, title, resolveArgs string, history []toolCallRecord) string {
+	var resolution string
+	if resolveArgs != "" {
+		var args struct {
+			Resolution string `json:"resolution"`
+		}
+		if json.Unmarshal([]byte(resolveArgs), &args) == nil {
+			resolution = args.Resolution
+		}
+	}
+
+	hint := fmt.Sprintf("Incident type: %s\nTitle: %s\n", incidentType, title)
+	if resolution != "" {
+		hint += fmt.Sprintf("Resolution: %s\n", resolution)
+	}
+
+	hint += "\nInvestigation steps taken:\n"
+	for i, tc := range history {
+		if i >= 10 {
+			hint += fmt.Sprintf("... and %d more steps\n", len(history)-10)
+			break
+		}
+		hint += fmt.Sprintf("  %d. %s(%s)\n", i+1, tc.Name, truncate(tc.Args, 120))
+	}
+
+	return hint
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}
+
+type toolCallRecord struct {
+	Name   string `json:"tool"`
+	Args   string `json:"arguments"`
+	Result string `json:"result"`
 }
 
 func (a *AgentActivities) recordEvent(ctx context.Context, incidentID, action, detail string) {

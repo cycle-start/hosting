@@ -1,4 +1,4 @@
-import { MapPin, Server, Users, Database, Globe, Boxes, Link2, HardDrive } from 'lucide-react'
+import { MapPin, Server, Users, Database, Globe, Boxes, Link2, HardDrive, AlertCircle, ShieldAlert, Clock } from 'lucide-react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatsCard } from '@/components/shared/stats-card'
@@ -38,6 +38,34 @@ export function DashboardPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
 
+      {/* Health Overview */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatsCard
+          label="Open Incidents"
+          value={stats.incidents_open}
+          icon={AlertCircle}
+          className={stats.incidents_open > 0 ? 'border-destructive/50' : ''}
+        />
+        <StatsCard
+          label="Critical"
+          value={stats.incidents_critical}
+          icon={AlertCircle}
+          className={stats.incidents_critical > 0 ? 'border-destructive/50' : ''}
+        />
+        <StatsCard
+          label="Escalated"
+          value={stats.incidents_escalated}
+          icon={ShieldAlert}
+          className={stats.incidents_escalated > 0 ? 'border-orange-500/50' : ''}
+        />
+        <StatsCard
+          label="MTTR (30d)"
+          value={stats.mttr_minutes != null ? `${Math.round(stats.mttr_minutes)}m` : 'N/A'}
+          icon={Clock}
+        />
+      </div>
+
+      {/* Infrastructure */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatsCard label="Regions" value={stats.regions} icon={MapPin} />
         <StatsCard label="Clusters" value={stats.clusters} icon={Server} />
@@ -49,7 +77,7 @@ export function DashboardPage() {
         <StatsCard label="FQDNs" value={stats.fqdns} icon={Link2} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Tenants by Status</CardTitle>
@@ -66,6 +94,26 @@ export function DashboardPage() {
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No tenants yet</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Incidents by Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stats.incidents_by_status?.length ? (
+              <div className="space-y-3">
+                {stats.incidents_by_status.map((s) => (
+                  <div key={s.status} className="flex items-center justify-between">
+                    <StatusBadge status={s.status} />
+                    <span className="text-sm font-medium">{s.count}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No incidents</p>
             )}
           </CardContent>
         </Card>

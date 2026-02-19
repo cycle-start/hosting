@@ -319,3 +319,29 @@ func (h *Incident) AddEvent(w http.ResponseWriter, r *http.Request) {
 
 	response.WriteJSON(w, http.StatusCreated, evt)
 }
+
+// ListIncidentGaps godoc
+//
+//	@Summary		List capability gaps linked to an incident
+//	@Description	Returns capability gaps linked to an incident.
+//	@Tags			Incidents
+//	@Security		ApiKeyAuth
+//	@Param			id	path		string	true	"Incident ID"
+//	@Success		200	{object}	response.PaginatedResponse{items=[]model.CapabilityGap}
+//	@Failure		500	{object}	response.ErrorResponse
+//	@Router			/incidents/{id}/gaps [get]
+func (h *Incident) ListIncidentGaps(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	gaps, err := h.svc.ListGapsByIncident(r.Context(), id)
+	if err != nil {
+		response.WriteServiceError(w, err)
+		return
+	}
+	if gaps == nil {
+		gaps = []model.CapabilityGap{}
+	}
+	response.WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"items":    gaps,
+		"has_more": false,
+	})
+}

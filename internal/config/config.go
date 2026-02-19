@@ -52,9 +52,10 @@ type Config struct {
 	InternalNetworkCIDR string // INTERNAL_NETWORK_CIDR — default 10.0.0.0/8, used for database ingress default
 
 	// LLM Agent
-	AgentEnabled      bool   // AGENT_ENABLED — enable the LLM incident agent (default: false)
-	AgentMaxConcurrent int   // AGENT_MAX_CONCURRENT — max parallel investigations (default: 3)
-	AgentAPIKey       string // AGENT_API_KEY — API key for the agent to call the core API
+	AgentEnabled            bool   // AGENT_ENABLED — enable the LLM incident agent (default: false)
+	AgentMaxConcurrent      int    // AGENT_MAX_CONCURRENT — max parallel group leaders (default: 3)
+	AgentFollowerConcurrent int    // AGENT_FOLLOWER_CONCURRENT — max parallel followers per group after leader resolves (default: 5)
+	AgentAPIKey             string // AGENT_API_KEY — API key for the agent to call the core API
 	LLMBaseURL        string // LLM_BASE_URL — OpenAI-compatible API base URL
 	LLMAPIKey         string // LLM_API_KEY — API key for the LLM endpoint
 	LLMModel          string // LLM_MODEL — model name (default: Qwen/Qwen2.5-72B-Instruct)
@@ -96,9 +97,10 @@ func Load() (*Config, error) {
 
 		InternalNetworkCIDR: getEnv("INTERNAL_NETWORK_CIDR", "10.0.0.0/8"),
 
-		AgentEnabled:       getEnvBool("AGENT_ENABLED", false),
-		AgentMaxConcurrent: getEnvInt("AGENT_MAX_CONCURRENT", 3),
-		AgentAPIKey:        getEnv("AGENT_API_KEY", ""),
+		AgentEnabled:            getEnvBool("AGENT_ENABLED", false),
+		AgentMaxConcurrent:      getEnvInt("AGENT_MAX_CONCURRENT", 3),
+		AgentFollowerConcurrent: getEnvInt("AGENT_FOLLOWER_CONCURRENT", 5),
+		AgentAPIKey:             getEnv("AGENT_API_KEY", ""),
 		LLMBaseURL:         getEnv("LLM_BASE_URL", ""),
 		LLMAPIKey:          getEnv("LLM_API_KEY", ""),
 		LLMModel:           getEnv("LLM_MODEL", "Qwen/Qwen2.5-72B-Instruct"),

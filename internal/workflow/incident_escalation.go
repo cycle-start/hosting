@@ -7,6 +7,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/edvin/hosting/internal/activity"
+	"github.com/edvin/hosting/internal/model"
 )
 
 // EscalateStaleIncidentsWorkflow runs on a cron schedule and auto-escalates incidents
@@ -38,7 +39,16 @@ func EscalateStaleIncidentsWorkflow(ctx workflow.Context) error {
 		if err != nil {
 			workflow.GetLogger(ctx).Warn("failed to escalate stale incident",
 				"id", inc.ID, "error", err)
+			continue
 		}
+
+		// Fire webhook for escalated incidents.
+		sendIncidentWebhook(ctx, model.Incident{
+			ID:       inc.ID,
+			Severity: inc.Severity,
+			Status:   model.IncidentEscalated,
+			Title:    inc.Title,
+		}, "escalated")
 	}
 
 	return nil

@@ -101,6 +101,9 @@ func main() {
 	callbackActivities := activity.NewCallback()
 	w.RegisterActivity(callbackActivities)
 
+	webhookActivities := activity.NewWebhook()
+	w.RegisterActivity(webhookActivities)
+
 	// Register agent activities (conditionally).
 	if cfg.AgentEnabled {
 		llmClient := llm.NewClient(cfg.LLMBaseURL, cfg.LLMAPIKey, cfg.LLMModel)
@@ -182,6 +185,11 @@ func main() {
 	w.RegisterWorkflow(workflow.ProcessIncidentQueueWorkflow)
 	w.RegisterWorkflow(workflow.InvestigateIncidentWorkflow)
 	w.RegisterWorkflow(workflow.EscalateStaleIncidentsWorkflow)
+	w.RegisterWorkflow(workflow.CheckConvergenceHealthWorkflow)
+	w.RegisterWorkflow(workflow.CheckNodeHealthWorkflow)
+	w.RegisterWorkflow(workflow.CheckDiskPressureWorkflow)
+	w.RegisterWorkflow(workflow.CheckCertExpiryWorkflow)
+	w.RegisterWorkflow(workflow.CheckCephFSHealthWorkflow)
 
 	if cfg.MetricsAddr != "" {
 		metricsSrv := metrics.NewServer(cfg.MetricsAddr)
@@ -253,6 +261,31 @@ func registerCronSchedules(ctx context.Context, tc temporalclient.Client, taskQu
 			cron:     "*/5 * * * *",
 			workflow: workflow.EscalateStaleIncidentsWorkflow,
 		},
+		{
+			id:       "convergence-health-cron",
+			cron:     "*/5 * * * *",
+			workflow: workflow.CheckConvergenceHealthWorkflow,
+		},
+		{
+			id:       "node-health-cron",
+			cron:     "*/2 * * * *",
+			workflow: workflow.CheckNodeHealthWorkflow,
+		},
+		{
+			id:       "disk-pressure-cron",
+			cron:     "*/5 * * * *",
+			workflow: workflow.CheckDiskPressureWorkflow,
+		},
+		{
+			id:       "cert-expiry-health-cron",
+			cron:     "0 1 * * *",
+			workflow: workflow.CheckCertExpiryWorkflow,
+		},
+		{
+			id:       "cephfs-health-cron",
+			cron:     "*/10 * * * *",
+			workflow: workflow.CheckCephFSHealthWorkflow,
+		},
 	}
 
 	if cfg.AgentEnabled {
@@ -260,7 +293,10 @@ func registerCronSchedules(ctx context.Context, tc temporalclient.Client, taskQu
 			id:       "incident-queue-cron",
 			cron:     "* * * * *",
 			workflow: workflow.ProcessIncidentQueueWorkflow,
-			args:     []interface{}{cfg.AgentMaxConcurrent},
+			args: []interface{}{workflow.ProcessIncidentQueueParams{
+				MaxConcurrent:      cfg.AgentMaxConcurrent,
+				FollowerConcurrent: cfg.AgentFollowerConcurrent,
+			}},
 		})
 	}
 

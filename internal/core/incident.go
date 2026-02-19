@@ -378,6 +378,33 @@ func (s *IncidentService) ListEvents(ctx context.Context, incidentID string, lim
 	return events, hasMore, nil
 }
 
+// ListGapsByIncident returns capability gaps linked to an incident.
+func (s *IncidentService) ListGapsByIncident(ctx context.Context, incidentID string) ([]model.CapabilityGap, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT g.id, g.tool_name, g.description, g.category, g.occurrences, g.status,
+		        g.implemented_at, g.created_at, g.updated_at
+		 FROM capability_gaps g
+		 JOIN incident_capability_gaps icg ON g.id = icg.gap_id
+		 WHERE icg.incident_id = $1
+		 ORDER BY g.occurrences DESC`, incidentID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list gaps by incident: %w", err)
+	}
+	defer rows.Close()
+
+	var gaps []model.CapabilityGap
+	for rows.Next() {
+		var g model.CapabilityGap
+		if err := rows.Scan(&g.ID, &g.ToolName, &g.Description, &g.Category, &g.Occurrences,
+			&g.Status, &g.ImplementedAt, &g.CreatedAt, &g.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan capability gap: %w", err)
+		}
+		gaps = append(gaps, g)
+	}
+	return gaps, rows.Err()
+}
+
 // IncidentFilters holds optional filters for listing incidents.
 type IncidentFilters struct {
 	Status       string

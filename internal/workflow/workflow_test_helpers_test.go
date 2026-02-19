@@ -25,6 +25,8 @@ func registerActivities(env *testsuite.TestWorkflowEnvironment) {
 	env.RegisterActivity(&activity.Migrate{})
 	env.RegisterActivity(&activity.Stalwart{})
 	env.RegisterActivity(&activity.Callback{})
+	env.RegisterActivity(&activity.Webhook{})
+	env.RegisterActivity(&activity.AgentActivities{})
 }
 
 // matchFailedStatus returns a mock.MatchedBy matcher for UpdateResourceStatusParams

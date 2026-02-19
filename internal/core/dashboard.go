@@ -21,6 +21,13 @@ type DashboardStats struct {
 	TenantsPerShard  []ShardTenantCount `json:"tenants_per_shard"`
 	NodesPerCluster  []ClusterNodeCount `json:"nodes_per_cluster"`
 	TenantsByStatus  []StatusCount      `json:"tenants_by_status"`
+
+	IncidentsOpen      int           `json:"incidents_open"`
+	IncidentsCritical  int           `json:"incidents_critical"`
+	IncidentsEscalated int           `json:"incidents_escalated"`
+	IncidentsByStatus  []StatusCount `json:"incidents_by_status"`
+	CapabilityGapsOpen int           `json:"capability_gaps_open"`
+	MTTRMinutes        *float64      `json:"mttr_minutes"`
 }
 
 // ShardTenantCount holds tenant count per shard.
@@ -80,6 +87,14 @@ func (s *DashboardService) Stats(ctx context.Context) (*DashboardStats, error) {
 			SELECT count(*) AS c FROM valkey_instances
 		), fqdn_count AS (
 			SELECT count(*) AS c FROM fqdns
+		), incident_open AS (
+			SELECT count(*) AS c FROM incidents WHERE status NOT IN ('resolved', 'cancelled')
+		), incident_critical AS (
+			SELECT count(*) AS c FROM incidents WHERE severity = 'critical' AND status NOT IN ('resolved', 'cancelled')
+		), incident_escalated AS (
+			SELECT count(*) AS c FROM incidents WHERE status = 'escalated'
+		), capability_gap_open AS (
+			SELECT count(*) AS c FROM capability_gaps WHERE status = 'open'
 		)
 		SELECT
 			(SELECT c FROM region_count),
@@ -92,7 +107,11 @@ func (s *DashboardService) Stats(ctx context.Context) (*DashboardStats, error) {
 			(SELECT c FROM database_count),
 			(SELECT c FROM zone_count),
 			(SELECT c FROM valkey_count),
-			(SELECT c FROM fqdn_count)`
+			(SELECT c FROM fqdn_count),
+			(SELECT c FROM incident_open),
+			(SELECT c FROM incident_critical),
+			(SELECT c FROM incident_escalated),
+			(SELECT c FROM capability_gap_open)`
 
 	stats := &DashboardStats{}
 	err := s.db.QueryRow(ctx, countsQuery).Scan(
@@ -107,6 +126,10 @@ func (s *DashboardService) Stats(ctx context.Context) (*DashboardStats, error) {
 		&stats.Zones,
 		&stats.ValkeyInstances,
 		&stats.FQDNs,
+		&stats.IncidentsOpen,
+		&stats.IncidentsCritical,
+		&stats.IncidentsEscalated,
+		&stats.CapabilityGapsOpen,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("dashboard counts: %w", err)
@@ -173,6 +196,35 @@ func (s *DashboardService) Stats(ctx context.Context) (*DashboardStats, error) {
 	}
 	if err := tbsRows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate status counts: %w", err)
+	}
+
+	// Incidents by status
+	ibsRows, err := s.db.Query(ctx,
+		`SELECT status, count(*) FROM incidents GROUP BY status ORDER BY count(*) DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("dashboard incidents by status: %w", err)
+	}
+	defer ibsRows.Close()
+
+	for ibsRows.Next() {
+		var sc StatusCount
+		if err := ibsRows.Scan(&sc.Status, &sc.Count); err != nil {
+			return nil, fmt.Errorf("scan incident status count: %w", err)
+		}
+		stats.IncidentsByStatus = append(stats.IncidentsByStatus, sc)
+	}
+	if err := ibsRows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate incident status counts: %w", err)
+	}
+
+	// MTTR — average time to resolve for incidents resolved in last 30 days
+	var mttr *float64
+	err = s.db.QueryRow(ctx,
+		`SELECT EXTRACT(EPOCH FROM avg(resolved_at - detected_at)) / 60
+		 FROM incidents
+		 WHERE status = 'resolved' AND resolved_at > now() - interval '30 days'`).Scan(&mttr)
+	if err == nil {
+		stats.MTTRMinutes = mttr
 	}
 
 	return stats, nil

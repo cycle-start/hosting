@@ -20,6 +20,7 @@ data:
   INTERNAL_NETWORK_CIDR: {{ .Values.config.internalNetworkCidr | quote }}
   AGENT_ENABLED: {{ .Values.config.agentEnabled | quote }}
   AGENT_MAX_CONCURRENT: {{ .Values.config.agentMaxConcurrent | quote }}
+  AGENT_FOLLOWER_CONCURRENT: {{ .Values.config.agentFollowerConcurrent | quote }}
   LLM_BASE_URL: {{ .Values.config.llmBaseUrl | quote }}
   LLM_MODEL: {{ .Values.config.llmModel | quote }}
   LLM_MAX_TURNS: {{ .Values.config.llmMaxTurns | quote }}

@@ -1035,14 +1035,14 @@ export function useAuditLogs(params?: AuditListParams) {
 export function usePlatformConfig() {
   return useQuery({
     queryKey: ['platform-config'],
-    queryFn: () => api.get<PlatformConfig[]>('/platform/config'),
+    queryFn: () => api.get<PlatformConfig>('/platform/config'),
   })
 }
 
 export function useUpdatePlatformConfig() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: PlatformConfig[]) => api.put('/platform/config', data),
+    mutationFn: (data: PlatformConfig) => api.put('/platform/config', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['platform-config'] }),
   })
 }
@@ -1225,6 +1225,23 @@ export function useCancelIncident() {
       qc.invalidateQueries({ queryKey: ['incident'] })
       qc.invalidateQueries({ queryKey: ['incident-events'] })
     },
+  })
+}
+
+// Incident-Gap linking
+export function useIncidentGaps(incidentId: string) {
+  return useQuery({
+    queryKey: ['incident-gaps', incidentId],
+    queryFn: () => api.get<PaginatedResponse<CapabilityGap>>(`/incidents/${incidentId}/gaps`),
+    enabled: !!incidentId,
+  })
+}
+
+export function useGapIncidents(gapId: string) {
+  return useQuery({
+    queryKey: ['gap-incidents', gapId],
+    queryFn: () => api.get<PaginatedResponse<Incident>>(`/capability-gaps/${gapId}/incidents`),
+    enabled: !!gapId,
   })
 }
 

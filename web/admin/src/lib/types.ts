@@ -396,12 +396,16 @@ export interface DashboardStats {
   tenants_per_shard: { shard_id: string; shard_name: string; role: string; count: number }[]
   nodes_per_cluster: { cluster_id: string; cluster_name: string; count: number }[]
   tenants_by_status: { status: string; count: number }[]
+  incidents_open: number
+  incidents_critical: number
+  incidents_escalated: number
+  incidents_by_status: { status: string; count: number }[]
+  capability_gaps_open: number
+  mttr_minutes: number | null
 }
 
-export interface PlatformConfig {
-  key: string
-  value: string
-}
+// Platform config is a flat key-value map returned by the API.
+export type PlatformConfig = Record<string, string>
 
 export interface TenantResourceSummary {
   webroots: Record<string, number>

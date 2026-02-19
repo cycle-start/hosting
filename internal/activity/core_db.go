@@ -2058,3 +2058,60 @@ func (a *CoreDB) ListZoneRecordsByZoneID(ctx context.Context, zoneID string) ([]
 	}
 	return records, rows.Err()
 }
+
+// ListActiveNodes returns all nodes with status "active".
+func (a *CoreDB) ListActiveNodes(ctx context.Context) ([]model.Node, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, cluster_id, hostname, ip_address::text, ip6_address::text, roles, status, last_health_at, created_at, updated_at
+		 FROM nodes WHERE status = $1 ORDER BY hostname`, model.StatusActive,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list active nodes: %w", err)
+	}
+	defer rows.Close()
+
+	var nodes []model.Node
+	for rows.Next() {
+		var n model.Node
+		if err := rows.Scan(&n.ID, &n.ClusterID, &n.Hostname, &n.IPAddress, &n.IP6Address, &n.Roles, &n.Status, &n.LastHealthAt, &n.CreatedAt, &n.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan active node: %w", err)
+		}
+		nodes = append(nodes, n)
+	}
+	return nodes, rows.Err()
+}
+
+// ExpiringCert holds minimal cert info for the health cron.
+type ExpiringCert struct {
+	ID        string    `json:"id"`
+	FQDNID    string    `json:"fqdn_id"`
+	Type      string    `json:"type"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// GetExpiringCerts returns all active certificates expiring within the given number of days.
+func (a *CoreDB) GetExpiringCerts(ctx context.Context, days int) ([]ExpiringCert, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, fqdn_id, type, expires_at
+		 FROM certificates
+		 WHERE status = $1 AND is_active = true
+		   AND expires_at <= now() + make_interval(days => $2)
+		   AND expires_at > now()
+		 ORDER BY expires_at ASC`,
+		"active", days,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get expiring certs: %w", err)
+	}
+	defer rows.Close()
+
+	var certs []ExpiringCert
+	for rows.Next() {
+		var c ExpiringCert
+		if err := rows.Scan(&c.ID, &c.FQDNID, &c.Type, &c.ExpiresAt); err != nil {
+			return nil, fmt.Errorf("scan expiring cert: %w", err)
+		}
+		certs = append(certs, c)
+	}
+	return certs, rows.Err()
+}

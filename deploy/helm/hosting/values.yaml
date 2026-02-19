@@ -61,6 +61,7 @@ config:
   # LLM incident agent
   agentEnabled: "false"
   agentMaxConcurrent: "3"
+  agentFollowerConcurrent: "5"
   llmBaseUrl: ""
   llmModel: "Qwen/Qwen2.5-72B-Instruct"
   llmMaxTurns: "10"

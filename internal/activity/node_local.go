@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 
 	"github.com/rs/zerolog"
 	"go.temporal.io/sdk/temporal"
@@ -1056,5 +1057,92 @@ func syncBashrcEnvBlock(tenantName string, webroots []webrootEnvInfo) error {
 	}
 
 	return nil
+}
+
+// --------------------------------------------------------------------------
+// Disk usage activities
+// --------------------------------------------------------------------------
+
+// DiskUsage reports disk usage for a single mount point.
+type DiskUsage struct {
+	Path       string  `json:"path"`
+	TotalBytes uint64  `json:"total_bytes"`
+	UsedBytes  uint64  `json:"used_bytes"`
+	FreeBytes  uint64  `json:"free_bytes"`
+	UsedPct    float64 `json:"used_pct"`
+}
+
+// CephFSStatus reports the CephFS mount status on this node.
+type CephFSStatus struct {
+	Path    string `json:"path"`
+	Mounted bool   `json:"mounted"`
+	Error   string `json:"error,omitempty"`
+}
+
+// CheckCephFSMount checks if CephFS is properly mounted at the web storage path.
+func (a *NodeLocal) CheckCephFSMount(ctx context.Context) (*CephFSStatus, error) {
+	path := "/var/www/storage"
+	status := &CephFSStatus{Path: path}
+
+	if os.Getenv("SKIP_CEPHFS_CHECK") == "1" {
+		status.Mounted = true
+		return status, nil
+	}
+
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(path, &stat); err != nil {
+		status.Error = fmt.Sprintf("statfs failed: %v", err)
+		return status, nil
+	}
+
+	const cephFSMagic = 0x00C36400
+	if stat.Type != cephFSMagic {
+		status.Error = fmt.Sprintf("unexpected filesystem type 0x%X (expected CephFS 0x%X)", stat.Type, cephFSMagic)
+		return status, nil
+	}
+
+	status.Mounted = true
+	return status, nil
+}
+
+// GetDiskUsage returns disk usage for key mount points on the node.
+func (a *NodeLocal) GetDiskUsage(ctx context.Context) ([]DiskUsage, error) {
+	paths := []string{"/", "/var/lib/mysql", "/var/www/storage"}
+
+	var results []DiskUsage
+	seen := make(map[uint64]bool) // dedup by filesystem device ID
+
+	for _, path := range paths {
+		var stat syscall.Statfs_t
+		if err := syscall.Statfs(path, &stat); err != nil {
+			// Path doesn't exist on this node type — skip.
+			continue
+		}
+
+		// Deduplicate by device — multiple paths may be on the same filesystem.
+		devID := uint64(stat.Fsid.X__val[0])<<32 | uint64(stat.Fsid.X__val[1])
+		if seen[devID] {
+			continue
+		}
+		seen[devID] = true
+
+		total := stat.Blocks * uint64(stat.Bsize)
+		free := stat.Bavail * uint64(stat.Bsize) // available to unprivileged users
+		used := total - free
+		var usedPct float64
+		if total > 0 {
+			usedPct = float64(used) / float64(total) * 100
+		}
+
+		results = append(results, DiskUsage{
+			Path:       path,
+			TotalBytes: total,
+			UsedBytes:  used,
+			FreeBytes:  free,
+			UsedPct:    usedPct,
+		})
+	}
+
+	return results, nil
 }
 

@@ -187,3 +187,65 @@ func (a *CoreDB) FindStaleIncidents(ctx context.Context) ([]StaleIncident, error
 	}
 	return stale, nil
 }
+
+// FindStaleConvergingShardsParams holds the threshold for stale convergence detection.
+type FindStaleConvergingShardsParams struct {
+	MaxAge time.Duration `json:"max_age"`
+}
+
+// StaleConvergingShard represents a shard stuck in converging status.
+type StaleConvergingShard struct {
+	ID        string `json:"id"`
+	ClusterID string `json:"cluster_id"`
+	Name      string `json:"name"`
+	Role      string `json:"role"`
+}
+
+// FindStaleConvergingShards returns shards that have been in "converging" status
+// longer than the given threshold.
+func (a *CoreDB) FindStaleConvergingShards(ctx context.Context, params FindStaleConvergingShardsParams) ([]StaleConvergingShard, error) {
+	cutoff := time.Now().Add(-params.MaxAge)
+	rows, err := a.db.Query(ctx,
+		`SELECT id, cluster_id, name, role FROM shards
+		 WHERE status = 'converging' AND updated_at < $1`, cutoff,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("find stale converging shards: %w", err)
+	}
+	defer rows.Close()
+
+	var shards []StaleConvergingShard
+	for rows.Next() {
+		var s StaleConvergingShard
+		if err := rows.Scan(&s.ID, &s.ClusterID, &s.Name, &s.Role); err != nil {
+			return nil, fmt.Errorf("scan stale converging shard: %w", err)
+		}
+		shards = append(shards, s)
+	}
+	return shards, rows.Err()
+}
+
+// FindUnhealthyNodes returns active nodes that haven't reported health within the given threshold.
+func (a *CoreDB) FindUnhealthyNodes(ctx context.Context, maxAge time.Duration) ([]model.Node, error) {
+	cutoff := time.Now().Add(-maxAge)
+	rows, err := a.db.Query(ctx,
+		`SELECT id, cluster_id, hostname, ip_address::text, ip6_address::text, roles, status, last_health_at, created_at, updated_at
+		 FROM nodes
+		 WHERE status = $1 AND (last_health_at IS NULL OR last_health_at < $2)`,
+		model.StatusActive, cutoff,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("find unhealthy nodes: %w", err)
+	}
+	defer rows.Close()
+
+	var nodes []model.Node
+	for rows.Next() {
+		var n model.Node
+		if err := rows.Scan(&n.ID, &n.ClusterID, &n.Hostname, &n.IPAddress, &n.IP6Address, &n.Roles, &n.Status, &n.LastHealthAt, &n.CreatedAt, &n.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan unhealthy node: %w", err)
+		}
+		nodes = append(nodes, n)
+	}
+	return nodes, rows.Err()
+}

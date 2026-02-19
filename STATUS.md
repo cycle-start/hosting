@@ -274,16 +274,27 @@ Names are `{prefix}{10-char-random}`, globally unique, auto-generated on creatio
 ### Incident Management & LLM Agent
 
 - **Incident tracking:** Create, update, resolve, escalate, cancel incidents with full event timeline
-- **Auto-detection:** Replication health cron creates incidents for broken/lagging replication
+- **Auto-detection:** 7 health crons create incidents automatically:
+  - Replication health (every minute): replication broken, replication lag
+  - Convergence health (every 5 min): shards stuck in converging state
+  - Node health (every 2 min): nodes not reporting health
+  - Disk pressure (every 5 min): disk usage >90% (warning) or >95% (critical)
+  - Cert expiry (daily): certificates expiring within 14 days
+  - CephFS health (every 10 min): CephFS unmounted on web nodes
+  - Incident escalation (every 5 min): stale incidents not being addressed
 - **Auto-resolution:** When health checks pass, matching incidents are auto-resolved
-- **Capability gaps:** Track missing tools/capabilities reported by agents, sorted by occurrence
+- **Capability gaps:** Track missing tools/capabilities reported by agents, sorted by occurrence; linked to incidents
+- **Webhook notifications:** Configurable webhooks for critical incidents and escalations (generic JSON or Slack Block Kit)
+- **Dashboard integration:** Incident stats (open, critical, escalated, MTTR) on admin dashboard
 - **LLM Investigation Agent:** Autonomous incident responder powered by self-hosted LLM (vLLM + Qwen 72B)
-  - Temporal-orchestrated cron polls for unassigned incidents every minute
+  - **Smart scheduling (leader-follower):** Incidents grouped by type; leader investigated first, resolution hints passed to followers to avoid redundant investigation
+  - **Per-type concurrency:** Configurable via `platform_config` (`agent.concurrency.<type>`) — e.g., disk_pressure can fan out widely while replication_lag stays conservative
   - Multi-turn conversation loop with 11 tools (read infrastructure, trigger convergence, resolve/escalate)
   - Tool calls execute via HTTP to core API (same auth as external users)
   - Every step recorded as `incident_event` for full observability
   - Configurable system prompt via `platform_config`
-  - Feature-flagged (`AGENT_ENABLED`), concurrency-capped (`AGENT_MAX_CONCURRENT`)
+  - Feature-flagged (`AGENT_ENABLED`), concurrency-capped (`AGENT_MAX_CONCURRENT`, `AGENT_FOLLOWER_CONCURRENT`)
+  - See `docs/agent-control-plane.md` for full architecture documentation
 
 ### Extended E2E Tests
 

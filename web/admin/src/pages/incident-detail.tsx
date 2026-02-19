@@ -4,6 +4,7 @@ import { AlertCircle, CheckCircle, ArrowUpCircle, XCircle } from 'lucide-react'
 import {
   useIncident,
   useIncidentEvents,
+  useIncidentGaps,
   useResolveIncident,
   useEscalateIncident,
   useCancelIncident,
@@ -31,6 +32,7 @@ export function IncidentDetailPage() {
   const { id } = useParams({ strict: false }) as { id: string }
   const { data: incident, isLoading } = useIncident(id)
   const { data: eventsData, isLoading: eventsLoading } = useIncidentEvents(id)
+  const { data: gapsData, isLoading: gapsLoading } = useIncidentGaps(id)
   const resolveMutation = useResolveIncident()
   const escalateMutation = useEscalateIncident()
   const cancelMutation = useCancelIncident()
@@ -42,6 +44,7 @@ export function IncidentDetailPage() {
   const [actionText, setActionText] = useState('')
 
   const events = eventsData?.items ?? []
+  const gaps = gapsData?.items ?? []
 
   if (isLoading || !incident) {
     return (
@@ -99,6 +102,7 @@ export function IncidentDetailPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="timeline">Timeline ({events.length})</TabsTrigger>
+          <TabsTrigger value="gaps">Capability Gaps ({gaps.length})</TabsTrigger>
           <TabsTrigger value="details">Details</TabsTrigger>
         </TabsList>
 
@@ -137,6 +141,40 @@ export function IncidentDetailPage() {
                       <span className="text-xs text-muted-foreground whitespace-nowrap">
                         {formatRelative(evt.created_at)}
                       </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="gaps" className="space-y-4">
+          {gapsLoading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : gaps.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                No capability gaps linked to this incident.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {gaps.map((gap) => (
+                <Card key={gap.id}>
+                  <CardContent className="py-3 px-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-mono text-sm font-medium">{gap.tool_name}</span>
+                          <StatusBadge status={gap.status} />
+                        </div>
+                        <p className="text-sm text-muted-foreground">{gap.description}</p>
+                        <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                          <span>Category: {gap.category}</span>
+                          <span>Occurrences: {gap.occurrences}</span>
+                        </div>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

@@ -21,7 +21,7 @@ func TestDashboardService_Stats_Success(t *testing.T) {
 	svc := NewDashboardService(db)
 	ctx := context.Background()
 
-	// Mock the counts query
+	// Mock the counts query (15 fields)
 	countRow := &mockRow{
 		scanFunc: func(dest ...any) error {
 			*(dest[0].(*int)) = 3   // regions
@@ -35,10 +35,14 @@ func TestDashboardService_Stats_Success(t *testing.T) {
 			*(dest[8].(*int)) = 20  // zones
 			*(dest[9].(*int)) = 10  // valkey_instances
 			*(dest[10].(*int)) = 30 // fqdns
+			*(dest[11].(*int)) = 5  // incidents_open
+			*(dest[12].(*int)) = 2  // incidents_critical
+			*(dest[13].(*int)) = 1  // incidents_escalated
+			*(dest[14].(*int)) = 3  // capability_gaps_open
 			return nil
 		},
 	}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(countRow)
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(countRow).Once()
 
 	// Mock tenants per shard query
 	tpsRows := newMockRows(
@@ -67,10 +71,29 @@ func TestDashboardService_Stats_Success(t *testing.T) {
 			return nil
 		},
 	)
+	// Mock incidents by status query
+	ibsRows := newMockRows(
+		func(dest ...any) error {
+			*(dest[0].(*string)) = "open"
+			*(dest[1].(*int)) = 5
+			return nil
+		},
+	)
 
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tpsRows, nil).Once()
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(npcRows, nil).Once()
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tbsRows, nil).Once()
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(ibsRows, nil).Once()
+
+	// Mock MTTR query
+	mttrVal := 45.5
+	mttrRow := &mockRow{
+		scanFunc: func(dest ...any) error {
+			*(dest[0].(**float64)) = &mttrVal
+			return nil
+		},
+	}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(mttrRow).Once()
 
 	stats, err := svc.Stats(ctx)
 	require.NoError(t, err)
@@ -85,6 +108,10 @@ func TestDashboardService_Stats_Success(t *testing.T) {
 	assert.Equal(t, 20, stats.Zones)
 	assert.Equal(t, 10, stats.ValkeyInstances)
 	assert.Equal(t, 30, stats.FQDNs)
+	assert.Equal(t, 5, stats.IncidentsOpen)
+	assert.Equal(t, 2, stats.IncidentsCritical)
+	assert.Equal(t, 1, stats.IncidentsEscalated)
+	assert.Equal(t, 3, stats.CapabilityGapsOpen)
 
 	require.Len(t, stats.TenantsPerShard, 1)
 	assert.Equal(t, "shard-1", stats.TenantsPerShard[0].ShardID)
@@ -100,6 +127,13 @@ func TestDashboardService_Stats_Success(t *testing.T) {
 	require.Len(t, stats.TenantsByStatus, 1)
 	assert.Equal(t, "active", stats.TenantsByStatus[0].Status)
 	assert.Equal(t, 90, stats.TenantsByStatus[0].Count)
+
+	require.Len(t, stats.IncidentsByStatus, 1)
+	assert.Equal(t, "open", stats.IncidentsByStatus[0].Status)
+	assert.Equal(t, 5, stats.IncidentsByStatus[0].Count)
+
+	require.NotNil(t, stats.MTTRMinutes)
+	assert.InDelta(t, 45.5, *stats.MTTRMinutes, 0.01)
 
 	db.AssertExpectations(t)
 }
@@ -130,7 +164,7 @@ func TestDashboardService_Stats_TenantsPerShardQueryError(t *testing.T) {
 
 	countRow := &mockRow{
 		scanFunc: func(dest ...any) error {
-			for i := 0; i < 11; i++ {
+			for i := 0; i < 15; i++ {
 				*(dest[i].(*int)) = 0
 			}
 			return nil

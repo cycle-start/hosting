@@ -153,6 +153,63 @@ func (s *CapabilityGapService) List(ctx context.Context, status, category string
 	return gaps, hasMore, nil
 }
 
+// ListIncidentsByGap returns incidents linked to a capability gap.
+func (s *CapabilityGapService) ListIncidentsByGap(ctx context.Context, gapID string) ([]model.Incident, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT i.id, i.dedupe_key, i.type, i.severity, i.status, i.title, i.detail,
+		        i.resource_type, i.resource_id, i.source, i.assigned_to, i.resolution,
+		        i.detected_at, i.resolved_at, i.escalated_at, i.created_at, i.updated_at
+		 FROM incidents i
+		 JOIN incident_capability_gaps icg ON i.id = icg.incident_id
+		 WHERE icg.gap_id = $1
+		 ORDER BY i.created_at DESC`, gapID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list incidents by gap: %w", err)
+	}
+	defer rows.Close()
+
+	var incidents []model.Incident
+	for rows.Next() {
+		var inc model.Incident
+		if err := rows.Scan(&inc.ID, &inc.DedupeKey, &inc.Type, &inc.Severity,
+			&inc.Status, &inc.Title, &inc.Detail, &inc.ResourceType,
+			&inc.ResourceID, &inc.Source, &inc.AssignedTo, &inc.Resolution,
+			&inc.DetectedAt, &inc.ResolvedAt, &inc.EscalatedAt,
+			&inc.CreatedAt, &inc.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan incident: %w", err)
+		}
+		incidents = append(incidents, inc)
+	}
+	return incidents, rows.Err()
+}
+
+// CountIncidentsByGap returns the number of linked incidents for each gap ID.
+func (s *CapabilityGapService) CountIncidentsByGap(ctx context.Context, gapIDs []string) (map[string]int, error) {
+	if len(gapIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := s.db.Query(ctx,
+		`SELECT gap_id, count(*) FROM incident_capability_gaps
+		 WHERE gap_id = ANY($1) GROUP BY gap_id`, gapIDs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("count incidents by gap: %w", err)
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int)
+	for rows.Next() {
+		var gapID string
+		var count int
+		if err := rows.Scan(&gapID, &count); err != nil {
+			return nil, fmt.Errorf("scan gap incident count: %w", err)
+		}
+		counts[gapID] = count
+	}
+	return counts, rows.Err()
+}
+
 // Update updates mutable fields on a capability gap.
 func (s *CapabilityGapService) Update(ctx context.Context, id string, status *string) error {
 	if status == nil {

@@ -661,6 +661,7 @@ func (s *Server) setupRoutes() {
 			r.Get("/incidents", incident.List)
 			r.Get("/incidents/{id}", incident.Get)
 			r.Get("/incidents/{id}/events", incident.ListEvents)
+			r.Get("/incidents/{id}/gaps", incident.ListIncidentGaps)
 		})
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireScope("incidents", "write"))
@@ -676,6 +677,7 @@ func (s *Server) setupRoutes() {
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireScope("incidents", "read"))
 			r.Get("/capability-gaps", capabilityGap.List)
+			r.Get("/capability-gaps/{id}/incidents", capabilityGap.ListGapIncidents)
 		})
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireScope("incidents", "write"))

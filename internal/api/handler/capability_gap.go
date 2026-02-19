@@ -7,6 +7,7 @@ import (
 	"github.com/edvin/hosting/internal/api/request"
 	"github.com/edvin/hosting/internal/api/response"
 	"github.com/edvin/hosting/internal/core"
+	"github.com/edvin/hosting/internal/model"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -107,4 +108,30 @@ func (h *CapabilityGap) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ListGapIncidents godoc
+//
+//	@Summary		List incidents linked to a capability gap
+//	@Description	Returns incidents linked to a capability gap.
+//	@Tags			Capability Gaps
+//	@Security		ApiKeyAuth
+//	@Param			id	path		string	true	"Gap ID"
+//	@Success		200	{object}	response.PaginatedResponse{items=[]model.Incident}
+//	@Failure		500	{object}	response.ErrorResponse
+//	@Router			/capability-gaps/{id}/incidents [get]
+func (h *CapabilityGap) ListGapIncidents(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	incidents, err := h.svc.ListIncidentsByGap(r.Context(), id)
+	if err != nil {
+		response.WriteServiceError(w, err)
+		return
+	}
+	if incidents == nil {
+		incidents = []model.Incident{}
+	}
+	response.WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"items":    incidents,
+		"has_more": false,
+	})
 }
