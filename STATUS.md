@@ -271,6 +271,20 @@ Names are `{prefix}{10-char-random}`, globally unique, auto-generated on creatio
 - Enhanced dashboards: Log Explorer, API Overview, Infrastructure
 - New dashboards: Tenant activity, Workflow stats, Database, DNS
 
+### Incident Management & LLM Agent
+
+- **Incident tracking:** Create, update, resolve, escalate, cancel incidents with full event timeline
+- **Auto-detection:** Replication health cron creates incidents for broken/lagging replication
+- **Auto-resolution:** When health checks pass, matching incidents are auto-resolved
+- **Capability gaps:** Track missing tools/capabilities reported by agents, sorted by occurrence
+- **LLM Investigation Agent:** Autonomous incident responder powered by self-hosted LLM (vLLM + Qwen 72B)
+  - Temporal-orchestrated cron polls for unassigned incidents every minute
+  - Multi-turn conversation loop with 11 tools (read infrastructure, trigger convergence, resolve/escalate)
+  - Tool calls execute via HTTP to core API (same auth as external users)
+  - Every step recorded as `incident_event` for full observability
+  - Configurable system prompt via `platform_config`
+  - Feature-flagged (`AGENT_ENABLED`), concurrency-capped (`AGENT_MAX_CONCURRENT`)
+
 ### Extended E2E Tests
 
 - 14 test files covering 50+ scenarios: Valkey, Email, SSH Key, Certificate, Brand isolation, API Key scopes

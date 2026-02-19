@@ -53,6 +53,8 @@ func (s *CheckReplicationHealthWorkflowTestSuite) TestHealthy() {
 		SQLRunning: true,
 	}, nil)
 
+	// Healthy shard that was already active — no auto-resolve or status change expected.
+
 	s.env.ExecuteWorkflow(CheckReplicationHealthWorkflow)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
@@ -89,6 +91,11 @@ func (s *CheckReplicationHealthWorkflowTestSuite) TestBrokenReplication() {
 			params.StatusMessage != nil
 	})).Return(nil)
 
+	// Should create an incident.
+	s.env.OnActivity("CreateIncident", mock.Anything, mock.MatchedBy(func(params activity.CreateIncidentParams) bool {
+		return params.Type == "replication_broken" && params.Severity == "critical"
+	})).Return(&activity.CreateIncidentResult{ID: "inc-test", Created: true}, nil)
+
 	s.env.ExecuteWorkflow(CheckReplicationHealthWorkflow)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
@@ -122,6 +129,11 @@ func (s *CheckReplicationHealthWorkflowTestSuite) TestDegradedRestoredToActive()
 			params.ID == shardID &&
 			params.Status == model.StatusActive
 	})).Return(nil)
+
+	// Should auto-resolve replication incidents.
+	s.env.OnActivity("AutoResolveIncidents", mock.Anything, mock.MatchedBy(func(params activity.AutoResolveIncidentsParams) bool {
+		return params.ResourceType == "shard" && params.ResourceID == shardID && params.TypePrefix == "replication_"
+	})).Return(0, nil)
 
 	s.env.ExecuteWorkflow(CheckReplicationHealthWorkflow)
 	s.True(s.env.IsWorkflowCompleted())
@@ -159,6 +171,11 @@ func (s *CheckReplicationHealthWorkflowTestSuite) TestHighReplicationLag() {
 			params.Status == "degraded" &&
 			params.StatusMessage != nil
 	})).Return(nil)
+
+	// Should create a warning incident.
+	s.env.OnActivity("CreateIncident", mock.Anything, mock.MatchedBy(func(params activity.CreateIncidentParams) bool {
+		return params.Type == "replication_lag" && params.Severity == "warning"
+	})).Return(&activity.CreateIncidentResult{ID: "inc-test", Created: true}, nil)
 
 	s.env.ExecuteWorkflow(CheckReplicationHealthWorkflow)
 	s.True(s.env.IsWorkflowCompleted())

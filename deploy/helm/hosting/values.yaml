@@ -58,6 +58,12 @@ config:
   lokiUrl: "http://127.0.0.1:3100"
   tenantLokiUrl: "http://127.0.0.1:3101"
   internalNetworkCidr: "10.0.0.0/8"
+  # LLM incident agent
+  agentEnabled: "false"
+  agentMaxConcurrent: "3"
+  llmBaseUrl: ""
+  llmModel: "Qwen/Qwen2.5-72B-Instruct"
+  llmMaxTurns: "10"
 
 # Secrets — either inline or reference an existing K8s Secret
 secrets:
@@ -68,6 +74,8 @@ secrets:
   powerdnsDatabaseUrl: ""
   stalwartAdminToken: ""
   secretEncryptionKey: ""
+  llmApiKey: ""
+  agentApiKey: ""
 
 # Temporal connection
 temporal:

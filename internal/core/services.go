@@ -52,6 +52,8 @@ type Services struct {
 	Search             *SearchService
 	DesiredState       *DesiredStateService
 	NodeHealth         *NodeHealthService
+	Incident           *IncidentService
+	CapabilityGap      *CapabilityGapService
 }
 
 func NewServices(db *pgxpool.Pool, tc temporalclient.Client, oidcIssuerURL string, secretEncryptionKey string) *Services {
@@ -102,6 +104,8 @@ func newServicesFromDB(db DB, tc temporalclient.Client, oidcIssuerURL string, se
 		Search:             NewSearchService(db),
 		DesiredState:       NewDesiredStateService(db),
 		NodeHealth:         NewNodeHealthService(db),
+		Incident:           NewIncidentService(db),
+		CapabilityGap:      NewCapabilityGapService(db),
 	}
 }
 

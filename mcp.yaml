@@ -89,6 +89,13 @@ groups:
       - "API Keys"
       - "Audit Logs"
 
+  operations:
+    description: "Incident management, capability gaps, and operational tools for AI maintenance agents"
+    tags:
+      - "Incidents"
+      - "Incident Events"
+      - "Capability Gaps"
+
 # Per-tool overrides keyed by auto-derived tool name.
 # Use this to fix names, improve descriptions, or adjust hints.
 overrides:

@@ -127,6 +127,8 @@ func (s *Server) setupRoutes() {
 		search := handler.NewSearch(s.services.Search)
 		apiKey := handler.NewAPIKey(s.services.APIKey)
 		internalNode := handler.NewInternalNode(s.services.DesiredState, s.services.NodeHealth, s.services.CronJob)
+		incident := handler.NewIncident(s.services.Incident)
+		capabilityGap := handler.NewCapabilityGap(s.services.CapabilityGap)
 
 		// Workflow await (admin-only, blocks until workflow completes)
 		workflow := handler.NewWorkflow(s.temporalClient)
@@ -651,6 +653,34 @@ func (s *Server) setupRoutes() {
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireScope("backups", "delete"))
 			r.Delete("/backups/{id}", backup.Delete)
+		})
+
+		// Incidents
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("incidents", "read"))
+			r.Get("/incidents", incident.List)
+			r.Get("/incidents/{id}", incident.Get)
+			r.Get("/incidents/{id}/events", incident.ListEvents)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("incidents", "write"))
+			r.Post("/incidents", incident.Create)
+			r.Patch("/incidents/{id}", incident.Update)
+			r.Post("/incidents/{id}/resolve", incident.Resolve)
+			r.Post("/incidents/{id}/escalate", incident.Escalate)
+			r.Post("/incidents/{id}/cancel", incident.Cancel)
+			r.Post("/incidents/{id}/events", incident.AddEvent)
+		})
+
+		// Capability Gaps
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("incidents", "read"))
+			r.Get("/capability-gaps", capabilityGap.List)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("incidents", "write"))
+			r.Post("/capability-gaps", capabilityGap.Report)
+			r.Patch("/capability-gaps/{id}", capabilityGap.Update)
 		})
 	})
 }

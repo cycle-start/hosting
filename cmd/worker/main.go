@@ -18,6 +18,7 @@ import (
 	"github.com/edvin/hosting/internal/activity"
 	"github.com/edvin/hosting/internal/config"
 	"github.com/edvin/hosting/internal/db"
+	"github.com/edvin/hosting/internal/llm"
 	"github.com/edvin/hosting/internal/logging"
 	"github.com/edvin/hosting/internal/metrics"
 	"github.com/edvin/hosting/internal/workflow"
@@ -100,6 +101,15 @@ func main() {
 	callbackActivities := activity.NewCallback()
 	w.RegisterActivity(callbackActivities)
 
+	// Register agent activities (conditionally).
+	if cfg.AgentEnabled {
+		llmClient := llm.NewClient(cfg.LLMBaseURL, cfg.LLMAPIKey, cfg.LLMModel)
+		toolRegistry := llm.NewRegistry("http://"+cfg.HTTPListenAddr, cfg.AgentAPIKey)
+		agentActivities := activity.NewAgentActivities(corePool, llmClient, toolRegistry, cfg.LLMMaxTurns)
+		w.RegisterActivity(agentActivities)
+		logger.Info().Msg("agent activities registered")
+	}
+
 	// Register workflows
 	w.RegisterWorkflow(workflow.TenantProvisionWorkflow)
 	w.RegisterWorkflow(workflow.CreateTenantWorkflow)
@@ -169,6 +179,8 @@ func main() {
 	w.RegisterWorkflow(workflow.CheckReplicationHealthWorkflow)
 	w.RegisterWorkflow(workflow.SyncEgressRulesWorkflow)
 	w.RegisterWorkflow(workflow.SyncDatabaseAccessWorkflow)
+	w.RegisterWorkflow(workflow.ProcessIncidentQueueWorkflow)
+	w.RegisterWorkflow(workflow.InvestigateIncidentWorkflow)
 
 	if cfg.MetricsAddr != "" {
 		metricsSrv := metrics.NewServer(cfg.MetricsAddr)
@@ -235,6 +247,15 @@ func registerCronSchedules(ctx context.Context, tc temporalclient.Client, taskQu
 			cron:     "* * * * *",
 			workflow: workflow.CheckReplicationHealthWorkflow,
 		},
+	}
+
+	if cfg.AgentEnabled {
+		schedules = append(schedules, cronSchedule{
+			id:       "incident-queue-cron",
+			cron:     "* * * * *",
+			workflow: workflow.ProcessIncidentQueueWorkflow,
+			args:     []interface{}{cfg.AgentMaxConcurrent},
+		})
 	}
 
 	scheduleClient := tc.ScheduleClient()

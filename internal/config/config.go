@@ -50,6 +50,15 @@ type Config struct {
 	SecretEncryptionKey string // SECRET_ENCRYPTION_KEY — 32-byte AES-256 key, hex-encoded
 
 	InternalNetworkCIDR string // INTERNAL_NETWORK_CIDR — default 10.0.0.0/8, used for database ingress default
+
+	// LLM Agent
+	AgentEnabled      bool   // AGENT_ENABLED — enable the LLM incident agent (default: false)
+	AgentMaxConcurrent int   // AGENT_MAX_CONCURRENT — max parallel investigations (default: 3)
+	AgentAPIKey       string // AGENT_API_KEY — API key for the agent to call the core API
+	LLMBaseURL        string // LLM_BASE_URL — OpenAI-compatible API base URL
+	LLMAPIKey         string // LLM_API_KEY — API key for the LLM endpoint
+	LLMModel          string // LLM_MODEL — model name (default: Qwen/Qwen2.5-72B-Instruct)
+	LLMMaxTurns       int    // LLM_MAX_TURNS — max conversation turns per investigation (default: 10)
 }
 
 func Load() (*Config, error) {
@@ -86,6 +95,14 @@ func Load() (*Config, error) {
 		SecretEncryptionKey: getEnv("SECRET_ENCRYPTION_KEY", ""),
 
 		InternalNetworkCIDR: getEnv("INTERNAL_NETWORK_CIDR", "10.0.0.0/8"),
+
+		AgentEnabled:       getEnvBool("AGENT_ENABLED", false),
+		AgentMaxConcurrent: getEnvInt("AGENT_MAX_CONCURRENT", 3),
+		AgentAPIKey:        getEnv("AGENT_API_KEY", ""),
+		LLMBaseURL:         getEnv("LLM_BASE_URL", ""),
+		LLMAPIKey:          getEnv("LLM_API_KEY", ""),
+		LLMModel:           getEnv("LLM_MODEL", "Qwen/Qwen2.5-72B-Instruct"),
+		LLMMaxTurns:        getEnvInt("LLM_MAX_TURNS", 10),
 	}
 
 	return cfg, nil
@@ -140,12 +157,32 @@ func (c *Config) Validate(binary string) error {
 		return fmt.Errorf("TEMPORAL_TLS_CERT and TEMPORAL_TLS_KEY must both be set or both unset")
 	}
 
+	// Agent: require LLM_BASE_URL and AGENT_API_KEY when enabled.
+	if c.AgentEnabled {
+		if c.LLMBaseURL == "" {
+			missing = append(missing, "LLM_BASE_URL")
+		}
+		if c.AgentAPIKey == "" {
+			missing = append(missing, "AGENT_API_KEY")
+		}
+		if len(missing) > 0 {
+			return fmt.Errorf("AGENT_ENABLED=true but missing: %s", strings.Join(missing, ", "))
+		}
+	}
+
 	return nil
 }
 
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return fallback
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	if v := os.Getenv(key); v != "" {
+		return v == "true" || v == "1" || v == "yes"
 	}
 	return fallback
 }
