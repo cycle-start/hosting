@@ -14,4 +14,5 @@ type Zone struct {
 	CreatedAt  time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at" db:"updated_at"`
 	RegionName string    `json:"region_name,omitempty" db:"-"`
+	TenantName *string   `json:"tenant_name,omitempty" db:"-"`
 }

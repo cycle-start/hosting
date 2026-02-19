@@ -41,9 +41,13 @@ export function ZonesPage() {
       cell: ({ row }) => row.original.region_name || row.original.region_id,
     },
     {
-      accessorKey: 'tenant_id',
+      accessorKey: 'tenant_name',
       header: 'Tenant',
-      cell: ({ row }) => row.original.tenant_id ? <code className="text-xs">{truncateID(row.original.tenant_id)}</code> : <span className="text-muted-foreground">-</span>,
+      cell: ({ row }) => row.original.tenant_name
+        ? <code className="text-xs">{row.original.tenant_name}</code>
+        : row.original.tenant_id
+          ? <code className="text-xs text-muted-foreground">{truncateID(row.original.tenant_id)}</code>
+          : <span className="text-muted-foreground">-</span>,
     },
     {
       accessorKey: 'status',

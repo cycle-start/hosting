@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { ArrowLeft, Plus, Trash2, Pencil, RotateCw } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Pencil, RotateCw, ChevronDown, ChevronRight, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -14,14 +14,16 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  Tooltip, TooltipContent, TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ResourceHeader } from '@/components/shared/resource-header'
 import { DataTable } from '@/components/shared/data-table'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
-import { CopyButton } from '@/components/shared/copy-button'
 import { LogViewer } from '@/components/shared/log-viewer'
-import { formatDate, truncateID } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import {
   useZone, useZoneRecords, useCreateZoneRecord, useUpdateZoneRecord,
   useDeleteZoneRecord, useRetryZoneRecord,
@@ -57,6 +59,39 @@ const typesMeta: Record<string, { placeholder: string; hint?: string; usesPriori
 
 function getMeta(type: string) {
   return typesMeta[type] || { placeholder: '' }
+}
+
+// Format long DNS content for readable display.
+function ContentCell({ content, type }: { content: string; type: string }) {
+  const [expanded, setExpanded] = useState(false)
+
+  // Short values render inline.
+  if (content.length <= 50) {
+    return <code className="text-xs">{content}</code>
+  }
+
+  // Long TXT/DKIM values: show truncated with expand toggle.
+  if (!expanded) {
+    return (
+      <button
+        className="flex items-center gap-1 text-left group"
+        onClick={(e) => { e.stopPropagation(); setExpanded(true) }}
+      >
+        <code className="text-xs truncate max-w-[300px] block">{content}</code>
+        <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground group-hover:text-foreground" />
+      </button>
+    )
+  }
+
+  return (
+    <button
+      className="flex items-start gap-1 text-left group"
+      onClick={(e) => { e.stopPropagation(); setExpanded(false) }}
+    >
+      <code className="text-xs break-all whitespace-pre-wrap max-w-[400px] block">{content}</code>
+      <ChevronDown className="h-3 w-3 shrink-0 mt-0.5 text-muted-foreground group-hover:text-foreground" />
+    </button>
+  )
 }
 
 export function ZoneDetailPage() {
@@ -98,43 +133,65 @@ export function ZoneDetailPage() {
 
   const columns: ColumnDef<ZoneRecord>[] = [
     {
-      accessorKey: 'id',
-      header: 'ID',
+      accessorKey: 'type',
+      header: 'Type',
+      size: 70,
       cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          <code className="text-xs">{truncateID(row.original.id)}</code>
-          <CopyButton value={row.original.id} />
-        </div>
+        <Badge variant="outline" className="font-mono text-xs font-semibold">
+          {row.original.type}
+        </Badge>
       ),
     },
     {
-      accessorKey: 'type',
-      header: 'Type',
+      accessorKey: 'name',
+      header: 'Name',
+      size: 240,
       cell: ({ row }) => (
-        <code className="text-xs font-semibold">{row.original.type}</code>
+        <code className="text-xs">{row.original.name}</code>
       ),
     },
-    { accessorKey: 'name', header: 'Name' },
     {
       accessorKey: 'content',
       header: 'Content',
       cell: ({ row }) => (
-        <code className="text-xs break-all max-w-xs block">{row.original.content}</code>
+        <ContentCell content={row.original.content} type={row.original.type} />
       ),
     },
-    { accessorKey: 'ttl', header: 'TTL' },
+    {
+      accessorKey: 'ttl',
+      header: 'TTL',
+      size: 60,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">{row.original.ttl}</span>
+      ),
+    },
     {
       accessorKey: 'priority',
-      header: 'Priority',
-      cell: ({ row }) => row.original.priority ?? '-',
+      header: 'Pri',
+      size: 50,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">
+          {row.original.priority ?? '-'}
+        </span>
+      ),
     },
     {
       accessorKey: 'managed_by',
       header: 'Source',
+      size: 80,
       cell: ({ row }) => {
         const mb = row.original.managed_by
         if (mb === 'auto') {
-          return <Badge variant="secondary" className="text-xs">Auto</Badge>
+          return (
+            <Tooltip>
+              <TooltipTrigger>
+                <Badge variant="secondary" className="text-xs gap-1">
+                  <Lock className="h-3 w-3" /> Auto
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>Managed automatically — cannot be edited</TooltipContent>
+            </Tooltip>
+          )
         }
         return <Badge variant="outline" className="text-xs">Custom</Badge>
       },
@@ -142,41 +199,43 @@ export function ZoneDetailPage() {
     {
       accessorKey: 'status',
       header: 'Status',
+      size: 80,
       cell: ({ row }) => <StatusBadge status={row.original.status} />,
     },
     {
       id: 'actions',
+      size: 100,
       cell: ({ row }) => {
         const r = row.original
         const isCustom = r.managed_by === 'custom'
         const isFailed = r.status === 'failed'
         return (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 justify-end">
             {isFailed && (
               <Button
-                variant="ghost" size="icon"
+                variant="ghost" size="icon" className="h-7 w-7"
                 onClick={(e) => { e.stopPropagation(); handleRetry(r.id) }}
                 title="Retry"
               >
-                <RotateCw className="h-4 w-4 text-yellow-500" />
+                <RotateCw className="h-3.5 w-3.5 text-yellow-500" />
               </Button>
             )}
             {isCustom && (
               <Button
-                variant="ghost" size="icon"
+                variant="ghost" size="icon" className="h-7 w-7"
                 onClick={(e) => { e.stopPropagation(); openEdit(r) }}
                 title="Edit"
               >
-                <Pencil className="h-4 w-4" />
+                <Pencil className="h-3.5 w-3.5" />
               </Button>
             )}
             {isCustom && (
               <Button
-                variant="ghost" size="icon"
+                variant="ghost" size="icon" className="h-7 w-7"
                 onClick={(e) => { e.stopPropagation(); setDeleteTarget(r) }}
                 title="Delete"
               >
-                <Trash2 className="h-4 w-4 text-destructive" />
+                <Trash2 className="h-3.5 w-3.5 text-destructive" />
               </Button>
             )}
           </div>
@@ -203,7 +262,7 @@ export function ZoneDetailPage() {
         ttl: parseInt(formTTL) || 3600,
         priority: formPriority ? parseInt(formPriority) : undefined,
       })
-      toast.success('Record created')
+      toast.success('Record created — provisioning')
       setCreateOpen(false)
       resetCreateForm()
     } catch (e: unknown) {
@@ -220,7 +279,7 @@ export function ZoneDetailPage() {
         ttl: editTTL ? parseInt(editTTL) : undefined,
         priority: editPriority ? parseInt(editPriority) : undefined,
       })
-      toast.success('Record updated')
+      toast.success('Record updated — provisioning')
       setEditTarget(null)
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Failed to update record')
@@ -259,6 +318,15 @@ export function ZoneDetailPage() {
   const createMeta = getMeta(formType)
   const editMeta = editTarget ? getMeta(editTarget.type) : { placeholder: '' }
 
+  // Build subtitle parts.
+  const subtitleParts: string[] = []
+  subtitleParts.push(`Region: ${zone.region_name || zone.region_id}`)
+  if (zone.tenant_name) {
+    subtitleParts.push(`Tenant: ${zone.tenant_name}`)
+  } else if (zone.tenant_id) {
+    subtitleParts.push(`Tenant: ${zone.tenant_id}`)
+  }
+
   return (
     <div className="space-y-6">
       <Button variant="ghost" size="sm" onClick={() => navigate({ to: '/zones' })}>
@@ -267,8 +335,9 @@ export function ZoneDetailPage() {
 
       <ResourceHeader
         title={zone.name}
-        subtitle={`Region: ${zone.region_name || zone.region_id}${zone.tenant_id ? ` | Tenant: ${zone.tenant_id}` : ''}`}
+        subtitle={subtitleParts.join(' | ')}
         status={zone.status}
+        meta={`Created ${formatDate(zone.created_at)}`}
         actions={
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="mr-2 h-4 w-4" /> Add Record
@@ -276,18 +345,12 @@ export function ZoneDetailPage() {
         }
       />
 
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <span>ID: <code>{zone.id}</code></span>
-        <CopyButton value={zone.id} />
-        <span className="ml-4">Created: {formatDate(zone.created_at)}</span>
-      </div>
-
       <DataTable
         columns={columns}
         data={records}
         loading={recordsLoading}
-        searchColumn="name"
-        searchPlaceholder="Search records..."
+        globalSearch
+        searchPlaceholder="Filter records (type, name, content...)"
         emptyMessage="No DNS records"
       />
 

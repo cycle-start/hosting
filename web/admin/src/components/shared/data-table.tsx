@@ -29,6 +29,7 @@ interface DataTableProps<TData, TValue> {
   loading?: boolean
   searchPlaceholder?: string
   searchColumn?: string
+  globalSearch?: boolean
   onRowClick?: (row: TData) => void
   pagination?: {
     hasMore: boolean
@@ -47,6 +48,7 @@ export function DataTable<TData, TValue>({
   loading = false,
   searchPlaceholder = 'Search...',
   searchColumn,
+  globalSearch = false,
   onRowClick,
   pagination,
   emptyMessage = 'No results found.',
@@ -54,6 +56,7 @@ export function DataTable<TData, TValue>({
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [globalFilter, setGlobalFilter] = useState('')
 
   const table = useReactTable({
     data,
@@ -63,16 +66,20 @@ export function DataTable<TData, TValue>({
     getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
     state: {
       sorting,
       columnFilters,
+      globalFilter: globalSearch ? globalFilter : undefined,
     },
   })
+
+  const showSearch = globalSearch || !!searchColumn
 
   if (loading) {
     return (
       <div className={cn('space-y-4', className)}>
-        {searchColumn && (
+        {showSearch && (
           <div className="relative max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Skeleton className="h-10 w-full" />
@@ -108,16 +115,20 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className={cn('space-y-4', className)}>
-      {searchColumn && (
+      {showSearch && (
         <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder={searchPlaceholder}
             value={
-              (table.getColumn(searchColumn)?.getFilterValue() as string) ?? ''
+              globalSearch
+                ? globalFilter
+                : (table.getColumn(searchColumn!)?.getFilterValue() as string) ?? ''
             }
             onChange={(event) =>
-              table.getColumn(searchColumn)?.setFilterValue(event.target.value)
+              globalSearch
+                ? setGlobalFilter(event.target.value)
+                : table.getColumn(searchColumn!)?.setFilterValue(event.target.value)
             }
             className="pl-9"
           />

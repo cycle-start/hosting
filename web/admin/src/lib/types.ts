@@ -140,6 +140,7 @@ export interface Zone {
   id: string
   brand_id: string
   tenant_id?: string | null
+  tenant_name?: string | null
   name: string
   region_id: string
   status: string

@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 interface ResourceHeaderProps {
   title: string
   subtitle?: string
+  meta?: string
   status?: string
   actions?: React.ReactNode
   className?: string
@@ -12,6 +13,7 @@ interface ResourceHeaderProps {
 export function ResourceHeader({
   title,
   subtitle,
+  meta,
   status,
   actions,
   className,
@@ -30,6 +32,9 @@ export function ResourceHeader({
         </div>
         {subtitle && (
           <p className="text-sm text-muted-foreground">{subtitle}</p>
+        )}
+        {meta && (
+          <p className="text-xs text-muted-foreground">{meta}</p>
         )}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
