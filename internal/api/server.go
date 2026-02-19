@@ -273,6 +273,7 @@ func (s *Server) setupRoutes() {
 				r.Post("/internal/v1/nodes/{nodeID}/health", internalNode.ReportHealth)
 				r.Post("/internal/v1/nodes/{nodeID}/drift-events", internalNode.ReportDriftEvents)
 				r.Post("/internal/v1/cron-jobs/{cronJobID}/outcome", internalNode.ReportCronOutcome)
+				r.Post("/internal/v1/login-sessions/validate", oidcLogin.ValidateLoginSession)
 			})
 		})
 

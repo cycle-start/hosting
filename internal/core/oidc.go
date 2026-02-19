@@ -141,17 +141,18 @@ func (s *OIDCService) Discovery() map[string]any {
 }
 
 // CreateLoginSession creates a short-lived login session for a tenant.
-func (s *OIDCService) CreateLoginSession(ctx context.Context, tenantID string) (*model.OIDCLoginSession, error) {
+func (s *OIDCService) CreateLoginSession(ctx context.Context, tenantID string, databaseID *string) (*model.OIDCLoginSession, error) {
 	session := &model.OIDCLoginSession{
-		ID:        platform.NewID(),
-		TenantID:  tenantID,
-		ExpiresAt: time.Now().Add(30 * time.Second),
-		CreatedAt: time.Now(),
+		ID:         platform.NewID(),
+		TenantID:   tenantID,
+		DatabaseID: databaseID,
+		ExpiresAt:  time.Now().Add(30 * time.Second),
+		CreatedAt:  time.Now(),
 	}
 
 	_, err := s.db.Exec(ctx,
-		`INSERT INTO oidc_login_sessions (id, tenant_id, expires_at, created_at) VALUES ($1, $2, $3, $4)`,
-		session.ID, session.TenantID, session.ExpiresAt, session.CreatedAt,
+		`INSERT INTO oidc_login_sessions (id, tenant_id, database_id, expires_at, created_at) VALUES ($1, $2, $3, $4, $5)`,
+		session.ID, session.TenantID, session.DatabaseID, session.ExpiresAt, session.CreatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: create login session: %w", err)
@@ -163,8 +164,8 @@ func (s *OIDCService) CreateLoginSession(ctx context.Context, tenantID string) (
 func (s *OIDCService) ValidateLoginSession(ctx context.Context, sessionID string) (*model.OIDCLoginSession, error) {
 	var sess model.OIDCLoginSession
 	err := s.db.QueryRow(ctx,
-		`SELECT id, tenant_id, expires_at, used FROM oidc_login_sessions WHERE id = $1`, sessionID,
-	).Scan(&sess.ID, &sess.TenantID, &sess.ExpiresAt, &sess.Used)
+		`SELECT id, tenant_id, database_id, expires_at, used FROM oidc_login_sessions WHERE id = $1`, sessionID,
+	).Scan(&sess.ID, &sess.TenantID, &sess.DatabaseID, &sess.ExpiresAt, &sess.Used)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: login session not found: %w", err)
 	}
@@ -182,6 +183,29 @@ func (s *OIDCService) ValidateLoginSession(ctx context.Context, sessionID string
 	}
 
 	return &sess, nil
+}
+
+// DatabaseConnectionInfo holds the info needed to create a CloudBeaver connection.
+type DatabaseConnectionInfo struct {
+	DatabaseName string `json:"database_name"`
+	Host         string `json:"host"`
+	Port         int    `json:"port"`
+}
+
+// GetDatabaseConnectionInfo looks up the database name and its primary node IP.
+func (s *OIDCService) GetDatabaseConnectionInfo(ctx context.Context, databaseID string) (*DatabaseConnectionInfo, error) {
+	var info DatabaseConnectionInfo
+	err := s.db.QueryRow(ctx, `
+		SELECT d.name, COALESCE(host(n.ip_address), ''), 3306
+		FROM databases d
+		LEFT JOIN node_shard_assignments ns ON ns.shard_id = d.shard_id AND ns.shard_index = 1
+		LEFT JOIN nodes n ON n.id = ns.node_id
+		WHERE d.id = $1
+	`, databaseID).Scan(&info.DatabaseName, &info.Host, &info.Port)
+	if err != nil {
+		return nil, fmt.Errorf("oidc: get database connection info: %w", err)
+	}
+	return &info, nil
 }
 
 // ValidateClient validates an OIDC client's credentials and redirect URI.

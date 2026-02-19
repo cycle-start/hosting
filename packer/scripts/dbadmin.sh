@@ -16,10 +16,13 @@ systemctl stop docker
 # Create directories for CloudBeaver config and workspace.
 mkdir -p /opt/cloudbeaver/workspace /opt/cloudbeaver/conf
 
-# Install CloudBeaver systemd service.
+# Install dbadmin-proxy and CloudBeaver systemd services.
+cp /tmp/dbadmin-proxy /opt/hosting/bin/dbadmin-proxy
+chmod +x /opt/hosting/bin/dbadmin-proxy
+cp /tmp/dbadmin-proxy.service /etc/systemd/system/dbadmin-proxy.service
 cp /tmp/cloudbeaver.service /etc/systemd/system/cloudbeaver.service
 systemctl daemon-reload
-systemctl enable cloudbeaver
+systemctl enable cloudbeaver dbadmin-proxy
 
 # Cleanup.
 apt-get clean

@@ -39,8 +39,8 @@ write_files:
               }
           },
           "app": {
-              "anonymousAccessEnabled": false,
-              "supportsCustomConnections": false,
+              "anonymousAccessEnabled": true,
+              "supportsCustomConnections": true,
               "forwardProxy": true,
               "publicCredentialsSaveEnabled": false,
               "adminCredentialsSaveEnabled": true,
@@ -97,6 +97,14 @@ write_files:
       SERVICE_NAME=node-agent
       METRICS_ADDR=:9100
 
+  - path: /etc/default/dbadmin-proxy
+    content: |
+      CORE_API_URL=http://${controlplane_ip}:8090/api/v1
+      CORE_API_TOKEN=${core_api_token}
+      CLOUDBEAVER_URL=http://127.0.0.1:8978
+      LISTEN_ADDR=127.0.0.1:4180
+      COOKIE_SECRET=CHANGE_ME_generate_with_openssl_rand_base64_24
+
   - path: /etc/nginx/sites-available/dbadmin
     permissions: '0644'
     content: |
@@ -106,7 +114,7 @@ write_files:
           server_name _;
 
           location / {
-              proxy_pass http://127.0.0.1:8978;
+              proxy_pass http://127.0.0.1:4180;
               proxy_set_header Host $host;
               proxy_set_header X-Real-IP $remote_addr;
               proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -126,7 +134,7 @@ write_files:
           ssl_certificate_key /etc/nginx/certs/dbadmin-key.pem;
 
           location / {
-              proxy_pass http://127.0.0.1:8978;
+              proxy_pass http://127.0.0.1:4180;
               proxy_set_header Host $host;
               proxy_set_header X-Real-IP $remote_addr;
               proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -149,6 +157,7 @@ runcmd:
   - rm -f /etc/nginx/sites-enabled/default
   - ln -sf /etc/nginx/sites-available/dbadmin /etc/nginx/sites-enabled/dbadmin
   - systemctl daemon-reload
-  - systemctl restart nginx
   - systemctl start cloudbeaver
+  - systemctl start dbadmin-proxy
+  - systemctl restart nginx
   - systemctl start node-agent

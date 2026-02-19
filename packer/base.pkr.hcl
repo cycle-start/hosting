@@ -15,6 +15,12 @@ variable "node_agent_binary" {
   default     = "../bin/node-agent"
 }
 
+variable "dbadmin_proxy_binary" {
+  description = "Path to pre-built linux/amd64 dbadmin-proxy binary"
+  type        = string
+  default     = "../bin/dbadmin-proxy"
+}
+
 variable "ubuntu_image_url" {
   description = "Ubuntu 24.04 cloud image URL"
   type        = string
@@ -505,6 +511,16 @@ build {
   provisioner "file" {
     source      = "files/cloudbeaver.service"
     destination = "/tmp/cloudbeaver.service"
+  }
+
+  provisioner "file" {
+    source      = var.dbadmin_proxy_binary
+    destination = "/tmp/dbadmin-proxy"
+  }
+
+  provisioner "file" {
+    source      = "files/dbadmin-proxy.service"
+    destination = "/tmp/dbadmin-proxy.service"
   }
 
   provisioner "file" {

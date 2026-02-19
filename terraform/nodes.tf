@@ -369,6 +369,8 @@ resource "libvirt_cloudinit_disk" "dbadmin_node" {
     region_id        = var.region_id
     cluster_id       = var.cluster_id
     base_domain      = var.base_domain
+    controlplane_ip  = var.controlplane_ip
+    core_api_token   = var.core_api_token
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.dbadmin_nodes[count.index].ip

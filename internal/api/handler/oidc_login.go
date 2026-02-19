@@ -41,7 +41,12 @@ func (h *OIDCLogin) CreateLoginSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := h.oidcSvc.CreateLoginSession(r.Context(), id)
+	var databaseID *string
+	if dbID := r.URL.Query().Get("database_id"); dbID != "" {
+		databaseID = &dbID
+	}
+
+	session, err := h.oidcSvc.CreateLoginSession(r.Context(), id, databaseID)
 	if err != nil {
 		response.WriteServiceError(w, err)
 		return
@@ -51,4 +56,43 @@ func (h *OIDCLogin) CreateLoginSession(w http.ResponseWriter, r *http.Request) {
 		"session_id": session.ID,
 		"expires_at": session.ExpiresAt,
 	})
+}
+
+// ValidateLoginSession godoc
+//
+//	@Summary		Validate a login session
+//	@Description	Validates and consumes a login session. Returns the associated tenant ID if the session is valid, not expired, and not already used. Internal endpoint used by the dbadmin proxy for server-to-server authentication.
+//	@Tags			Internal
+//	@Security		ApiKeyAuth
+//	@Param			session_id query string true "Login session ID"
+//	@Success		200 {object} map[string]any
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		403 {object} response.ErrorResponse
+//	@Router			/internal/v1/login-sessions/validate [post]
+func (h *OIDCLogin) ValidateLoginSession(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.URL.Query().Get("session_id")
+	if sessionID == "" {
+		response.WriteError(w, http.StatusBadRequest, "missing session_id parameter")
+		return
+	}
+
+	session, err := h.oidcSvc.ValidateLoginSession(r.Context(), sessionID)
+	if err != nil {
+		response.WriteError(w, http.StatusForbidden, err.Error())
+		return
+	}
+
+	result := map[string]any{
+		"tenant_id": session.TenantID,
+	}
+
+	// If a database_id is attached, look up connection info.
+	if session.DatabaseID != nil {
+		dbInfo, err := h.oidcSvc.GetDatabaseConnectionInfo(r.Context(), *session.DatabaseID)
+		if err == nil {
+			result["database"] = dbInfo
+		}
+	}
+
+	response.WriteJSON(w, http.StatusOK, result)
 }

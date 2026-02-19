@@ -650,8 +650,10 @@ export function useDeleteDatabaseUser() {
 // OIDC Login Sessions
 export function useCreateLoginSession() {
   return useMutation({
-    mutationFn: (tenantId: string) =>
-      api.post<{ session_id: string; expires_at: string }>(`/tenants/${tenantId}/login-sessions`),
+    mutationFn: ({ tenantId, databaseId }: { tenantId: string; databaseId?: string }) => {
+      const params = databaseId ? `?database_id=${databaseId}` : ''
+      return api.post<{ session_id: string; expires_at: string }>(`/tenants/${tenantId}/login-sessions${params}`)
+    },
   })
 }
 

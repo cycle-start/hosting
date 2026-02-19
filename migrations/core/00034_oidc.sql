@@ -36,6 +36,7 @@ CREATE TABLE oidc_auth_codes (
 CREATE TABLE oidc_login_sessions (
     id TEXT PRIMARY KEY,
     tenant_id TEXT NOT NULL REFERENCES tenants(id),
+    database_id TEXT REFERENCES databases(id),
     expires_at TIMESTAMPTZ NOT NULL,
     used BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()

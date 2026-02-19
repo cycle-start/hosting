@@ -32,9 +32,10 @@ type OIDCAuthCode struct {
 }
 
 type OIDCLoginSession struct {
-	ID        string    `json:"id" db:"id"`
-	TenantID  string    `json:"tenant_id" db:"tenant_id"`
-	ExpiresAt time.Time `json:"expires_at" db:"expires_at"`
-	Used      bool      `json:"used" db:"used"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	ID         string    `json:"id" db:"id"`
+	TenantID   string    `json:"tenant_id" db:"tenant_id"`
+	DatabaseID *string   `json:"database_id,omitempty" db:"database_id"`
+	ExpiresAt  time.Time `json:"expires_at" db:"expires_at"`
+	Used       bool      `json:"used" db:"used"`
+	CreatedAt  time.Time `json:"created_at" db:"created_at"`
 }

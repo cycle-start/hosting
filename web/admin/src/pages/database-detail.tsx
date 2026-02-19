@@ -53,10 +53,10 @@ export function DatabaseDetailPage() {
 
   const handleOpenDbAdmin = async () => {
     try {
-      const session = await createLoginSessionMut.mutateAsync(tenantId)
+      const session = await createLoginSessionMut.mutateAsync({ tenantId, databaseId })
       const baseDomain = window.location.hostname.split('.').slice(1).join('.')
       window.open(
-        `http://dbadmin.${baseDomain}/oauth2/start?rd=/&login_hint=${session.session_id}`,
+        `http://dbadmin.${baseDomain}/auth/login?token=${session.session_id}`,
         '_blank'
       )
     } catch (e: unknown) {

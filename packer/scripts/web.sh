@@ -20,6 +20,9 @@ apt-get install -y \
 # Create directories used by node-agent at runtime.
 mkdir -p /var/www/storage /etc/ssl/hosting /etc/ceph /etc/ssh/sshd_config.d
 
+# Pre-configure dummy kernel module for tenant0 ULA interface.
+echo "dummy" > /etc/modules-load.d/dummy.conf
+
 # SSH hardening config.
 cp /tmp/00-hosting-base.conf /etc/ssh/sshd_config.d/00-hosting-base.conf
 
