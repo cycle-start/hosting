@@ -11,6 +11,8 @@ import type {
   CreateTenantRequest, WebrootEnvVar,
   FQDNFormData, DatabaseUserFormData, ValkeyUserFormData,
   LogQueryResponse,
+  Incident, IncidentEvent, IncidentListParams,
+  CapabilityGap, CapabilityGapListParams,
 } from './types'
 
 function buildQuery(params?: Record<string, unknown>): string {
@@ -1160,6 +1162,86 @@ export function useTenantLogs(
       ),
     enabled,
     refetchInterval: 10000,
+  })
+}
+
+// Incidents
+export function useIncidents(params?: IncidentListParams) {
+  return useQuery({
+    queryKey: ['incidents', params],
+    queryFn: () => api.get<PaginatedResponse<Incident>>(listPath('/incidents', params as Record<string, unknown>)),
+  })
+}
+
+export function useIncident(id: string) {
+  return useQuery({
+    queryKey: ['incident', id],
+    queryFn: () => api.get<Incident>(`/incidents/${id}`),
+    enabled: !!id,
+  })
+}
+
+export function useIncidentEvents(incidentId: string) {
+  return useQuery({
+    queryKey: ['incident-events', incidentId],
+    queryFn: () => api.get<PaginatedResponse<IncidentEvent>>(`/incidents/${incidentId}/events?limit=100`),
+    enabled: !!incidentId,
+  })
+}
+
+export function useResolveIncident() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { id: string; resolution: string }) =>
+      api.post(`/incidents/${data.id}/resolve`, { resolution: data.resolution }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['incidents'] })
+      qc.invalidateQueries({ queryKey: ['incident'] })
+      qc.invalidateQueries({ queryKey: ['incident-events'] })
+    },
+  })
+}
+
+export function useEscalateIncident() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { id: string; reason: string }) =>
+      api.post(`/incidents/${data.id}/escalate`, { reason: data.reason }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['incidents'] })
+      qc.invalidateQueries({ queryKey: ['incident'] })
+      qc.invalidateQueries({ queryKey: ['incident-events'] })
+    },
+  })
+}
+
+export function useCancelIncident() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { id: string; reason?: string }) =>
+      api.post(`/incidents/${data.id}/cancel`, { reason: data.reason || '' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['incidents'] })
+      qc.invalidateQueries({ queryKey: ['incident'] })
+      qc.invalidateQueries({ queryKey: ['incident-events'] })
+    },
+  })
+}
+
+// Capability Gaps
+export function useCapabilityGaps(params?: CapabilityGapListParams) {
+  return useQuery({
+    queryKey: ['capability-gaps', params],
+    queryFn: () => api.get<PaginatedResponse<CapabilityGap>>(listPath('/capability-gaps', params as Record<string, unknown>)),
+  })
+}
+
+export function useUpdateCapabilityGap() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { id: string; status: string }) =>
+      api.patch(`/capability-gaps/${data.id}`, { status: data.status }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['capability-gaps'] }),
   })
 }
 

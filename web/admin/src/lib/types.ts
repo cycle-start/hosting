@@ -491,6 +491,60 @@ export interface S3BucketFormData {
   shard_id: string; public?: boolean; quota_bytes?: number
 }
 
+export interface Incident {
+  id: string
+  dedupe_key: string
+  type: string
+  severity: string
+  status: string
+  title: string
+  detail: string
+  resource_type?: string | null
+  resource_id?: string | null
+  source: string
+  assigned_to?: string | null
+  resolution?: string | null
+  detected_at: string
+  resolved_at?: string | null
+  escalated_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface IncidentEvent {
+  id: string
+  incident_id: string
+  actor: string
+  action: string
+  detail: string
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface CapabilityGap {
+  id: string
+  tool_name: string
+  description: string
+  category: string
+  occurrences: number
+  status: string
+  implemented_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface IncidentListParams extends ListParams {
+  severity?: string
+  type?: string
+  resource_type?: string
+  resource_id?: string
+  source?: string
+}
+
+export interface CapabilityGapListParams extends ListParams {
+  category?: string
+}
+
 export interface SSHKeyFormData { name: string; public_key: string }
 
 export interface CreateTenantRequest {

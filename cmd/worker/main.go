@@ -181,6 +181,7 @@ func main() {
 	w.RegisterWorkflow(workflow.SyncDatabaseAccessWorkflow)
 	w.RegisterWorkflow(workflow.ProcessIncidentQueueWorkflow)
 	w.RegisterWorkflow(workflow.InvestigateIncidentWorkflow)
+	w.RegisterWorkflow(workflow.EscalateStaleIncidentsWorkflow)
 
 	if cfg.MetricsAddr != "" {
 		metricsSrv := metrics.NewServer(cfg.MetricsAddr)
@@ -246,6 +247,11 @@ func registerCronSchedules(ctx context.Context, tc temporalclient.Client, taskQu
 			id:       "replication-health-cron",
 			cron:     "* * * * *",
 			workflow: workflow.CheckReplicationHealthWorkflow,
+		},
+		{
+			id:       "incident-escalation-cron",
+			cron:     "*/5 * * * *",
+			workflow: workflow.EscalateStaleIncidentsWorkflow,
 		},
 	}
 

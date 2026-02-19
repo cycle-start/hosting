@@ -22,6 +22,9 @@ import { PlatformConfigPage } from './pages/platform-config'
 import { APIKeysPage } from './pages/api-keys'
 import { APIKeyDetailPage } from './pages/api-key-detail'
 import { AuditLogPage } from './pages/audit-log'
+import { IncidentsPage } from './pages/incidents'
+import { IncidentDetailPage } from './pages/incident-detail'
+import { CapabilityGapsPage } from './pages/capability-gaps'
 
 const rootRoute = createRootRoute({
   component: Outlet,
@@ -164,6 +167,24 @@ const auditLogRoute = createRoute({
   component: AuditLogPage,
 })
 
+const incidentsRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/incidents',
+  component: IncidentsPage,
+})
+
+const incidentDetailRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/incidents/$id',
+  component: IncidentDetailPage,
+})
+
+const capabilityGapsRoute = createRoute({
+  getParentRoute: () => authLayout,
+  path: '/capability-gaps',
+  component: CapabilityGapsPage,
+})
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   authLayout.addChildren([
@@ -187,6 +208,9 @@ const routeTree = rootRoute.addChildren([
     apiKeysRoute,
     apiKeyDetailRoute,
     auditLogRoute,
+    incidentsRoute,
+    incidentDetailRoute,
+    capabilityGapsRoute,
   ]),
 ])
 

@@ -14,6 +14,8 @@ import {
   FileText,
   Search,
   Tag,
+  AlertCircle,
+  ShieldAlert,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -57,6 +59,13 @@ const navSections: NavSection[] = [
       { label: 'Brands', href: '/brands', icon: Tag },
       { label: 'Tenants', href: '/tenants', icon: Users },
       { label: 'Zones', href: '/zones', icon: Globe },
+    ],
+  },
+  {
+    title: 'Operations',
+    items: [
+      { label: 'Incidents', href: '/incidents', icon: AlertCircle },
+      { label: 'Capability Gaps', href: '/capability-gaps', icon: ShieldAlert },
     ],
   },
   {

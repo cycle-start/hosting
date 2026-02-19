@@ -108,6 +108,7 @@ func (a *CoreDB) AutoResolveIncidents(ctx context.Context, params AutoResolveInc
 type EscalateIncidentParams struct {
 	IncidentID string `json:"incident_id"`
 	Reason     string `json:"reason"`
+	Actor      string `json:"actor"`
 }
 
 // EscalateIncident marks an incident as escalated, records an event, and sets escalated_at.
@@ -122,11 +123,67 @@ func (a *CoreDB) EscalateIncident(ctx context.Context, params EscalateIncidentPa
 		return fmt.Errorf("escalate incident: %w", err)
 	}
 
+	actor := params.Actor
+	if actor == "" {
+		actor = "system:escalation-cron"
+	}
+
 	_, _ = a.db.Exec(ctx,
 		`INSERT INTO incident_events (id, incident_id, actor, action, detail, created_at)
 		 VALUES ($1, $2, $3, $4, $5, $6)`,
-		platform.NewID(), params.IncidentID, "agent:incident-investigator", "escalated", params.Reason, now,
+		platform.NewID(), params.IncidentID, actor, "escalated", params.Reason, now,
 	)
 
 	return nil
+}
+
+// StaleIncident represents an incident that should be auto-escalated.
+type StaleIncident struct {
+	ID       string `json:"id"`
+	Status   string `json:"status"`
+	Severity string `json:"severity"`
+	Title    string `json:"title"`
+	Reason   string `json:"reason"`
+}
+
+// FindStaleIncidents finds incidents that should be auto-escalated per the escalation policy:
+// - Critical open + unassigned > 15 min
+// - Warning open + unassigned > 1 hour
+// - Investigating or remediating > 30 min
+func (a *CoreDB) FindStaleIncidents(ctx context.Context) ([]StaleIncident, error) {
+	now := time.Now()
+
+	rows, err := a.db.Query(ctx,
+		`SELECT id, status, severity, title FROM incidents
+		 WHERE (
+		   (status = 'open' AND assigned_to IS NULL AND severity = 'critical' AND updated_at < $1)
+		   OR (status = 'open' AND assigned_to IS NULL AND severity = 'warning' AND updated_at < $2)
+		   OR (status IN ('investigating', 'remediating') AND updated_at < $3)
+		 )`,
+		now.Add(-15*time.Minute),
+		now.Add(-1*time.Hour),
+		now.Add(-30*time.Minute),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("find stale incidents: %w", err)
+	}
+	defer rows.Close()
+
+	var stale []StaleIncident
+	for rows.Next() {
+		var s StaleIncident
+		if err := rows.Scan(&s.ID, &s.Status, &s.Severity, &s.Title); err != nil {
+			return nil, fmt.Errorf("scan stale incident: %w", err)
+		}
+		switch {
+		case s.Status == model.IncidentOpen && s.Severity == model.SeverityCritical:
+			s.Reason = "Critical incident unassigned for more than 15 minutes"
+		case s.Status == model.IncidentOpen && s.Severity == model.SeverityWarning:
+			s.Reason = "Warning incident unassigned for more than 1 hour"
+		default:
+			s.Reason = fmt.Sprintf("Incident stuck in '%s' status for more than 30 minutes", s.Status)
+		}
+		stale = append(stale, s)
+	}
+	return stale, nil
 }

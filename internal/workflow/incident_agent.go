@@ -148,6 +148,7 @@ func escalateOnFailure(ctx workflow.Context, incidentID, reason string) {
 	err := workflow.ExecuteActivity(escalateCtx, "EscalateIncident", activity.EscalateIncidentParams{
 		IncidentID: incidentID,
 		Reason:     reason,
+		Actor:      "agent:incident-investigator",
 	}).Get(ctx, nil)
 	if err != nil {
 		workflow.GetLogger(ctx).Error("failed to escalate incident",
