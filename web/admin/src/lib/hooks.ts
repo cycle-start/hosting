@@ -1173,19 +1173,21 @@ export function useIncidents(params?: IncidentListParams) {
   })
 }
 
-export function useIncident(id: string) {
+export function useIncident(id: string, polling?: boolean) {
   return useQuery({
     queryKey: ['incident', id],
     queryFn: () => api.get<Incident>(`/incidents/${id}`),
     enabled: !!id,
+    refetchInterval: polling ? 3000 : false,
   })
 }
 
-export function useIncidentEvents(incidentId: string) {
+export function useIncidentEvents(incidentId: string, polling?: boolean) {
   return useQuery({
     queryKey: ['incident-events', incidentId],
     queryFn: () => api.get<PaginatedResponse<IncidentEvent>>(`/incidents/${incidentId}/events?limit=100`),
     enabled: !!incidentId,
+    refetchInterval: polling ? 3000 : false,
   })
 }
 

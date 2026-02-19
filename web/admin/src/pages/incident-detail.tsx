@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useParams } from '@tanstack/react-router'
-import { AlertCircle, CheckCircle, ArrowUpCircle, XCircle, Plus, MessageSquarePlus } from 'lucide-react'
+import { CheckCircle, ArrowUpCircle, XCircle, Plus, MessageSquarePlus, Send, Bot, User } from 'lucide-react'
 import {
   useIncident,
   useIncidentEvents,
@@ -27,6 +27,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -38,8 +39,12 @@ import {
 
 export function IncidentDetailPage() {
   const { id } = useParams({ strict: false }) as { id: string }
-  const { data: incident, isLoading } = useIncident(id)
-  const { data: eventsData, isLoading: eventsLoading } = useIncidentEvents(id)
+
+  // Enable polling when the incident is being investigated by the agent.
+  const { data: incident, isLoading } = useIncident(id, true)
+  const isAgentActive = incident?.status === 'investigating' &&
+    incident?.assigned_to?.startsWith('agent:')
+  const { data: eventsData, isLoading: eventsLoading } = useIncidentEvents(id, isAgentActive)
   const { data: gapsData, isLoading: gapsLoading } = useIncidentGaps(id)
   const resolveMutation = useResolveIncident()
   const escalateMutation = useEscalateIncident()
@@ -54,9 +59,21 @@ export function IncidentDetailPage() {
   const [noteOpen, setNoteOpen] = useState(false)
   const [noteAction, setNoteAction] = useState('commented')
   const [noteDetail, setNoteDetail] = useState('')
+  const [chatMessage, setChatMessage] = useState('')
+
+  const timelineEndRef = useRef<HTMLDivElement>(null)
+  const prevEventCount = useRef(0)
 
   const events = eventsData?.items ?? []
   const gaps = gapsData?.items ?? []
+
+  // Auto-scroll to bottom when new events arrive during agent investigation.
+  useEffect(() => {
+    if (isAgentActive && events.length > prevEventCount.current) {
+      timelineEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+    prevEventCount.current = events.length
+  }, [events.length, isAgentActive])
 
   if (isLoading || !incident) {
     return (
@@ -68,6 +85,15 @@ export function IncidentDetailPage() {
   }
 
   const isActive = ['open', 'investigating', 'remediating'].includes(incident.status)
+
+  const sendChatMessage = () => {
+    const msg = chatMessage.trim()
+    if (!msg) return
+    addEventMutation.mutate(
+      { incidentId: id, actor: 'admin', action: 'admin_message', detail: msg },
+      { onSuccess: () => setChatMessage('') },
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -111,6 +137,43 @@ export function IncidentDetailPage() {
         }
       />
 
+      {/* Agent chat bar — shown when agent is actively investigating */}
+      {isAgentActive && (
+        <Card className="border-blue-500/50">
+          <CardContent className="py-3 px-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Bot className="h-4 w-4 text-blue-500 animate-pulse" />
+              <span className="text-sm font-medium text-blue-500">
+                Agent is investigating
+              </span>
+              <span className="text-xs text-muted-foreground">
+                — Timeline updates live. Send a message to guide the agent.
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Send a message to the agent..."
+                value={chatMessage}
+                onChange={(e) => setChatMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    sendChatMessage()
+                  }
+                }}
+              />
+              <Button
+                size="sm"
+                disabled={!chatMessage.trim() || addEventMutation.isPending}
+                onClick={sendChatMessage}
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="timeline">Timeline ({events.length})</TabsTrigger>
@@ -119,7 +182,7 @@ export function IncidentDetailPage() {
         </TabsList>
 
         <TabsContent value="timeline" className="space-y-4">
-          {isActive && !noteOpen && (
+          {isActive && !isAgentActive && !noteOpen && (
             <Button
               variant="outline"
               size="sm"
@@ -128,7 +191,7 @@ export function IncidentDetailPage() {
               <Plus className="mr-2 h-4 w-4" /> Add Note
             </Button>
           )}
-          {isActive && noteOpen && (
+          {isActive && !isAgentActive && noteOpen && (
             <Card>
               <CardContent className="py-4 px-4 space-y-3">
                 <div className="flex items-center gap-2 mb-1">
@@ -186,34 +249,50 @@ export function IncidentDetailPage() {
             </Card>
           ) : (
             <div className="space-y-3">
-              {events.map((evt) => (
-                <Card key={evt.id}>
-                  <CardContent className="py-3 px-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <StatusBadge status={evt.action} />
-                          <span className="text-xs text-muted-foreground">{evt.actor}</span>
+              {events.map((evt) => {
+                const isAdminMsg = evt.action === 'admin_message'
+                const isAgentEvt = evt.actor.startsWith('agent:')
+                return (
+                  <Card
+                    key={evt.id}
+                    className={
+                      isAdminMsg ? 'border-blue-500/30 bg-blue-500/5' :
+                      isAgentEvt ? 'border-orange-500/20' : ''
+                    }
+                  >
+                    <CardContent className="py-3 px-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            {isAdminMsg ? (
+                              <User className="h-3.5 w-3.5 text-blue-500" />
+                            ) : isAgentEvt ? (
+                              <Bot className="h-3.5 w-3.5 text-orange-500" />
+                            ) : null}
+                            <StatusBadge status={evt.action} />
+                            <span className="text-xs text-muted-foreground">{evt.actor}</span>
+                          </div>
+                          <p className="text-sm">{evt.detail}</p>
+                          {evt.metadata && Object.keys(evt.metadata).length > 0 && (
+                            <details className="mt-2">
+                              <summary className="text-xs text-muted-foreground cursor-pointer">
+                                Metadata
+                              </summary>
+                              <pre className="mt-1 text-xs bg-muted p-2 rounded overflow-x-auto">
+                                {JSON.stringify(evt.metadata, null, 2)}
+                              </pre>
+                            </details>
+                          )}
                         </div>
-                        <p className="text-sm">{evt.detail}</p>
-                        {evt.metadata && Object.keys(evt.metadata).length > 0 && (
-                          <details className="mt-2">
-                            <summary className="text-xs text-muted-foreground cursor-pointer">
-                              Metadata
-                            </summary>
-                            <pre className="mt-1 text-xs bg-muted p-2 rounded overflow-x-auto">
-                              {JSON.stringify(evt.metadata, null, 2)}
-                            </pre>
-                          </details>
-                        )}
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {formatRelative(evt.created_at)}
+                        </span>
                       </div>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {formatRelative(evt.created_at)}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                )
+              })}
+              <div ref={timelineEndRef} />
             </div>
           )}
         </TabsContent>

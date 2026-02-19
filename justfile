@@ -116,12 +116,16 @@ create-api-key name:
 create-dev-key:
     CORE_DATABASE_URL="postgres://hosting:hosting@{{cp}}:5432/hosting_core?sslmode=disable" go run ./cmd/core-api create-api-key --name dev --raw-key hst_dev_e2e_test_key_00000000
 
+# Create the agent API key (used by the LLM incident agent to call the core API)
+create-agent-key:
+    CORE_DATABASE_URL="postgres://hosting:hosting@{{cp}}:5432/hosting_core?sslmode=disable" go run ./cmd/core-api create-api-key --name agent --raw-key hst_agent_key_000000000000000
+
 # Register cluster topology (regions, clusters, shards, nodes) with the platform
 cluster-apply:
     go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml
 
-# Full bootstrap after DB reset: migrate, create dev key, register cluster, seed tenants
-bootstrap: migrate create-dev-key cluster-apply seed
+# Full bootstrap after DB reset: migrate, create dev key, create agent key, register cluster, seed tenants
+bootstrap: migrate create-dev-key create-agent-key cluster-apply seed
 
 # Generate Temporal mTLS certificates
 gen-certs:

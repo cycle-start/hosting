@@ -33,7 +33,7 @@ type CancelIncident struct {
 
 type AddIncidentEvent struct {
 	Actor    string          `json:"actor" validate:"required"`
-	Action   string          `json:"action" validate:"required,oneof=investigated attempted_fix fix_succeeded fix_failed escalated resolved cancelled capability_gap commented"`
+	Action   string          `json:"action" validate:"required,oneof=investigated attempted_fix fix_succeeded fix_failed escalated resolved cancelled capability_gap commented admin_message"`
 	Detail   string          `json:"detail" validate:"required"`
 	Metadata json.RawMessage `json:"metadata"`
 }

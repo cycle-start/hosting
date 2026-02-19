@@ -205,6 +205,8 @@ type InvestigateIncidentResult struct {
 }
 
 // InvestigateIncident runs the multi-turn LLM investigation loop.
+// Between each turn, it checks for admin_message events posted by human operators
+// and injects them into the conversation, enabling live chat with the agent.
 func (a *AgentActivities) InvestigateIncident(ctx context.Context, params InvestigateIncidentParams) (*InvestigateIncidentResult, error) {
 	incidentJSON, err := json.Marshal(params.IncidentContext)
 	if err != nil {
@@ -232,8 +234,23 @@ func (a *AgentActivities) InvestigateIncident(ctx context.Context, params Invest
 	var toolHistory []toolCallRecord
 	var resolveArgs string
 
+	// Track which admin messages we've already injected (by event ID).
+	seenAdminMessages := map[string]bool{}
+
 	for turn := 1; turn <= a.maxTurns; turn++ {
 		activity.RecordHeartbeat(ctx, fmt.Sprintf("turn %d/%d", turn, a.maxTurns))
+
+		// Check for new admin messages between turns.
+		adminMsgs := a.fetchAdminMessages(ctx, incidentID, seenAdminMessages)
+		for _, msg := range adminMsgs {
+			messages = append(messages, llm.Message{
+				Role:    "user",
+				Content: fmt.Sprintf("Message from admin operator:\n\n%s", msg.Detail),
+			})
+			// Record that we acknowledged the message.
+			a.recordEvent(ctx, incidentID, "commented",
+				fmt.Sprintf("Received admin message: %s", truncate(msg.Detail, 100)))
+		}
 
 		resp, err := a.llm.Chat(ctx, llm.ChatRequest{
 			Messages: messages,
@@ -328,6 +345,40 @@ func (a *AgentActivities) InvestigateIncident(ctx context.Context, params Invest
 	}, nil
 }
 
+// adminMessage is a lightweight struct for admin messages fetched between turns.
+type adminMessage struct {
+	ID     string
+	Detail string
+}
+
+// fetchAdminMessages queries for admin_message events not yet seen and marks them as seen.
+func (a *AgentActivities) fetchAdminMessages(ctx context.Context, incidentID string, seen map[string]bool) []adminMessage {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, detail FROM incident_events
+		 WHERE incident_id = $1 AND action = 'admin_message'
+		 ORDER BY created_at ASC`,
+		incidentID,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var msgs []adminMessage
+	for rows.Next() {
+		var id, detail string
+		if err := rows.Scan(&id, &detail); err != nil {
+			continue
+		}
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		msgs = append(msgs, adminMessage{ID: id, Detail: detail})
+	}
+	return msgs
+}
+
 // buildResolutionHint creates a structured summary of how an incident was resolved,
 // suitable for passing as context to similar incidents.
 func buildResolutionHint(incidentType, title, resolveArgs string, history []toolCallRecord) string {
@@ -406,6 +457,13 @@ const DefaultSystemPrompt = `You are an autonomous infrastructure incident respo
 - Replication broken → check shard/node status → converge if nodes healthy
 - Shard degraded → list nodes → identify failures → consider convergence
 - Unknown type → gather all context → escalate with full summary
+
+## Admin Messages
+Human operators may send you messages during your investigation. These appear as
+"Message from admin operator:" in the conversation. When you receive one:
+- Acknowledge the message and adjust your investigation accordingly
+- Follow any instructions or guidance provided
+- Continue reporting your findings and actions as normal
 
 ## Constraints
 - No destructive actions (delete resources, revoke keys)

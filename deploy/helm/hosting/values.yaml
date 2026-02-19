@@ -76,7 +76,7 @@ secrets:
   stalwartAdminToken: ""
   secretEncryptionKey: ""
   llmApiKey: ""
-  agentApiKey: ""
+  agentApiKey: "" # Dev: hst_agent_key_000000000000000 (created by `just create-agent-key`)
 
 # Temporal connection
 temporal:
