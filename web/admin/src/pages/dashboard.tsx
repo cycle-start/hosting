@@ -1,4 +1,4 @@
-import { MapPin, Server, Users, Database, Globe, Boxes, Link2, HardDrive, AlertCircle, ShieldAlert, Clock } from 'lucide-react'
+import { MapPin, Server, Users, Database, Globe, Boxes, Link2, HardDrive, AlertCircle, ShieldAlert, Clock, Lightbulb } from 'lucide-react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatsCard } from '@/components/shared/stats-card'
@@ -39,7 +39,7 @@ export function DashboardPage() {
       <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
 
       {/* Health Overview */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatsCard
           label="Open Incidents"
           value={stats.incidents_open}
@@ -63,6 +63,12 @@ export function DashboardPage() {
           value={stats.mttr_minutes != null ? `${Math.round(stats.mttr_minutes)}m` : 'N/A'}
           icon={Clock}
         />
+        <StatsCard
+          label="Open Gaps"
+          value={stats.capability_gaps_open}
+          icon={Lightbulb}
+          className={stats.capability_gaps_open > 0 ? 'border-orange-500/50' : ''}
+        />
       </div>
 
       {/* Infrastructure */}
@@ -77,7 +83,7 @@ export function DashboardPage() {
         <StatsCard label="FQDNs" value={stats.fqdns} icon={Link2} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Tenants by Status</CardTitle>
@@ -124,6 +130,42 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <DataTable columns={clusterColumns} data={stats.nodes_per_cluster ?? []} emptyMessage="No clusters" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Agent Activity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              const investigating = stats.incidents_by_status?.find((s) => s.status === 'investigating')?.count ?? 0
+              const resolved = stats.incidents_by_status?.find((s) => s.status === 'resolved')?.count ?? 0
+              const escalated = stats.incidents_by_status?.find((s) => s.status === 'escalated')?.count ?? 0
+              const total = resolved + escalated
+              return (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Investigating</span>
+                    <span className="text-sm font-medium">{investigating}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Resolved</span>
+                    <span className="text-sm font-medium">{resolved}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Escalated</span>
+                    <span className="text-sm font-medium">{escalated}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-t pt-3">
+                    <span className="text-sm text-muted-foreground">Resolution Rate</span>
+                    <span className="text-sm font-medium">
+                      {total > 0 ? `${Math.round((resolved / total) * 100)}%` : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              )
+            })()}
           </CardContent>
         </Card>
       </div>

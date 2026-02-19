@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams } from '@tanstack/react-router'
-import { AlertCircle, CheckCircle, ArrowUpCircle, XCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle, ArrowUpCircle, XCircle, Plus, MessageSquarePlus } from 'lucide-react'
 import {
   useIncident,
   useIncidentEvents,
@@ -8,6 +8,7 @@ import {
   useResolveIncident,
   useEscalateIncident,
   useCancelIncident,
+  useAddIncidentEvent,
 } from '@/lib/hooks'
 import { formatDate, formatRelative } from '@/lib/utils'
 import { StatusBadge } from '@/components/shared/status-badge'
@@ -27,6 +28,13 @@ import {
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 export function IncidentDetailPage() {
   const { id } = useParams({ strict: false }) as { id: string }
@@ -36,12 +44,16 @@ export function IncidentDetailPage() {
   const resolveMutation = useResolveIncident()
   const escalateMutation = useEscalateIncident()
   const cancelMutation = useCancelIncident()
+  const addEventMutation = useAddIncidentEvent()
 
   const [activeTab, setActiveTab] = useState('timeline')
   const [resolveOpen, setResolveOpen] = useState(false)
   const [escalateOpen, setEscalateOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [actionText, setActionText] = useState('')
+  const [noteOpen, setNoteOpen] = useState(false)
+  const [noteAction, setNoteAction] = useState('commented')
+  const [noteDetail, setNoteDetail] = useState('')
 
   const events = eventsData?.items ?? []
   const gaps = gapsData?.items ?? []
@@ -107,6 +119,63 @@ export function IncidentDetailPage() {
         </TabsList>
 
         <TabsContent value="timeline" className="space-y-4">
+          {isActive && !noteOpen && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setNoteAction('commented'); setNoteDetail(''); setNoteOpen(true) }}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Add Note
+            </Button>
+          )}
+          {isActive && noteOpen && (
+            <Card>
+              <CardContent className="py-4 px-4 space-y-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <MessageSquarePlus className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Add Note</span>
+                </div>
+                <div className="space-y-2">
+                  <Label>Action</Label>
+                  <Select value={noteAction} onValueChange={setNoteAction}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="commented">Commented</SelectItem>
+                      <SelectItem value="investigated">Investigated</SelectItem>
+                      <SelectItem value="attempted_fix">Attempted Fix</SelectItem>
+                      <SelectItem value="fix_succeeded">Fix Succeeded</SelectItem>
+                      <SelectItem value="fix_failed">Fix Failed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Detail</Label>
+                  <Textarea
+                    value={noteDetail}
+                    onChange={(e) => setNoteDetail(e.target.value)}
+                    placeholder="Describe what happened..."
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    disabled={!noteDetail.trim() || addEventMutation.isPending}
+                    onClick={() => {
+                      addEventMutation.mutate(
+                        { incidentId: id, actor: 'admin', action: noteAction, detail: noteDetail },
+                        { onSuccess: () => { setNoteOpen(false); setNoteDetail(''); setNoteAction('commented') } },
+                      )
+                    }}
+                  >
+                    {addEventMutation.isPending ? 'Saving...' : 'Save'}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setNoteOpen(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           {eventsLoading ? (
             <Skeleton className="h-32 w-full" />
           ) : events.length === 0 ? (

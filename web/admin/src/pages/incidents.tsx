@@ -9,6 +9,7 @@ import { DataTable } from '@/components/shared/data-table'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { ResourceHeader } from '@/components/shared/resource-header'
 import { EmptyState } from '@/components/shared/empty-state'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -22,10 +23,14 @@ export function IncidentsPage() {
   const navigate = useNavigate()
   const [status, setStatus] = useState('')
   const [severity, setSeverity] = useState('')
+  const [type, setType] = useState('')
+  const [source, setSource] = useState('')
 
   const { data, isLoading } = useIncidents({
     status: status || undefined,
     severity: severity || undefined,
+    type: type || undefined,
+    source: source || undefined,
     limit: 50,
   })
 
@@ -116,6 +121,22 @@ export function IncidentsPage() {
               <SelectItem value="info">Info</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Type</Label>
+          <Input
+            placeholder="Filter by type..."
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Source</Label>
+          <Input
+            placeholder="Filter by source..."
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+          />
         </div>
       </div>
 

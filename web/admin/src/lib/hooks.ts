@@ -1245,6 +1245,21 @@ export function useGapIncidents(gapId: string) {
   })
 }
 
+export function useAddIncidentEvent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (params: { incidentId: string; actor: string; action: string; detail: string }) =>
+      api.post(`/incidents/${params.incidentId}/events`, {
+        actor: params.actor,
+        action: params.action,
+        detail: params.detail,
+      }),
+    onSuccess: (_, params) => {
+      qc.invalidateQueries({ queryKey: ['incident-events', params.incidentId] })
+    },
+  })
+}
+
 // Capability Gaps
 export function useCapabilityGaps(params?: CapabilityGapListParams) {
   return useQuery({

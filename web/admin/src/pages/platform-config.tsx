@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Save, Settings, Webhook, Code } from 'lucide-react'
+import { Save, Settings, Webhook, Code, Bot, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,16 @@ const WEBHOOK_TRIGGERS = [
   { key: 'critical', label: 'Critical Incidents', description: 'Fires when a new critical incident is created' },
   { key: 'escalated', label: 'Escalated Incidents', description: 'Fires when an incident is escalated' },
 ] as const
+
+const COMMON_INCIDENT_TYPES = [
+  'disk_pressure',
+  'node_health_missing',
+  'convergence_stuck',
+  'replication_lag',
+  'replication_broken',
+  'cert_expiring',
+  'cephfs_unmounted',
+]
 
 function WebhooksTab({ config, onSave, isSaving }: {
   config: PlatformConfig
@@ -101,6 +111,131 @@ function WebhooksTab({ config, onSave, isSaving }: {
         <Button onClick={handleSave} disabled={isSaving}>
           <Save className="mr-2 h-4 w-4" />
           {isSaving ? 'Saving...' : 'Save Webhooks'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function AgentTab({ config, onSave, isSaving }: {
+  config: PlatformConfig
+  onSave: (updates: PlatformConfig) => void
+  isSaving: boolean
+}) {
+  const [systemPrompt, setSystemPrompt] = useState('')
+  const [concurrencyEntries, setConcurrencyEntries] = useState<{ type: string; limit: string }[]>([])
+
+  useEffect(() => {
+    setSystemPrompt(config['agent.system_prompt'] || '')
+
+    const entries: { type: string; limit: string }[] = []
+    for (const key of Object.keys(config)) {
+      if (key.startsWith('agent.concurrency.')) {
+        const typeName = key.slice('agent.concurrency.'.length)
+        entries.push({ type: typeName, limit: config[key] || '' })
+      }
+    }
+    setConcurrencyEntries(entries)
+  }, [config])
+
+  const handleSave = () => {
+    const updates: PlatformConfig = {}
+    updates['agent.system_prompt'] = systemPrompt
+    for (const entry of concurrencyEntries) {
+      if (entry.type.trim()) {
+        updates[`agent.concurrency.${entry.type.trim()}`] = entry.limit
+      }
+    }
+    onSave(updates)
+  }
+
+  const addEntry = () => {
+    setConcurrencyEntries(prev => [...prev, { type: '', limit: '1' }])
+  }
+
+  const removeEntry = (index: number) => {
+    setConcurrencyEntries(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const updateEntry = (index: number, field: 'type' | 'limit', value: string) => {
+    setConcurrencyEntries(prev => prev.map((entry, i) =>
+      i === index ? { ...entry, [field]: value } : entry
+    ))
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">System Prompt</CardTitle>
+          <CardDescription>
+            Override the default system prompt for the LLM investigation agent. Leave empty to use the built-in default.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Textarea
+            className="min-h-[200px] font-mono"
+            placeholder="Leave empty to use the built-in default system prompt..."
+            value={systemPrompt}
+            onChange={e => setSystemPrompt(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            The default system prompt covers platform architecture, responsibilities, decision framework, and constraints.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Investigation Concurrency</CardTitle>
+          <CardDescription>
+            Configure how many follower incidents can be investigated in parallel per incident type. Types not listed here use the global default (AGENT_FOLLOWER_CONCURRENT).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {concurrencyEntries.length > 0 && (
+            <div className="space-y-2">
+              {concurrencyEntries.map((entry, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <Input
+                    className="flex-1"
+                    placeholder="Incident type (e.g., replication_lag)"
+                    value={entry.type}
+                    onChange={e => updateEntry(index, 'type', e.target.value)}
+                  />
+                  <Input
+                    className="w-24"
+                    type="number"
+                    min={1}
+                    placeholder="Limit"
+                    value={entry.limit}
+                    onChange={e => updateEntry(index, 'limit', e.target.value)}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeEntry(index)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+          <Button variant="outline" size="sm" onClick={addEntry}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Type
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Common types: {COMMON_INCIDENT_TYPES.join(', ')}
+          </p>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-end">
+        <Button onClick={handleSave} disabled={isSaving}>
+          <Save className="mr-2 h-4 w-4" />
+          {isSaving ? 'Saving...' : 'Save Agent Settings'}
         </Button>
       </div>
     </div>
@@ -195,6 +330,10 @@ export function PlatformConfigPage() {
             <Webhook className="mr-2 h-4 w-4" />
             Webhooks
           </TabsTrigger>
+          <TabsTrigger value="agent">
+            <Bot className="mr-2 h-4 w-4" />
+            Agent
+          </TabsTrigger>
           <TabsTrigger value="raw">
             <Code className="mr-2 h-4 w-4" />
             Raw JSON
@@ -202,6 +341,9 @@ export function PlatformConfigPage() {
         </TabsList>
         <TabsContent value="webhooks" className="mt-4">
           <WebhooksTab config={config} onSave={handleSave} isSaving={updateMutation.isPending} />
+        </TabsContent>
+        <TabsContent value="agent" className="mt-4">
+          <AgentTab config={config} onSave={handleSave} isSaving={updateMutation.isPending} />
         </TabsContent>
         <TabsContent value="raw" className="mt-4">
           <RawJsonTab config={config} onSave={handleSave} isSaving={updateMutation.isPending} />
