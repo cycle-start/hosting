@@ -156,10 +156,22 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 			expectedConfigs[confName] = true
 			// FPM pool configs are per-tenant (not per-webroot).
 			expectedPools[tenant.Name+".conf"] = true
+
+			fqdns := state.FQDNs[webroot.ID]
+			// Add service hostname as an additional server_name if enabled.
+			if webroot.ServiceHostnameEnabled {
+				if baseHostname, ok := state.BrandBaseHostnames[tenant.ID]; ok && baseHostname != "" {
+					fqdns = append(fqdns, activity.FQDNParam{
+						FQDN:      fmt.Sprintf("%s.%s.%s", webroot.Name, tenant.Name, baseHostname),
+						WebrootID: webroot.ID,
+					})
+				}
+			}
+
 			webrootEntries = append(webrootEntries, webrootEntry{
 				tenant:  tenant,
 				webroot: webroot,
-				fqdns:   state.FQDNs[webroot.ID],
+				fqdns:   fqdns,
 			})
 			// Daemon configs: daemon-{tenantName}-{daemonName}.conf
 			for _, daemon := range state.Daemons[webroot.ID] {

@@ -96,6 +96,7 @@ export interface Webroot {
   public_folder: string
   env_file_name: string
   env_shell_source: boolean
+  service_hostname_enabled: boolean
   status: string
   status_message?: string
   created_at: string
@@ -547,6 +548,15 @@ export interface IncidentListParams extends ListParams {
 
 export interface CapabilityGapListParams extends ListParams {
   category?: string
+}
+
+export interface ResourceUsage {
+  id: string
+  resource_type: string
+  resource_id: string
+  tenant_id: string
+  bytes_used: number
+  collected_at: string
 }
 
 export interface SSHKeyFormData { name: string; public_key: string }

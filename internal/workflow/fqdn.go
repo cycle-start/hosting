@@ -77,6 +77,14 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 		})
 	}
 
+	// Include service hostname as additional server_name if enabled.
+	if fctx.Webroot.ServiceHostnameEnabled && fctx.BrandBaseHostname != "" {
+		fqdnParams = append(fqdnParams, activity.FQDNParam{
+			FQDN:      fmt.Sprintf("%s.%s.%s", fctx.Webroot.Name, fctx.Tenant.Name, fctx.BrandBaseHostname),
+			WebrootID: fctx.Webroot.ID,
+		})
+	}
+
 	bindErrs := fanOutNodes(ctx, fctx.Nodes, func(gCtx workflow.Context, node model.Node) error {
 		nodeCtx := nodeActivityCtx(gCtx, node.ID)
 		return workflow.ExecuteActivity(nodeCtx, "UpdateWebroot", activity.UpdateWebrootParams{
@@ -206,6 +214,14 @@ func UnbindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 				FQDN:       f.FQDN,
 				WebrootID:  f.WebrootID,
 				SSLEnabled: f.SSLEnabled,
+			})
+		}
+
+		// Include service hostname as additional server_name if enabled.
+		if fctx.Webroot.ServiceHostnameEnabled && fctx.BrandBaseHostname != "" {
+			fqdnParams = append(fqdnParams, activity.FQDNParam{
+				FQDN:      fmt.Sprintf("%s.%s.%s", fctx.Webroot.Name, fctx.Tenant.Name, fctx.BrandBaseHostname),
+				WebrootID: fctx.Webroot.ID,
 			})
 		}
 

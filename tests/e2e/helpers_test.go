@@ -268,6 +268,33 @@ func httpPut(t *testing.T, url string, body interface{}) (*http.Response, string
 	return resp, string(b)
 }
 
+// httpPatch performs an HTTP PATCH with a JSON body.
+func httpPatch(t *testing.T, url string, body interface{}) (*http.Response, string) {
+	t.Helper()
+	var reqBody io.Reader
+	if body != nil {
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			t.Fatalf("marshal PATCH body: %v", err)
+		}
+		reqBody = bytes.NewReader(jsonBody)
+	}
+	req, err := http.NewRequest(http.MethodPatch, url, reqBody)
+	if err != nil {
+		t.Fatalf("create PATCH request %s: %v", url, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	setAPIKey(req)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("PATCH %s: %v", url, err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp, string(b)
+}
+
 // httpDelete performs an HTTP DELETE.
 func httpDelete(t *testing.T, url string) (*http.Response, string) {
 	t.Helper()

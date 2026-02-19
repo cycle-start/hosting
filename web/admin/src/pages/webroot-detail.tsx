@@ -49,6 +49,7 @@ export function WebrootDetailPage() {
   const [editPublicFolder, setEditPublicFolder] = useState('')
   const [editEnvFileName, setEditEnvFileName] = useState('')
   const [editEnvShellSource, setEditEnvShellSource] = useState(false)
+  const [editServiceHostname, setEditServiceHostname] = useState(true)
 
   // Create FQDN form
   const [fqdnValue, setFqdnValue] = useState('')
@@ -120,12 +121,13 @@ export function WebrootDetailPage() {
     setEditPublicFolder(webroot.public_folder)
     setEditEnvFileName(webroot.env_file_name || '.env.hosting')
     setEditEnvShellSource(webroot.env_shell_source || false)
+    setEditServiceHostname(webroot.service_hostname_enabled ?? true)
     setEditOpen(true)
   }
 
   const handleUpdate = async () => {
     try {
-      await updateMut.mutateAsync({ id: webrootId, runtime: editRuntime, runtime_version: editVersion, public_folder: editPublicFolder, env_file_name: editEnvFileName, env_shell_source: editEnvShellSource })
+      await updateMut.mutateAsync({ id: webrootId, runtime: editRuntime, runtime_version: editVersion, public_folder: editPublicFolder, env_file_name: editEnvFileName, env_shell_source: editEnvShellSource, service_hostname_enabled: editServiceHostname })
       toast.success('Webroot updated'); setEditOpen(false)
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }
@@ -496,7 +498,7 @@ export function WebrootDetailPage() {
 
       <ResourceHeader
         title={webroot.name}
-        subtitle={`${webroot.runtime} ${webroot.runtime_version} | Public: ${webroot.public_folder} | Env: ${webroot.env_file_name || '.env.hosting'}${webroot.env_shell_source ? ' (shell-sourced)' : ''}`}
+        subtitle={`${webroot.runtime} ${webroot.runtime_version} | Public: ${webroot.public_folder} | Env: ${webroot.env_file_name || '.env.hosting'}${webroot.env_shell_source ? ' (shell-sourced)' : ''} | Service hostname: ${webroot.service_hostname_enabled ? 'on' : 'off'}`}
         status={webroot.status}
         actions={
           <Button variant="outline" size="sm" onClick={openEdit}>
@@ -648,6 +650,13 @@ export function WebrootDetailPage() {
                 </div>
                 <p className="text-xs text-muted-foreground">Source env file in SSH shell sessions via .bashrc</p>
               </div>
+            </div>
+            <div className="space-y-2 flex flex-col justify-center pt-4">
+              <div className="flex items-center gap-2">
+                <Switch checked={editServiceHostname} onCheckedChange={setEditServiceHostname} />
+                <Label>Service Hostname</Label>
+              </div>
+              <p className="text-xs text-muted-foreground">Enable auto-generated {'{webroot}.{tenant}.{brand}'} hostname</p>
             </div>
           </div>
           <DialogFooter>

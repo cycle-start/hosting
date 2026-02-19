@@ -276,7 +276,7 @@ export function useCreateWebroot() {
 export function useUpdateWebroot() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { id: string; runtime?: string; runtime_version?: string; runtime_config?: Record<string, unknown>; public_folder?: string; env_file_name?: string; env_shell_source?: boolean }) =>
+    mutationFn: (data: { id: string; runtime?: string; runtime_version?: string; runtime_config?: Record<string, unknown>; public_folder?: string; env_file_name?: string; env_shell_source?: boolean; service_hostname_enabled?: boolean }) =>
       api.put<Webroot>(`/webroots/${data.id}`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['webroots'] })

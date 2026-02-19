@@ -413,6 +413,30 @@ func (s *TenantService) ResourceSummary(ctx context.Context, tenantID string) (*
 	return summary, nil
 }
 
+func (s *TenantService) ListResourceUsage(ctx context.Context, tenantID string) ([]model.ResourceUsage, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT ru.id, ru.resource_type, ru.resource_id, ru.tenant_id, ru.bytes_used, ru.collected_at
+		 FROM resource_usage ru WHERE ru.tenant_id = $1 ORDER BY ru.resource_type, ru.collected_at DESC`, tenantID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list resource usage for tenant %s: %w", tenantID, err)
+	}
+	defer rows.Close()
+
+	var usages []model.ResourceUsage
+	for rows.Next() {
+		var u model.ResourceUsage
+		if err := rows.Scan(&u.ID, &u.ResourceType, &u.ResourceID, &u.TenantID, &u.BytesUsed, &u.CollectedAt); err != nil {
+			return nil, fmt.Errorf("scan resource usage: %w", err)
+		}
+		usages = append(usages, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate resource usage: %w", err)
+	}
+	return usages, nil
+}
+
 func (s *TenantService) NextUID(ctx context.Context) (int, error) {
 	var uid int
 	err := s.db.QueryRow(ctx, "SELECT nextval('tenant_uid_seq')").Scan(&uid)

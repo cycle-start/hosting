@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -1144,5 +1145,124 @@ func (a *NodeLocal) GetDiskUsage(ctx context.Context) ([]DiskUsage, error) {
 	}
 
 	return results, nil
+}
+
+// --------------------------------------------------------------------------
+// Resource usage collection activities
+// --------------------------------------------------------------------------
+
+// GetResourceUsageParams holds parameters for collecting per-resource usage.
+type GetResourceUsageParams struct {
+	Role string `json:"role"` // "web" or "database"
+}
+
+// ResourceUsageEntry represents per-resource disk usage collected from a node.
+type ResourceUsageEntry struct {
+	ResourceType string `json:"resource_type"` // "webroot" or "database"
+	Name         string `json:"name"`          // "tenant/webroot" or "db_name"
+	BytesUsed    int64  `json:"bytes_used"`
+}
+
+// GetResourceUsage collects per-resource disk usage on this node.
+func (a *NodeLocal) GetResourceUsage(ctx context.Context, params GetResourceUsageParams) ([]ResourceUsageEntry, error) {
+	a.logger.Info().Str("role", params.Role).Msg("GetResourceUsage")
+
+	switch params.Role {
+	case "web":
+		return a.getWebResourceUsage(ctx)
+	case "database":
+		return a.getDatabaseResourceUsage(ctx)
+	default:
+		return nil, fmt.Errorf("unsupported role for resource usage: %s", params.Role)
+	}
+}
+
+// getWebResourceUsage walks /var/www/storage/*/webroots/*/ and runs du -sb on each.
+func (a *NodeLocal) getWebResourceUsage(ctx context.Context) ([]ResourceUsageEntry, error) {
+	baseDir := "/var/www/storage"
+	tenantDirs, err := os.ReadDir(baseDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read storage dir: %w", err)
+	}
+
+	var entries []ResourceUsageEntry
+	for _, tenantDir := range tenantDirs {
+		if !tenantDir.IsDir() {
+			continue
+		}
+		tenantName := tenantDir.Name()
+		webrootsDir := filepath.Join(baseDir, tenantName, "webroots")
+		webrootDirs, err := os.ReadDir(webrootsDir)
+		if err != nil {
+			continue // no webroots dir for this tenant
+		}
+		for _, wrDir := range webrootDirs {
+			if !wrDir.IsDir() {
+				continue
+			}
+			webrootName := wrDir.Name()
+			webrootPath := filepath.Join(webrootsDir, webrootName)
+
+			// Run du -sb to get total bytes.
+			cmd := exec.CommandContext(ctx, "du", "-sb", webrootPath)
+			out, err := cmd.Output()
+			if err != nil {
+				a.logger.Warn().Err(err).Str("path", webrootPath).Msg("du -sb failed")
+				continue
+			}
+			parts := strings.Fields(string(out))
+			if len(parts) < 1 {
+				continue
+			}
+			bytesUsed, err := strconv.ParseInt(parts[0], 10, 64)
+			if err != nil {
+				continue
+			}
+
+			entries = append(entries, ResourceUsageEntry{
+				ResourceType: "webroot",
+				Name:         tenantName + "/" + webrootName,
+				BytesUsed:    bytesUsed,
+			})
+		}
+	}
+
+	return entries, nil
+}
+
+// getDatabaseResourceUsage queries MySQL information_schema for per-database sizes.
+func (a *NodeLocal) getDatabaseResourceUsage(ctx context.Context) ([]ResourceUsageEntry, error) {
+	cmd := exec.CommandContext(ctx, "mysql", "-N", "-B", "-e",
+		"SELECT table_schema, SUM(data_length + index_length) FROM information_schema.tables WHERE table_schema NOT IN ('mysql','information_schema','performance_schema','sys') GROUP BY table_schema")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("mysql query failed: %w", err)
+	}
+
+	var entries []ResourceUsageEntry
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) < 2 {
+			continue
+		}
+		dbName := parts[0]
+		bytesUsed, err := strconv.ParseInt(parts[1], 10, 64)
+		if err != nil {
+			continue
+		}
+		entries = append(entries, ResourceUsageEntry{
+			ResourceType: "database",
+			Name:         dbName,
+			BytesUsed:    bytesUsed,
+		})
+	}
+
+	return entries, nil
 }
 

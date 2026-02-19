@@ -121,12 +121,13 @@ func TestWebrootService_GetByID_Success(t *testing.T) {
 		*(dest[5].(*json.RawMessage)) = cfg
 		*(dest[6].(*string)) = "/public"
 		*(dest[7].(*string)) = ".env.hosting"
-		*(dest[8].(*bool)) = false
-		*(dest[9].(*string)) = model.StatusActive
-		*(dest[10].(**string)) = nil // status_message
-		*(dest[11].(*string)) = ""  // suspend_reason
-		*(dest[12].(*time.Time)) = now
+		*(dest[8].(*bool)) = false  // env_shell_source
+		*(dest[9].(*bool)) = true   // service_hostname_enabled
+		*(dest[10].(*string)) = model.StatusActive
+		*(dest[11].(**string)) = nil // status_message
+		*(dest[12].(*string)) = ""  // suspend_reason
 		*(dest[13].(*time.Time)) = now
+		*(dest[14].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -183,12 +184,13 @@ func TestWebrootService_ListByTenant_Success(t *testing.T) {
 			*(dest[5].(*json.RawMessage)) = cfg
 			*(dest[6].(*string)) = "/public"
 			*(dest[7].(*string)) = ".env.hosting"
-			*(dest[8].(*bool)) = false
-			*(dest[9].(*string)) = model.StatusActive
-			*(dest[10].(**string)) = nil // status_message
-			*(dest[11].(*string)) = ""  // suspend_reason
-			*(dest[12].(*time.Time)) = now
+			*(dest[8].(*bool)) = false  // env_shell_source
+			*(dest[9].(*bool)) = true   // service_hostname_enabled
+			*(dest[10].(*string)) = model.StatusActive
+			*(dest[11].(**string)) = nil // status_message
+			*(dest[12].(*string)) = ""  // suspend_reason
 			*(dest[13].(*time.Time)) = now
+			*(dest[14].(*time.Time)) = now
 			return nil
 		},
 	)

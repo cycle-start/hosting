@@ -113,20 +113,25 @@ func (h *Webroot) Create(w http.ResponseWriter, r *http.Request) {
 	if req.EnvShellSource != nil {
 		envShellSource = *req.EnvShellSource
 	}
+	serviceHostnameEnabled := true
+	if req.ServiceHostnameEnabled != nil {
+		serviceHostnameEnabled = *req.ServiceHostnameEnabled
+	}
 
 	webroot := &model.Webroot{
-		ID:             platform.NewID(),
-		TenantID:       tenantID,
-		Name:           platform.NewName("w"),
-		Runtime:        req.Runtime,
-		RuntimeVersion: req.RuntimeVersion,
-		RuntimeConfig:  runtimeConfig,
-		PublicFolder:   req.PublicFolder,
-		EnvFileName:    envFileName,
-		EnvShellSource: envShellSource,
-		Status:         model.StatusPending,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		ID:                     platform.NewID(),
+		TenantID:               tenantID,
+		Name:                   platform.NewName("w"),
+		Runtime:                req.Runtime,
+		RuntimeVersion:         req.RuntimeVersion,
+		RuntimeConfig:          runtimeConfig,
+		PublicFolder:            req.PublicFolder,
+		EnvFileName:             envFileName,
+		EnvShellSource:          envShellSource,
+		ServiceHostnameEnabled: serviceHostnameEnabled,
+		Status:                 model.StatusPending,
+		CreatedAt:              now,
+		UpdatedAt:              now,
 	}
 
 	if err := h.svc.Create(r.Context(), webroot); err != nil {
@@ -227,6 +232,9 @@ func (h *Webroot) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.EnvShellSource != nil {
 		webroot.EnvShellSource = *req.EnvShellSource
+	}
+	if req.ServiceHostnameEnabled != nil {
+		webroot.ServiceHostnameEnabled = *req.ServiceHostnameEnabled
 	}
 
 	// Validate PHP runtime_config after merging.

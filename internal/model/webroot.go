@@ -14,8 +14,9 @@ type Webroot struct {
 	RuntimeConfig  json.RawMessage `json:"runtime_config" db:"runtime_config"`
 	PublicFolder   string          `json:"public_folder" db:"public_folder"`
 	EnvFileName    string          `json:"env_file_name" db:"env_file_name"`
-	EnvShellSource bool            `json:"env_shell_source" db:"env_shell_source"`
-	Status         string          `json:"status" db:"status"`
+	EnvShellSource         bool            `json:"env_shell_source" db:"env_shell_source"`
+	ServiceHostnameEnabled bool            `json:"service_hostname_enabled" db:"service_hostname_enabled"`
+	Status                 string          `json:"status" db:"status"`
 	StatusMessage  *string         `json:"status_message,omitempty" db:"status_message"`
 	SuspendReason  string          `json:"suspend_reason" db:"suspend_reason"`
 	CreatedAt      time.Time       `json:"created_at" db:"created_at"`

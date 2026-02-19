@@ -673,6 +673,40 @@ func (h *Tenant) ResourceSummary(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, summary)
 }
 
+// ResourceUsage godoc
+//
+//	@Summary		Get resource usage for a tenant
+//	@Description	Returns per-resource storage usage (bytes) for webroots and databases belonging to this tenant. Data is collected periodically by the resource usage cron workflow.
+//	@Tags			Tenants
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Tenant ID"
+//	@Success		200 {object} response.ItemsResponse{items=[]model.ResourceUsage}
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/tenants/{id}/resource-usage [get]
+func (h *Tenant) ResourceUsage(w http.ResponseWriter, r *http.Request) {
+	id, err := request.RequireID(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !h.checkTenantBrandAccess(w, r, id) {
+		return
+	}
+
+	usages, err := h.svc.ListResourceUsage(r.Context(), id)
+	if err != nil {
+		response.WriteServiceError(w, err)
+		return
+	}
+
+	if usages == nil {
+		usages = []model.ResourceUsage{}
+	}
+	response.WriteJSON(w, http.StatusOK, map[string]interface{}{"items": usages})
+}
+
 // Migrate godoc
 //
 //	@Summary		Migrate a tenant to another shard

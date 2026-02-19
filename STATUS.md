@@ -33,8 +33,8 @@ Full CRUD REST API at `api.hosting.test/api/v1` with OpenAPI docs at `/docs`.
 | Cluster LB Addrs | CRUD `/clusters/{id}/lb-addresses` | No | |
 | Shards | CRUD `/clusters/{id}/shards`, converge, retry | Yes | Roles: web, database, dns, email, valkey, s3 |
 | Nodes | CRUD `/clusters/{id}/nodes` | No | UUID-based Temporal task queue routing |
-| Tenants | CRUD, suspend/unsuspend/migrate/retry `/tenants` | Yes | Resource summary, login sessions, retry-failed |
-| Webroots | CRUD `/tenants/{id}/webroots`, retry | Yes | PHP/Node/Python/Ruby/Static runtimes |
+| Tenants | CRUD, suspend/unsuspend/migrate/retry `/tenants` | Yes | Resource summary, resource usage, login sessions, retry-failed |
+| Webroots | CRUD `/tenants/{id}/webroots`, retry | Yes | PHP/Node/Python/Ruby/Static runtimes; service hostnames |
 | FQDNs | CRUD `/webroots/{id}/fqdns`, retry | Yes | Auto-DNS + auto-LB-map + optional LE cert |
 | Certificates | List/upload `/fqdns/{id}/certificates`, retry | Yes | PEM upload, LE provisioning |
 | SSH Keys | CRUD `/tenants/{id}/ssh-keys`, retry | Yes | SSH public keys for SFTP/SSH access |
@@ -101,6 +101,7 @@ Full CRUD REST API at `api.hosting.test/api/v1` with OpenAPI docs at `/docs`.
 - `ConvergeShardWorkflow`: role-aware (web/database/valkey/LB), cleans orphaned nginx configs before provisioning, collects errors without stopping
 - `TenantProvisionWorkflow`: long-running orchestrator, processes provision signals sequentially as child workflows, uses ContinueAsNew after 1000 iterations
 - `UpdateServiceHostnamesWorkflow`: auto-generates DNS records for tenant services
+- `CollectResourceUsageWorkflow`: cron (every 30 min), fans out to web/DB nodes, collects per-resource disk usage, upserts to `resource_usage` table
 - Audit log cleanup cron
 
 **Provisioning callbacks:** optional webhook notifications on task completion with configurable retry.
@@ -125,6 +126,7 @@ Runs on each VM node, connecting to Temporal via `node-{uuid}` task queue:
 - Auto-created A/AAAA records when binding FQDNs (if zone exists)
 - Auto-created MX/SPF/DKIM/DMARC records when creating email accounts
 - Auto-created service hostname records (ssh/sftp/mysql/web) on tenant provisioning — tracked in core DB
+- Auto-created per-webroot service hostname DNS records (`{webroot}.{tenant}.{brand.base_hostname}`)
 - Custom records override auto records (auto records preserved in core DB for reactivation)
 - Retroactive auto-record creation when zone appears after existing FQDNs
 - `managed_by`: `custom` (user) vs `auto` (platform), with `source_type` tracking origin
@@ -297,12 +299,33 @@ Names are `{prefix}{10-char-random}`, globally unique, auto-generated on creatio
   - Feature-flagged (`AGENT_ENABLED`), concurrency-capped (`AGENT_MAX_CONCURRENT`, `AGENT_FOLLOWER_CONCURRENT`)
   - See `docs/incident-management.md` for full documentation
 
+### Resource Usage Collection
+
+- Per-resource disk usage tracking (webroots via `du -sb`, databases via MySQL `information_schema`)
+- `resource_usage` table: one row per resource, upserted every 30 minutes by cron workflow
+- API: `GET /tenants/{id}/resource-usage` returns all usage entries for a tenant
+- Collection-only — no quotas or billing enforcement
+
+### Per-Webroot Service Hostnames
+
+- Every webroot gets a stable service hostname: `{webroot}.{tenant}.{brand.base_hostname}`
+- Enabled by default (`service_hostname_enabled: true`), toggleable per webroot
+- Create/update/delete workflows auto-manage DNS A records and LB map entries
+- Convergence includes service hostnames as additional nginx `server_name` entries
+- FQDN bind/unbind workflows include service hostname in nginx config regeneration
+
 ### Extended E2E Tests
 
-- 14 test files covering 50+ scenarios: Valkey, Email, SSH Key, Certificate, Brand isolation, API Key scopes
+- 28 test files covering 60+ scenarios: Valkey, Email, SSH Key, Certificate, Brand isolation, API Key scopes
 - Full-stack FQDN binding: zone → webroot → FQDN → DNS → HAProxy → nginx → HTTP verification
 - Cross-shard migration tests (tenant, database, valkey)
 - Backup/restore with data verification, retry on failed resources, DNS propagation via dig
+- Incident CRUD with event timeline, dedupe, status transitions (open → escalated → resolved/cancelled)
+- Resource usage collection verification (cron-based, per-webroot/database byte counts)
+- Service hostname tests (enable/disable toggle, DNS record creation, HTTP traffic via LB)
+- Cron job lifecycle (create → systemd timer verification → update → disable/enable → delete)
+- Shard convergence trigger with idempotency test
+- Suspend/resume with HTTP 503 verification and restore
 
 ---
 
@@ -318,6 +341,6 @@ Names are `{prefix}{10-char-random}`, globally unique, auto-generated on creatio
 ### Platform Features
 
 - **Per-brand DNS isolation:** Separate PowerDNS databases per brand (currently shared)
-- **Resource metering/billing:** Usage tracking, quotas enforcement, billing integration
+- **Resource metering/billing:** Quotas enforcement, billing integration (usage tracking implemented)
 - **Rate limiting:** API rate limiting per API key/brand
 - **Multi-region:** Cross-region failover and data replication

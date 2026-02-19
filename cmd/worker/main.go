@@ -190,6 +190,7 @@ func main() {
 	w.RegisterWorkflow(workflow.CheckDiskPressureWorkflow)
 	w.RegisterWorkflow(workflow.CheckCertExpiryWorkflow)
 	w.RegisterWorkflow(workflow.CheckCephFSHealthWorkflow)
+	w.RegisterWorkflow(workflow.CollectResourceUsageWorkflow)
 
 	if cfg.MetricsAddr != "" {
 		metricsSrv := metrics.NewServer(cfg.MetricsAddr)
@@ -285,6 +286,11 @@ func registerCronSchedules(ctx context.Context, tc temporalclient.Client, taskQu
 			id:       "cephfs-health-cron",
 			cron:     "*/10 * * * *",
 			workflow: workflow.CheckCephFSHealthWorkflow,
+		},
+		{
+			id:       "resource-usage-collection-cron",
+			cron:     "*/30 * * * *",
+			workflow: workflow.CollectResourceUsageWorkflow,
 		},
 	}
 

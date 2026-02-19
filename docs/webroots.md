@@ -13,6 +13,9 @@ A **webroot** is a website document root belonging to a tenant. Each webroot has
 | `runtime_version` | string | Version string (e.g. `8.5`, `20`, `3.12`) |
 | `runtime_config` | JSON | Runtime-specific configuration (default: `{}`) |
 | `public_folder` | string | Subfolder to serve as document root (e.g. `public`) |
+| `env_file_name` | string | Env file name (default: `.env.hosting`) |
+| `env_shell_source` | bool | Auto-source env vars in SSH sessions |
+| `service_hostname_enabled` | bool | Enable per-webroot service hostname (default: `true`) |
 | `status` | string | Current lifecycle status |
 | `status_message` | string | Error message when `failed` |
 
@@ -36,6 +39,7 @@ A **webroot** is a website document root belonging to a tenant. Each webroot has
   "runtime_version": "8.5",
   "runtime_config": {},
   "public_folder": "public",
+  "service_hostname_enabled": true,
   "fqdns": [
     { "fqdn": "example.com", "ssl_enabled": true }
   ]
@@ -51,7 +55,8 @@ All fields are optional. Only provided fields are changed.
   "runtime": "node",
   "runtime_version": "20",
   "runtime_config": {"entry_point": "server.js"},
-  "public_folder": "dist"
+  "public_folder": "dist",
+  "service_hostname_enabled": false
 }
 ```
 
@@ -127,6 +132,28 @@ Key features:
 - **Debug headers**: `X-Served-By` (hostname) and `X-Shard` (shard name)
 - **Orphan cleanup**: `CleanOrphanedConfigs` removes config files for webroots that no longer exist
 - **Logs**: Access and error logs per webroot in `/var/www/storage/{tenantID}/logs/`
+
+## Service Hostnames
+
+Each webroot automatically gets a stable service hostname in the format:
+
+```
+{webroot_name}.{tenant_name}.{brand.base_hostname}
+```
+
+For example, a webroot named `main` on tenant `t_abc1234567` under a brand with base hostname `hosting.example.com` would get:
+
+```
+main.t_abc1234567.hosting.example.com
+```
+
+Service hostnames are enabled by default (`service_hostname_enabled: true`) and can be toggled per webroot via the API. When enabled:
+
+1. **DNS A records** are auto-created pointing to the cluster's load balancer IPs
+2. **LB map entries** are created (hostname → shard backend)
+3. **Nginx server_name** includes the service hostname alongside bound FQDNs
+
+This provides a predictable URL for each webroot without requiring custom FQDN binding. Service hostnames are managed by the create/update/delete webroot workflows and included in shard convergence.
 
 ## FQDN Binding
 

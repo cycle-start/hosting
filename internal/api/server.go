@@ -304,6 +304,7 @@ func (s *Server) setupRoutes() {
 			r.Get("/tenants", tenant.List)
 			r.Get("/tenants/{id}", tenant.Get)
 			r.Get("/tenants/{id}/resource-summary", tenant.ResourceSummary)
+			r.Get("/tenants/{id}/resource-usage", tenant.ResourceUsage)
 			r.Get("/tenants/{tenantID}/logs", logs.TenantLogs)
 		})
 		r.Group(func(r chi.Router) {

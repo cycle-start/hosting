@@ -51,6 +51,15 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 		}
 	}
 
+	// Add service hostname as an additional server_name if enabled.
+	serviceHostname := webrootServiceHostname(wctx)
+	if serviceHostname != "" {
+		fqdnParams = append(fqdnParams, activity.FQDNParam{
+			FQDN:      serviceHostname,
+			WebrootID: wctx.Webroot.ID,
+		})
+	}
+
 	if wctx.Tenant.ShardID == nil {
 		noShardErr := fmt.Errorf("tenant %s has no shard assigned", wctx.Webroot.TenantID)
 		_ = setResourceFailed(ctx, "webroots", webrootID, noShardErr)
@@ -77,6 +86,11 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 		combinedErr := fmt.Errorf("create webroot errors: %s", joinErrors(errs))
 		_ = setResourceFailed(ctx, "webroots", webrootID, combinedErr)
 		return combinedErr
+	}
+
+	// Create service hostname DNS + LB entries if enabled.
+	if serviceHostname != "" {
+		setupServiceHostname(ctx, wctx, serviceHostname)
 	}
 
 	// Set status to active.
@@ -162,6 +176,15 @@ func UpdateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 		}
 	}
 
+	// Add service hostname as an additional server_name if enabled.
+	serviceHostname := webrootServiceHostname(wctx)
+	if serviceHostname != "" {
+		fqdnParams = append(fqdnParams, activity.FQDNParam{
+			FQDN:      serviceHostname,
+			WebrootID: wctx.Webroot.ID,
+		})
+	}
+
 	if wctx.Tenant.ShardID == nil {
 		noShardErr := fmt.Errorf("tenant %s has no shard assigned", wctx.Webroot.TenantID)
 		_ = setResourceFailed(ctx, "webroots", webrootID, noShardErr)
@@ -188,6 +211,11 @@ func UpdateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 		combinedErr := fmt.Errorf("update webroot errors: %s", joinErrors(errs))
 		_ = setResourceFailed(ctx, "webroots", webrootID, combinedErr)
 		return combinedErr
+	}
+
+	// Ensure service hostname DNS + LB entries are in sync.
+	if serviceHostname != "" {
+		setupServiceHostname(ctx, wctx, serviceHostname)
 	}
 
 	// Set status to active.
@@ -235,6 +263,12 @@ func DeleteWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 		return noShardErr
 	}
 
+	// Clean up service hostname DNS + LB entries if enabled.
+	serviceHostname := webrootServiceHostname(wctx)
+	if serviceHostname != "" {
+		teardownServiceHostname(ctx, wctx, serviceHostname)
+	}
+
 	// Delete webroot on each node in the shard (parallel, continue-on-error).
 	errs := fanOutNodes(ctx, wctx.Nodes, func(gCtx workflow.Context, node model.Node) error {
 		nodeCtx := nodeActivityCtx(gCtx, node.ID)
@@ -255,4 +289,61 @@ func DeleteWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 		ID:     webrootID,
 		Status: model.StatusDeleted,
 	}).Get(ctx, nil)
+}
+
+// webrootServiceHostname computes the service hostname for a webroot.
+// Returns empty string if service hostname is disabled or brand info is missing.
+func webrootServiceHostname(wctx activity.WebrootContext) string {
+	if !wctx.Webroot.ServiceHostnameEnabled || wctx.BrandBaseHostname == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s.%s.%s", wctx.Webroot.Name, wctx.Tenant.Name, wctx.BrandBaseHostname)
+}
+
+// setupServiceHostname creates DNS A records and LB map entries for a service hostname.
+func setupServiceHostname(ctx workflow.Context, wctx activity.WebrootContext, hostname string) {
+	logger := workflow.GetLogger(ctx)
+
+	// Create DNS A records pointing to cluster LB addresses.
+	err := workflow.ExecuteActivity(ctx, "AutoCreateDNSRecords", activity.AutoCreateDNSRecordsParams{
+		FQDN:        hostname,
+		LBAddresses: wctx.LBAddresses,
+	}).Get(ctx, nil)
+	if err != nil {
+		logger.Warn("failed to create service hostname DNS records", "hostname", hostname, "error", err)
+	}
+
+	// Set LB map entry on all LB nodes.
+	for _, lbNode := range wctx.LBNodes {
+		lbCtx := nodeActivityCtx(ctx, lbNode.ID)
+		err := workflow.ExecuteActivity(lbCtx, "SetLBMapEntry", activity.SetLBMapEntryParams{
+			FQDN:      hostname,
+			LBBackend: wctx.Shard.LBBackend,
+		}).Get(ctx, nil)
+		if err != nil {
+			logger.Warn("failed to set service hostname LB map entry", "hostname", hostname, "node", lbNode.ID, "error", err)
+		}
+	}
+}
+
+// teardownServiceHostname removes DNS records and LB map entries for a service hostname.
+func teardownServiceHostname(ctx workflow.Context, wctx activity.WebrootContext, hostname string) {
+	logger := workflow.GetLogger(ctx)
+
+	// Delete DNS records.
+	err := workflow.ExecuteActivity(ctx, "AutoDeleteDNSRecords", hostname).Get(ctx, nil)
+	if err != nil {
+		logger.Warn("failed to delete service hostname DNS records", "hostname", hostname, "error", err)
+	}
+
+	// Delete LB map entry on all LB nodes.
+	for _, lbNode := range wctx.LBNodes {
+		lbCtx := nodeActivityCtx(ctx, lbNode.ID)
+		err := workflow.ExecuteActivity(lbCtx, "DeleteLBMapEntry", activity.DeleteLBMapEntryParams{
+			FQDN: hostname,
+		}).Get(ctx, nil)
+		if err != nil {
+			logger.Warn("failed to delete service hostname LB map entry", "hostname", hostname, "node", lbNode.ID, "error", err)
+		}
+	}
 }

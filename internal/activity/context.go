@@ -4,21 +4,26 @@ import "github.com/edvin/hosting/internal/model"
 
 // WebrootContext bundles all data needed by webroot workflows.
 type WebrootContext struct {
-	Webroot model.Webroot `json:"webroot"`
-	Tenant  model.Tenant  `json:"tenant"`
-	Nodes   []model.Node  `json:"nodes"`
-	FQDNs   []model.FQDN  `json:"fqdns"`
+	Webroot           model.Webroot            `json:"webroot"`
+	Tenant            model.Tenant             `json:"tenant"`
+	Nodes             []model.Node             `json:"nodes"`
+	FQDNs             []model.FQDN             `json:"fqdns"`
+	BrandBaseHostname string                   `json:"brand_base_hostname"`
+	Shard             model.Shard              `json:"shard"`
+	LBAddresses       []model.ClusterLBAddress `json:"lb_addresses"`
+	LBNodes           []model.Node             `json:"lb_nodes"`
 }
 
 // FQDNContext bundles all data needed by FQDN workflows.
 type FQDNContext struct {
-	FQDN        model.FQDN              `json:"fqdn"`
-	Webroot     model.Webroot            `json:"webroot"`
-	Tenant      model.Tenant             `json:"tenant"`
-	Shard       model.Shard              `json:"shard"`
-	Nodes       []model.Node             `json:"nodes"`
-	LBAddresses []model.ClusterLBAddress `json:"lb_addresses"`
-	LBNodes     []model.Node             `json:"lb_nodes"`
+	FQDN              model.FQDN              `json:"fqdn"`
+	Webroot           model.Webroot            `json:"webroot"`
+	Tenant            model.Tenant             `json:"tenant"`
+	Shard             model.Shard              `json:"shard"`
+	Nodes             []model.Node             `json:"nodes"`
+	LBAddresses       []model.ClusterLBAddress `json:"lb_addresses"`
+	LBNodes           []model.Node             `json:"lb_nodes"`
+	BrandBaseHostname string                   `json:"brand_base_hostname"`
 }
 
 // DatabaseUserContext bundles all data needed by database user workflows.
