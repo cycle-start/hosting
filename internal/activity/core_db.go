@@ -19,6 +19,7 @@ type DB interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Begin(ctx context.Context) (pgx.Tx, error)
 }
 
 // CoreDB contains activities that read from and update the core database.
@@ -2019,6 +2020,32 @@ func (a *CoreDB) ListEmailAccountsByFQDNID(ctx context.Context, fqdnID string) (
 	return accounts, rows.Err()
 }
 
+// ListEmailAccountsByTenantID retrieves all email accounts for a tenant by
+// joining through webroots → fqdns → email_accounts.
+func (a *CoreDB) ListEmailAccountsByTenantID(ctx context.Context, tenantID string) ([]model.EmailAccount, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT ea.id, ea.fqdn_id, ea.address, ea.display_name, ea.quota_bytes, ea.status, ea.status_message, ea.created_at, ea.updated_at
+		 FROM email_accounts ea
+		 JOIN fqdns f ON ea.fqdn_id = f.id
+		 JOIN webroots w ON f.webroot_id = w.id
+		 WHERE w.tenant_id = $1`, tenantID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list email accounts by tenant: %w", err)
+	}
+	defer rows.Close()
+
+	var accounts []model.EmailAccount
+	for rows.Next() {
+		var a model.EmailAccount
+		if err := rows.Scan(&a.ID, &a.FQDNID, &a.Address, &a.DisplayName, &a.QuotaBytes, &a.Status, &a.StatusMessage, &a.CreatedAt, &a.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan email account row: %w", err)
+		}
+		accounts = append(accounts, a)
+	}
+	return accounts, rows.Err()
+}
+
 // ListEmailAliasesByAccountID retrieves all aliases for an email account.
 func (a *CoreDB) ListEmailAliasesByAccountID(ctx context.Context, accountID string) ([]model.EmailAlias, error) {
 	rows, err := a.db.Query(ctx,
@@ -2232,4 +2259,65 @@ func (a *CoreDB) ListResourceUsageByTenantID(ctx context.Context, tenantID strin
 		usages = append(usages, u)
 	}
 	return usages, rows.Err()
+}
+
+// DeleteTenantDBRows bulk-deletes all database rows belonging to a tenant in
+// correct FK order inside a single transaction. This is idempotent: rows
+// already deleted by earlier workflow phases are simply no-ops.
+func (a *CoreDB) DeleteTenantDBRows(ctx context.Context, tenantID string) error {
+	tx, err := a.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	// Email features (via email_accounts → fqdns → webroots).
+	emailAccountSubquery := `SELECT ea.id FROM email_accounts ea JOIN fqdns f ON ea.fqdn_id=f.id JOIN webroots w ON f.webroot_id=w.id WHERE w.tenant_id=$1`
+	fqdnSubquery := `SELECT f.id FROM fqdns f JOIN webroots w ON f.webroot_id=w.id WHERE w.tenant_id=$1`
+
+	queries := []string{
+		`DELETE FROM email_autoreplies WHERE account_id IN (` + emailAccountSubquery + `)`,
+		`DELETE FROM email_forwards WHERE account_id IN (` + emailAccountSubquery + `)`,
+		`DELETE FROM email_aliases WHERE account_id IN (` + emailAccountSubquery + `)`,
+		`DELETE FROM email_accounts WHERE fqdn_id IN (` + fqdnSubquery + `)`,
+
+		// Certificates and FQDNs (via webroots).
+		`DELETE FROM certificates WHERE fqdn_id IN (` + fqdnSubquery + `)`,
+		`DELETE FROM fqdns WHERE webroot_id IN (SELECT id FROM webroots WHERE tenant_id=$1)`,
+
+		// Direct tenant children (web-shard).
+		`DELETE FROM daemons WHERE tenant_id=$1`,
+		`DELETE FROM cron_jobs WHERE tenant_id=$1`,
+		`DELETE FROM webroots WHERE tenant_id=$1`,
+		`DELETE FROM ssh_keys WHERE tenant_id=$1`,
+		`DELETE FROM backups WHERE tenant_id=$1`,
+		`DELETE FROM tenant_egress_rules WHERE tenant_id=$1`,
+		`DELETE FROM resource_usage WHERE tenant_id=$1`,
+
+		// OIDC sessions.
+		`DELETE FROM oidc_auth_codes WHERE tenant_id=$1`,
+		`DELETE FROM oidc_login_sessions WHERE tenant_id=$1`,
+
+		// Cross-shard leftovers (idempotent — usually already deleted by Phase 1 workflows).
+		`DELETE FROM database_users WHERE database_id IN (SELECT id FROM databases WHERE tenant_id=$1)`,
+		`DELETE FROM database_access_rules WHERE database_id IN (SELECT id FROM databases WHERE tenant_id=$1)`,
+		`DELETE FROM databases WHERE tenant_id=$1`,
+		`DELETE FROM valkey_users WHERE valkey_instance_id IN (SELECT id FROM valkey_instances WHERE tenant_id=$1)`,
+		`DELETE FROM valkey_instances WHERE tenant_id=$1`,
+		`DELETE FROM s3_access_keys WHERE bucket_id IN (SELECT id FROM s3_buckets WHERE tenant_id=$1)`,
+		`DELETE FROM s3_buckets WHERE tenant_id=$1`,
+		`DELETE FROM zone_records WHERE zone_id IN (SELECT id FROM zones WHERE tenant_id=$1)`,
+		`DELETE FROM zones WHERE tenant_id=$1`,
+
+		// Finally, the tenant itself.
+		`DELETE FROM tenants WHERE id=$1`,
+	}
+
+	for _, q := range queries {
+		if _, err := tx.Exec(ctx, q, tenantID); err != nil {
+			return fmt.Errorf("delete tenant rows: %w", err)
+		}
+	}
+
+	return tx.Commit(ctx)
 }

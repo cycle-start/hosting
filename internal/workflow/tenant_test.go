@@ -401,8 +401,61 @@ func (s *DeleteTenantWorkflowTestSuite) AfterTest(suiteName, testName string) {
 	s.env.AssertExpectations(s.T())
 }
 
+// mockDeleteTenantPhase1 sets up mocks for the Phase 1 cross-shard resource listing
+// (returning empty lists so no child workflows are spawned).
+func mockDeleteTenantPhase1Empty(env *testsuite.TestWorkflowEnvironment, tenantID string) {
+	env.OnActivity("ListDatabasesByTenantID", mock.Anything, tenantID).Return([]model.Database{}, nil)
+	env.OnActivity("ListValkeyInstancesByTenantID", mock.Anything, tenantID).Return([]model.ValkeyInstance{}, nil)
+	env.OnActivity("ListS3BucketsByTenantID", mock.Anything, tenantID).Return([]model.S3Bucket{}, nil)
+	env.OnActivity("ListZonesByTenantID", mock.Anything, tenantID).Return([]model.Zone{}, nil)
+	env.OnActivity("ListEmailAccountsByTenantID", mock.Anything, tenantID).Return([]model.EmailAccount{}, nil)
+}
+
 func (s *DeleteTenantWorkflowTestSuite) TestSuccess() {
 	tenantID := "test-tenant-1"
+	shardID := "test-shard-1"
+	shardIdx := 1
+	tenant := model.Tenant{
+		ID:      tenantID,
+		Name:    "t_test123456",
+		BrandID: "test-brand",
+		UID:     5001,
+		ShardID: &shardID,
+	}
+	nodes := []model.Node{
+		{ID: "node-1", ClusterID: "dev-1", ShardIndex: &shardIdx},
+	}
+
+	// Set deleting.
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
+		Table: "tenants", ID: tenantID, Status: model.StatusDeleting,
+	}).Return(nil)
+	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
+
+	// Phase 1: empty cross-shard resources.
+	mockDeleteTenantPhase1Empty(s.env, tenantID)
+
+	// Phase 2: web-node cleanup.
+	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("RemoveTenantAddresses", mock.Anything, activity.ConfigureTenantAddressesParams{
+		TenantName: "t_test123456", TenantUID: 5001, ClusterID: "dev-1", NodeShardIdx: 1,
+	}).Return(nil)
+	s.env.OnActivity("RemoveSSHConfig", mock.Anything, "t_test123456").Return(nil)
+	s.env.OnActivity("DeleteTenant", mock.Anything, "t_test123456").Return(nil)
+
+	// Phase 3: convergence (child workflow).
+	s.env.OnWorkflow(ConvergeShardWorkflow, mock.Anything, ConvergeShardParams{ShardID: shardID}).Return(nil)
+
+	// Phase 4: DB row cleanup.
+	s.env.OnActivity("DeleteTenantDBRows", mock.Anything, tenantID).Return(nil)
+
+	s.env.ExecuteWorkflow(DeleteTenantWorkflow, tenantID)
+	s.True(s.env.IsWorkflowCompleted())
+	s.NoError(s.env.GetWorkflowError())
+}
+
+func (s *DeleteTenantWorkflowTestSuite) TestWithCrossShardResources() {
+	tenantID := "test-tenant-cross"
 	shardID := "test-shard-1"
 	shardIdx := 1
 	tenant := model.Tenant{
@@ -420,15 +473,37 @@ func (s *DeleteTenantWorkflowTestSuite) TestSuccess() {
 		Table: "tenants", ID: tenantID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
+
+	// Phase 1: some cross-shard resources exist.
+	s.env.OnActivity("ListDatabasesByTenantID", mock.Anything, tenantID).Return([]model.Database{
+		{ID: "db-1", TenantID: &tenantID},
+	}, nil)
+	s.env.OnActivity("ListValkeyInstancesByTenantID", mock.Anything, tenantID).Return([]model.ValkeyInstance{
+		{ID: "vi-1", TenantID: &tenantID},
+	}, nil)
+	s.env.OnActivity("ListS3BucketsByTenantID", mock.Anything, tenantID).Return([]model.S3Bucket{}, nil)
+	s.env.OnActivity("ListZonesByTenantID", mock.Anything, tenantID).Return([]model.Zone{
+		{ID: "zone-1", TenantID: &tenantID},
+	}, nil)
+	s.env.OnActivity("ListEmailAccountsByTenantID", mock.Anything, tenantID).Return([]model.EmailAccount{}, nil)
+
+	// Phase 1 child workflows.
+	s.env.OnWorkflow(DeleteDatabaseWorkflow, mock.Anything, "db-1").Return(nil)
+	s.env.OnWorkflow(DeleteValkeyInstanceWorkflow, mock.Anything, "vi-1").Return(nil)
+	s.env.OnWorkflow(DeleteZoneWorkflow, mock.Anything, "zone-1").Return(nil)
+
+	// Phase 2: web-node cleanup.
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("RemoveTenantAddresses", mock.Anything, activity.ConfigureTenantAddressesParams{
 		TenantName: "t_test123456", TenantUID: 5001, ClusterID: "dev-1", NodeShardIdx: 1,
 	}).Return(nil)
 	s.env.OnActivity("RemoveSSHConfig", mock.Anything, "t_test123456").Return(nil)
 	s.env.OnActivity("DeleteTenant", mock.Anything, "t_test123456").Return(nil)
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "tenants", ID: tenantID, Status: model.StatusDeleted,
-	}).Return(nil)
+
+	// Phase 3 + 4.
+	s.env.OnWorkflow(ConvergeShardWorkflow, mock.Anything, ConvergeShardParams{ShardID: shardID}).Return(nil)
+	s.env.OnActivity("DeleteTenantDBRows", mock.Anything, tenantID).Return(nil)
+
 	s.env.ExecuteWorkflow(DeleteTenantWorkflow, tenantID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
@@ -453,6 +528,11 @@ func (s *DeleteTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 		Table: "tenants", ID: tenantID, Status: model.StatusDeleting,
 	}).Return(nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
+
+	// Phase 1: empty.
+	mockDeleteTenantPhase1Empty(s.env, tenantID)
+
+	// Phase 2: node cleanup fails.
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("RemoveTenantAddresses", mock.Anything, activity.ConfigureTenantAddressesParams{
 		TenantName: "t_test123456", TenantUID: 5001, ClusterID: "dev-1", NodeShardIdx: 1,
@@ -473,6 +553,39 @@ func (s *DeleteTenantWorkflowTestSuite) TestGetTenantFails_SetsStatusFailed() {
 	}).Return(nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(nil, fmt.Errorf("db error"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("tenants", tenantID)).Return(nil)
+	s.env.ExecuteWorkflow(DeleteTenantWorkflow, tenantID)
+	s.True(s.env.IsWorkflowCompleted())
+	s.Error(s.env.GetWorkflowError())
+}
+
+func (s *DeleteTenantWorkflowTestSuite) TestDBRowCleanupFails_SetsStatusFailed() {
+	tenantID := "test-tenant-4"
+	shardID := "test-shard-4"
+	shardIdx := 1
+	tenant := model.Tenant{
+		ID:      tenantID,
+		Name:    "t_test123456",
+		BrandID: "test-brand",
+		UID:     5001,
+		ShardID: &shardID,
+	}
+	nodes := []model.Node{
+		{ID: "node-1", ClusterID: "dev-1", ShardIndex: &shardIdx},
+	}
+
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
+		Table: "tenants", ID: tenantID, Status: model.StatusDeleting,
+	}).Return(nil)
+	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
+	mockDeleteTenantPhase1Empty(s.env, tenantID)
+	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
+	s.env.OnActivity("RemoveTenantAddresses", mock.Anything, mock.Anything).Return(nil)
+	s.env.OnActivity("RemoveSSHConfig", mock.Anything, "t_test123456").Return(nil)
+	s.env.OnActivity("DeleteTenant", mock.Anything, "t_test123456").Return(nil)
+	s.env.OnWorkflow(ConvergeShardWorkflow, mock.Anything, ConvergeShardParams{ShardID: shardID}).Return(nil)
+	s.env.OnActivity("DeleteTenantDBRows", mock.Anything, tenantID).Return(fmt.Errorf("FK violation"))
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("tenants", tenantID)).Return(nil)
+
 	s.env.ExecuteWorkflow(DeleteTenantWorkflow, tenantID)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())

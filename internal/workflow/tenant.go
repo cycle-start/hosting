@@ -498,7 +498,16 @@ func UnsuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	return nil
 }
 
-// DeleteTenantWorkflow deletes a tenant from all nodes in the tenant's shard.
+// DeleteTenantWorkflow deletes a tenant and all its resources across all shards.
+//
+// Phase 1: Cross-shard resource cleanup — uses existing delete workflows for
+// databases, valkey instances, S3 buckets, zones, and email accounts.
+// Phase 2: Web-node cleanup — removes ULA addresses, SSH config, user account,
+// bind mounts, CephFS directory, and log directory on each shard node.
+// Phase 3: Shard convergence — triggers convergence to clean orphaned configs
+// (nginx sites, PHP-FPM pools, supervisor daemons, cron systemd units).
+// Phase 4: DB row cleanup — bulk-deletes all remaining child rows and the
+// tenant itself in a single transaction.
 func DeleteTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
@@ -535,6 +544,64 @@ func DeleteTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		return noShardErr
 	}
 
+	// ── Phase 1: Cross-shard resource cleanup ────────────────────────────
+	// List all cross-shard resources and spawn delete workflows in parallel.
+	// Errors are collected but non-fatal — Phase 4 catches leftovers.
+
+	var databases []model.Database
+	var valkeyInstances []model.ValkeyInstance
+	var s3Buckets []model.S3Bucket
+	var zones []model.Zone
+	var emailAccounts []model.EmailAccount
+
+	_ = workflow.ExecuteActivity(ctx, "ListDatabasesByTenantID", tenantID).Get(ctx, &databases)
+	_ = workflow.ExecuteActivity(ctx, "ListValkeyInstancesByTenantID", tenantID).Get(ctx, &valkeyInstances)
+	_ = workflow.ExecuteActivity(ctx, "ListS3BucketsByTenantID", tenantID).Get(ctx, &s3Buckets)
+	_ = workflow.ExecuteActivity(ctx, "ListZonesByTenantID", tenantID).Get(ctx, &zones)
+	_ = workflow.ExecuteActivity(ctx, "ListEmailAccountsByTenantID", tenantID).Get(ctx, &emailAccounts)
+
+	var children []ChildWorkflowSpec
+	for _, d := range databases {
+		children = append(children, ChildWorkflowSpec{
+			WorkflowName: "DeleteDatabaseWorkflow",
+			WorkflowID:   fmt.Sprintf("delete-database-%s", d.ID),
+			Arg:          d.ID,
+		})
+	}
+	for _, vi := range valkeyInstances {
+		children = append(children, ChildWorkflowSpec{
+			WorkflowName: "DeleteValkeyInstanceWorkflow",
+			WorkflowID:   fmt.Sprintf("delete-valkey-instance-%s", vi.ID),
+			Arg:          vi.ID,
+		})
+	}
+	for _, b := range s3Buckets {
+		children = append(children, ChildWorkflowSpec{
+			WorkflowName: "DeleteS3BucketWorkflow",
+			WorkflowID:   fmt.Sprintf("delete-s3-bucket-%s", b.ID),
+			Arg:          b.ID,
+		})
+	}
+	for _, z := range zones {
+		children = append(children, ChildWorkflowSpec{
+			WorkflowName: "DeleteZoneWorkflow",
+			WorkflowID:   fmt.Sprintf("delete-zone-%s", z.ID),
+			Arg:          z.ID,
+		})
+	}
+	for _, ea := range emailAccounts {
+		children = append(children, ChildWorkflowSpec{
+			WorkflowName: "DeleteEmailAccountWorkflow",
+			WorkflowID:   fmt.Sprintf("delete-email-account-%s", ea.ID),
+			Arg:          ea.ID,
+		})
+	}
+
+	if errs := fanOutChildWorkflows(ctx, children); len(errs) > 0 {
+		workflow.GetLogger(ctx).Warn("phase 1: cross-shard cleanup failures (non-fatal)", "errors", joinErrors(errs))
+	}
+
+	// ── Phase 2: Web-node cleanup ────────────────────────────────────────
 	var nodes []model.Node
 	err = workflow.ExecuteActivity(ctx, "ListNodesByShard", *tenant.ShardID).Get(ctx, &nodes)
 	if err != nil {
@@ -542,31 +609,27 @@ func DeleteTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		return err
 	}
 
-	// Determine cluster ID from nodes.
-	deleteClusterID := ""
+	clusterID := ""
 	if len(nodes) > 0 {
-		deleteClusterID = nodes[0].ClusterID
+		clusterID = nodes[0].ClusterID
 	}
 
-	// Delete tenant on each node in the shard (parallel, continue-on-error).
 	errs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
 		nodeCtx := nodeActivityCtx(gCtx, node.ID)
 		var nodeErrs []string
 
-		// Remove tenant ULA addresses before deleting the tenant.
 		if node.ShardIndex != nil {
 			if err := workflow.ExecuteActivity(nodeCtx, "RemoveTenantAddresses",
 				activity.ConfigureTenantAddressesParams{
 					TenantName:   tenant.Name,
 					TenantUID:    tenant.UID,
-					ClusterID:    deleteClusterID,
+					ClusterID:    clusterID,
 					NodeShardIdx: *node.ShardIndex,
 				}).Get(gCtx, nil); err != nil {
 				nodeErrs = append(nodeErrs, fmt.Sprintf("remove ULA: %v", err))
 			}
 		}
 
-		// Remove SSH config before deleting the tenant.
 		if err := workflow.ExecuteActivity(nodeCtx, "RemoveSSHConfig", tenant.Name).Get(gCtx, nil); err != nil {
 			nodeErrs = append(nodeErrs, fmt.Sprintf("remove SSH config: %v", err))
 		}
@@ -581,15 +644,35 @@ func DeleteTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		return nil
 	})
 	if len(errs) > 0 {
-		combinedErr := fmt.Errorf("delete errors: %s", joinErrors(errs))
+		combinedErr := fmt.Errorf("phase 2: node cleanup errors: %s", joinErrors(errs))
 		_ = setResourceFailed(ctx, "tenants", tenantID, combinedErr)
 		return combinedErr
 	}
 
-	// Set status to deleted.
-	return workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
-		Table:  "tenants",
-		ID:     tenantID,
-		Status: model.StatusDeleted,
-	}).Get(ctx, nil)
+	// ── Phase 3: Shard convergence ───────────────────────────────────────
+	convergeCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
+		WorkflowID: fmt.Sprintf("converge-shard-%s-delete-tenant-%s", *tenant.ShardID, tenantID),
+		TaskQueue:  "hosting-tasks",
+	})
+	if err := workflow.ExecuteChildWorkflow(convergeCtx, ConvergeShardWorkflow,
+		ConvergeShardParams{ShardID: *tenant.ShardID}).Get(ctx, nil); err != nil {
+		workflow.GetLogger(ctx).Warn("phase 3: shard convergence failed (non-fatal)", "error", err)
+	}
+
+	// ── Phase 4: DB row cleanup ──────────────────────────────────────────
+	longCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: 2 * time.Minute,
+		RetryPolicy: &temporal.RetryPolicy{
+			MaximumAttempts:    5,
+			InitialInterval:    2 * time.Second,
+			MaximumInterval:    30 * time.Second,
+			BackoffCoefficient: 2.0,
+		},
+	})
+	if err := workflow.ExecuteActivity(longCtx, "DeleteTenantDBRows", tenantID).Get(ctx, nil); err != nil {
+		_ = setResourceFailed(ctx, "tenants", tenantID, err)
+		return err
+	}
+
+	return nil
 }

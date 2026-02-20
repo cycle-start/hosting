@@ -318,8 +318,24 @@ func (m *TenantManager) Delete(ctx context.Context, name string) error {
 		m.logger.Debug().Str("tenant", name).Int("attempt", i+1).Msg("re-killing processes before userdel retry")
 	}
 
-	// Remove the CephFS directory tree.
+	// Unmount any bind mounts inside the chroot (created by SSHManager for
+	// shell access: /bin, /lib, /lib64, /usr). Without this, os.RemoveAll
+	// fails with EROFS on read-only bind-mounted directories.
 	chrootDir := filepath.Join(m.webStorageDir, name)
+	if mounts, err := os.ReadFile("/proc/mounts"); err == nil {
+		for _, line := range strings.Split(string(mounts), "\n") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 && strings.HasPrefix(fields[1], chrootDir+"/") {
+				m.logger.Debug().Str("mount", fields[1]).Msg("unmounting chroot bind mount")
+				umount := exec.CommandContext(ctx, "umount", "-l", fields[1])
+				if out, err := umount.CombinedOutput(); err != nil {
+					m.logger.Warn().Str("mount", fields[1]).Str("output", string(out)).Err(err).Msg("umount failed")
+				}
+			}
+		}
+	}
+
+	// Remove the CephFS directory tree.
 	if err := os.RemoveAll(chrootDir); err != nil {
 		return status.Errorf(codes.Internal, "remove CephFS dir %s: %v", chrootDir, err)
 	}

@@ -38,6 +38,14 @@ func (m *mockDB) QueryRow(ctx context.Context, sql string, arguments ...any) pgx
 	return args.Get(0).(pgx.Row)
 }
 
+func (m *mockDB) Begin(ctx context.Context) (pgx.Tx, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(pgx.Tx), args.Error(1)
+}
+
 // ---------- Mock Rows ----------
 
 type mockRows struct {
