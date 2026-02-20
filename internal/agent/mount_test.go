@@ -9,7 +9,7 @@ import (
 )
 
 func TestCheckMount_NonexistentPath(t *testing.T) {
-	err := checkMount("/nonexistent/path/that/does/not/exist")
+	err := CheckMount("/nonexistent/path/that/does/not/exist")
 	assert.Error(t, err)
 	st, ok := status.FromError(err)
 	assert.True(t, ok)
@@ -19,7 +19,7 @@ func TestCheckMount_NonexistentPath(t *testing.T) {
 
 func TestCheckMount_NotCephFS(t *testing.T) {
 	// Use a known-mounted non-CephFS path (like /tmp).
-	err := checkMount("/tmp")
+	err := CheckMount("/tmp")
 	assert.Error(t, err)
 	st, ok := status.FromError(err)
 	assert.True(t, ok)

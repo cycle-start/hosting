@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	temporalclient "go.temporal.io/sdk/client"
@@ -110,6 +111,35 @@ func main() {
 				logger.Error().Err(err).Msg("metrics server failed")
 			}
 		}()
+	}
+
+	// Block startup until CephFS is mounted on web nodes. This prevents the
+	// Temporal worker from accepting tasks that will immediately fail because
+	// the storage filesystem isn't ready. Retries every 5s for up to 2 minutes;
+	// if CephFS still isn't available, fatal out and let systemd restart us.
+	if cfg.NodeRole == "web" && os.Getenv("SKIP_CEPHFS_CHECK") != "1" {
+		webStorageDir := agentCfg.WebStorageDir
+		const (
+			retryInterval = 5 * time.Second
+			maxWait       = 2 * time.Minute
+		)
+		deadline := time.Now().Add(maxWait)
+		for {
+			if err := agent.CheckMount(webStorageDir); err == nil {
+				logger.Info().Str("path", webStorageDir).Msg("CephFS mount verified")
+				break
+			}
+			if time.Now().After(deadline) {
+				logger.Fatal().
+					Str("path", webStorageDir).
+					Dur("waited", maxWait).
+					Msg("CephFS not mounted after timeout, exiting")
+			}
+			logger.Warn().
+				Str("path", webStorageDir).
+				Msg("CephFS not mounted, retrying...")
+			time.Sleep(retryInterval)
+		}
 	}
 
 	logger.Info().

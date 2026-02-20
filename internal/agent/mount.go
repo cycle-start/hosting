@@ -11,12 +11,13 @@ import (
 // cephFSMagic is the filesystem magic number for CephFS.
 const cephFSMagic = 0x00C36400
 
-// checkMount verifies that the given path is a mounted CephFS filesystem.
+// CheckMount verifies that the given path is a mounted CephFS filesystem.
 // Returns nil if the path is a valid CephFS mount, or a gRPC Unavailable error otherwise.
 // This is called before any mutating webroot/tenant operation to guard against
-// operating on an unmounted or wrong filesystem.
+// operating on an unmounted or wrong filesystem. It is also used as a startup
+// readiness gate for web node agents.
 // Set SKIP_CEPHFS_CHECK=1 to bypass (for development without CephFS).
-func checkMount(path string) error {
+func CheckMount(path string) error {
 	if os.Getenv("SKIP_CEPHFS_CHECK") == "1" {
 		return nil
 	}

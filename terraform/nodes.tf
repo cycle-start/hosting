@@ -34,10 +34,18 @@ resource "random_uuid" "lb_node_id" {
 
 resource "random_uuid" "ceph_fsid" {}
 
-# Pre-generated CephFS client key — injected into both storage and web nodes
-# so web nodes don't need to SCP the keyring from the storage node.
+# Pre-generated CephFS client key material — injected into both storage and web
+# nodes so web nodes don't need to SCP the keyring from the storage node.
+# Ceph expects a full CryptoKey structure (type + created + len + key), so we
+# prepend the fixed 12-byte header to the random key material.
 resource "random_id" "ceph_web_key" {
   byte_length = 16
+}
+
+locals {
+  # CryptoKey header (12 bytes, base64): type=1 (CephX, u16le) + created=0 (8 bytes) + len=16 (u16le)
+  # Since the header is exactly 12 bytes (multiple of 3), base64 concatenation is safe.
+  ceph_web_key = "AQAAAAAAAAAAABAA${random_id.ceph_web_key.b64_std}"
 }
 
 # --- Volumes (backed by golden images) ---
@@ -142,7 +150,7 @@ resource "libvirt_cloudinit_disk" "web_node" {
     region_id        = var.region_id
     cluster_id       = var.cluster_id
     ceph_fsid        = random_uuid.ceph_fsid.result
-    ceph_web_key     = random_id.ceph_web_key.b64_std
+    ceph_web_key     = local.ceph_web_key
     core_api_url     = "http://${var.controlplane_ip}:8090/api/v1"
     core_api_token   = var.core_api_token
   })
@@ -217,6 +225,7 @@ resource "libvirt_cloudinit_disk" "dns_node" {
     ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
     region_id        = var.region_id
     cluster_id       = var.cluster_id
+    controlplane_ip  = var.controlplane_ip
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.dns_nodes[count.index].ip
@@ -328,7 +337,7 @@ resource "libvirt_cloudinit_disk" "storage_node" {
     region_id          = var.region_id
     cluster_id         = var.cluster_id
     ceph_fsid          = random_uuid.ceph_fsid.result
-    ceph_web_key       = random_id.ceph_web_key.b64_std
+    ceph_web_key       = local.ceph_web_key
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.storage_nodes[count.index].ip

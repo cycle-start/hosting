@@ -36,7 +36,7 @@ func (m *WebrootManager) storagePath(tenantName, webrootName string) string {
 
 // Create provisions a new webroot directory on CephFS.
 func (m *WebrootManager) Create(ctx context.Context, info *runtime.WebrootInfo) error {
-	if err := checkMount(m.webStorageDir); err != nil {
+	if err := CheckMount(m.webStorageDir); err != nil {
 		return err
 	}
 
@@ -77,7 +77,7 @@ func (m *WebrootManager) Create(ctx context.Context, info *runtime.WebrootInfo) 
 
 // Update ensures the webroot directories are in the expected state.
 func (m *WebrootManager) Update(ctx context.Context, info *runtime.WebrootInfo) error {
-	if err := checkMount(m.webStorageDir); err != nil {
+	if err := CheckMount(m.webStorageDir); err != nil {
 		return err
 	}
 
@@ -111,7 +111,7 @@ func (m *WebrootManager) Update(ctx context.Context, info *runtime.WebrootInfo) 
 
 // Delete removes a webroot's storage directory.
 func (m *WebrootManager) Delete(ctx context.Context, tenantName, webrootName string) error {
-	if err := checkMount(m.webStorageDir); err != nil {
+	if err := CheckMount(m.webStorageDir); err != nil {
 		return err
 	}
 

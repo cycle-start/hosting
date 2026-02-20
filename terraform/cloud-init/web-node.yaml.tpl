@@ -49,10 +49,10 @@ write_files:
       Wants=network-online.target
 
       [Mount]
-      What=${storage_node_ip}:/
+      What=web@${ceph_fsid}.cephfs=/
       Where=/var/www/storage
       Type=ceph
-      Options=name=web,secretfile=/etc/ceph/ceph.client.web.secret,noatime,_netdev
+      Options=secretfile=/etc/ceph/ceph.client.web.secret,noatime,_netdev
       TimeoutSec=30
 
       [Install]

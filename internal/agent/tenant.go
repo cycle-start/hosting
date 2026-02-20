@@ -51,7 +51,7 @@ func (m *TenantManager) WebStorageDir() string {
 //
 //	/var/log/hosting/{tenant}/           tenant:tenant 0750
 func (m *TenantManager) Create(ctx context.Context, info *TenantInfo) error {
-	if err := checkMount(m.webStorageDir); err != nil {
+	if err := CheckMount(m.webStorageDir); err != nil {
 		return err
 	}
 
@@ -269,7 +269,7 @@ func (m *TenantManager) Unsuspend(ctx context.Context, name string) error {
 
 // Delete removes a tenant user account and its CephFS directory.
 func (m *TenantManager) Delete(ctx context.Context, name string) error {
-	if err := checkMount(m.webStorageDir); err != nil {
+	if err := CheckMount(m.webStorageDir); err != nil {
 		return err
 	}
 

@@ -43,7 +43,10 @@ echo "proc /proc proc defaults,hidepid=2 0 0" >> /etc/fstab
 # Vector role-specific config.
 cp /tmp/vector-web.toml /etc/vector/config.d/web.toml
 
-# CephFS mount dependency for node-agent on web nodes.
+# CephFS mount ordering for node-agent on web nodes.
+# Requires: if CephFS mount drops, systemd stops node-agent. Combined with
+# Restart=always, the agent restarts and blocks at its startup readiness gate
+# until CephFS recovers.
 mkdir -p /etc/systemd/system/node-agent.service.d
 cat > /etc/systemd/system/node-agent.service.d/cephfs.conf << 'EOF'
 [Unit]
@@ -54,3 +57,7 @@ EOF
 # Cleanup.
 apt-get clean
 rm -rf /var/lib/apt/lists/*
+
+# Final cloud-init clean — must be last to prevent package triggers from
+# recreating /var/lib/cloud state.
+cloud-init clean
