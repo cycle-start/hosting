@@ -80,6 +80,9 @@ write_files:
       # Allow single-node pool creation.
       ceph config set mon auth_allow_insecure_global_id_reclaim false || true
 
+      # Enable msgr2 (v2) protocol on the monitor for userspace clients.
+      ceph mon enable-msgr2
+
       # --- Manager ---
       mkdir -p "/var/lib/ceph/mgr/ceph-$HOST"
       ceph auth get-or-create "mgr.$HOST" \
@@ -151,13 +154,8 @@ write_files:
       ceph fs new cephfs cephfs_metadata cephfs_data
 
       # Import the pre-generated web client key (shared with web nodes via Terraform).
-      cat > /etc/ceph/ceph.client.web.keyring << KEYRING
-[client.web]
-	key = ${ceph_web_key}
-	caps mon = "allow r"
-	caps osd = "allow rw pool=cephfs_data"
-	caps mds = "allow rw"
-KEYRING
+      printf '[client.web]\n\tkey = %s\n\tcaps mon = "allow r"\n\tcaps osd = "allow rw pool=cephfs_data"\n\tcaps mds = "allow rw"\n' \
+        '${ceph_web_key}' > /etc/ceph/ceph.client.web.keyring
       ceph auth import -i /etc/ceph/ceph.client.web.keyring
 
       echo "CephFS setup complete."

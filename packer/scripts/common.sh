@@ -11,6 +11,11 @@ apt-get update
 apt-get upgrade -y
 apt-get install -y curl
 
+# Install HWE kernel for Ceph Squid (19.x) msgr2 compatibility and newer
+# hardware support. The stock 6.8 kernel's ceph module can't parse Squid
+# OSD maps via msgr2.
+apt-get install -y linux-generic-hwe-24.04
+
 # Create directories and install node-agent binary.
 mkdir -p /opt/hosting/bin
 install -m 0755 /tmp/node-agent /opt/hosting/bin/node-agent
