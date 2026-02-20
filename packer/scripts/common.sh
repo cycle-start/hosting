@@ -36,4 +36,6 @@ systemctl enable vector
 # Cleanup.
 apt-get clean
 rm -rf /var/lib/apt/lists/*
-cloud-init clean
+# NOTE: cloud-init clean is called at the end of each role-specific script,
+# AFTER all packages are installed. This ensures no package triggers
+# recreate /var/lib/cloud state after the clean.

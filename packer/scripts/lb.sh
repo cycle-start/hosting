@@ -29,3 +29,7 @@ cp /tmp/vector-lb.toml /etc/vector/config.d/lb.toml
 # Cleanup.
 apt-get clean
 rm -rf /var/lib/apt/lists/*
+
+# Final cloud-init clean — must be last to prevent package triggers from
+# recreating /var/lib/cloud state.
+cloud-init clean

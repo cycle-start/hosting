@@ -185,15 +185,7 @@ vm-up:
         sudo virsh net-start hosting; \
     fi
     cd terraform && terraform apply -auto-approve
-    @echo "Waiting for control plane API ({{cp}}:8090)..."
-    @for i in $(seq 1 60); do \
-        if curl -sf -o /dev/null http://{{cp}}:8090/healthz 2>/dev/null; then \
-            echo "Control plane ready."; \
-            break; \
-        fi; \
-        if [ "$i" -eq 60 ]; then echo "Timed out waiting for control plane" && exit 1; fi; \
-        sleep 5; \
-    done
+    just _wait-api
     go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml
 
 # Rebuild everything: new golden images, recreate VMs, deploy control plane
@@ -201,18 +193,88 @@ vm-rebuild:
     just packer-all
     just vm-down
     cd terraform && terraform apply -auto-approve
-    @echo "Waiting for k3s to be ready..."
-    @sleep 30
+    @if sudo virsh net-info hosting 2>/dev/null | grep -q 'Active:.*no'; then \
+        echo "Starting libvirt network 'hosting'..."; \
+        sudo virsh net-start hosting; \
+    fi
+    just _wait-k3s
     just vm-kubeconfig
     just vm-deploy
+    just _wait-postgres
     just migrate
     just create-dev-key
     just create-agent-key
-    just vm-up
+    just _wait-api
+    go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml
+
+# Wait for k3s API to be reachable on the control plane VM
+[private]
+_wait-k3s:
+    @echo "Waiting for k3s to be ready on {{cp}}..."
+    @for i in $(seq 1 60); do \
+        if ssh {{ssh_opts}} -o ConnectTimeout=2 ubuntu@{{cp}} "sudo k3s kubectl get nodes" >/dev/null 2>&1; then \
+            echo "k3s is ready."; \
+            exit 0; \
+        fi; \
+        sleep 5; \
+    done; \
+    echo "ERROR: k3s did not become ready after 5 minutes."; \
+    echo "  Try: ssh ubuntu@{{cp}} 'sudo systemctl status k3s'"; \
+    exit 1
+
+# Wait for both PostgreSQL databases to accept connections
+[private]
+_wait-postgres:
+    #!/usr/bin/env bash
+    echo "Waiting for PostgreSQL (core on :5432, powerdns on :5433)..."
+    for i in $(seq 1 60); do
+        if (echo > /dev/tcp/{{cp}}/5432) 2>/dev/null && (echo > /dev/tcp/{{cp}}/5433) 2>/dev/null; then
+            echo "Both PostgreSQL ports are accepting connections."
+            exit 0
+        fi
+        sleep 3
+    done
+    echo "ERROR: PostgreSQL did not become ready after 3 minutes."
+    echo "  Core DB (:5432):"
+    (echo > /dev/tcp/{{cp}}/5432) 2>&1 && echo "    port open" || echo "    port closed"
+    echo "  PowerDNS DB (:5433):"
+    (echo > /dev/tcp/{{cp}}/5433) 2>&1 && echo "    port open" || echo "    port closed"
+    echo "  Check pods: kubectl --context hosting get pods | grep postgres"
+    exit 1
+
+# Wait for the core API to be healthy
+[private]
+_wait-api:
+    @echo "Waiting for control plane API ({{cp}}:8090)..."
+    @for i in $(seq 1 60); do \
+        if curl -sf -o /dev/null http://{{cp}}:8090/healthz 2>/dev/null; then \
+            echo "Control plane API is ready."; \
+            exit 0; \
+        fi; \
+        sleep 5; \
+    done; \
+    echo "ERROR: Core API did not become healthy after 5 minutes."; \
+    echo "  Check pods: kubectl --context hosting get pods"; \
+    echo "  Check logs: kubectl --context hosting logs deploy/hosting-core-api --tail=50"; \
+    exit 1
 
 # Destroy VMs
 vm-down:
-    cd terraform && terraform destroy -auto-approve
+    -cd terraform && terraform destroy -auto-approve
+    @# Clean up leftover files that prevent pool deletion
+    @if [ -d /var/lib/libvirt/hosting-pool ]; then \
+        sudo rm -rf /var/lib/libvirt/hosting-pool; \
+    fi
+    @# Ensure pool is undefined if terraform couldn't delete it
+    @if sudo virsh pool-info hosting >/dev/null 2>&1; then \
+        sudo virsh pool-destroy hosting 2>/dev/null || true; \
+        sudo virsh pool-undefine hosting 2>/dev/null || true; \
+    fi
+    @# Ensure network is cleaned up
+    @if sudo virsh net-info hosting >/dev/null 2>&1; then \
+        sudo virsh net-destroy hosting 2>/dev/null || true; \
+        sudo virsh net-undefine hosting 2>/dev/null || true; \
+    fi
 
 # SSH into a VM (e.g. just vm-ssh web-1-node-0)
 vm-ssh name:
