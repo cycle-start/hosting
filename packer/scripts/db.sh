@@ -44,6 +44,11 @@ binlog_transaction_dependency_tracking = WRITESET
 transaction_write_set_extraction       = XXHASH64
 REPL_EOF
 
+# Remove auto.cnf so each VM gets a unique server UUID on first boot.
+# Without this, all nodes cloned from this image share the same UUID,
+# which breaks MySQL replication.
+rm -f /var/lib/mysql/auto.cnf
+
 # Vector role-specific config.
 cp /tmp/vector-db.toml /etc/vector/config.d/db.toml
 

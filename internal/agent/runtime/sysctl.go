@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -155,7 +156,15 @@ func sysctl(ctx context.Context, args ...string) error {
 
 func pkillSignal(ctx context.Context, process, signal string) error {
 	cmd := exec.CommandContext(ctx, "pkill", "-"+signal, "-f", process)
-	if output, err := cmd.CombinedOutput(); err != nil {
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// pkill exit code 1 means no processes matched — not an error.
+		// This is expected for socket-activated services (e.g. PHP-FPM)
+		// that haven't started yet.
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+			return nil
+		}
 		return fmt.Errorf("pkill -%s %s: %s: %w", signal, process, string(output), err)
 	}
 	return nil

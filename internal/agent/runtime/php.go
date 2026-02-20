@@ -265,14 +265,32 @@ func (p *PHP) Remove(ctx context.Context, webroot *WebrootInfo) error {
 	return p.Stop(ctx, webroot)
 }
 
-// ReloadAll reloads all installed PHP-FPM services by scanning /etc/php/*/fpm/.
+// ReloadAll reloads PHP-FPM services that have active tenant pools.
+// It skips versions that only have the default www.conf (or no pools at all)
+// since there's nothing to reload.
 func (p *PHP) ReloadAll(ctx context.Context) error {
-	versionDirs, err := filepath.Glob("/etc/php/*/fpm")
+	poolDirs, err := filepath.Glob("/etc/php/*/fpm/pool.d")
 	if err != nil {
-		return fmt.Errorf("glob php fpm dirs: %w", err)
+		return fmt.Errorf("glob php pool dirs: %w", err)
 	}
-	for _, dir := range versionDirs {
-		version := filepath.Base(filepath.Dir(dir))
+	for _, poolDir := range poolDirs {
+		// Check if this version has any tenant pool configs (not just www.conf).
+		hasTenantPools := false
+		entries, err := os.ReadDir(poolDir)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if !e.IsDir() && strings.HasSuffix(e.Name(), ".conf") && e.Name() != "www.conf" {
+				hasTenantPools = true
+				break
+			}
+		}
+		if !hasTenantPools {
+			continue
+		}
+
+		version := filepath.Base(filepath.Dir(filepath.Dir(poolDir)))
 		service := fmt.Sprintf("php%s-fpm", version)
 		p.logger.Info().Str("service", service).Msg("reloading PHP-FPM")
 		if err := p.svcMgr.Signal(ctx, service, "USR2"); err != nil {
