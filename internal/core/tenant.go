@@ -488,7 +488,7 @@ func (s *TenantService) RetryFailed(ctx context.Context, tenantID string) (int, 
 		{`SELECT f.id, f.fqdn FROM fqdns f JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND f.status = 'failed'`, "fqdns", "CreateFQDNWorkflow", "fqdn"},
 		{`SELECT c.id, f.fqdn FROM certificates c JOIN fqdns f ON f.id = c.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND c.status = 'failed'`, "certificates", "UploadCustomCertWorkflow", "certificate"},
 		{"SELECT id, name FROM zones WHERE tenant_id = $1 AND status = 'failed'", "zones", "CreateZoneWorkflow", "zone"},
-		{`SELECT zr.id, zr.name || '/' || zr.type FROM zone_records zr JOIN zones z ON z.id = zr.zone_id WHERE z.tenant_id = $1 AND zr.status = 'failed'`, "zone_records", "CreateZoneRecordWorkflow", "zone-record"},
+		// zone_records handled separately below (needs ZoneRecordParams).
 		{"SELECT id, name FROM databases WHERE tenant_id = $1 AND status = 'failed'", "databases", "CreateDatabaseWorkflow", "database"},
 		{`SELECT du.id, du.username FROM database_users du JOIN databases d ON d.id = du.database_id WHERE d.tenant_id = $1 AND du.status = 'failed'`, "database_users", "CreateDatabaseUserWorkflow", "database-user"},
 		{"SELECT id, name FROM valkey_instances WHERE tenant_id = $1 AND status = 'failed'", "valkey_instances", "CreateValkeyInstanceWorkflow", "valkey-instance"},
@@ -540,6 +540,44 @@ func (s *TenantService) RetryFailed(ctx context.Context, tenantID string) (int, 
 				Arg:          item.id,
 			}); err != nil {
 				return count, fmt.Errorf("signal %s for %s: %w", spec.workflowName, item.id, err)
+			}
+			count++
+		}
+	}
+
+	// Retry failed zone records (needs ZoneRecordParams, can't use generic loop).
+	{
+		rows, err := s.db.Query(ctx,
+			`SELECT zr.id, zr.name, zr.type, zr.content, zr.ttl, zr.priority, zr.managed_by, z.name AS zone_name
+			 FROM zone_records zr JOIN zones z ON z.id = zr.zone_id
+			 WHERE z.tenant_id = $1 AND zr.status = 'failed'`, tenantID)
+		if err != nil {
+			return count, fmt.Errorf("query failed zone_records: %w", err)
+		}
+		var zrParams []model.ZoneRecordParams
+		for rows.Next() {
+			var p model.ZoneRecordParams
+			if err := rows.Scan(&p.RecordID, &p.Name, &p.Type, &p.Content, &p.TTL, &p.Priority, &p.ManagedBy, &p.ZoneName); err != nil {
+				rows.Close()
+				return count, fmt.Errorf("scan failed zone_records: %w", err)
+			}
+			zrParams = append(zrParams, p)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return count, fmt.Errorf("iterate failed zone_records: %w", err)
+		}
+		for _, p := range zrParams {
+			_, err := s.db.Exec(ctx, "UPDATE zone_records SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", model.StatusProvisioning, p.RecordID)
+			if err != nil {
+				return count, fmt.Errorf("set zone_records %s to provisioning: %w", p.RecordID, err)
+			}
+			if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
+				WorkflowName: "CreateZoneRecordWorkflow",
+				WorkflowID:   workflowID("zone-record", p.Name+"/"+p.Type, p.RecordID),
+				Arg:          p,
+			}); err != nil {
+				return count, fmt.Errorf("signal CreateZoneRecordWorkflow for %s: %w", p.RecordID, err)
 			}
 			count++
 		}

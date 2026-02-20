@@ -131,7 +131,20 @@ func CreateZoneWorkflow(ctx workflow.Context, zoneID string) error {
 	_ = workflow.ExecuteActivity(ctx, "ListZoneRecordsByZoneID", zoneID).Get(ctx, &records)
 	for _, r := range records {
 		if r.Status == model.StatusPending {
-			children = append(children, ChildWorkflowSpec{WorkflowName: "CreateZoneRecordWorkflow", WorkflowID: fmt.Sprintf("create-zone-record-%s", r.ID), Arg: r.ID})
+			children = append(children, ChildWorkflowSpec{
+				WorkflowName: "CreateZoneRecordWorkflow",
+				WorkflowID:   fmt.Sprintf("create-zone-record-%s", r.ID),
+				Arg: model.ZoneRecordParams{
+					RecordID:  r.ID,
+					Name:      r.Name,
+					Type:      r.Type,
+					Content:   r.Content,
+					TTL:       r.TTL,
+					Priority:  r.Priority,
+					ManagedBy: r.ManagedBy,
+					ZoneName:  zone.Name,
+				},
+			})
 		}
 	}
 

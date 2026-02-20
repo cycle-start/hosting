@@ -80,6 +80,11 @@ func (h *ZoneRecord) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := request.ValidateZoneRecord(req.Type, req.Name, req.Content, req.Priority); err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	ttl := req.TTL
 	if ttl == 0 {
 		ttl = 3600
@@ -180,6 +185,11 @@ func (h *ZoneRecord) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Priority != nil {
 		record.Priority = req.Priority
+	}
+
+	if err := request.ValidateZoneRecord(record.Type, record.Name, record.Content, record.Priority); err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	if err := h.svc.Update(r.Context(), record); err != nil {

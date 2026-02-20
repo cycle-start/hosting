@@ -29,6 +29,11 @@ func (s *ZoneRecordService) Create(ctx context.Context, record *model.ZoneRecord
 		return fmt.Errorf("insert zone record: %w", err)
 	}
 
+	zoneName, err := s.getZoneName(ctx, record.ZoneID)
+	if err != nil {
+		return fmt.Errorf("get zone name for record: %w", err)
+	}
+
 	tenantID, err := resolveTenantIDFromZone(ctx, s.db, record.ZoneID)
 	if err != nil {
 		return fmt.Errorf("resolve tenant for zone record: %w", err)
@@ -36,7 +41,16 @@ func (s *ZoneRecordService) Create(ctx context.Context, record *model.ZoneRecord
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateZoneRecordWorkflow",
 		WorkflowID:   fmt.Sprintf("create-zone-record-%s", record.ID),
-		Arg:          record.ID,
+		Arg: model.ZoneRecordParams{
+			RecordID:  record.ID,
+			Name:      record.Name,
+			Type:      record.Type,
+			Content:   record.Content,
+			TTL:       record.TTL,
+			Priority:  record.Priority,
+			ManagedBy: record.ManagedBy,
+			ZoneName:  zoneName,
+		},
 	}); err != nil {
 		return fmt.Errorf("signal CreateZoneRecordWorkflow: %w", err)
 	}
@@ -110,6 +124,11 @@ func (s *ZoneRecordService) Update(ctx context.Context, record *model.ZoneRecord
 		return fmt.Errorf("update zone record %s: %w", record.ID, err)
 	}
 
+	zoneName, err := s.getZoneNameByRecord(ctx, record.ID)
+	if err != nil {
+		return fmt.Errorf("get zone name for record: %w", err)
+	}
+
 	tenantID, err := resolveTenantIDFromZoneRecord(ctx, s.db, record.ID)
 	if err != nil {
 		return fmt.Errorf("resolve tenant for zone record: %w", err)
@@ -117,7 +136,16 @@ func (s *ZoneRecordService) Update(ctx context.Context, record *model.ZoneRecord
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateZoneRecordWorkflow",
 		WorkflowID:   workflowID("zone-record", record.Name+"/"+record.Type, record.ID),
-		Arg:          record.ID,
+		Arg: model.ZoneRecordParams{
+			RecordID:  record.ID,
+			Name:      record.Name,
+			Type:      record.Type,
+			Content:   record.Content,
+			TTL:       record.TTL,
+			Priority:  record.Priority,
+			ManagedBy: record.ManagedBy,
+			ZoneName:  zoneName,
+		},
 	}); err != nil {
 		return fmt.Errorf("signal UpdateZoneRecordWorkflow: %w", err)
 	}
@@ -126,13 +154,21 @@ func (s *ZoneRecordService) Update(ctx context.Context, record *model.ZoneRecord
 }
 
 func (s *ZoneRecordService) Delete(ctx context.Context, id string) error {
-	var name string
+	var name, rtype, content, managedBy string
+	var ttl int
+	var priority *int
 	err := s.db.QueryRow(ctx,
-		"UPDATE zone_records SET status = $1, updated_at = now() WHERE id = $2 RETURNING name || '/' || type",
+		`UPDATE zone_records SET status = $1, updated_at = now() WHERE id = $2
+		 RETURNING name, type, content, ttl, priority, managed_by`,
 		model.StatusDeleting, id,
-	).Scan(&name)
+	).Scan(&name, &rtype, &content, &ttl, &priority, &managedBy)
 	if err != nil {
 		return fmt.Errorf("set zone record %s status to deleting: %w", id, err)
+	}
+
+	zoneName, err := s.getZoneNameByRecord(ctx, id)
+	if err != nil {
+		return fmt.Errorf("get zone name for record: %w", err)
 	}
 
 	tenantID, err := resolveTenantIDFromZoneRecord(ctx, s.db, id)
@@ -141,8 +177,17 @@ func (s *ZoneRecordService) Delete(ctx context.Context, id string) error {
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteZoneRecordWorkflow",
-		WorkflowID:   workflowID("zone-record", name, id),
-		Arg:          id,
+		WorkflowID:   workflowID("zone-record", name+"/"+rtype, id),
+		Arg: model.ZoneRecordParams{
+			RecordID:  id,
+			Name:      name,
+			Type:      rtype,
+			Content:   content,
+			TTL:       ttl,
+			Priority:  priority,
+			ManagedBy: managedBy,
+			ZoneName:  zoneName,
+		},
 	}); err != nil {
 		return fmt.Errorf("signal DeleteZoneRecordWorkflow: %w", err)
 	}
@@ -151,25 +196,67 @@ func (s *ZoneRecordService) Delete(ctx context.Context, id string) error {
 }
 
 func (s *ZoneRecordService) Retry(ctx context.Context, id string) error {
-	var status, name string
-	err := s.db.QueryRow(ctx, "SELECT status, name || '/' || type FROM zone_records WHERE id = $1", id).Scan(&status, &name)
+	var status string
+	var r model.ZoneRecord
+	err := s.db.QueryRow(ctx,
+		`SELECT status, name, type, content, ttl, priority, managed_by, zone_id
+		 FROM zone_records WHERE id = $1`, id,
+	).Scan(&status, &r.Name, &r.Type, &r.Content, &r.TTL, &r.Priority, &r.ManagedBy, &r.ZoneID)
 	if err != nil {
 		return fmt.Errorf("get zone record status: %w", err)
 	}
 	if status != model.StatusFailed {
 		return fmt.Errorf("zone record %s is not in failed state (current: %s)", id, status)
 	}
+
 	_, err = s.db.Exec(ctx, "UPDATE zone_records SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", model.StatusProvisioning, id)
 	if err != nil {
 		return fmt.Errorf("set zone record %s status to provisioning: %w", id, err)
 	}
+
+	zoneName, err := s.getZoneName(ctx, r.ZoneID)
+	if err != nil {
+		return fmt.Errorf("get zone name for record: %w", err)
+	}
+
 	tenantID, err := resolveTenantIDFromZoneRecord(ctx, s.db, id)
 	if err != nil {
 		return fmt.Errorf("resolve tenant for zone record: %w", err)
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateZoneRecordWorkflow",
-		WorkflowID:   workflowID("zone-record", name, id),
-		Arg:          id,
+		WorkflowID:   workflowID("zone-record", r.Name+"/"+r.Type, id),
+		Arg: model.ZoneRecordParams{
+			RecordID:  id,
+			Name:      r.Name,
+			Type:      r.Type,
+			Content:   r.Content,
+			TTL:       r.TTL,
+			Priority:  r.Priority,
+			ManagedBy: r.ManagedBy,
+			ZoneName:  zoneName,
+		},
 	})
+}
+
+// getZoneName fetches the zone name by zone ID.
+func (s *ZoneRecordService) getZoneName(ctx context.Context, zoneID string) (string, error) {
+	var name string
+	err := s.db.QueryRow(ctx, "SELECT name FROM zones WHERE id = $1", zoneID).Scan(&name)
+	if err != nil {
+		return "", fmt.Errorf("get zone name for zone %s: %w", zoneID, err)
+	}
+	return name, nil
+}
+
+// getZoneNameByRecord fetches the zone name via the record's zone_id.
+func (s *ZoneRecordService) getZoneNameByRecord(ctx context.Context, recordID string) (string, error) {
+	var name string
+	err := s.db.QueryRow(ctx,
+		`SELECT z.name FROM zones z JOIN zone_records r ON r.zone_id = z.id WHERE r.id = $1`, recordID,
+	).Scan(&name)
+	if err != nil {
+		return "", fmt.Errorf("get zone name for record %s: %w", recordID, err)
+	}
+	return name, nil
 }

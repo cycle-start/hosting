@@ -30,32 +30,21 @@ func (s *CreateZoneRecordWorkflowTestSuite) AfterTest(suiteName, testName string
 }
 
 func (s *CreateZoneRecordWorkflowTestSuite) TestSuccess() {
-	recordID := "test-record-1"
-	zoneID := "test-zone-1"
 	priority := 10
-
-	record := model.ZoneRecord{
-		ID:       recordID,
-		ZoneID:   zoneID,
-		Type:     "A",
-		Name:     "www.example.com",
-		Content:  "10.0.0.1",
-		TTL:      300,
-		Priority: &priority,
-	}
-	zone := model.Zone{
-		ID:      zoneID,
-		BrandID: "test-brand",
-		Name:    "example.com",
+	params := model.ZoneRecordParams{
+		RecordID:  "test-record-1",
+		Name:      "www.example.com",
+		Type:      "A",
+		Content:   "10.0.0.1",
+		TTL:       300,
+		Priority:  &priority,
+		ManagedBy: model.ManagedByCustom,
+		ZoneName:  "example.com",
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusProvisioning,
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetZoneRecordContext", mock.Anything, recordID).Return(&activity.ZoneRecordContext{
-		Record:   record,
-		ZoneName: zone.Name,
-	}, nil)
 	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(42, nil)
 	s.env.OnActivity("WriteDNSRecord", mock.Anything, activity.WriteDNSRecordParams{
 		DomainID: 42,
@@ -65,40 +54,33 @@ func (s *CreateZoneRecordWorkflowTestSuite) TestSuccess() {
 		TTL:      300,
 		Priority: &priority,
 	}).Return(nil)
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusActive,
+	s.env.OnActivity("DeactivateAutoRecords", mock.Anything, activity.DeactivateAutoRecordsParams{
+		Name: "www.example.com",
+		Type: "A",
 	}).Return(nil)
-	s.env.ExecuteWorkflow(CreateZoneRecordWorkflow, recordID)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusActive,
+	}).Return(nil)
+	s.env.ExecuteWorkflow(CreateZoneRecordWorkflow, params)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
 }
 
 func (s *CreateZoneRecordWorkflowTestSuite) TestNilPriority_Success() {
-	recordID := "test-record-2"
-	zoneID := "test-zone-2"
-
-	record := model.ZoneRecord{
-		ID:       recordID,
-		ZoneID:   zoneID,
-		Type:     "CNAME",
-		Name:     "www.example.com",
-		Content:  "example.com",
-		TTL:      3600,
-		Priority: nil,
-	}
-	zone := model.Zone{
-		ID:      zoneID,
-		BrandID: "test-brand",
-		Name:    "example.com",
+	params := model.ZoneRecordParams{
+		RecordID:  "test-record-2",
+		Name:      "www.example.com",
+		Type:      "CNAME",
+		Content:   "example.com",
+		TTL:       3600,
+		Priority:  nil,
+		ManagedBy: model.ManagedByCustom,
+		ZoneName:  "example.com",
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusProvisioning,
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetZoneRecordContext", mock.Anything, recordID).Return(&activity.ZoneRecordContext{
-		Record:   record,
-		ZoneName: zone.Name,
-	}, nil)
 	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(42, nil)
 	s.env.OnActivity("WriteDNSRecord", mock.Anything, activity.WriteDNSRecordParams{
 		DomainID: 42,
@@ -108,79 +90,100 @@ func (s *CreateZoneRecordWorkflowTestSuite) TestNilPriority_Success() {
 		TTL:      3600,
 		Priority: nil,
 	}).Return(nil)
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusActive,
+	s.env.OnActivity("DeactivateAutoRecords", mock.Anything, activity.DeactivateAutoRecordsParams{
+		Name: "www.example.com",
+		Type: "CNAME",
 	}).Return(nil)
-	s.env.ExecuteWorkflow(CreateZoneRecordWorkflow, recordID)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusActive,
+	}).Return(nil)
+	s.env.ExecuteWorkflow(CreateZoneRecordWorkflow, params)
+	s.True(s.env.IsWorkflowCompleted())
+	s.NoError(s.env.GetWorkflowError())
+}
+
+func (s *CreateZoneRecordWorkflowTestSuite) TestAutoManaged_NoDeactivation() {
+	params := model.ZoneRecordParams{
+		RecordID:  "test-record-auto",
+		Name:      "www.example.com",
+		Type:      "A",
+		Content:   "10.0.0.1",
+		TTL:       300,
+		ManagedBy: model.ManagedByAuto,
+		ZoneName:  "example.com",
+	}
+
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusProvisioning,
+	}).Return(nil)
+	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(42, nil)
+	s.env.OnActivity("WriteDNSRecord", mock.Anything, mock.Anything).Return(nil)
+	// No DeactivateAutoRecords expectation — auto records don't trigger deactivation.
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusActive,
+	}).Return(nil)
+	s.env.ExecuteWorkflow(CreateZoneRecordWorkflow, params)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
 }
 
 func (s *CreateZoneRecordWorkflowTestSuite) TestZoneNotFoundInDNS_SetsStatusFailed() {
-	recordID := "test-record-nf"
-	zoneID := "test-zone-nf"
-
-	record := model.ZoneRecord{
-		ID:      recordID,
-		ZoneID:  zoneID,
-		Type:    "A",
-		Name:    "www.example.com",
-		Content: "10.0.0.1",
-		TTL:     300,
+	params := model.ZoneRecordParams{
+		RecordID: "test-record-nf",
+		Name:     "www.example.com",
+		Type:     "A",
+		Content:  "10.0.0.1",
+		TTL:      300,
+		ZoneName: "example.com",
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusProvisioning,
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetZoneRecordContext", mock.Anything, recordID).Return(&activity.ZoneRecordContext{
-		Record:   record,
-		ZoneName: "example.com",
-	}, nil)
 	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(0, nil)
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", recordID)).Return(nil)
-	s.env.ExecuteWorkflow(CreateZoneRecordWorkflow, recordID)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", params.RecordID)).Return(nil)
+	s.env.ExecuteWorkflow(CreateZoneRecordWorkflow, params)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
 }
 
-func (s *CreateZoneRecordWorkflowTestSuite) TestGetRecordFails_SetsStatusFailed() {
-	recordID := "test-record-3"
+func (s *CreateZoneRecordWorkflowTestSuite) TestGetDNSZoneFails_SetsStatusFailed() {
+	params := model.ZoneRecordParams{
+		RecordID: "test-record-3",
+		Name:     "www.example.com",
+		Type:     "A",
+		Content:  "10.0.0.1",
+		TTL:      300,
+		ZoneName: "example.com",
+	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusProvisioning,
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetZoneRecordContext", mock.Anything, recordID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", recordID)).Return(nil)
-	s.env.ExecuteWorkflow(CreateZoneRecordWorkflow, recordID)
+	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(0, fmt.Errorf("dns db error"))
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", params.RecordID)).Return(nil)
+	s.env.ExecuteWorkflow(CreateZoneRecordWorkflow, params)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
 }
 
 func (s *CreateZoneRecordWorkflowTestSuite) TestWriteDNSRecordFails_SetsStatusFailed() {
-	recordID := "test-record-4"
-	zoneID := "test-zone-4"
-
-	record := model.ZoneRecord{
-		ID:      recordID,
-		ZoneID:  zoneID,
-		Type:    "A",
-		Name:    "www.example.com",
-		Content: "10.0.0.1",
-		TTL:     300,
+	params := model.ZoneRecordParams{
+		RecordID: "test-record-4",
+		Name:     "www.example.com",
+		Type:     "A",
+		Content:  "10.0.0.1",
+		TTL:      300,
+		ZoneName: "example.com",
 	}
-	zone := model.Zone{ID: zoneID, BrandID: "test-brand", Name: "example.com"}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusProvisioning,
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetZoneRecordContext", mock.Anything, recordID).Return(&activity.ZoneRecordContext{
-		Record:   record,
-		ZoneName: zone.Name,
-	}, nil)
 	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(42, nil)
 	s.env.OnActivity("WriteDNSRecord", mock.Anything, mock.Anything).Return(fmt.Errorf("db error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", recordID)).Return(nil)
-	s.env.ExecuteWorkflow(CreateZoneRecordWorkflow, recordID)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", params.RecordID)).Return(nil)
+	s.env.ExecuteWorkflow(CreateZoneRecordWorkflow, params)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
 }
@@ -203,27 +206,18 @@ func (s *UpdateZoneRecordWorkflowTestSuite) AfterTest(suiteName, testName string
 }
 
 func (s *UpdateZoneRecordWorkflowTestSuite) TestSuccess() {
-	recordID := "test-record-1"
-	zoneID := "test-zone-1"
-
-	record := model.ZoneRecord{
-		ID:       recordID,
-		ZoneID:   zoneID,
-		Type:     "A",
+	params := model.ZoneRecordParams{
+		RecordID: "test-record-1",
 		Name:     "www.example.com",
+		Type:     "A",
 		Content:  "10.0.0.2",
 		TTL:      600,
-		Priority: nil,
+		ZoneName: "example.com",
 	}
-	zone := model.Zone{ID: zoneID, BrandID: "test-brand", Name: "example.com"}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusProvisioning,
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetZoneRecordContext", mock.Anything, recordID).Return(&activity.ZoneRecordContext{
-		Record:   record,
-		ZoneName: zone.Name,
-	}, nil)
 	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(42, nil)
 	s.env.OnActivity("UpdateDNSRecord", mock.Anything, activity.UpdateDNSRecordParams{
 		DomainID: 42,
@@ -234,78 +228,70 @@ func (s *UpdateZoneRecordWorkflowTestSuite) TestSuccess() {
 		Priority: nil,
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusActive,
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusActive,
 	}).Return(nil)
-	s.env.ExecuteWorkflow(UpdateZoneRecordWorkflow, recordID)
+	s.env.ExecuteWorkflow(UpdateZoneRecordWorkflow, params)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
 }
 
 func (s *UpdateZoneRecordWorkflowTestSuite) TestZoneNotFoundInDNS_SetsStatusFailed() {
-	recordID := "test-record-nf"
-	zoneID := "test-zone-nf"
-
-	record := model.ZoneRecord{
-		ID:      recordID,
-		ZoneID:  zoneID,
-		Type:    "A",
-		Name:    "www.example.com",
-		Content: "10.0.0.2",
-		TTL:     600,
+	params := model.ZoneRecordParams{
+		RecordID: "test-record-nf",
+		Name:     "www.example.com",
+		Type:     "A",
+		Content:  "10.0.0.2",
+		TTL:      600,
+		ZoneName: "example.com",
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusProvisioning,
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetZoneRecordContext", mock.Anything, recordID).Return(&activity.ZoneRecordContext{
-		Record:   record,
-		ZoneName: "example.com",
-	}, nil)
 	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(0, nil)
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", recordID)).Return(nil)
-	s.env.ExecuteWorkflow(UpdateZoneRecordWorkflow, recordID)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", params.RecordID)).Return(nil)
+	s.env.ExecuteWorkflow(UpdateZoneRecordWorkflow, params)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
 }
 
 func (s *UpdateZoneRecordWorkflowTestSuite) TestUpdateDNSRecordFails_SetsStatusFailed() {
-	recordID := "test-record-2"
-	zoneID := "test-zone-2"
-
-	record := model.ZoneRecord{
-		ID:      recordID,
-		ZoneID:  zoneID,
-		Type:    "A",
-		Name:    "www.example.com",
-		Content: "10.0.0.2",
-		TTL:     600,
+	params := model.ZoneRecordParams{
+		RecordID: "test-record-2",
+		Name:     "www.example.com",
+		Type:     "A",
+		Content:  "10.0.0.2",
+		TTL:      600,
+		ZoneName: "example.com",
 	}
-	zone := model.Zone{ID: zoneID, BrandID: "test-brand", Name: "example.com"}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusProvisioning,
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetZoneRecordContext", mock.Anything, recordID).Return(&activity.ZoneRecordContext{
-		Record:   record,
-		ZoneName: zone.Name,
-	}, nil)
 	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(42, nil)
 	s.env.OnActivity("UpdateDNSRecord", mock.Anything, mock.Anything).Return(fmt.Errorf("db error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", recordID)).Return(nil)
-	s.env.ExecuteWorkflow(UpdateZoneRecordWorkflow, recordID)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", params.RecordID)).Return(nil)
+	s.env.ExecuteWorkflow(UpdateZoneRecordWorkflow, params)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
 }
 
-func (s *UpdateZoneRecordWorkflowTestSuite) TestGetRecordFails_SetsStatusFailed() {
-	recordID := "test-record-3"
+func (s *UpdateZoneRecordWorkflowTestSuite) TestGetDNSZoneFails_SetsStatusFailed() {
+	params := model.ZoneRecordParams{
+		RecordID: "test-record-3",
+		Name:     "www.example.com",
+		Type:     "A",
+		Content:  "10.0.0.2",
+		TTL:      600,
+		ZoneName: "example.com",
+	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusProvisioning,
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusProvisioning,
 	}).Return(nil)
-	s.env.OnActivity("GetZoneRecordContext", mock.Anything, recordID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", recordID)).Return(nil)
-	s.env.ExecuteWorkflow(UpdateZoneRecordWorkflow, recordID)
+	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(0, fmt.Errorf("dns db error"))
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", params.RecordID)).Return(nil)
+	s.env.ExecuteWorkflow(UpdateZoneRecordWorkflow, params)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
 }
@@ -328,26 +314,18 @@ func (s *DeleteZoneRecordWorkflowTestSuite) AfterTest(suiteName, testName string
 }
 
 func (s *DeleteZoneRecordWorkflowTestSuite) TestSuccess() {
-	recordID := "test-record-1"
-	zoneID := "test-zone-1"
-
-	record := model.ZoneRecord{
-		ID:      recordID,
-		ZoneID:  zoneID,
-		Type:    "A",
-		Name:    "www.example.com",
-		Content: "10.0.0.1",
-		TTL:     300,
+	params := model.ZoneRecordParams{
+		RecordID: "test-record-1",
+		Name:     "www.example.com",
+		Type:     "A",
+		Content:  "10.0.0.1",
+		TTL:      300,
+		ZoneName: "example.com",
 	}
-	zone := model.Zone{ID: zoneID, BrandID: "test-brand", Name: "example.com"}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusDeleting,
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusDeleting,
 	}).Return(nil)
-	s.env.OnActivity("GetZoneRecordContext", mock.Anything, recordID).Return(&activity.ZoneRecordContext{
-		Record:   record,
-		ZoneName: zone.Name,
-	}, nil)
 	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(42, nil)
 	s.env.OnActivity("DeleteDNSRecord", mock.Anything, activity.DeleteDNSRecordParams{
 		DomainID: 42,
@@ -355,83 +333,107 @@ func (s *DeleteZoneRecordWorkflowTestSuite) TestSuccess() {
 		Type:     "A",
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusDeleted,
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusDeleted,
 	}).Return(nil)
-	s.env.ExecuteWorkflow(DeleteZoneRecordWorkflow, recordID)
+	s.env.ExecuteWorkflow(DeleteZoneRecordWorkflow, params)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
 }
 
 func (s *DeleteZoneRecordWorkflowTestSuite) TestZoneNotFoundInDNS_SkipsDeleteAndSucceeds() {
-	recordID := "test-record-nf"
-	zoneID := "test-zone-nf"
-
-	record := model.ZoneRecord{
-		ID:      recordID,
-		ZoneID:  zoneID,
-		Type:    "A",
-		Name:    "www.example.com",
-		Content: "10.0.0.1",
-		TTL:     300,
+	params := model.ZoneRecordParams{
+		RecordID: "test-record-nf",
+		Name:     "www.example.com",
+		Type:     "A",
+		Content:  "10.0.0.1",
+		TTL:      300,
+		ZoneName: "example.com",
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusDeleting,
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusDeleting,
 	}).Return(nil)
-	s.env.OnActivity("GetZoneRecordContext", mock.Anything, recordID).Return(&activity.ZoneRecordContext{
-		Record:   record,
-		ZoneName: "example.com",
-	}, nil)
 	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(0, nil)
 	// No DeleteDNSRecord expectation — it should be skipped.
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusDeleted,
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusDeleted,
 	}).Return(nil)
-	s.env.ExecuteWorkflow(DeleteZoneRecordWorkflow, recordID)
+	s.env.ExecuteWorkflow(DeleteZoneRecordWorkflow, params)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
 }
 
 func (s *DeleteZoneRecordWorkflowTestSuite) TestDeleteDNSRecordFails_SetsStatusFailed() {
-	recordID := "test-record-2"
-	zoneID := "test-zone-2"
-
-	record := model.ZoneRecord{
-		ID:      recordID,
-		ZoneID:  zoneID,
-		Type:    "A",
-		Name:    "www.example.com",
-		Content: "10.0.0.1",
-		TTL:     300,
+	params := model.ZoneRecordParams{
+		RecordID: "test-record-2",
+		Name:     "www.example.com",
+		Type:     "A",
+		Content:  "10.0.0.1",
+		TTL:      300,
+		ZoneName: "example.com",
 	}
-	zone := model.Zone{ID: zoneID, BrandID: "test-brand", Name: "example.com"}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusDeleting,
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusDeleting,
 	}).Return(nil)
-	s.env.OnActivity("GetZoneRecordContext", mock.Anything, recordID).Return(&activity.ZoneRecordContext{
-		Record:   record,
-		ZoneName: zone.Name,
-	}, nil)
 	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(42, nil)
 	s.env.OnActivity("DeleteDNSRecord", mock.Anything, mock.Anything).Return(fmt.Errorf("db error"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", recordID)).Return(nil)
-	s.env.ExecuteWorkflow(DeleteZoneRecordWorkflow, recordID)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", params.RecordID)).Return(nil)
+	s.env.ExecuteWorkflow(DeleteZoneRecordWorkflow, params)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
 }
 
-func (s *DeleteZoneRecordWorkflowTestSuite) TestGetRecordFails_SetsStatusFailed() {
-	recordID := "test-record-3"
+func (s *DeleteZoneRecordWorkflowTestSuite) TestGetDNSZoneFails_SetsStatusFailed() {
+	params := model.ZoneRecordParams{
+		RecordID: "test-record-3",
+		Name:     "www.example.com",
+		Type:     "A",
+		Content:  "10.0.0.1",
+		TTL:      300,
+		ZoneName: "example.com",
+	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
-		Table: "zone_records", ID: recordID, Status: model.StatusDeleting,
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusDeleting,
 	}).Return(nil)
-	s.env.OnActivity("GetZoneRecordContext", mock.Anything, recordID).Return(nil, fmt.Errorf("not found"))
-	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", recordID)).Return(nil)
-	s.env.ExecuteWorkflow(DeleteZoneRecordWorkflow, recordID)
+	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(0, fmt.Errorf("dns db error"))
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("zone_records", params.RecordID)).Return(nil)
+	s.env.ExecuteWorkflow(DeleteZoneRecordWorkflow, params)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
+}
+
+func (s *DeleteZoneRecordWorkflowTestSuite) TestCustomRecord_ReactivatesAutoRecords() {
+	params := model.ZoneRecordParams{
+		RecordID:  "test-record-custom",
+		Name:      "www.example.com",
+		Type:      "A",
+		Content:   "10.0.0.1",
+		TTL:       300,
+		ManagedBy: model.ManagedByCustom,
+		ZoneName:  "example.com",
+	}
+
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusDeleting,
+	}).Return(nil)
+	s.env.OnActivity("GetDNSZoneIDByName", mock.Anything, "example.com").Return(42, nil)
+	s.env.OnActivity("DeleteDNSRecord", mock.Anything, activity.DeleteDNSRecordParams{
+		DomainID: 42,
+		Name:     "www.example.com",
+		Type:     "A",
+	}).Return(nil)
+	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
+		Table: "zone_records", ID: params.RecordID, Status: model.StatusDeleted,
+	}).Return(nil)
+	s.env.OnActivity("ReactivateAutoRecords", mock.Anything, activity.DeactivateAutoRecordsParams{
+		Name: "www.example.com",
+		Type: "A",
+	}).Return(nil)
+	s.env.ExecuteWorkflow(DeleteZoneRecordWorkflow, params)
+	s.True(s.env.IsWorkflowCompleted())
+	s.NoError(s.env.GetWorkflowError())
 }
 
 // ---------- Run all suites ----------

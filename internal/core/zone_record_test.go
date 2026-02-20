@@ -49,6 +49,13 @@ func TestZoneRecordService_Create_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	// getZoneName
+	zoneNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "example.com"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(zoneNameRow).Once()
+
 	// resolveTenantIDFromZone
 	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
@@ -100,6 +107,13 @@ func TestZoneRecordService_Create_WorkflowError(t *testing.T) {
 	record := &model.ZoneRecord{ID: "test-record-1", Type: "A"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+
+	// getZoneName
+	zoneNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "example.com"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(zoneNameRow).Once()
 
 	// resolveTenantIDFromZone (nil tenant => signalProvision uses ExecuteWorkflow)
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
@@ -255,6 +269,13 @@ func TestZoneRecordService_Update_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	// getZoneNameByRecord
+	zoneNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "example.com"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(zoneNameRow).Once()
+
 	// resolveTenantIDFromZoneRecord
 	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
@@ -305,6 +326,13 @@ func TestZoneRecordService_Update_WorkflowError(t *testing.T) {
 	record := &model.ZoneRecord{ID: "test-record-1"}
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
+	// getZoneNameByRecord
+	zoneNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "example.com"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(zoneNameRow).Once()
+
 	// resolveTenantIDFromZoneRecord (nil tenant => signalProvision uses ExecuteWorkflow)
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(**string)) = nil
@@ -331,11 +359,24 @@ func TestZoneRecordService_Delete_Success(t *testing.T) {
 
 	recordID := "test-record-1"
 
+	// RETURNING name, type, content, ttl, priority, managed_by
 	updateRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "@/A"
+		*(dest[0].(*string)) = "@"
+		*(dest[1].(*string)) = "A"
+		*(dest[2].(*string)) = "1.2.3.4"
+		*(dest[3].(*int)) = 3600
+		*(dest[4].(**int)) = nil
+		*(dest[5].(*string)) = model.ManagedByCustom
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
+
+	// getZoneNameByRecord
+	zoneNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "example.com"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(zoneNameRow).Once()
 
 	// resolveTenantIDFromZoneRecord
 	tenantID := "test-tenant-1"
@@ -386,11 +427,24 @@ func TestZoneRecordService_Delete_WorkflowError(t *testing.T) {
 	svc := NewZoneRecordService(db, tc)
 	ctx := context.Background()
 
+	// RETURNING name, type, content, ttl, priority, managed_by
 	updateRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "@/A"
+		*(dest[0].(*string)) = "@"
+		*(dest[1].(*string)) = "A"
+		*(dest[2].(*string)) = "1.2.3.4"
+		*(dest[3].(*int)) = 3600
+		*(dest[4].(**int)) = nil
+		*(dest[5].(*string)) = model.ManagedByCustom
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
+
+	// getZoneNameByRecord
+	zoneNameRow := &mockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = "example.com"
+		return nil
+	}}
+	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(zoneNameRow).Once()
 
 	// resolveTenantIDFromZoneRecord
 	tenantID := "test-tenant-1"

@@ -155,17 +155,35 @@ func TestZoneRecordCreate_InvalidRecordType(t *testing.T) {
 }
 
 func TestZoneRecordCreate_ValidRecordTypes(t *testing.T) {
-	validTypes := []string{"A", "AAAA", "CNAME", "MX", "TXT", "SRV", "NS", "CAA", "PTR"}
-	for _, rt := range validTypes {
-		t.Run(rt, func(t *testing.T) {
+	cases := []struct {
+		rtype   string
+		content string
+		extra   map[string]any
+	}{
+		{"A", "1.2.3.4", nil},
+		{"AAAA", "2001:db8::1", nil},
+		{"CNAME", "example.com", nil},
+		{"MX", "mail.example.com", map[string]any{"priority": 10}},
+		{"TXT", "v=spf1 ~all", nil},
+		{"SRV", "5 5060 sip.example.com", map[string]any{"priority": 10}},
+		{"NS", "ns1.example.com", nil},
+		{"CAA", `0 issue "letsencrypt.org"`, nil},
+		{"PTR", "host.example.com", nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.rtype, func(t *testing.T) {
 			h := newZoneRecordHandler()
 			rec := httptest.NewRecorder()
 			zid := "test-zone-1"
-			r := newRequest(http.MethodPost, "/zones/"+zid+"/records", map[string]any{
-				"type":    rt,
+			body := map[string]any{
+				"type":    tc.rtype,
 				"name":    "@",
-				"content": "1.2.3.4",
-			})
+				"content": tc.content,
+			}
+			for k, v := range tc.extra {
+				body[k] = v
+			}
+			r := newRequest(http.MethodPost, "/zones/"+zid+"/records", body)
 			r = withChiURLParam(r, "zoneID", zid)
 
 			func() {
