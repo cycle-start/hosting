@@ -246,28 +246,29 @@ func TestDatabaseMigrate_Success(t *testing.T) {
 	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(getRow).Once()
 
 	// Brand check: tenant GetByID
-	// Scan order: ID, Name, BrandID, RegionID, ClusterID, ShardID, UID,
+	// Scan order: ID, Name, BrandID, CustomerID, RegionID, ClusterID, ShardID, UID,
 	//   SFTPEnabled, SSHEnabled, DiskQuotaBytes, Status, StatusMessage, SuspendReason,
 	//   CreatedAt, UpdatedAt, RegionName, ClusterName, ShardName
 	tenantRow := &handlerMockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = tenantID         // ID
 		*(dest[1].(*string)) = "t_testtenant01" // Name
 		*(dest[2].(*string)) = "test-brand"     // BrandID
-		*(dest[3].(*string)) = "dev"            // RegionID
-		*(dest[4].(*string)) = "dev"            // ClusterID
-		*(dest[5].(**string)) = nil             // ShardID
-		*(dest[6].(*int)) = 1000                // UID
-		*(dest[7].(*bool)) = false              // SFTPEnabled
-		*(dest[8].(*bool)) = false              // SSHEnabled
-		*(dest[9].(*int64)) = 0                 // DiskQuotaBytes
-		*(dest[10].(*string)) = "active"        // Status
-		*(dest[11].(**string)) = nil            // StatusMessage
-		*(dest[12].(*string)) = ""              // SuspendReason
-		*(dest[13].(*time.Time)) = now          // CreatedAt
-		*(dest[14].(*time.Time)) = now          // UpdatedAt
-		*(dest[15].(*string)) = "dev"           // RegionName
-		*(dest[16].(*string)) = "dev"           // ClusterName
-		*(dest[17].(**string)) = nil            // ShardName
+		*(dest[3].(*string)) = ""               // CustomerID
+		*(dest[4].(*string)) = "dev"            // RegionID
+		*(dest[5].(*string)) = "dev"            // ClusterID
+		*(dest[6].(**string)) = nil             // ShardID
+		*(dest[7].(*int)) = 1000                // UID
+		*(dest[8].(*bool)) = false              // SFTPEnabled
+		*(dest[9].(*bool)) = false              // SSHEnabled
+		*(dest[10].(*int64)) = int64(0)         // DiskQuotaBytes
+		*(dest[11].(*string)) = "active"        // Status
+		*(dest[12].(**string)) = nil            // StatusMessage
+		*(dest[13].(*string)) = ""              // SuspendReason
+		*(dest[14].(*time.Time)) = now          // CreatedAt
+		*(dest[15].(*time.Time)) = now          // UpdatedAt
+		*(dest[16].(*string)) = "dev"           // RegionName
+		*(dest[17].(*string)) = "dev"           // ClusterName
+		*(dest[18].(**string)) = nil            // ShardName
 		return nil
 	}}
 	tenantDB.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(tenantRow).Once()

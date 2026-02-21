@@ -284,6 +284,7 @@ func TestTenantCreate_ValidBodyParsing(t *testing.T) {
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants", map[string]any{
 		"brand_id":     "test-brand",
+		"customer_id":  "cust-1",
 		"region_id":    "test-region-1",
 		"cluster_id":   "test-cluster-1",
 		"shard_id":     "test-shard-1",
@@ -304,10 +305,11 @@ func TestTenantCreate_OptionalSFTPEnabled(t *testing.T) {
 	h := newTenantHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants", map[string]any{
-		"brand_id":   "test-brand",
-		"region_id":  "test-region-1",
-		"cluster_id": "test-cluster-1",
-		"shard_id":   "test-shard-1",
+		"brand_id":    "test-brand",
+		"customer_id": "cust-1",
+		"region_id":   "test-region-1",
+		"cluster_id":  "test-cluster-1",
+		"shard_id":    "test-shard-1",
 	})
 
 	func() {
@@ -324,6 +326,7 @@ func TestTenantCreate_ExtraFieldsIgnored(t *testing.T) {
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants", map[string]any{
 		"brand_id":    "test-brand",
+		"customer_id": "cust-1",
 		"region_id":   "test-region-1",
 		"cluster_id":  "test-cluster-1",
 		"shard_id":    "test-shard-1",
@@ -342,10 +345,11 @@ func TestTenantCreate_ExtraFieldsIgnored(t *testing.T) {
 
 func validTenantBody() map[string]any {
 	return map[string]any{
-		"brand_id":   "test-brand",
-		"region_id":  "test-region-1",
-		"cluster_id": "test-cluster-1",
-		"shard_id":   "test-shard-1",
+		"brand_id":    "test-brand",
+		"customer_id": "cust-1",
+		"region_id":   "test-region-1",
+		"cluster_id":  "test-cluster-1",
+		"shard_id":    "test-shard-1",
 	}
 }
 
