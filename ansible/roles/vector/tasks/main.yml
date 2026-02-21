@@ -129,7 +129,7 @@
       ExecStartPre=
       ExecStartPre=/usr/bin/vector validate --skip-healthchecks --config-dir /etc/vector/config.d
       ExecStart=
-      ExecStart=/usr/bin/vector --config-dir /etc/vector/config.d --no-healthchecks
+      ExecStart=/usr/bin/vector --config-dir /etc/vector/config.d
     dest: /etc/systemd/system/vector.service.d/override.conf
   when: "'controlplane' not in group_names"
   notify: restart vector
@@ -141,7 +141,7 @@
       ExecStartPre=
       ExecStartPre=/usr/bin/vector validate --skip-healthchecks --config-toml /etc/vector/vector.toml
       ExecStart=
-      ExecStart=/usr/bin/vector --config-toml /etc/vector/vector.toml --no-healthchecks
+      ExecStart=/usr/bin/vector --config-toml /etc/vector/vector.toml
     dest: /etc/systemd/system/vector.service.d/override.conf
   when: "'controlplane' in group_names"
   notify: restart vector
