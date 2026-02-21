@@ -120,6 +120,7 @@ func main() {
 	w.RegisterWorkflow(workflow.SuspendTenantWorkflow)
 	w.RegisterWorkflow(workflow.UnsuspendTenantWorkflow)
 	w.RegisterWorkflow(workflow.DeleteTenantWorkflow)
+	w.RegisterWorkflow(workflow.DeleteSubscriptionWorkflow)
 	w.RegisterWorkflow(workflow.CreateWebrootWorkflow)
 	w.RegisterWorkflow(workflow.UpdateWebrootWorkflow)
 	w.RegisterWorkflow(workflow.DeleteWebrootWorkflow)

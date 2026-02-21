@@ -36,7 +36,7 @@ func (s *CreateS3BucketWorkflowTestSuite) TestSuccess() {
 	tenant := model.Tenant{ID: tenantID, Name: "ttest1234567"}
 	bucket := model.S3Bucket{
 		ID:         bucketID,
-		TenantID:   &tenantID,
+		TenantID:   tenantID,
 		Name:       "mybucket",
 		ShardID:    &shardID,
 		Public:     false,
@@ -72,7 +72,7 @@ func (s *CreateS3BucketWorkflowTestSuite) TestSuccessPublicBucket() {
 	tenant := model.Tenant{ID: tenantID, Name: "ttest1234567"}
 	bucket := model.S3Bucket{
 		ID:         bucketID,
-		TenantID:   &tenantID,
+		TenantID:   tenantID,
 		Name:       "publicbucket",
 		ShardID:    &shardID,
 		Public:     true,
@@ -128,7 +128,7 @@ func (s *CreateS3BucketWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	tenant := model.Tenant{ID: tenantID, Name: "ttest1234567"}
 	bucket := model.S3Bucket{
 		ID:         bucketID,
-		TenantID:   &tenantID,
+		TenantID:   tenantID,
 		Name:       "mybucket",
 		ShardID:    &shardID,
 		Public:     false,
@@ -186,7 +186,7 @@ func (s *DeleteS3BucketWorkflowTestSuite) TestSuccess() {
 	tenant := model.Tenant{ID: tenantID, Name: "ttest1234567"}
 	bucket := model.S3Bucket{
 		ID:         bucketID,
-		TenantID:   &tenantID,
+		TenantID:   tenantID,
 		Name:       "mybucket",
 		ShardID:    &shardID,
 		Public:     false,
@@ -236,7 +236,7 @@ func (s *DeleteS3BucketWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	tenant := model.Tenant{ID: tenantID, Name: "ttest1234567"}
 	bucket := model.S3Bucket{
 		ID:         bucketID,
-		TenantID:   &tenantID,
+		TenantID:   tenantID,
 		Name:       "mybucket",
 		ShardID:    &shardID,
 		Public:     false,

@@ -7,10 +7,10 @@ Email hosting is powered by [Stalwart](https://stalwart.org/), an all-in-one mai
 Email accounts are scoped to FQDNs (domains). The resolution chain for any email operation is:
 
 ```
-FQDN -> Webroot -> Tenant -> Cluster -> Stalwart URL + Token
+FQDN -> Tenant -> Cluster -> Stalwart URL + Token
 ```
 
-This is encapsulated in `StalwartContext`, resolved once per workflow via the `GetStalwartContext` activity. The context provides the Stalwart base URL, admin token, mail hostname, and FQDN details.
+Since FQDNs are now tenant-scoped (not webroot-scoped), the resolution chain goes directly from FQDN to tenant. This is encapsulated in `StalwartContext`, resolved once per workflow via the `GetStalwartContext` activity. The context provides the Stalwart base URL, admin token, mail hostname, and FQDN details.
 
 Two clients are used to talk to Stalwart:
 - **REST client** (`stalwart.Client`) -- account/domain CRUD, alias management via principal patch operations
@@ -20,7 +20,9 @@ Two clients are used to talk to Stalwart:
 
 An email account is a mailbox on Stalwart. Each account belongs to an FQDN and has an address, display name, and quota.
 
-**Model fields:** `id`, `fqdn_id`, `address`, `display_name`, `quota_bytes`, `status`
+**Model fields:** `id`, `fqdn_id`, `subscription_id`, `address`, `display_name`, `quota_bytes`, `status`
+
+The `subscription_id` is required when creating an email account, linking it to a subscription for billing and lifecycle management.
 
 ### Create workflow (`CreateEmailAccountWorkflow`)
 

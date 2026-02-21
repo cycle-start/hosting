@@ -159,8 +159,9 @@ func (s *CreateDaemonWorkflowTestSuite) TestSuccess_WithProxy() {
 
 	// With proxy_path: regenerate nginx on all nodes (ListDaemonsByWebroot + GetFQDNsByWebrootID + UpdateWebroot + ReloadNginx).
 	s.env.OnActivity("ListDaemonsByWebroot", mock.Anything, "wr-1").Return([]model.Daemon{daemonCtx.Daemon}, nil)
+	wr1 := "wr-1"
 	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, "wr-1").Return([]model.FQDN{
-		{FQDN: "example.com", WebrootID: "wr-1", SSLEnabled: true, Status: model.StatusActive},
+		{FQDN: "example.com", WebrootID: &wr1, SSLEnabled: true, Status: model.StatusActive},
 	}, nil)
 	s.env.OnActivity("UpdateWebroot", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)

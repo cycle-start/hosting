@@ -119,6 +119,7 @@ func (s *Server) setupRoutes() {
 		sshKey := handler.NewSSHKey(s.services.SSHKey, s.services.Tenant)
 		egressRule := handler.NewTenantEgressRule(s.services.TenantEgressRule, s.services.Tenant)
 		dbAccessRule := handler.NewDatabaseAccessRule(s.services.DatabaseAccessRule, s.services.Database)
+		subscription := handler.NewSubscription(s.services)
 		emailAccount := handler.NewEmailAccount(s.services)
 		emailAlias := handler.NewEmailAlias(s.services.EmailAlias)
 		emailForward := handler.NewEmailForward(s.services.EmailForward)
@@ -324,6 +325,21 @@ func (s *Server) setupRoutes() {
 			r.Delete("/tenants/{id}", tenant.Delete)
 		})
 
+		// Subscriptions
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("subscriptions", "read"))
+			r.Get("/tenants/{tenantID}/subscriptions", subscription.ListByTenant)
+			r.Get("/subscriptions/{id}", subscription.Get)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("subscriptions", "write"))
+			r.Post("/tenants/{tenantID}/subscriptions", subscription.Create)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("subscriptions", "delete"))
+			r.Delete("/subscriptions/{id}", subscription.Delete)
+		})
+
 		// Webroots
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireScope("webroots", "read"))
@@ -399,12 +415,14 @@ func (s *Server) setupRoutes() {
 		// FQDNs
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireScope("fqdns", "read"))
+			r.Get("/tenants/{tenantID}/fqdns", fqdn.ListByTenant)
 			r.Get("/webroots/{webrootID}/fqdns", fqdn.ListByWebroot)
 			r.Get("/fqdns/{id}", fqdn.Get)
 		})
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireScope("fqdns", "write"))
-			r.Post("/webroots/{webrootID}/fqdns", fqdn.Create)
+			r.Post("/tenants/{tenantID}/fqdns", fqdn.Create)
+			r.Put("/fqdns/{id}", fqdn.Update)
 			r.Post("/fqdns/{id}/retry", fqdn.Retry)
 		})
 		r.Group(func(r chi.Router) {
@@ -433,7 +451,6 @@ func (s *Server) setupRoutes() {
 			r.Use(mw.RequireScope("zones", "write"))
 			r.Post("/zones", zone.Create)
 			r.Put("/zones/{id}", zone.Update)
-			r.Put("/zones/{id}/tenant", zone.ReassignTenant)
 			r.Post("/zones/{id}/retry", zone.Retry)
 		})
 		r.Group(func(r chi.Router) {
@@ -468,7 +485,6 @@ func (s *Server) setupRoutes() {
 			r.Use(mw.RequireScope("databases", "write"))
 			r.Post("/tenants/{tenantID}/databases", database.Create)
 			r.Post("/databases/{id}/migrate", database.Migrate)
-			r.Put("/databases/{id}/tenant", database.ReassignTenant)
 			r.Post("/databases/{id}/retry", database.Retry)
 		})
 		r.Group(func(r chi.Router) {
@@ -503,7 +519,6 @@ func (s *Server) setupRoutes() {
 			r.Use(mw.RequireScope("valkey", "write"))
 			r.Post("/tenants/{tenantID}/valkey-instances", valkeyInstance.Create)
 			r.Post("/valkey-instances/{id}/migrate", valkeyInstance.Migrate)
-			r.Put("/valkey-instances/{id}/tenant", valkeyInstance.ReassignTenant)
 			r.Post("/valkey-instances/{id}/retry", valkeyInstance.Retry)
 		})
 		r.Group(func(r chi.Router) {

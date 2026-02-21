@@ -115,19 +115,20 @@ func TestWebrootService_GetByID_Success(t *testing.T) {
 	row := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = webrootID
 		*(dest[1].(*string)) = tenantID
-		*(dest[2].(*string)) = "my-site"
-		*(dest[3].(*string)) = "php"
-		*(dest[4].(*string)) = "8.2"
-		*(dest[5].(*json.RawMessage)) = cfg
-		*(dest[6].(*string)) = "/public"
-		*(dest[7].(*string)) = ".env.hosting"
-		*(dest[8].(*bool)) = false  // env_shell_source
-		*(dest[9].(*bool)) = true   // service_hostname_enabled
-		*(dest[10].(*string)) = model.StatusActive
-		*(dest[11].(**string)) = nil // status_message
-		*(dest[12].(*string)) = ""  // suspend_reason
-		*(dest[13].(*time.Time)) = now
+		*(dest[2].(*string)) = "" // subscription_id
+		*(dest[3].(*string)) = "my-site"
+		*(dest[4].(*string)) = "php"
+		*(dest[5].(*string)) = "8.2"
+		*(dest[6].(*json.RawMessage)) = cfg
+		*(dest[7].(*string)) = "/public"
+		*(dest[8].(*string)) = ".env.hosting"
+		*(dest[9].(*bool)) = false  // env_shell_source
+		*(dest[10].(*bool)) = true  // service_hostname_enabled
+		*(dest[11].(*string)) = model.StatusActive
+		*(dest[12].(**string)) = nil // status_message
+		*(dest[13].(*string)) = ""  // suspend_reason
 		*(dest[14].(*time.Time)) = now
+		*(dest[15].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -178,19 +179,20 @@ func TestWebrootService_ListByTenant_Success(t *testing.T) {
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
 			*(dest[1].(*string)) = tenantID
-			*(dest[2].(*string)) = "site-a"
-			*(dest[3].(*string)) = "php"
-			*(dest[4].(*string)) = "8.2"
-			*(dest[5].(*json.RawMessage)) = cfg
-			*(dest[6].(*string)) = "/public"
-			*(dest[7].(*string)) = ".env.hosting"
-			*(dest[8].(*bool)) = false  // env_shell_source
-			*(dest[9].(*bool)) = true   // service_hostname_enabled
-			*(dest[10].(*string)) = model.StatusActive
-			*(dest[11].(**string)) = nil // status_message
-			*(dest[12].(*string)) = ""  // suspend_reason
-			*(dest[13].(*time.Time)) = now
+			*(dest[2].(*string)) = "" // subscription_id
+			*(dest[3].(*string)) = "site-a"
+			*(dest[4].(*string)) = "php"
+			*(dest[5].(*string)) = "8.2"
+			*(dest[6].(*json.RawMessage)) = cfg
+			*(dest[7].(*string)) = "/public"
+			*(dest[8].(*string)) = ".env.hosting"
+			*(dest[9].(*bool)) = false  // env_shell_source
+			*(dest[10].(*bool)) = true  // service_hostname_enabled
+			*(dest[11].(*string)) = model.StatusActive
+			*(dest[12].(**string)) = nil // status_message
+			*(dest[13].(*string)) = ""  // suspend_reason
 			*(dest[14].(*time.Time)) = now
+			*(dest[15].(*time.Time)) = now
 			return nil
 		},
 	)

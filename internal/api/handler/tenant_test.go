@@ -354,8 +354,8 @@ func TestTenantCreate_WithNestedZones_ValidationPasses(t *testing.T) {
 	rec := httptest.NewRecorder()
 	body := validTenantBody()
 	body["zones"] = []map[string]any{
-		{"name": "example.com"},
-		{"name": "example.org"},
+		{"subscription_id": "sub-1", "name": "example.com"},
+		{"subscription_id": "sub-1", "name": "example.org"},
 	}
 	r := newRequest(http.MethodPost, "/tenants", body)
 
@@ -373,6 +373,7 @@ func TestTenantCreate_WithNestedWebroots_ValidationPasses(t *testing.T) {
 	body := validTenantBody()
 	body["webroots"] = []map[string]any{
 		{
+			"subscription_id": "sub-1",
 			"runtime":         "php",
 			"runtime_version": "8.5",
 			"fqdns": []map[string]any{
@@ -396,7 +397,8 @@ func TestTenantCreate_WithNestedDatabases_ValidationPasses(t *testing.T) {
 	body := validTenantBody()
 	body["databases"] = []map[string]any{
 		{
-			"shard_id": "test-db-shard",
+			"subscription_id": "sub-1",
+			"shard_id":        "test-db-shard",
 			"users": []map[string]any{
 				{
 					"username":   "admin",
@@ -422,7 +424,8 @@ func TestTenantCreate_WithNestedValkeyInstances_ValidationPasses(t *testing.T) {
 	body := validTenantBody()
 	body["valkey_instances"] = []map[string]any{
 		{
-			"shard_id": "test-valkey-shard",
+			"subscription_id": "sub-1",
+			"shard_id":        "test-valkey-shard",
 			"users": []map[string]any{
 				{
 					"username":   "cacheuser",
@@ -657,10 +660,11 @@ func TestTenantCreate_FullNested_ValidationPasses(t *testing.T) {
 	rec := httptest.NewRecorder()
 	body := validTenantBody()
 	body["zones"] = []map[string]any{
-		{"name": "example.com"},
+		{"subscription_id": "sub-1", "name": "example.com"},
 	}
 	body["webroots"] = []map[string]any{
 		{
+			"subscription_id": "sub-1",
 			"runtime":         "php",
 			"runtime_version": "8.5",
 			"public_folder":   "public",
@@ -670,9 +674,10 @@ func TestTenantCreate_FullNested_ValidationPasses(t *testing.T) {
 					"ssl_enabled": true,
 					"email_accounts": []map[string]any{
 						{
-							"address":      "admin@example.com",
-							"display_name": "Admin",
-							"quota_bytes":  1073741824,
+							"subscription_id": "sub-1",
+							"address":         "admin@example.com",
+							"display_name":    "Admin",
+							"quota_bytes":     1073741824,
 							"aliases": []map[string]any{
 								{"address": "postmaster@example.com"},
 							},
@@ -692,7 +697,8 @@ func TestTenantCreate_FullNested_ValidationPasses(t *testing.T) {
 	}
 	body["databases"] = []map[string]any{
 		{
-			"shard_id": "test-db-shard",
+			"subscription_id": "sub-1",
+			"shard_id":        "test-db-shard",
 			"users": []map[string]any{
 				{
 					"username":   "admin",
@@ -704,8 +710,9 @@ func TestTenantCreate_FullNested_ValidationPasses(t *testing.T) {
 	}
 	body["valkey_instances"] = []map[string]any{
 		{
-			"shard_id":      "test-valkey-shard",
-			"max_memory_mb": 128,
+			"subscription_id": "sub-1",
+			"shard_id":        "test-valkey-shard",
+			"max_memory_mb":   128,
 			"users": []map[string]any{
 				{
 					"username":    "cacheuser",

@@ -140,7 +140,7 @@ func (h *Webroot) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Nested FQDN creation
-	if err := createNestedFQDNs(r.Context(), h.services, webroot.ID, req.FQDNs); err != nil {
+	if err := createNestedFQDNs(r.Context(), h.services, webroot.ID, tenantID, req.FQDNs); err != nil {
 		response.WriteServiceError(w, err)
 		return
 	}

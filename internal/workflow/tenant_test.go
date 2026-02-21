@@ -476,14 +476,14 @@ func (s *DeleteTenantWorkflowTestSuite) TestWithCrossShardResources() {
 
 	// Phase 1: some cross-shard resources exist.
 	s.env.OnActivity("ListDatabasesByTenantID", mock.Anything, tenantID).Return([]model.Database{
-		{ID: "db-1", TenantID: &tenantID},
+		{ID: "db-1", TenantID: tenantID},
 	}, nil)
 	s.env.OnActivity("ListValkeyInstancesByTenantID", mock.Anything, tenantID).Return([]model.ValkeyInstance{
-		{ID: "vi-1", TenantID: &tenantID},
+		{ID: "vi-1", TenantID: tenantID},
 	}, nil)
 	s.env.OnActivity("ListS3BucketsByTenantID", mock.Anything, tenantID).Return([]model.S3Bucket{}, nil)
 	s.env.OnActivity("ListZonesByTenantID", mock.Anything, tenantID).Return([]model.Zone{
-		{ID: "zone-1", TenantID: &tenantID},
+		{ID: "zone-1", TenantID: tenantID},
 	}, nil)
 	s.env.OnActivity("ListEmailAccountsByTenantID", mock.Anything, tenantID).Return([]model.EmailAccount{}, nil)
 

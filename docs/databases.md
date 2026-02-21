@@ -23,7 +23,8 @@ Database and user names are validated with `^[a-zA-Z0-9_]+$` to prevent SQL inje
 | Field            | Type      | JSON                | Description                          |
 |------------------|-----------|---------------------|--------------------------------------|
 | `ID`             | `string`  | `id`                | Platform-generated unique ID         |
-| `TenantID`       | `*string` | `tenant_id`         | Owning tenant (nullable)             |
+| `TenantID`       | `string`  | `tenant_id`         | Owning tenant (required)             |
+| `SubscriptionID` | `string`  | `subscription_id`   | Subscription grouping                |
 | `Name`           | `string`  | `name`              | MySQL database name                  |
 | `ShardID`        | `*string` | `shard_id`          | Database shard assignment            |
 | `NodeID`         | `*string` | `node_id`           | Specific node (optional)             |

@@ -100,10 +100,11 @@ func (h *Database) Create(w http.ResponseWriter, r *http.Request) {
 	shardID := req.ShardID
 	dbName := platform.NewName("db")
 	database := &model.Database{
-		ID:        platform.NewID(),
-		TenantID:  &tenantID,
-		Name:      dbName,
-		ShardID:   &shardID,
+		ID:             platform.NewID(),
+		TenantID:       tenantID,
+		SubscriptionID: req.SubscriptionID,
+		Name:           dbName,
+		ShardID:        &shardID,
 		Status:    model.StatusPending,
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -164,10 +165,8 @@ func (h *Database) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if database.TenantID != nil {
-		if !checkTenantBrand(w, r, h.tenantSvc, *database.TenantID) {
-			return
-		}
+	if !checkTenantBrand(w, r, h.tenantSvc, database.TenantID) {
+		return
 	}
 
 	response.WriteJSON(w, http.StatusOK, database)
@@ -196,10 +195,8 @@ func (h *Database) Delete(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	if database.TenantID != nil {
-		if !checkTenantBrand(w, r, h.tenantSvc, *database.TenantID) {
-			return
-		}
+	if !checkTenantBrand(w, r, h.tenantSvc, database.TenantID) {
+		return
 	}
 
 	if err := h.svc.Delete(r.Context(), id); err != nil {
@@ -240,10 +237,8 @@ func (h *Database) Migrate(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	if database.TenantID != nil {
-		if !checkTenantBrand(w, r, h.tenantSvc, *database.TenantID) {
-			return
-		}
+	if !checkTenantBrand(w, r, h.tenantSvc, database.TenantID) {
+		return
 	}
 
 	if err := h.svc.Migrate(r.Context(), id, req.TargetShardID); err != nil {
@@ -252,56 +247,6 @@ func (h *Database) Migrate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusAccepted)
-}
-
-// ReassignTenant godoc
-//
-//	@Summary		Reassign database to a different tenant
-//	@Description	Changes the tenant ownership of a database without moving any data. This is a synchronous operation. Pass null tenant_id to detach the database from its current tenant.
-//	@Tags			Databases
-//	@Security		ApiKeyAuth
-//	@Param			id		path		string							true	"Database ID"
-//	@Param			body	body		request.ReassignDatabaseTenant	true	"New tenant ID"
-//	@Success		200		{object}	model.Database
-//	@Failure		400		{object}	response.ErrorResponse
-//	@Failure		500		{object}	response.ErrorResponse
-//	@Router			/databases/{id}/tenant [put]
-func (h *Database) ReassignTenant(w http.ResponseWriter, r *http.Request) {
-	id, err := request.RequireID(chi.URLParam(r, "id"))
-	if err != nil {
-		response.WriteError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	var req request.ReassignDatabaseTenant
-	if err := request.Decode(r, &req); err != nil {
-		response.WriteError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	database, err := h.svc.GetByID(r.Context(), id)
-	if err != nil {
-		response.WriteError(w, http.StatusNotFound, err.Error())
-		return
-	}
-	if database.TenantID != nil {
-		if !checkTenantBrand(w, r, h.tenantSvc, *database.TenantID) {
-			return
-		}
-	}
-
-	if err := h.svc.ReassignTenant(r.Context(), id, req.TenantID); err != nil {
-		response.WriteServiceError(w, err)
-		return
-	}
-
-	database, err = h.svc.GetByID(r.Context(), id)
-	if err != nil {
-		response.WriteServiceError(w, err)
-		return
-	}
-
-	response.WriteJSON(w, http.StatusOK, database)
 }
 
 // Retry godoc
@@ -326,10 +271,8 @@ func (h *Database) Retry(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	if database.TenantID != nil {
-		if !checkTenantBrand(w, r, h.tenantSvc, *database.TenantID) {
-			return
-		}
+	if !checkTenantBrand(w, r, h.tenantSvc, database.TenantID) {
+		return
 	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {
 		response.WriteServiceError(w, err)

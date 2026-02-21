@@ -77,8 +77,12 @@ All endpoints require `ApiKeyAuth`. Brand access is enforced on every request.
   "shard_id": "web-1",
   "sftp_enabled": true,
   "ssh_enabled": false,
-  "zones": [{ "name": "example.com" }],
+  "subscriptions": [
+    { "id": "550e8400-e29b-41d4-a716-446655440000", "name": "main" }
+  ],
+  "zones": [{ "subscription_id": "550e8400-e29b-41d4-a716-446655440000", "name": "example.com" }],
   "webroots": [{
+    "subscription_id": "550e8400-e29b-41d4-a716-446655440000",
     "name": "main",
     "runtime": "php",
     "runtime_version": "8.5",
@@ -86,22 +90,25 @@ All endpoints require `ApiKeyAuth`. Brand access is enforced on every request.
     "fqdns": [{ "fqdn": "example.com", "ssl_enabled": true }]
   }],
   "databases": [{
+    "subscription_id": "550e8400-e29b-41d4-a716-446655440000",
     "name": "main_db",
     "shard_id": "db-1",
     "users": [{ "username": "app", "password": "secret123", "privileges": ["ALL"] }]
   }],
   "valkey_instances": [{
+    "subscription_id": "550e8400-e29b-41d4-a716-446655440000",
     "name": "cache",
     "shard_id": "valkey-1",
     "max_memory_mb": 64,
     "users": [{ "username": "app", "password": "secret123", "privileges": ["allcommands"], "key_pattern": "~*" }]
   }],
-  "s3_buckets": [{ "name": "media", "shard_id": "s3-1", "public": false }],
+  "s3_buckets": [{ "subscription_id": "550e8400-e29b-41d4-a716-446655440000", "name": "media", "shard_id": "s3-1", "public": false }],
+  "fqdns": [{ "fqdn": "unbound.example.com", "ssl_enabled": true }],
   "ssh_keys": [{ "name": "deploy", "public_key": "ssh-ed25519 AAAA..." }]
 }
 ```
 
-The cluster must be in the brand's allowed cluster list. All nested resources are created in the same request and trigger their own provisioning workflows.
+The cluster must be in the brand's allowed cluster list. Subscriptions are created synchronously before other resources. All nested resources require a `subscription_id` and trigger their own provisioning workflows. FQDNs can be created at the top level (unbound to any webroot) or nested inside webroots.
 
 ## Migration
 
@@ -128,6 +135,7 @@ POST /tenants/{id}/suspend
 Suspending a tenant requires a `reason` (free text, e.g., "abuse", "unpaid", "migration"). The reason is stored in `suspend_reason` on the tenant and all cascaded child resources.
 
 **Cascade behavior:** When a tenant is suspended, all active child resources are also suspended with the same reason:
+- Subscriptions
 - Webroots
 - Databases
 - Valkey instances

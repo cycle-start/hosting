@@ -20,9 +20,9 @@ func NewZoneService(db DB, tc temporalclient.Client) *ZoneService {
 
 func (s *ZoneService) Create(ctx context.Context, zone *model.Zone) error {
 	// Auto-derive brand_id from tenant if not set.
-	if zone.BrandID == "" && zone.TenantID != nil {
+	if zone.BrandID == "" && zone.TenantID != "" {
 		var brandID string
-		err := s.db.QueryRow(ctx, `SELECT brand_id FROM tenants WHERE id = $1`, *zone.TenantID).Scan(&brandID)
+		err := s.db.QueryRow(ctx, `SELECT brand_id FROM tenants WHERE id = $1`, zone.TenantID).Scan(&brandID)
 		if err != nil {
 			return fmt.Errorf("get tenant brand_id for zone: %w", err)
 		}
@@ -30,20 +30,16 @@ func (s *ZoneService) Create(ctx context.Context, zone *model.Zone) error {
 	}
 
 	_, err := s.db.Exec(ctx,
-		`INSERT INTO zones (id, brand_id, tenant_id, name, region_id, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		zone.ID, zone.BrandID, zone.TenantID, zone.Name, zone.RegionID, zone.Status,
+		`INSERT INTO zones (id, brand_id, tenant_id, subscription_id, name, region_id, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		zone.ID, zone.BrandID, zone.TenantID, zone.SubscriptionID, zone.Name, zone.RegionID, zone.Status,
 		zone.CreatedAt, zone.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("insert zone: %w", err)
 	}
 
-	var tenantID string
-	if zone.TenantID != nil {
-		tenantID = *zone.TenantID
-	}
-	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, zone.TenantID, model.ProvisionTask{
 		WorkflowName: "CreateZoneWorkflow",
 		WorkflowID:   fmt.Sprintf("create-zone-%s", zone.ID),
 		Arg:          zone.ID,
@@ -57,13 +53,13 @@ func (s *ZoneService) Create(ctx context.Context, zone *model.Zone) error {
 func (s *ZoneService) GetByID(ctx context.Context, id string) (*model.Zone, error) {
 	var z model.Zone
 	err := s.db.QueryRow(ctx,
-		`SELECT z.id, z.brand_id, z.tenant_id, z.name, z.region_id, z.status, z.status_message, z.suspend_reason, z.created_at, z.updated_at,
+		`SELECT z.id, z.brand_id, z.tenant_id, z.subscription_id, z.name, z.region_id, z.status, z.status_message, z.suspend_reason, z.created_at, z.updated_at,
 		        r.name, t.name
 		 FROM zones z
 		 JOIN regions r ON r.id = z.region_id
 		 LEFT JOIN tenants t ON t.id = z.tenant_id
 		 WHERE z.id = $1`, id,
-	).Scan(&z.ID, &z.BrandID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.StatusMessage, &z.SuspendReason,
+	).Scan(&z.ID, &z.BrandID, &z.TenantID, &z.SubscriptionID, &z.Name, &z.RegionID, &z.Status, &z.StatusMessage, &z.SuspendReason,
 		&z.CreatedAt, &z.UpdatedAt,
 		&z.RegionName, &z.TenantName)
 	if err != nil {
@@ -73,7 +69,7 @@ func (s *ZoneService) GetByID(ctx context.Context, id string) (*model.Zone, erro
 }
 
 func (s *ZoneService) List(ctx context.Context, params request.ListParams) ([]model.Zone, bool, error) {
-	query := `SELECT z.id, z.brand_id, z.tenant_id, z.name, z.region_id, z.status, z.status_message, z.suspend_reason, z.created_at, z.updated_at, r.name, t.name FROM zones z JOIN regions r ON r.id = z.region_id LEFT JOIN tenants t ON t.id = z.tenant_id WHERE true`
+	query := `SELECT z.id, z.brand_id, z.tenant_id, z.subscription_id, z.name, z.region_id, z.status, z.status_message, z.suspend_reason, z.created_at, z.updated_at, r.name, t.name FROM zones z JOIN regions r ON r.id = z.region_id LEFT JOIN tenants t ON t.id = z.tenant_id WHERE true`
 	args := []any{}
 	argIdx := 1
 
@@ -124,7 +120,7 @@ func (s *ZoneService) List(ctx context.Context, params request.ListParams) ([]mo
 	var zones []model.Zone
 	for rows.Next() {
 		var z model.Zone
-		if err := rows.Scan(&z.ID, &z.BrandID, &z.TenantID, &z.Name, &z.RegionID, &z.Status, &z.StatusMessage, &z.SuspendReason,
+		if err := rows.Scan(&z.ID, &z.BrandID, &z.TenantID, &z.SubscriptionID, &z.Name, &z.RegionID, &z.Status, &z.StatusMessage, &z.SuspendReason,
 			&z.CreatedAt, &z.UpdatedAt,
 			&z.RegionName, &z.TenantName); err != nil {
 			return nil, false, fmt.Errorf("scan zone: %w", err)
@@ -144,9 +140,9 @@ func (s *ZoneService) List(ctx context.Context, params request.ListParams) ([]mo
 
 func (s *ZoneService) Update(ctx context.Context, zone *model.Zone) error {
 	_, err := s.db.Exec(ctx,
-		`UPDATE zones SET brand_id = $1, tenant_id = $2, name = $3, region_id = $4, status = $5, updated_at = now()
-		 WHERE id = $6`,
-		zone.BrandID, zone.TenantID, zone.Name, zone.RegionID, zone.Status, zone.ID,
+		`UPDATE zones SET brand_id = $1, tenant_id = $2, subscription_id = $3, name = $4, region_id = $5, status = $6, updated_at = now()
+		 WHERE id = $7`,
+		zone.BrandID, zone.TenantID, zone.SubscriptionID, zone.Name, zone.RegionID, zone.Status, zone.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update zone %s: %w", zone.ID, err)
@@ -176,17 +172,6 @@ func (s *ZoneService) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("signal DeleteZoneWorkflow: %w", err)
 	}
 
-	return nil
-}
-
-func (s *ZoneService) ReassignTenant(ctx context.Context, id string, tenantID *string) error {
-	_, err := s.db.Exec(ctx,
-		"UPDATE zones SET tenant_id = $1, updated_at = now() WHERE id = $2",
-		tenantID, id,
-	)
-	if err != nil {
-		return fmt.Errorf("reassign zone %s to tenant: %w", id, err)
-	}
 	return nil
 }
 

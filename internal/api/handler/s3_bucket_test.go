@@ -87,7 +87,8 @@ func TestS3BucketCreate_ValidBody(t *testing.T) {
 	rec := httptest.NewRecorder()
 	tid := "test-tenant-1"
 	r := newRequest(http.MethodPost, "/tenants/"+tid+"/s3-buckets", map[string]any{
-		"shard_id": "test-shard-1",
+		"subscription_id": "sub-1",
+		"shard_id":        "test-shard-1",
 	})
 	r = withChiURLParam(r, "tenantID", tid)
 
@@ -104,9 +105,10 @@ func TestS3BucketCreate_WithOptionalFields(t *testing.T) {
 	rec := httptest.NewRecorder()
 	tid := "test-tenant-1"
 	r := newRequest(http.MethodPost, "/tenants/"+tid+"/s3-buckets", map[string]any{
-		"shard_id":    "test-shard-1",
-		"public":      true,
-		"quota_bytes": 1073741824,
+		"subscription_id": "sub-1",
+		"shard_id":        "test-shard-1",
+		"public":          true,
+		"quota_bytes":     1073741824,
 	})
 	r = withChiURLParam(r, "tenantID", tid)
 

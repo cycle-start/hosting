@@ -14,6 +14,22 @@ func newFQDNHandler() *FQDN {
 	return &FQDN{svc: nil, services: nil}
 }
 
+// --- ListByTenant ---
+
+func TestFQDNListByTenant_EmptyID(t *testing.T) {
+	h := newFQDNHandler()
+	rec := httptest.NewRecorder()
+	r := newRequest(http.MethodGet, "/tenants//fqdns", nil)
+	r = withChiURLParam(r, "tenantID", "")
+
+	h.ListByTenant(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+	body := decodeErrorResponse(rec)
+	assert.Contains(t, body["error"], "missing required ID")
+}
+
 // --- ListByWebroot ---
 
 func TestFQDNListByWebroot_EmptyID(t *testing.T) {
@@ -32,13 +48,13 @@ func TestFQDNListByWebroot_EmptyID(t *testing.T) {
 
 // --- Create ---
 
-func TestFQDNCreate_EmptyWebrootID(t *testing.T) {
+func TestFQDNCreate_EmptyTenantID(t *testing.T) {
 	h := newFQDNHandler()
 	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/webroots//fqdns", map[string]any{
+	r := newRequest(http.MethodPost, "/tenants//fqdns", map[string]any{
 		"fqdn": "example.com",
 	})
-	r = withChiURLParam(r, "webrootID", "")
+	r = withChiURLParam(r, "tenantID", "")
 
 	h.Create(rec, r)
 
@@ -50,8 +66,9 @@ func TestFQDNCreate_EmptyWebrootID(t *testing.T) {
 func TestFQDNCreate_InvalidJSON(t *testing.T) {
 	h := newFQDNHandler()
 	rec := httptest.NewRecorder()
-	r := newRequestRaw(http.MethodPost, "/webroots/"+validID+"/fqdns", "{bad json")
-	r = withChiURLParam(r, "webrootID", validID)
+	tid := "test-tenant-1"
+	r := newRequestRaw(http.MethodPost, "/tenants/"+tid+"/fqdns", "{bad json")
+	r = withChiURLParam(r, "tenantID", tid)
 
 	h.Create(rec, r)
 
@@ -63,8 +80,9 @@ func TestFQDNCreate_InvalidJSON(t *testing.T) {
 func TestFQDNCreate_EmptyBody(t *testing.T) {
 	h := newFQDNHandler()
 	rec := httptest.NewRecorder()
-	r := newRequestRaw(http.MethodPost, "/webroots/"+validID+"/fqdns", "")
-	r = withChiURLParam(r, "webrootID", validID)
+	tid := "test-tenant-1"
+	r := newRequestRaw(http.MethodPost, "/tenants/"+tid+"/fqdns", "")
+	r = withChiURLParam(r, "tenantID", tid)
 
 	h.Create(rec, r)
 
@@ -74,8 +92,9 @@ func TestFQDNCreate_EmptyBody(t *testing.T) {
 func TestFQDNCreate_MissingFQDN(t *testing.T) {
 	h := newFQDNHandler()
 	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/webroots/"+validID+"/fqdns", map[string]any{})
-	r = withChiURLParam(r, "webrootID", validID)
+	tid := "test-tenant-1"
+	r := newRequest(http.MethodPost, "/tenants/"+tid+"/fqdns", map[string]any{})
+	r = withChiURLParam(r, "tenantID", tid)
 
 	h.Create(rec, r)
 
@@ -96,10 +115,11 @@ func TestFQDNCreate_InvalidFQDNFormat(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := newFQDNHandler()
 			rec := httptest.NewRecorder()
-			r := newRequest(http.MethodPost, "/webroots/"+validID+"/fqdns", map[string]any{
+			tid := "test-tenant-1"
+			r := newRequest(http.MethodPost, "/tenants/"+tid+"/fqdns", map[string]any{
 				"fqdn": tt.fqdn,
 			})
-			r = withChiURLParam(r, "webrootID", validID)
+			r = withChiURLParam(r, "tenantID", tid)
 
 			h.Create(rec, r)
 
@@ -118,11 +138,11 @@ func TestFQDNCreate_ValidFQDN(t *testing.T) {
 		t.Run(fqdn, func(t *testing.T) {
 			h := newFQDNHandler()
 			rec := httptest.NewRecorder()
-			wid := "test-webroot-1"
-			r := newRequest(http.MethodPost, "/webroots/"+wid+"/fqdns", map[string]any{
+			tid := "test-tenant-1"
+			r := newRequest(http.MethodPost, "/tenants/"+tid+"/fqdns", map[string]any{
 				"fqdn": fqdn,
 			})
-			r = withChiURLParam(r, "webrootID", wid)
+			r = withChiURLParam(r, "tenantID", tid)
 
 			func() {
 				defer func() { recover() }()
@@ -137,12 +157,12 @@ func TestFQDNCreate_ValidFQDN(t *testing.T) {
 func TestFQDNCreate_OptionalSSLEnabled(t *testing.T) {
 	h := newFQDNHandler()
 	rec := httptest.NewRecorder()
-	wid := "test-webroot-2"
-	r := newRequest(http.MethodPost, "/webroots/"+wid+"/fqdns", map[string]any{
+	tid := "test-tenant-1"
+	r := newRequest(http.MethodPost, "/tenants/"+tid+"/fqdns", map[string]any{
 		"fqdn":        "example.com",
 		"ssl_enabled": true,
 	})
-	r = withChiURLParam(r, "webrootID", wid)
+	r = withChiURLParam(r, "tenantID", tid)
 
 	func() {
 		defer func() { recover() }()
@@ -155,11 +175,11 @@ func TestFQDNCreate_OptionalSSLEnabled(t *testing.T) {
 func TestFQDNCreate_WithoutSSLEnabled(t *testing.T) {
 	h := newFQDNHandler()
 	rec := httptest.NewRecorder()
-	wid := "test-webroot-3"
-	r := newRequest(http.MethodPost, "/webroots/"+wid+"/fqdns", map[string]any{
+	tid := "test-tenant-1"
+	r := newRequest(http.MethodPost, "/tenants/"+tid+"/fqdns", map[string]any{
 		"fqdn": "example.com",
 	})
-	r = withChiURLParam(r, "webrootID", wid)
+	r = withChiURLParam(r, "tenantID", tid)
 
 	func() {
 		defer func() { recover() }()
@@ -174,21 +194,23 @@ func TestFQDNCreate_WithoutSSLEnabled(t *testing.T) {
 func TestFQDNCreate_WithNestedEmailAccounts_ValidationPasses(t *testing.T) {
 	h := newFQDNHandler()
 	rec := httptest.NewRecorder()
-	wid := "test-webroot-1"
-	r := newRequest(http.MethodPost, "/webroots/"+wid+"/fqdns", map[string]any{
+	tid := "test-tenant-1"
+	r := newRequest(http.MethodPost, "/tenants/"+tid+"/fqdns", map[string]any{
 		"fqdn": "example.com",
 		"email_accounts": []map[string]any{
 			{
-				"address":      "admin@example.com",
-				"display_name": "Admin",
-				"quota_bytes":  1073741824,
+				"subscription_id": "sub-1",
+				"address":         "admin@example.com",
+				"display_name":    "Admin",
+				"quota_bytes":     1073741824,
 			},
 			{
-				"address": "info@example.com",
+				"subscription_id": "sub-1",
+				"address":         "info@example.com",
 			},
 		},
 	})
-	r = withChiURLParam(r, "webrootID", wid)
+	r = withChiURLParam(r, "tenantID", tid)
 
 	func() {
 		defer func() { recover() }()
@@ -201,14 +223,14 @@ func TestFQDNCreate_WithNestedEmailAccounts_ValidationPasses(t *testing.T) {
 func TestFQDNCreate_WithInvalidNestedEmail_ValidationFails(t *testing.T) {
 	h := newFQDNHandler()
 	rec := httptest.NewRecorder()
-	wid := "test-webroot-1"
-	r := newRequest(http.MethodPost, "/webroots/"+wid+"/fqdns", map[string]any{
+	tid := "test-tenant-1"
+	r := newRequest(http.MethodPost, "/tenants/"+tid+"/fqdns", map[string]any{
 		"fqdn": "example.com",
 		"email_accounts": []map[string]any{
-			{"address": "not-an-email"}, // invalid email
+			{"subscription_id": "sub-1", "address": "not-an-email"}, // invalid email
 		},
 	})
-	r = withChiURLParam(r, "webrootID", wid)
+	r = withChiURLParam(r, "tenantID", tid)
 
 	h.Create(rec, r)
 
@@ -252,8 +274,9 @@ func TestFQDNDelete_EmptyID(t *testing.T) {
 func TestFQDNCreate_ErrorResponseFormat(t *testing.T) {
 	h := newFQDNHandler()
 	rec := httptest.NewRecorder()
-	r := newRequestRaw(http.MethodPost, "/webroots/"+validID+"/fqdns", "{bad")
-	r = withChiURLParam(r, "webrootID", validID)
+	tid := "test-tenant-1"
+	r := newRequestRaw(http.MethodPost, "/tenants/"+tid+"/fqdns", "{bad")
+	r = withChiURLParam(r, "tenantID", tid)
 
 	h.Create(rec, r)
 

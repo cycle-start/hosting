@@ -119,14 +119,15 @@ func (h *EmailAccount) Create(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	account := &model.EmailAccount{
-		ID:          platform.NewID(),
-		FQDNID:      fqdnID,
-		Address:     req.Address,
-		DisplayName: req.DisplayName,
-		QuotaBytes:  req.QuotaBytes,
-		Status:      model.StatusPending,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:             platform.NewID(),
+		FQDNID:         fqdnID,
+		SubscriptionID: req.SubscriptionID,
+		Address:        req.Address,
+		DisplayName:    req.DisplayName,
+		QuotaBytes:     req.QuotaBytes,
+		Status:         model.StatusPending,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 
 	if err := h.svc.Create(r.Context(), account); err != nil {

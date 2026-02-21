@@ -48,7 +48,7 @@ func TestDatabaseUserService_Create_Success(t *testing.T) {
 	// resolveTenantIDFromDatabase
 	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(**string)) = &tenantID
+		*(dest[0].(*string)) = tenantID
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
@@ -97,9 +97,9 @@ func TestDatabaseUserService_Create_WorkflowError(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	// resolveTenantIDFromDatabase (nil tenant => signalProvision uses ExecuteWorkflow)
+	// resolveTenantIDFromDatabase (empty tenant => signalProvision uses ExecuteWorkflow)
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(**string)) = nil
+		*(dest[0].(*string)) = ""
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
@@ -251,7 +251,7 @@ func TestDatabaseUserService_Update_Success(t *testing.T) {
 	// resolveTenantIDFromDatabaseUser
 	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(**string)) = &tenantID
+		*(dest[0].(*string)) = tenantID
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
@@ -298,9 +298,9 @@ func TestDatabaseUserService_Update_WorkflowError(t *testing.T) {
 	user := &model.DatabaseUser{ID: "test-dbuser-1"}
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	// resolveTenantIDFromDatabaseUser (nil tenant => signalProvision uses ExecuteWorkflow)
+	// resolveTenantIDFromDatabaseUser (empty tenant => signalProvision uses ExecuteWorkflow)
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(**string)) = nil
+		*(dest[0].(*string)) = ""
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
@@ -333,7 +333,7 @@ func TestDatabaseUserService_Delete_Success(t *testing.T) {
 	// resolveTenantIDFromDatabaseUser
 	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(**string)) = &tenantID
+		*(dest[0].(*string)) = tenantID
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
@@ -388,7 +388,7 @@ func TestDatabaseUserService_Delete_WorkflowError(t *testing.T) {
 	// resolveTenantIDFromDatabaseUser
 	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(**string)) = &tenantID
+		*(dest[0].(*string)) = tenantID
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()

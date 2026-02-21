@@ -46,7 +46,7 @@ func TestS3AccessKeyService_Create_Success(t *testing.T) {
 	// resolveTenantIDFromS3Bucket
 	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(**string)) = &tenantID
+		*(dest[0].(*string)) = tenantID
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
@@ -228,7 +228,7 @@ func TestS3AccessKeyService_Delete_Success(t *testing.T) {
 	// resolveTenantIDFromS3AccessKey
 	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(**string)) = &tenantID
+		*(dest[0].(*string)) = tenantID
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()

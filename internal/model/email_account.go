@@ -5,6 +5,7 @@ import "time"
 type EmailAccount struct {
 	ID          string    `json:"id" db:"id"`
 	FQDNID      string    `json:"fqdn_id" db:"fqdn_id"`
+	SubscriptionID string `json:"subscription_id" db:"subscription_id"`
 	Address     string    `json:"address" db:"address"`
 	DisplayName string    `json:"display_name" db:"display_name"`
 	QuotaBytes  int64     `json:"quota_bytes" db:"quota_bytes"`

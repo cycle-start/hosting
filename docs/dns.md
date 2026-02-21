@@ -8,7 +8,8 @@ DNS is powered by PowerDNS with zones and records managed through the core API. 
 |-------|------|-------------|
 | `id` | string | UUID |
 | `brand_id` | string | Brand this zone belongs to |
-| `tenant_id` | string | Optional tenant association (nullable) |
+| `tenant_id` | string | Owning tenant (required) |
+| `subscription_id` | string | Subscription grouping (required) |
 | `name` | string | Zone name (e.g. `example.com`) |
 | `region_id` | string | Region where the DNS shard lives |
 | `status` | string | Lifecycle status |
@@ -39,7 +40,6 @@ DNS is powered by PowerDNS with zones and records managed through the core API. 
 | `GET` | `/zones/{id}` | 200 | Get zone by ID |
 | `PUT` | `/zones/{id}` | 200 | Update zone (sync). Currently only `tenant_id` |
 | `DELETE` | `/zones/{id}` | 202 | Delete zone and all records (async) |
-| `PUT` | `/zones/{id}/tenant` | 200 | Reassign zone to a different tenant (sync) |
 | `POST` | `/zones/{id}/retry` | 202 | Retry a failed zone |
 
 ### Create Zone Request
@@ -49,11 +49,12 @@ DNS is powered by PowerDNS with zones and records managed through the core API. 
   "name": "example.com",
   "brand_id": "acme",
   "region_id": "osl-1",
-  "tenant_id": "abc123"
+  "tenant_id": "abc123",
+  "subscription_id": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
-If `tenant_id` is provided, `brand_id` is derived from the tenant automatically. If `tenant_id` is omitted, `brand_id` is required.
+Both `tenant_id` and `subscription_id` are required. When `tenant_id` is provided, `brand_id` is derived from the tenant automatically (so `brand_id` can be omitted).
 
 ## Zone Record API Endpoints
 
@@ -155,11 +156,11 @@ These are marked `managed_by: "auto"` with `source_type: "service-hostname"` and
 
 ## Tenant Reassignment
 
-Zones can be reassigned to a different tenant (or detached from any tenant) without affecting the DNS data in PowerDNS:
+Zones can be reassigned to a different tenant via the update endpoint without affecting the DNS data in PowerDNS:
 
 ```json
-PUT /zones/{id}/tenant
+PUT /zones/{id}
 { "tenant_id": "new-tenant-id" }
 ```
 
-Pass `null` for `tenant_id` to detach the zone. This is a synchronous operation -- no Temporal workflow is triggered.
+Since `tenant_id` is required (NOT NULL), zones cannot be detached from a tenant. This is a synchronous operation -- no Temporal workflow is triggered.

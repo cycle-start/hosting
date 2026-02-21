@@ -1,7 +1,8 @@
 -- +goose Up
 CREATE TABLE s3_buckets (
     id          TEXT PRIMARY KEY,
-    tenant_id   TEXT REFERENCES tenants(id) ON DELETE SET NULL,
+    tenant_id       TEXT NOT NULL REFERENCES tenants(id),
+    subscription_id TEXT NOT NULL REFERENCES subscriptions(id),
     name        TEXT NOT NULL,
     shard_id    TEXT REFERENCES shards(id),
     public      BOOLEAN NOT NULL DEFAULT false,

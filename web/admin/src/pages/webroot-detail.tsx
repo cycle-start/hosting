@@ -150,7 +150,7 @@ export function WebrootDetailPage() {
     setTouched({ fqdn: true })
     if (validateField(fqdnValue, [rules.required(), rules.fqdn()])) return
     try {
-      await createFqdnMut.mutateAsync({ webroot_id: webrootId, fqdn: fqdnValue, ssl_enabled: fqdnSsl })
+      await createFqdnMut.mutateAsync({ tenant_id: webroot.tenant_id, fqdn: fqdnValue, webroot_id: webrootId, ssl_enabled: fqdnSsl })
       toast.success('FQDN created'); setCreateFqdnOpen(false); setFqdnValue(''); setFqdnSsl(true); setTouched({})
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }

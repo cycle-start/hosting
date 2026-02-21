@@ -49,14 +49,14 @@ func CreateS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 	}
 
 	// Look up the tenant for the name used by RGW.
-	if bucket.TenantID == nil || *bucket.TenantID == "" {
+	if bucket.TenantID == "" {
 		noTenantErr := fmt.Errorf("s3 bucket %s has no tenant assigned", bucketID)
 		_ = setResourceFailed(ctx, "s3_buckets", bucketID, noTenantErr)
 		return noTenantErr
 	}
 
 	var tenant model.Tenant
-	err = workflow.ExecuteActivity(ctx, "GetTenantByID", *bucket.TenantID).Get(ctx, &tenant)
+	err = workflow.ExecuteActivity(ctx, "GetTenantByID", bucket.TenantID).Get(ctx, &tenant)
 	if err != nil {
 		_ = setResourceFailed(ctx, "s3_buckets", bucketID, err)
 		return err
@@ -155,8 +155,8 @@ func UpdateS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 	}
 
 	var tenant model.Tenant
-	if bucket.TenantID != nil {
-		err = workflow.ExecuteActivity(ctx, "GetTenantByID", *bucket.TenantID).Get(ctx, &tenant)
+	if bucket.TenantID != "" {
+		err = workflow.ExecuteActivity(ctx, "GetTenantByID", bucket.TenantID).Get(ctx, &tenant)
 		if err != nil {
 			return err
 		}
@@ -225,8 +225,8 @@ func DeleteS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 	}
 
 	var tenant model.Tenant
-	if bucket.TenantID != nil {
-		err = workflow.ExecuteActivity(ctx, "GetTenantByID", *bucket.TenantID).Get(ctx, &tenant)
+	if bucket.TenantID != "" {
+		err = workflow.ExecuteActivity(ctx, "GetTenantByID", bucket.TenantID).Get(ctx, &tenant)
 		if err != nil {
 			_ = setResourceFailed(ctx, "s3_buckets", bucketID, err)
 			return err

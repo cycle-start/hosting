@@ -61,7 +61,6 @@ func Seed(configPath string, timeout time.Duration) error {
 	fmt.Printf("Cluster %q: %s\n", cfg.Cluster, clusterID)
 
 	// In-memory maps for tracking created resources
-	zoneMap := map[string]string{}   // zone name -> ID
 	tenantMap := map[string]string{} // tenant name -> ID
 	shardMap := map[string]string{}  // shard name -> ID
 	brandMap := map[string]string{}  // brand name -> ID
@@ -131,45 +130,6 @@ func Seed(configPath string, timeout time.Duration) error {
 		}
 	}
 
-	// 2. Create zones (without tenant link first)
-	for _, z := range cfg.Zones {
-		zoneID, err := client.FindZoneByName(z.Name)
-		if err == nil {
-			fmt.Printf("Zone %q: exists (%s, skipping)\n", z.Name, zoneID)
-			zoneMap[z.Name] = zoneID
-			continue
-		}
-
-		fmt.Printf("Creating zone %q...\n", z.Name)
-		zoneBody := map[string]any{
-			"name":      z.Name,
-			"region_id": regionID,
-		}
-		if z.Brand != "" {
-			brandID, ok := brandMap[z.Brand]
-			if !ok {
-				return fmt.Errorf("zone %q: brand %q not found (must be defined in brands section)", z.Name, z.Brand)
-			}
-			zoneBody["brand_id"] = brandID
-		}
-		resp, err := client.Post("/zones", zoneBody)
-		if err != nil {
-			return fmt.Errorf("create zone %q: %w", z.Name, err)
-		}
-
-		zoneID, err = extractID(resp)
-		if err != nil {
-			return fmt.Errorf("parse zone ID: %w", err)
-		}
-		zoneMap[z.Name] = zoneID
-
-		fmt.Printf("  Zone %q: %s, awaiting workflow...\n", z.Name, zoneID)
-		if err := client.AwaitWorkflow(fmt.Sprintf("create-zone-%s", zoneID)); err != nil {
-			return fmt.Errorf("await zone %q: %w", z.Name, err)
-		}
-		fmt.Printf("  Zone %q: active\n", z.Name)
-	}
-
 	// Discover web node IPs once (needed for fixture deployment).
 	var webNodeIPs []string
 	needsFixture := false
@@ -207,13 +167,42 @@ func Seed(configPath string, timeout time.Duration) error {
 			emailsByFQDN[e.FQDN] = append(emailsByFQDN[e.FQDN], e)
 		}
 
+		// Build subscriptions: generate IDs and track name -> ID map
+		subMap := map[string]string{} // subscription name -> generated ID
+		var subscriptions []map[string]any
+		// Auto-create a "default" subscription if none specified
+		if len(t.Subscriptions) == 0 {
+			t.Subscriptions = []SubscriptionDef{{Name: "default"}}
+		}
+		for _, s := range t.Subscriptions {
+			id := generateUUID()
+			subMap[s.Name] = id
+			subscriptions = append(subscriptions, map[string]any{
+				"id":   id,
+				"name": s.Name,
+			})
+		}
+
+		// resolveSubID finds the subscription ID for a resource's subscription name.
+		// Falls back to the first subscription if not specified.
+		resolveSubID := func(subName string) string {
+			if subName != "" {
+				if id, ok := subMap[subName]; ok {
+					return id
+				}
+			}
+			// Default: use first subscription
+			return subMap[t.Subscriptions[0].Name]
+		}
+
 		// Resolve brand
 		tenantBody := map[string]any{
-			"region_id":    regionID,
-			"cluster_id":   clusterID,
-			"shard_id":     webShardID,
-			"sftp_enabled": t.SFTPEnabled,
-			"ssh_enabled":  t.SSHEnabled,
+			"region_id":     regionID,
+			"cluster_id":    clusterID,
+			"shard_id":      webShardID,
+			"sftp_enabled":  t.SFTPEnabled,
+			"ssh_enabled":   t.SSHEnabled,
+			"subscriptions": subscriptions,
 		}
 		if t.Brand != "" {
 			brandID, ok := brandMap[t.Brand]
@@ -259,6 +248,7 @@ func Seed(configPath string, timeout time.Duration) error {
 			var webroots []map[string]any
 			for _, w := range t.Webroots {
 				wr := map[string]any{
+					"subscription_id": resolveSubID(w.Subscription),
 					"runtime":         w.Runtime,
 					"runtime_version": w.RuntimeVersion,
 				}
@@ -284,7 +274,7 @@ func Seed(configPath string, timeout time.Duration) error {
 							"ssl_enabled": f.SSLEnabled,
 						}
 						if emails, ok := emailsByFQDN[f.FQDN]; ok {
-							fqdnEntry["email_accounts"] = buildEmailAccountEntries(emails)
+							fqdnEntry["email_accounts"] = buildEmailAccountEntries(emails, resolveSubID)
 						}
 						fqdns = append(fqdns, fqdnEntry)
 					}
@@ -337,7 +327,8 @@ func Seed(configPath string, timeout time.Duration) error {
 					return err
 				}
 				dbEntry := map[string]any{
-					"shard_id": dbShardID,
+					"subscription_id": resolveSubID(d.Subscription),
+					"shard_id":        dbShardID,
 				}
 				if len(d.AccessRules) > 0 {
 					var rules []map[string]any
@@ -363,7 +354,8 @@ func Seed(configPath string, timeout time.Duration) error {
 					return err
 				}
 				entry := map[string]any{
-					"shard_id": vkShardID,
+					"subscription_id": resolveSubID(v.Subscription),
+					"shard_id":        vkShardID,
 				}
 				if v.MaxMemoryMB > 0 {
 					entry["max_memory_mb"] = v.MaxMemoryMB
@@ -397,7 +389,8 @@ func Seed(configPath string, timeout time.Duration) error {
 					return err
 				}
 				entry := map[string]any{
-					"shard_id": s3ShardID,
+					"subscription_id": resolveSubID(s.Subscription),
+					"shard_id":        s3ShardID,
 				}
 				if s.Public != nil {
 					entry["public"] = *s.Public
@@ -430,17 +423,42 @@ func Seed(configPath string, timeout time.Duration) error {
 		}
 		fmt.Printf("  Tenant %q: all resources active\n", t.Name)
 
-		// Link zones that reference this tenant
+		// Create zones that reference this tenant
 		for _, z := range cfg.Zones {
 			if z.Tenant == t.Name {
-				zoneID := zoneMap[z.Name]
-				fmt.Printf("  Linking zone %q to tenant %q...\n", z.Name, t.Name)
-				_, err := client.Put(fmt.Sprintf("/zones/%s/tenant", zoneID), map[string]any{
-					"tenant_id": tenantID,
-				})
-				if err != nil {
-					return fmt.Errorf("link zone %q to tenant %q: %w", z.Name, t.Name, err)
+				zoneID, err := client.FindZoneByName(z.Name)
+				if err == nil {
+					fmt.Printf("  Zone %q: exists (%s, skipping)\n", z.Name, zoneID)
+					continue
 				}
+
+				fmt.Printf("  Creating zone %q for tenant %q...\n", z.Name, t.Name)
+				zoneBody := map[string]any{
+					"name":            z.Name,
+					"tenant_id":       tenantID,
+					"subscription_id": resolveSubID(z.Subscription),
+					"region_id":       regionID,
+				}
+				if z.Brand != "" {
+					bID, ok := brandMap[z.Brand]
+					if !ok {
+						return fmt.Errorf("zone %q: brand %q not found (must be defined in brands section)", z.Name, z.Brand)
+					}
+					zoneBody["brand_id"] = bID
+				}
+				resp, err := client.Post("/zones", zoneBody)
+				if err != nil {
+					return fmt.Errorf("create zone %q: %w", z.Name, err)
+				}
+				zoneID, err = extractID(resp)
+				if err != nil {
+					return fmt.Errorf("parse zone ID: %w", err)
+				}
+				fmt.Printf("    Zone %q: %s, awaiting workflow...\n", z.Name, zoneID)
+				if err := client.AwaitWorkflow(fmt.Sprintf("create-zone-%s", zoneID)); err != nil {
+					return fmt.Errorf("await zone %q: %w", z.Name, err)
+				}
+				fmt.Printf("    Zone %q: active\n", z.Name)
 			}
 		}
 
@@ -595,11 +613,12 @@ func Seed(configPath string, timeout time.Duration) error {
 }
 
 // buildEmailAccountEntries converts seed email account defs to nested API request entries.
-func buildEmailAccountEntries(emails []EmailAcctDef) []map[string]any {
+func buildEmailAccountEntries(emails []EmailAcctDef, resolveSubID func(string) string) []map[string]any {
 	var accounts []map[string]any
 	for _, e := range emails {
 		acct := map[string]any{
-			"address": e.Address,
+			"subscription_id": resolveSubID(e.Subscription),
+			"address":         e.Address,
 		}
 		if e.DisplayName != "" {
 			acct["display_name"] = e.DisplayName
@@ -765,6 +784,14 @@ func retrySetup(url, host string, timeout time.Duration) error {
 		time.Sleep(3 * time.Second)
 	}
 	return fmt.Errorf("timed out: %w", lastErr)
+}
+
+func generateUUID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // variant 10
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
 func extractNameFromResp(resp *Response) string {

@@ -70,9 +70,13 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 	}
 	var fqdnParams []activity.FQDNParam
 	for _, f := range allFQDNs {
+		var webrootID string
+		if f.WebrootID != nil {
+			webrootID = *f.WebrootID
+		}
 		fqdnParams = append(fqdnParams, activity.FQDNParam{
 			FQDN:       f.FQDN,
-			WebrootID:  f.WebrootID,
+			WebrootID:  webrootID,
 			SSLEnabled: f.SSLEnabled,
 		})
 	}
@@ -210,9 +214,13 @@ func UnbindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 			if f.ID == fqdnID {
 				continue
 			}
+			var webrootID string
+			if f.WebrootID != nil {
+				webrootID = *f.WebrootID
+			}
 			fqdnParams = append(fqdnParams, activity.FQDNParam{
 				FQDN:       f.FQDN,
-				WebrootID:  f.WebrootID,
+				WebrootID:  webrootID,
 				SSLEnabled: f.SSLEnabled,
 			})
 		}

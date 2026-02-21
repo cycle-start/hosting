@@ -4,7 +4,7 @@ import type {
   Region, Cluster, Shard, Node, Tenant, Webroot, FQDN, Certificate,
   Zone, ZoneRecord, Database, DatabaseUser,
   ValkeyInstance, ValkeyUser, EmailAccount, EmailAlias, EmailForward, EmailAutoReply,
-  S3Bucket, S3AccessKey,
+  S3Bucket, S3AccessKey, Subscription,
   SSHKey, CronJob, Daemon, Backup, Brand,
   APIKey, APIKeyCreateResponse, AuditLogEntry, DashboardStats,
   PlatformConfig, ListParams, AuditListParams, TenantResourceSummary,
@@ -247,6 +247,40 @@ export function useTenantResourceSummary(tenantId: string) {
   })
 }
 
+// Subscriptions
+export function useSubscriptions(tenantId: string) {
+  return useQuery({
+    queryKey: ['subscriptions', tenantId],
+    queryFn: () => api.get<PaginatedResponse<Subscription>>(listPath(`/tenants/${tenantId}/subscriptions`)),
+    enabled: !!tenantId,
+  })
+}
+
+export function useSubscription(id: string) {
+  return useQuery({
+    queryKey: ['subscription', id],
+    queryFn: () => api.get<Subscription>(`/subscriptions/${id}`),
+    enabled: !!id,
+  })
+}
+
+export function useCreateSubscription() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { tenant_id: string; id: string; name: string }) =>
+      api.post<Subscription>(`/tenants/${data.tenant_id}/subscriptions`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['subscriptions'] }),
+  })
+}
+
+export function useDeleteSubscription() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/subscriptions/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['subscriptions'] }),
+  })
+}
+
 // Webroots
 export function useWebroots(tenantId: string) {
   return useQuery({
@@ -267,7 +301,7 @@ export function useWebroot(id: string) {
 export function useCreateWebroot() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { tenant_id: string; runtime: string; runtime_version: string; runtime_config?: Record<string, unknown>; public_folder?: string; fqdns?: FQDNFormData[] }) =>
+    mutationFn: (data: { tenant_id: string; subscription_id: string; runtime: string; runtime_version: string; runtime_config?: Record<string, unknown>; public_folder?: string; fqdns?: FQDNFormData[] }) =>
       api.post<Webroot>(`/tenants/${data.tenant_id}/webroots`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['webroots'] }),
   })
@@ -321,9 +355,17 @@ export function useDeleteEnvVar() {
 }
 
 // FQDNs
+export function useTenantFQDNs(tenantId: string) {
+  return useQuery({
+    queryKey: ['fqdns', 'tenant', tenantId],
+    queryFn: () => api.get<PaginatedResponse<FQDN>>(listPath(`/tenants/${tenantId}/fqdns`)),
+    enabled: !!tenantId,
+  })
+}
+
 export function useFQDNs(webrootId: string) {
   return useQuery({
-    queryKey: ['fqdns', webrootId],
+    queryKey: ['fqdns', 'webroot', webrootId],
     queryFn: () => api.get<PaginatedResponse<FQDN>>(listPath(`/webroots/${webrootId}/fqdns`)),
     enabled: !!webrootId,
   })
@@ -340,9 +382,21 @@ export function useFQDN(id: string) {
 export function useCreateFQDN() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { webroot_id: string; fqdn: string; ssl_enabled?: boolean }) =>
-      api.post<FQDN>(`/webroots/${data.webroot_id}/fqdns`, data),
+    mutationFn: (data: { tenant_id: string; fqdn: string; webroot_id?: string; ssl_enabled?: boolean }) =>
+      api.post<FQDN>(`/tenants/${data.tenant_id}/fqdns`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['fqdns'] }),
+  })
+}
+
+export function useUpdateFQDN() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { id: string; webroot_id?: string | null; ssl_enabled?: boolean }) =>
+      api.put<FQDN>(`/fqdns/${data.id}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fqdns'] })
+      qc.invalidateQueries({ queryKey: ['fqdn'] })
+    },
   })
 }
 
@@ -400,7 +454,7 @@ export function useEmailAccount(id: string) {
 export function useCreateEmailAccount() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { fqdn_id: string; address: string; display_name?: string; quota_bytes?: number }) =>
+    mutationFn: (data: { fqdn_id: string; subscription_id: string; address: string; display_name?: string; quota_bytes?: number }) =>
       api.post<EmailAccount>(`/fqdns/${data.fqdn_id}/email-accounts`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['email-accounts'] }),
   })
@@ -511,7 +565,7 @@ export function useZone(id: string) {
 export function useCreateZone() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { name: string; region_id: string; brand_id?: string; tenant_id?: string }) =>
+    mutationFn: (data: { name: string; region_id: string; subscription_id: string; brand_id?: string; tenant_id?: string }) =>
       api.post<Zone>('/zones', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['zones'] }),
   })
@@ -600,7 +654,7 @@ export function useDatabase(id: string) {
 export function useCreateDatabase() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { tenant_id: string; shard_id: string; users?: DatabaseUserFormData[] }) =>
+    mutationFn: (data: { tenant_id: string; subscription_id: string; shard_id: string; users?: DatabaseUserFormData[] }) =>
       api.post<Database>(`/tenants/${data.tenant_id}/databases`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['databases'] }),
   })
@@ -679,7 +733,7 @@ export function useValkeyInstance(id: string) {
 export function useCreateValkeyInstance() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { tenant_id: string; shard_id: string; max_memory_mb?: number; users?: ValkeyUserFormData[] }) =>
+    mutationFn: (data: { tenant_id: string; subscription_id: string; shard_id: string; max_memory_mb?: number; users?: ValkeyUserFormData[] }) =>
       api.post<ValkeyInstance>(`/tenants/${data.tenant_id}/valkey-instances`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['valkey-instances'] }),
   })
@@ -748,7 +802,7 @@ export function useS3Bucket(id: string) {
 export function useCreateS3Bucket() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { tenant_id: string; shard_id: string; public?: boolean; quota_bytes?: number }) =>
+    mutationFn: (data: { tenant_id: string; subscription_id: string; shard_id: string; public?: boolean; quota_bytes?: number }) =>
       api.post<S3Bucket>(`/tenants/${data.tenant_id}/s3-buckets`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['s3-buckets'] }),
   })

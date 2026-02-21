@@ -18,6 +18,17 @@ CREATE TABLE tenants (
 
 CREATE SEQUENCE tenant_uid_seq START 5000;
 
+CREATE TABLE subscriptions (
+    id         TEXT PRIMARY KEY,
+    tenant_id  TEXT NOT NULL REFERENCES tenants(id),
+    name       TEXT NOT NULL,
+    status     TEXT NOT NULL DEFAULT 'active',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(tenant_id, name)
+);
+
 -- +goose Down
+DROP TABLE subscriptions;
 DROP SEQUENCE tenant_uid_seq;
 DROP TABLE tenants;

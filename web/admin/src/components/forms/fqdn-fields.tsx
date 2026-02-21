@@ -24,7 +24,7 @@ export function FQDNFields({ value, onChange }: Props) {
         title="Email Accounts"
         items={value.email_accounts ?? []}
         onChange={(email_accounts) => onChange({ ...value, email_accounts })}
-        defaultItem={() => ({ address: '' })}
+        defaultItem={() => ({ subscription_id: '', address: '' })}
         renderItem={(item, _, onItemChange) => <EmailAccountFields value={item} onChange={onItemChange} />}
         addLabel="Add Email Account"
       />

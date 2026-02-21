@@ -39,7 +39,7 @@ func (s *BindFQDNWorkflowTestSuite) TestSuccess_NoSSL() {
 	fqdn := model.FQDN{
 		ID:         fqdnID,
 		FQDN:       "example.com",
-		WebrootID:  webrootID,
+		WebrootID:  &webrootID,
 		SSLEnabled: false,
 	}
 	webroot := model.Webroot{
@@ -105,7 +105,7 @@ func (s *BindFQDNWorkflowTestSuite) TestSuccess_WithSSL() {
 	fqdn := model.FQDN{
 		ID:         fqdnID,
 		FQDN:       "secure.example.com",
-		WebrootID:  webrootID,
+		WebrootID:  &webrootID,
 		SSLEnabled: true,
 	}
 	webroot := model.Webroot{
@@ -174,7 +174,7 @@ func (s *BindFQDNWorkflowTestSuite) TestSuccess_SSLChildWorkflowFails_StillSucce
 	fqdn := model.FQDN{
 		ID:         fqdnID,
 		FQDN:       "secure.example.com",
-		WebrootID:  webrootID,
+		WebrootID:  &webrootID,
 		SSLEnabled: true,
 	}
 	webroot := model.Webroot{
@@ -238,7 +238,7 @@ func (s *BindFQDNWorkflowTestSuite) TestAutoCreateDNSFails_SetsStatusFailed() {
 	fqdn := model.FQDN{
 		ID:         fqdnID,
 		FQDN:       "example.com",
-		WebrootID:  webrootID,
+		WebrootID:  &webrootID,
 		SSLEnabled: false,
 	}
 	webroot := model.Webroot{
@@ -305,7 +305,7 @@ func (s *BindFQDNWorkflowTestSuite) TestSetLBMapEntryFails_SetsStatusFailed() {
 	fqdn := model.FQDN{
 		ID:         fqdnID,
 		FQDN:       "example.com",
-		WebrootID:  webrootID,
+		WebrootID:  &webrootID,
 		SSLEnabled: false,
 	}
 	webroot := model.Webroot{
@@ -365,7 +365,7 @@ func (s *BindFQDNWorkflowTestSuite) TestUpdateWebrootFails_SetsStatusFailed() {
 	fqdn := model.FQDN{
 		ID:         fqdnID,
 		FQDN:       "example.com",
-		WebrootID:  webrootID,
+		WebrootID:  &webrootID,
 		SSLEnabled: false,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
@@ -426,7 +426,7 @@ func (s *UnbindFQDNWorkflowTestSuite) TestSuccess() {
 	fqdn := model.FQDN{
 		ID:        fqdnID,
 		FQDN:      "example.com",
-		WebrootID: webrootID,
+		WebrootID: &webrootID,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
 	tenant := model.Tenant{ID: tenantID, Name: "t_test123456", BrandID: "test-brand", ClusterID: clusterID, ShardID: &shardID}
@@ -447,7 +447,7 @@ func (s *UnbindFQDNWorkflowTestSuite) TestSuccess() {
 	}, nil)
 	s.env.OnActivity("AutoDeleteDNSRecords", mock.Anything, "example.com").Return(nil)
 	// GetFQDNsByWebrootID returns the FQDN being unbound + another remaining one.
-	otherFQDN := model.FQDN{ID: "other-fqdn", FQDN: "other.example.com", WebrootID: webrootID, SSLEnabled: false}
+	otherFQDN := model.FQDN{ID: "other-fqdn", FQDN: "other.example.com", WebrootID: &webrootID, SSLEnabled: false}
 	s.env.OnActivity("GetFQDNsByWebrootID", mock.Anything, webrootID).Return([]model.FQDN{fqdn, otherFQDN}, nil)
 	s.env.OnActivity("UpdateWebroot", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("DeleteLBMapEntry", mock.Anything, activity.DeleteLBMapEntryParams{
@@ -469,7 +469,7 @@ func (s *UnbindFQDNWorkflowTestSuite) TestAutoDeleteDNSFails_SetsStatusFailed() 
 	fqdn := model.FQDN{
 		ID:        fqdnID,
 		FQDN:      "example.com",
-		WebrootID: webrootID,
+		WebrootID: &webrootID,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
 	tenant := model.Tenant{ID: tenantID, Name: "t_test123456", BrandID: "test-brand"}
@@ -511,7 +511,7 @@ func (s *UnbindFQDNWorkflowTestSuite) TestUpdateWebrootFails_SetsStatusFailed() 
 	fqdn := model.FQDN{
 		ID:        fqdnID,
 		FQDN:      "example.com",
-		WebrootID: webrootID,
+		WebrootID: &webrootID,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
 	tenant := model.Tenant{ID: tenantID, Name: "t_test123456", BrandID: "test-brand", ClusterID: "test-cluster-4", ShardID: &shardID}

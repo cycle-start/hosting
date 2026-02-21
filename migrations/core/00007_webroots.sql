@@ -2,6 +2,7 @@
 CREATE TABLE webroots (
     id                       TEXT PRIMARY KEY,
     tenant_id                TEXT NOT NULL REFERENCES tenants(id),
+    subscription_id          TEXT NOT NULL REFERENCES subscriptions(id),
     name                     TEXT NOT NULL,
     runtime                  TEXT NOT NULL,
     runtime_version          TEXT NOT NULL,

@@ -8,6 +8,7 @@ A **webroot** is a website document root belonging to a tenant. Each webroot has
 |-------|------|-------------|
 | `id` | string | Auto-generated short ID |
 | `tenant_id` | string | Owning tenant |
+| `subscription_id` | string | Subscription grouping (required) |
 | `name` | string | Slug name (e.g. `main`, `blog`) |
 | `runtime` | string | One of: `php`, `node`, `python`, `ruby`, `static` |
 | `runtime_version` | string | Version string (e.g. `8.5`, `20`, `3.12`) |
@@ -34,6 +35,7 @@ A **webroot** is a website document root belonging to a tenant. Each webroot has
 
 ```json
 {
+  "subscription_id": "550e8400-e29b-41d4-a716-446655440000",
   "name": "main",
   "runtime": "php",
   "runtime_version": "8.5",
@@ -157,11 +159,15 @@ This provides a predictable URL for each webroot without requiring custom FQDN b
 
 ## FQDN Binding
 
-FQDNs are bound to webroots (not to tenants directly). When an FQDN is bound:
+FQDNs are tenant-scoped (`tenant_id NOT NULL`) and can optionally be bound to a webroot (`webroot_id` is nullable). An FQDN can exist independently of any webroot -- for example, to serve email or to reserve a domain before assigning it to a webroot.
+
+When an FQDN is bound to a webroot:
 1. Auto-DNS records (A/AAAA) are created pointing to the cluster's load balancer IPs
 2. The LB map entry is created (FQDN -> shard backend)
 3. Nginx is reloaded on all shard nodes
 4. If `ssl_enabled` is true, a Let's Encrypt certificate is provisioned via a child workflow
+
+Unbound FQDNs (no webroot) can be created at the tenant level via `POST /tenants` with a top-level `fqdns` array, or via the FQDN API directly.
 
 ## Storage Layout
 

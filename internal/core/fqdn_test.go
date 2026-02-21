@@ -32,10 +32,12 @@ func TestFQDNService_Create_Success(t *testing.T) {
 	svc := NewFQDNService(db, tc)
 	ctx := context.Background()
 
+	webrootID := "test-webroot-1"
 	fqdn := &model.FQDN{
 		ID:         "test-fqdn-1",
+		TenantID:   "test-tenant-1",
 		FQDN:       "example.com",
-		WebrootID:  "test-webroot-1",
+		WebrootID:  &webrootID,
 		SSLEnabled: true,
 		Status:     model.StatusPending,
 		CreatedAt:  time.Now(),
@@ -43,13 +45,6 @@ func TestFQDNService_Create_Success(t *testing.T) {
 	}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-
-	// resolveTenantIDFromWebroot
-	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "test-tenant-1"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
 
 	// signalProvision tenant name lookup
 	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
@@ -91,16 +86,9 @@ func TestFQDNService_Create_WorkflowError(t *testing.T) {
 	svc := NewFQDNService(db, tc)
 	ctx := context.Background()
 
-	fqdn := &model.FQDN{ID: "test-fqdn-1", FQDN: "example.com"}
+	fqdn := &model.FQDN{ID: "test-fqdn-1", FQDN: "example.com"} // no TenantID => ExecuteWorkflow directly
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-
-	// resolveTenantIDFromWebroot (returns empty => signalProvision uses ExecuteWorkflow)
-	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = ""
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow)
 
 	tc.On("ExecuteWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
@@ -123,15 +111,17 @@ func TestFQDNService_GetByID_Success(t *testing.T) {
 	webrootID := "test-webroot-1"
 	now := time.Now().Truncate(time.Microsecond)
 
+	tenantID := "test-tenant-1"
 	row := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = fqdnID
-		*(dest[1].(*string)) = "example.com"
-		*(dest[2].(*string)) = webrootID
-		*(dest[3].(*bool)) = true
-		*(dest[4].(*string)) = model.StatusActive
-		*(dest[5].(**string)) = nil // status_message
-		*(dest[6].(*time.Time)) = now
+		*(dest[1].(*string)) = tenantID
+		*(dest[2].(*string)) = "example.com"
+		*(dest[3].(**string)) = &webrootID
+		*(dest[4].(*bool)) = true
+		*(dest[5].(*string)) = model.StatusActive
+		*(dest[6].(**string)) = nil // status_message
 		*(dest[7].(*time.Time)) = now
+		*(dest[8].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -141,7 +131,7 @@ func TestFQDNService_GetByID_Success(t *testing.T) {
 	require.NotNil(t, result)
 	assert.Equal(t, fqdnID, result.ID)
 	assert.Equal(t, "example.com", result.FQDN)
-	assert.Equal(t, webrootID, result.WebrootID)
+	assert.Equal(t, &webrootID, result.WebrootID)
 	assert.True(t, result.SSLEnabled)
 	assert.Equal(t, model.StatusActive, result.Status)
 	db.AssertExpectations(t)
@@ -177,27 +167,30 @@ func TestFQDNService_ListByWebroot_Success(t *testing.T) {
 	id1, id2 := "test-fqdn-1", "test-fqdn-2"
 	now := time.Now().Truncate(time.Microsecond)
 
+	tenantID := "test-tenant-1"
 	rows := newMockRows(
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
-			*(dest[1].(*string)) = "alpha.example.com"
-			*(dest[2].(*string)) = webrootID
-			*(dest[3].(*bool)) = true
-			*(dest[4].(*string)) = model.StatusActive
-			*(dest[5].(**string)) = nil // status_message
-			*(dest[6].(*time.Time)) = now
+			*(dest[1].(*string)) = tenantID
+			*(dest[2].(*string)) = "alpha.example.com"
+			*(dest[3].(**string)) = &webrootID
+			*(dest[4].(*bool)) = true
+			*(dest[5].(*string)) = model.StatusActive
+			*(dest[6].(**string)) = nil // status_message
 			*(dest[7].(*time.Time)) = now
+			*(dest[8].(*time.Time)) = now
 			return nil
 		},
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id2
-			*(dest[1].(*string)) = "beta.example.com"
-			*(dest[2].(*string)) = webrootID
-			*(dest[3].(*bool)) = false
-			*(dest[4].(*string)) = model.StatusPending
-			*(dest[5].(**string)) = nil // status_message
-			*(dest[6].(*time.Time)) = now
+			*(dest[1].(*string)) = tenantID
+			*(dest[2].(*string)) = "beta.example.com"
+			*(dest[3].(**string)) = &webrootID
+			*(dest[4].(*bool)) = false
+			*(dest[5].(*string)) = model.StatusPending
+			*(dest[6].(**string)) = nil // status_message
 			*(dest[7].(*time.Time)) = now
+			*(dest[8].(*time.Time)) = now
 			return nil
 		},
 	)
@@ -255,16 +248,10 @@ func TestFQDNService_Delete_Success(t *testing.T) {
 
 	updateRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "example.com"
+		*(dest[1].(*string)) = "test-tenant-1"
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
-
-	// resolveTenantIDFromFQDN
-	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "test-tenant-1"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
 
 	// signalProvision tenant name lookup
 	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
@@ -309,16 +296,10 @@ func TestFQDNService_Delete_WorkflowError(t *testing.T) {
 
 	updateRow := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "example.com"
+		*(dest[1].(*string)) = "test-tenant-1"
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
-
-	// resolveTenantIDFromFQDN
-	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "test-tenant-1"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
 
 	// signalProvision tenant name lookup
 	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {

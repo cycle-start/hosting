@@ -20,20 +20,16 @@ func NewS3BucketService(db DB, tc temporalclient.Client) *S3BucketService {
 
 func (s *S3BucketService) Create(ctx context.Context, bucket *model.S3Bucket) error {
 	_, err := s.db.Exec(ctx,
-		`INSERT INTO s3_buckets (id, tenant_id, name, shard_id, public, quota_bytes, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		bucket.ID, bucket.TenantID, bucket.Name, bucket.ShardID,
+		`INSERT INTO s3_buckets (id, tenant_id, subscription_id, name, shard_id, public, quota_bytes, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		bucket.ID, bucket.TenantID, bucket.SubscriptionID, bucket.Name, bucket.ShardID,
 		bucket.Public, bucket.QuotaBytes, bucket.Status, bucket.CreatedAt, bucket.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("insert s3 bucket: %w", err)
 	}
 
-	var tenantID string
-	if bucket.TenantID != nil {
-		tenantID = *bucket.TenantID
-	}
-	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
+	if err := signalProvision(ctx, s.tc, s.db, bucket.TenantID, model.ProvisionTask{
 		WorkflowName: "CreateS3BucketWorkflow",
 		WorkflowID:   fmt.Sprintf("create-s3-bucket-%s", bucket.ID),
 		Arg:          bucket.ID,
@@ -47,12 +43,12 @@ func (s *S3BucketService) Create(ctx context.Context, bucket *model.S3Bucket) er
 func (s *S3BucketService) GetByID(ctx context.Context, id string) (*model.S3Bucket, error) {
 	var b model.S3Bucket
 	err := s.db.QueryRow(ctx,
-		`SELECT b.id, b.tenant_id, b.name, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.suspend_reason, b.created_at, b.updated_at,
+		`SELECT b.id, b.tenant_id, b.subscription_id, b.name, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.suspend_reason, b.created_at, b.updated_at,
 		        sh.name
 		 FROM s3_buckets b
 		 LEFT JOIN shards sh ON sh.id = b.shard_id
 		 WHERE b.id = $1`, id,
-	).Scan(&b.ID, &b.TenantID, &b.Name, &b.ShardID,
+	).Scan(&b.ID, &b.TenantID, &b.SubscriptionID, &b.Name, &b.ShardID,
 		&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.SuspendReason, &b.CreatedAt, &b.UpdatedAt,
 		&b.ShardName)
 	if err != nil {
@@ -62,7 +58,7 @@ func (s *S3BucketService) GetByID(ctx context.Context, id string) (*model.S3Buck
 }
 
 func (s *S3BucketService) ListByTenant(ctx context.Context, tenantID string, params request.ListParams) ([]model.S3Bucket, bool, error) {
-	query := `SELECT b.id, b.tenant_id, b.name, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.suspend_reason, b.created_at, b.updated_at, sh.name FROM s3_buckets b LEFT JOIN shards sh ON sh.id = b.shard_id WHERE b.tenant_id = $1`
+	query := `SELECT b.id, b.tenant_id, b.subscription_id, b.name, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.suspend_reason, b.created_at, b.updated_at, sh.name FROM s3_buckets b LEFT JOIN shards sh ON sh.id = b.shard_id WHERE b.tenant_id = $1`
 	args := []any{tenantID}
 	argIdx := 2
 
@@ -108,7 +104,7 @@ func (s *S3BucketService) ListByTenant(ctx context.Context, tenantID string, par
 	var buckets []model.S3Bucket
 	for rows.Next() {
 		var b model.S3Bucket
-		if err := rows.Scan(&b.ID, &b.TenantID, &b.Name, &b.ShardID,
+		if err := rows.Scan(&b.ID, &b.TenantID, &b.SubscriptionID, &b.Name, &b.ShardID,
 			&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.SuspendReason, &b.CreatedAt, &b.UpdatedAt,
 			&b.ShardName); err != nil {
 			return nil, false, fmt.Errorf("scan s3 bucket: %w", err)

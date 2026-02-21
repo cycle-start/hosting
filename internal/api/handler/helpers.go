@@ -50,13 +50,15 @@ func generatePassword() string {
 }
 
 // createNestedFQDNs creates FQDNs and their nested email resources for a webroot.
-func createNestedFQDNs(ctx context.Context, services *core.Services, webrootID string, fqdns []request.CreateFQDNNested) error {
+func createNestedFQDNs(ctx context.Context, services *core.Services, webrootID string, tenantID string, fqdns []request.CreateFQDNNested) error {
 	for _, fr := range fqdns {
 		now := time.Now()
+		wid := webrootID
 		fqdn := &model.FQDN{
 			ID:        platform.NewID(),
+			TenantID:  tenantID,
 			FQDN:      fr.FQDN,
-			WebrootID: webrootID,
+			WebrootID: &wid,
 			Status:    model.StatusPending,
 			CreatedAt: now,
 			UpdatedAt: now,
@@ -79,14 +81,15 @@ func createNestedEmailAccounts(ctx context.Context, services *core.Services, fqd
 	for _, ar := range accounts {
 		now := time.Now()
 		account := &model.EmailAccount{
-			ID:          platform.NewID(),
-			FQDNID:      fqdnID,
-			Address:     ar.Address,
-			DisplayName: ar.DisplayName,
-			QuotaBytes:  ar.QuotaBytes,
-			Status:      model.StatusPending,
-			CreatedAt:   now,
-			UpdatedAt:   now,
+			ID:             platform.NewID(),
+			FQDNID:         fqdnID,
+			SubscriptionID: ar.SubscriptionID,
+			Address:        ar.Address,
+			DisplayName:    ar.DisplayName,
+			QuotaBytes:     ar.QuotaBytes,
+			Status:         model.StatusPending,
+			CreatedAt:      now,
+			UpdatedAt:      now,
 		}
 		if err := services.EmailAccount.Create(ctx, account); err != nil {
 			return fmt.Errorf("create email account %s: %s", ar.Address, err.Error())

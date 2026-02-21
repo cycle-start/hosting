@@ -82,7 +82,7 @@ export function FQDNDetailPage() {
     setTouched({ email: true })
     if (validateField(emailAddr, [rules.required(), rules.email()])) return
     try {
-      await createEmailMut.mutateAsync({ fqdn_id: fqdnId, address: emailAddr, display_name: emailDisplay || undefined, quota_bytes: emailQuota ? parseInt(emailQuota) : undefined })
+      await createEmailMut.mutateAsync({ fqdn_id: fqdnId, subscription_id: '', address: emailAddr, display_name: emailDisplay || undefined, quota_bytes: emailQuota ? parseInt(emailQuota) : undefined })
       toast.success('Email account created'); setCreateEmailOpen(false); setEmailAddr(''); setEmailDisplay(''); setEmailQuota(''); setTouched({})
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }
@@ -187,7 +187,7 @@ export function FQDNDetailPage() {
         </TabsContent>
 
         <TabsContent value="access-logs">
-          <TenantLogViewer tenantId={tenantId} webrootId={fqdn.webroot_id} />
+          <TenantLogViewer tenantId={tenantId} webrootId={fqdn.webroot_id ?? undefined} />
         </TabsContent>
 
         <TabsContent value="platform-logs">

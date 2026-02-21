@@ -37,7 +37,7 @@ func TestZoneService_Create_Success(t *testing.T) {
 	zone := &model.Zone{
 		ID:        "test-zone-1",
 		BrandID:   "test-brand",
-		TenantID:  &tenantID,
+		TenantID:  tenantID,
 		Name:      "example.com",
 		RegionID:  "test-region-1",
 		Status:    model.StatusPending,
@@ -112,18 +112,21 @@ func TestZoneService_GetByID_Success(t *testing.T) {
 	regionName := "Test Region"
 	now := time.Now().Truncate(time.Microsecond)
 
+	tenantName := "Test Tenant"
 	row := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = zoneID
 		*(dest[1].(*string)) = "test-brand"
-		*(dest[2].(**string)) = &tenantID
-		*(dest[3].(*string)) = "example.com"
-		*(dest[4].(*string)) = regionID
-		*(dest[5].(*string)) = model.StatusActive
-		*(dest[6].(**string)) = nil // status_message
-		*(dest[7].(*string)) = ""  // suspend_reason
-		*(dest[8].(*time.Time)) = now
+		*(dest[2].(*string)) = tenantID
+		*(dest[3].(*string)) = "" // subscription_id
+		*(dest[4].(*string)) = "example.com"
+		*(dest[5].(*string)) = regionID
+		*(dest[6].(*string)) = model.StatusActive
+		*(dest[7].(**string)) = nil // status_message
+		*(dest[8].(*string)) = ""  // suspend_reason
 		*(dest[9].(*time.Time)) = now
-		*(dest[10].(*string)) = regionName
+		*(dest[10].(*time.Time)) = now
+		*(dest[11].(*string)) = regionName
+		*(dest[12].(**string)) = &tenantName
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -133,7 +136,7 @@ func TestZoneService_GetByID_Success(t *testing.T) {
 	require.NotNil(t, result)
 	assert.Equal(t, zoneID, result.ID)
 	assert.Equal(t, "example.com", result.Name)
-	assert.Equal(t, &tenantID, result.TenantID)
+	assert.Equal(t, tenantID, result.TenantID)
 	assert.Equal(t, regionName, result.RegionName)
 	db.AssertExpectations(t)
 }
@@ -170,19 +173,22 @@ func TestZoneService_List_Success(t *testing.T) {
 	regionName := "Test Region"
 	now := time.Now().Truncate(time.Microsecond)
 
+	tenantName := "Test Tenant"
 	rows := newMockRows(
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
 			*(dest[1].(*string)) = "test-brand"
-			*(dest[2].(**string)) = &tenantID
-			*(dest[3].(*string)) = "example.com"
-			*(dest[4].(*string)) = regionID
-			*(dest[5].(*string)) = model.StatusActive
-			*(dest[6].(**string)) = nil // status_message
-			*(dest[7].(*string)) = ""  // suspend_reason
-			*(dest[8].(*time.Time)) = now
+			*(dest[2].(*string)) = tenantID
+			*(dest[3].(*string)) = "" // subscription_id
+			*(dest[4].(*string)) = "example.com"
+			*(dest[5].(*string)) = regionID
+			*(dest[6].(*string)) = model.StatusActive
+			*(dest[7].(**string)) = nil // status_message
+			*(dest[8].(*string)) = ""  // suspend_reason
 			*(dest[9].(*time.Time)) = now
-			*(dest[10].(*string)) = regionName
+			*(dest[10].(*time.Time)) = now
+			*(dest[11].(*string)) = regionName
+			*(dest[12].(**string)) = &tenantName
 			return nil
 		},
 	)
@@ -262,7 +268,7 @@ func TestZoneService_Delete_Success(t *testing.T) {
 	// resolveTenantIDFromZone
 	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(**string)) = &tenantID
+		*(dest[0].(*string)) = tenantID
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
@@ -317,7 +323,7 @@ func TestZoneService_Delete_WorkflowError(t *testing.T) {
 	// resolveTenantIDFromZone
 	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(**string)) = &tenantID
+		*(dest[0].(*string)) = tenantID
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
@@ -338,49 +344,3 @@ func TestZoneService_Delete_WorkflowError(t *testing.T) {
 	tc.AssertExpectations(t)
 }
 
-// ---------- ReassignTenant ----------
-
-func TestZoneService_ReassignTenant_Success(t *testing.T) {
-	db := &mockDB{}
-	tc := &temporalmocks.Client{}
-	svc := NewZoneService(db, tc)
-	ctx := context.Background()
-
-	zoneID := "test-zone-1"
-	tenantID := "test-tenant-1"
-
-	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-
-	err := svc.ReassignTenant(ctx, zoneID, &tenantID)
-	require.NoError(t, err)
-	db.AssertExpectations(t)
-}
-
-func TestZoneService_ReassignTenant_NilTenant(t *testing.T) {
-	db := &mockDB{}
-	tc := &temporalmocks.Client{}
-	svc := NewZoneService(db, tc)
-	ctx := context.Background()
-
-	zoneID := "test-zone-1"
-
-	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-
-	err := svc.ReassignTenant(ctx, zoneID, nil)
-	require.NoError(t, err)
-	db.AssertExpectations(t)
-}
-
-func TestZoneService_ReassignTenant_DBError(t *testing.T) {
-	db := &mockDB{}
-	tc := &temporalmocks.Client{}
-	svc := NewZoneService(db, tc)
-	ctx := context.Background()
-
-	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
-
-	err := svc.ReassignTenant(ctx, "test-zone-1", nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "reassign zone")
-	db.AssertExpectations(t)
-}

@@ -2,7 +2,8 @@
 CREATE TABLE zones (
     id         TEXT PRIMARY KEY,
     brand_id   TEXT NOT NULL REFERENCES brands(id),
-    tenant_id  TEXT REFERENCES tenants(id) ON DELETE SET NULL,
+    tenant_id       TEXT NOT NULL REFERENCES tenants(id),
+    subscription_id TEXT NOT NULL REFERENCES subscriptions(id),
     name       TEXT NOT NULL UNIQUE,
     region_id  TEXT NOT NULL REFERENCES regions(id),
     status     TEXT NOT NULL DEFAULT 'pending',

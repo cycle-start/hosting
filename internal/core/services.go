@@ -25,6 +25,7 @@ type Services struct {
 	Shard              *ShardService
 	Node               *NodeService
 	Tenant             *TenantService
+	Subscription       *SubscriptionService
 	Webroot            *WebrootService
 	WebrootEnvVar      *WebrootEnvVarService
 	FQDN               *FQDNService
@@ -77,6 +78,7 @@ func newServicesFromDB(db DB, tc temporalclient.Client, oidcIssuerURL string, se
 		Shard:              NewShardService(db, tc),
 		Node:               NewNodeService(db),
 		Tenant:             NewTenantService(db, tc),
+		Subscription:       NewSubscriptionService(db, tc),
 		Webroot:            NewWebrootService(db, tc),
 		WebrootEnvVar:      NewWebrootEnvVarService(db, tc, secretEncryptionKey),
 		FQDN:               NewFQDNService(db, tc),

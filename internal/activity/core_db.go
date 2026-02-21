@@ -2271,9 +2271,9 @@ func (a *CoreDB) DeleteTenantDBRows(ctx context.Context, tenantID string) error 
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
 
-	// Email features (via email_accounts → fqdns → webroots).
-	emailAccountSubquery := `SELECT ea.id FROM email_accounts ea JOIN fqdns f ON ea.fqdn_id=f.id JOIN webroots w ON f.webroot_id=w.id WHERE w.tenant_id=$1`
-	fqdnSubquery := `SELECT f.id FROM fqdns f JOIN webroots w ON f.webroot_id=w.id WHERE w.tenant_id=$1`
+	// Email features (via email_accounts → fqdns).
+	emailAccountSubquery := `SELECT ea.id FROM email_accounts ea JOIN fqdns f ON ea.fqdn_id=f.id WHERE f.tenant_id=$1`
+	fqdnSubquery := `SELECT id FROM fqdns WHERE tenant_id=$1`
 
 	queries := []string{
 		`DELETE FROM email_autoreplies WHERE account_id IN (` + emailAccountSubquery + `)`,
@@ -2283,7 +2283,7 @@ func (a *CoreDB) DeleteTenantDBRows(ctx context.Context, tenantID string) error 
 
 		// Certificates and FQDNs (via webroots).
 		`DELETE FROM certificates WHERE fqdn_id IN (` + fqdnSubquery + `)`,
-		`DELETE FROM fqdns WHERE webroot_id IN (SELECT id FROM webroots WHERE tenant_id=$1)`,
+		`DELETE FROM fqdns WHERE tenant_id=$1`,
 
 		// Direct tenant children (web-shard).
 		`DELETE FROM daemons WHERE tenant_id=$1`,
@@ -2308,6 +2308,7 @@ func (a *CoreDB) DeleteTenantDBRows(ctx context.Context, tenantID string) error 
 		`DELETE FROM s3_buckets WHERE tenant_id=$1`,
 		`DELETE FROM zone_records WHERE zone_id IN (SELECT id FROM zones WHERE tenant_id=$1)`,
 		`DELETE FROM zones WHERE tenant_id=$1`,
+		`DELETE FROM subscriptions WHERE tenant_id=$1`,
 
 		// Finally, the tenant itself.
 		`DELETE FROM tenants WHERE id=$1`,

@@ -98,10 +98,11 @@ func (h *S3Bucket) Create(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	shardID := req.ShardID
 	bucket := &model.S3Bucket{
-		ID:        platform.NewID(),
-		TenantID:  &tenantID,
-		Name:      platform.NewName("s3"),
-		ShardID:   &shardID,
+		ID:             platform.NewID(),
+		TenantID:       tenantID,
+		SubscriptionID: req.SubscriptionID,
+		Name:           platform.NewName("s3"),
+		ShardID:        &shardID,
 		Status:    model.StatusPending,
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -145,10 +146,8 @@ func (h *S3Bucket) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if bucket.TenantID != nil {
-		if !checkTenantBrand(w, r, h.tenantSvc, *bucket.TenantID) {
-			return
-		}
+	if !checkTenantBrand(w, r, h.tenantSvc, bucket.TenantID) {
+		return
 	}
 
 	response.WriteJSON(w, http.StatusOK, bucket)
@@ -184,10 +183,8 @@ func (h *S3Bucket) Update(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	if bucket.TenantID != nil {
-		if !checkTenantBrand(w, r, h.tenantSvc, *bucket.TenantID) {
-			return
-		}
+	if !checkTenantBrand(w, r, h.tenantSvc, bucket.TenantID) {
+		return
 	}
 
 	if err := h.svc.Update(r.Context(), id, req.Public, req.QuotaBytes); err != nil {
@@ -227,10 +224,8 @@ func (h *S3Bucket) Delete(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	if bucket.TenantID != nil {
-		if !checkTenantBrand(w, r, h.tenantSvc, *bucket.TenantID) {
-			return
-		}
+	if !checkTenantBrand(w, r, h.tenantSvc, bucket.TenantID) {
+		return
 	}
 
 	if err := h.svc.Delete(r.Context(), id); err != nil {
@@ -263,10 +258,8 @@ func (h *S3Bucket) Retry(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	if bucket.TenantID != nil {
-		if !checkTenantBrand(w, r, h.tenantSvc, *bucket.TenantID) {
-			return
-		}
+	if !checkTenantBrand(w, r, h.tenantSvc, bucket.TenantID) {
+		return
 	}
 	if err := h.svc.Retry(r.Context(), id); err != nil {
 		response.WriteServiceError(w, err)
@@ -282,7 +275,7 @@ func (h *S3Bucket) CreateNested(w http.ResponseWriter, r *http.Request, tenantID
 		shardID := br.ShardID
 		bucket := &model.S3Bucket{
 			ID:        platform.NewID(),
-			TenantID:  &tenantID,
+			TenantID:  tenantID,
 			Name:      platform.NewName("s3"),
 			ShardID:   &shardID,
 			Status:    model.StatusPending,

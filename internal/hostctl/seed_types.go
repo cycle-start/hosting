@@ -34,9 +34,10 @@ type BrandDef struct {
 }
 
 type ZoneDef struct {
-	Name   string `yaml:"name"`
-	Brand  string `yaml:"brand"`
-	Tenant string `yaml:"tenant"`
+	Name         string `yaml:"name"`
+	Brand        string `yaml:"brand"`
+	Tenant       string `yaml:"tenant"`
+	Subscription string `yaml:"subscription"`
 }
 
 type TenantDef struct {
@@ -45,6 +46,7 @@ type TenantDef struct {
 	Shard           string              `yaml:"shard"`
 	SFTPEnabled     bool                `yaml:"sftp_enabled"`
 	SSHEnabled      bool                `yaml:"ssh_enabled"`
+	Subscriptions   []SubscriptionDef   `yaml:"subscriptions"`
 	SSHKeys         []SSHKeyDef         `yaml:"ssh_keys"`
 	Webroots        []WebrootDef        `yaml:"webroots"`
 	Databases       []DatabaseDef       `yaml:"databases"`
@@ -55,12 +57,17 @@ type TenantDef struct {
 	Backups         []BackupDef         `yaml:"backups"`
 }
 
+type SubscriptionDef struct {
+	Name string `yaml:"name"`
+}
+
 type SSHKeyDef struct {
 	Name      string `yaml:"name"`
 	PublicKey string `yaml:"public_key"` // Supports "${SSH_PUBLIC_KEY}" → reads SSH_PUBLIC_KEY env var or ~/.ssh/id_rsa.pub
 }
 
 type WebrootDef struct {
+	Subscription   string            `yaml:"subscription"`
 	Runtime        string            `yaml:"runtime"`
 	RuntimeVersion string            `yaml:"runtime_version"`
 	RuntimeConfig  map[string]any    `yaml:"runtime_config"`
@@ -103,7 +110,8 @@ type DaemonDef struct {
 }
 
 type DatabaseDef struct {
-	Shard       string                  `yaml:"shard"`
+	Subscription string                  `yaml:"subscription"`
+	Shard        string                  `yaml:"shard"`
 	Users       []DatabaseUserDef       `yaml:"users"`
 	AccessRules []DatabaseAccessRuleDef `yaml:"access_rules"`
 }
@@ -115,7 +123,8 @@ type DatabaseUserDef struct {
 }
 
 type ValkeyInstanceDef struct {
-	Shard       string          `yaml:"shard"`
+	Subscription string          `yaml:"subscription"`
+	Shard        string          `yaml:"shard"`
 	MaxMemoryMB int             `yaml:"max_memory_mb"`
 	Users       []ValkeyUserDef `yaml:"users"`
 }
@@ -128,13 +137,15 @@ type ValkeyUserDef struct {
 }
 
 type S3BucketDef struct {
-	Shard      string `yaml:"shard"`
+	Subscription string `yaml:"subscription"`
+	Shard        string `yaml:"shard"`
 	Public     *bool  `yaml:"public"`
 	QuotaBytes *int64 `yaml:"quota_bytes"`
 }
 
 type EmailAcctDef struct {
-	FQDN        string              `yaml:"fqdn"`
+	Subscription string              `yaml:"subscription"`
+	FQDN         string              `yaml:"fqdn"`
 	Address     string              `yaml:"address"`
 	DisplayName string              `yaml:"display_name"`
 	QuotaBytes  int64               `yaml:"quota_bytes"`

@@ -145,18 +145,36 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 
+		// Nested subscription creation
+		subMap := map[string]string{} // subscription name -> ID (for resolving by nested resources)
+		for _, sr := range req.Subscriptions {
+			now2 := time.Now()
+			sub := &model.Subscription{
+				ID:        sr.ID,
+				TenantID:  tenant.ID,
+				Name:      sr.Name,
+				Status:    model.StatusActive,
+				CreatedAt: now2,
+				UpdatedAt: now2,
+			}
+			if err := tx.Subscription.Create(skipCtx, sub); err != nil {
+				return fmt.Errorf("create subscription %s: %w", sr.Name, err)
+			}
+			subMap[sr.Name] = sr.ID
+		}
+
 		// Nested zone creation
 		for _, zr := range req.Zones {
 			now2 := time.Now()
-			tenantID := tenant.ID
 			zone := &model.Zone{
-				ID:        platform.NewID(),
-				TenantID:  &tenantID,
-				Name:      zr.Name,
-				RegionID:  tenant.RegionID,
-				Status:    model.StatusPending,
-				CreatedAt: now2,
-				UpdatedAt: now2,
+				ID:             platform.NewID(),
+				TenantID:       tenant.ID,
+				SubscriptionID: zr.SubscriptionID,
+				Name:           zr.Name,
+				RegionID:       tenant.RegionID,
+				Status:         model.StatusPending,
+				CreatedAt:      now2,
+				UpdatedAt:      now2,
 			}
 			if err := tx.Zone.Create(skipCtx, zone); err != nil {
 				return fmt.Errorf("create zone %s: %w", zr.Name, err)
@@ -173,6 +191,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 			webroot := &model.Webroot{
 				ID:             platform.NewID(),
 				TenantID:       tenant.ID,
+				SubscriptionID: wr.SubscriptionID,
 				Name:           platform.NewName("w"),
 				Runtime:        wr.Runtime,
 				RuntimeVersion: wr.RuntimeVersion,
@@ -189,7 +208,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 			if err := tx.Webroot.Create(skipCtx, webroot); err != nil {
 				return fmt.Errorf("create webroot: %w", err)
 			}
-			if err := createNestedFQDNs(skipCtx, tx, webroot.ID, wr.FQDNs); err != nil {
+			if err := createNestedFQDNs(skipCtx, tx, webroot.ID, tenant.ID, wr.FQDNs); err != nil {
 				return err
 			}
 
@@ -259,14 +278,14 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 		// Nested database creation
 		for _, dr := range req.Databases {
 			now2 := time.Now()
-			tenantID := tenant.ID
 			dbShardID := dr.ShardID
 			dbName := platform.NewName("db")
 			database := &model.Database{
-				ID:        platform.NewID(),
-				TenantID:  &tenantID,
-				Name:      dbName,
-				ShardID:   &dbShardID,
+				ID:             platform.NewID(),
+				TenantID:       tenant.ID,
+				SubscriptionID: dr.SubscriptionID,
+				Name:           dbName,
+				ShardID:        &dbShardID,
 				Status:    model.StatusPending,
 				CreatedAt: now2,
 				UpdatedAt: now2,
@@ -312,17 +331,17 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 		// Nested valkey instance creation
 		for _, vr := range req.ValkeyInstances {
 			now2 := time.Now()
-			tenantID := tenant.ID
 			vShardID := vr.ShardID
 			maxMemoryMB := vr.MaxMemoryMB
 			if maxMemoryMB == 0 {
 				maxMemoryMB = 64
 			}
 			instance := &model.ValkeyInstance{
-				ID:          platform.NewID(),
-				TenantID:    &tenantID,
-				Name:        platform.NewName("kv"),
-				ShardID:     &vShardID,
+				ID:             platform.NewID(),
+				TenantID:       tenant.ID,
+				SubscriptionID: vr.SubscriptionID,
+				Name:           platform.NewName("kv"),
+				ShardID:        &vShardID,
 				MaxMemoryMB: maxMemoryMB,
 				Password:    generatePassword(),
 				Status:      model.StatusPending,
@@ -358,13 +377,13 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 		// Nested S3 bucket creation
 		for _, br := range req.S3Buckets {
 			now2 := time.Now()
-			tenantID := tenant.ID
 			s3ShardID := br.ShardID
 			bucket := &model.S3Bucket{
-				ID:        platform.NewID(),
-				TenantID:  &tenantID,
-				Name:      platform.NewName("s3"),
-				ShardID:   &s3ShardID,
+				ID:             platform.NewID(),
+				TenantID:       tenant.ID,
+				SubscriptionID: br.SubscriptionID,
+				Name:           platform.NewName("s3"),
+				ShardID:        &s3ShardID,
 				Status:    model.StatusPending,
 				CreatedAt: now2,
 				UpdatedAt: now2,
@@ -393,6 +412,25 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 				if err := tx.S3AccessKey.Create(skipCtx, key); err != nil {
 					return fmt.Errorf("create s3 access key: %w", err)
 				}
+			}
+		}
+
+		// Top-level FQDN creation (unbound to webroots)
+		for _, fr := range req.FQDNs {
+			now2 := time.Now()
+			fqdn := &model.FQDN{
+				ID:        platform.NewID(),
+				TenantID:  tenant.ID,
+				FQDN:      fr.FQDN,
+				Status:    model.StatusPending,
+				CreatedAt: now2,
+				UpdatedAt: now2,
+			}
+			if fr.SSLEnabled != nil {
+				fqdn.SSLEnabled = *fr.SSLEnabled
+			}
+			if err := tx.FQDN.Create(skipCtx, fqdn); err != nil {
+				return fmt.Errorf("create fqdn %s: %w", fr.FQDN, err)
 			}
 		}
 

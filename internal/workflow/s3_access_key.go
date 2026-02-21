@@ -48,11 +48,6 @@ func CreateS3AccessKeyWorkflow(ctx workflow.Context, keyID string) error {
 		return noShardErr
 	}
 
-	var tenantID string
-	if sctx.Bucket.TenantID != nil {
-		tenantID = *sctx.Bucket.TenantID
-	}
-
 	if len(sctx.Nodes) == 0 {
 		noNodesErr := fmt.Errorf("no nodes found in S3 shard %s", *sctx.Bucket.ShardID)
 		_ = setResourceFailed(ctx, "s3_access_keys", keyID, noNodesErr)
@@ -62,7 +57,7 @@ func CreateS3AccessKeyWorkflow(ctx workflow.Context, keyID string) error {
 	nodeCtx := nodeActivityCtx(ctx, sctx.Nodes[0].ID)
 
 	err = workflow.ExecuteActivity(nodeCtx, "CreateS3AccessKey", activity.CreateS3AccessKeyParams{
-		TenantID:        tenantID,
+		TenantID:        sctx.Bucket.TenantID,
 		AccessKeyID:     sctx.Key.AccessKeyID,
 		SecretAccessKey: sctx.Key.SecretAccessKey,
 	}).Get(ctx, nil)
@@ -116,11 +111,6 @@ func DeleteS3AccessKeyWorkflow(ctx workflow.Context, keyID string) error {
 		return noShardErr
 	}
 
-	var tenantID string
-	if sctx.Bucket.TenantID != nil {
-		tenantID = *sctx.Bucket.TenantID
-	}
-
 	if len(sctx.Nodes) == 0 {
 		noNodesErr := fmt.Errorf("no nodes found in S3 shard %s", *sctx.Bucket.ShardID)
 		_ = setResourceFailed(ctx, "s3_access_keys", keyID, noNodesErr)
@@ -130,7 +120,7 @@ func DeleteS3AccessKeyWorkflow(ctx workflow.Context, keyID string) error {
 	nodeCtx := nodeActivityCtx(ctx, sctx.Nodes[0].ID)
 
 	err = workflow.ExecuteActivity(nodeCtx, "DeleteS3AccessKey", activity.DeleteS3AccessKeyParams{
-		TenantID:    tenantID,
+		TenantID:    sctx.Bucket.TenantID,
 		AccessKeyID: sctx.Key.AccessKeyID,
 	}).Get(ctx, nil)
 	if err != nil {

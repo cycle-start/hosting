@@ -43,7 +43,7 @@ func (s *CreateS3AccessKeyWorkflowTestSuite) TestSuccess() {
 	}
 	bucket := model.S3Bucket{
 		ID:       bucketID,
-		TenantID: &tenantID,
+		TenantID: tenantID,
 		Name:     "mybucket",
 		ShardID:  &shardID,
 	}
@@ -116,7 +116,7 @@ func (s *DeleteS3AccessKeyWorkflowTestSuite) TestSuccess() {
 	}
 	bucket := model.S3Bucket{
 		ID:       bucketID,
-		TenantID: &tenantID,
+		TenantID: tenantID,
 		Name:     "mybucket",
 		ShardID:  &shardID,
 	}

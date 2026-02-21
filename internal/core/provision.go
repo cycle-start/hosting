@@ -117,144 +117,90 @@ func resolveTenantIDFromWebroot(ctx context.Context, db DB, webrootID string) (s
 
 func resolveTenantIDFromFQDN(ctx context.Context, db DB, fqdnID string) (string, error) {
 	var id string
-	err := db.QueryRow(ctx, "SELECT w.tenant_id FROM webroots w JOIN fqdns f ON f.webroot_id = w.id WHERE f.id = $1", fqdnID).Scan(&id)
+	err := db.QueryRow(ctx, "SELECT tenant_id FROM fqdns WHERE id = $1", fqdnID).Scan(&id)
 	return id, err
 }
 
 func resolveTenantIDFromDatabase(ctx context.Context, db DB, databaseID string) (string, error) {
-	var id *string
+	var id string
 	err := db.QueryRow(ctx, "SELECT tenant_id FROM databases WHERE id = $1", databaseID).Scan(&id)
-	if err != nil {
-		return "", err
-	}
-	if id == nil {
-		return "", nil
-	}
-	return *id, nil
+	return id, err
 }
 
 func resolveTenantIDFromDatabaseUser(ctx context.Context, db DB, userID string) (string, error) {
-	var id *string
+	var id string
 	err := db.QueryRow(ctx, "SELECT d.tenant_id FROM databases d JOIN database_users du ON du.database_id = d.id WHERE du.id = $1", userID).Scan(&id)
-	if err != nil {
-		return "", err
-	}
-	if id == nil {
-		return "", nil
-	}
-	return *id, nil
+	return id, err
 }
 
 func resolveTenantIDFromDatabaseAccessRule(ctx context.Context, db DB, ruleID string) (string, error) {
-	var id *string
+	var id string
 	err := db.QueryRow(ctx, "SELECT d.tenant_id FROM databases d JOIN database_access_rules dar ON dar.database_id = d.id WHERE dar.id = $1", ruleID).Scan(&id)
-	if err != nil {
-		return "", err
-	}
-	if id == nil {
-		return "", nil
-	}
-	return *id, nil
+	return id, err
 }
 
 func resolveTenantIDFromValkeyInstance(ctx context.Context, db DB, instanceID string) (string, error) {
-	var id *string
+	var id string
 	err := db.QueryRow(ctx, "SELECT tenant_id FROM valkey_instances WHERE id = $1", instanceID).Scan(&id)
-	if err != nil {
-		return "", err
-	}
-	if id == nil {
-		return "", nil
-	}
-	return *id, nil
+	return id, err
 }
 
 func resolveTenantIDFromValkeyUser(ctx context.Context, db DB, userID string) (string, error) {
-	var id *string
+	var id string
 	err := db.QueryRow(ctx, "SELECT vi.tenant_id FROM valkey_instances vi JOIN valkey_users vu ON vu.valkey_instance_id = vi.id WHERE vu.id = $1", userID).Scan(&id)
-	if err != nil {
-		return "", err
-	}
-	if id == nil {
-		return "", nil
-	}
-	return *id, nil
+	return id, err
 }
 
 func resolveTenantIDFromS3Bucket(ctx context.Context, db DB, bucketID string) (string, error) {
-	var id *string
+	var id string
 	err := db.QueryRow(ctx, "SELECT tenant_id FROM s3_buckets WHERE id = $1", bucketID).Scan(&id)
-	if err != nil {
-		return "", err
-	}
-	if id == nil {
-		return "", nil
-	}
-	return *id, nil
+	return id, err
 }
 
 func resolveTenantIDFromS3AccessKey(ctx context.Context, db DB, keyID string) (string, error) {
-	var id *string
+	var id string
 	err := db.QueryRow(ctx, "SELECT b.tenant_id FROM s3_buckets b JOIN s3_access_keys k ON k.s3_bucket_id = b.id WHERE k.id = $1", keyID).Scan(&id)
-	if err != nil {
-		return "", err
-	}
-	if id == nil {
-		return "", nil
-	}
-	return *id, nil
+	return id, err
 }
 
 func resolveTenantIDFromEmailAccount(ctx context.Context, db DB, accountID string) (string, error) {
 	var id string
-	err := db.QueryRow(ctx, "SELECT w.tenant_id FROM webroots w JOIN fqdns f ON f.webroot_id = w.id JOIN email_accounts ea ON ea.fqdn_id = f.id WHERE ea.id = $1", accountID).Scan(&id)
+	err := db.QueryRow(ctx, "SELECT f.tenant_id FROM fqdns f JOIN email_accounts ea ON ea.fqdn_id = f.id WHERE ea.id = $1", accountID).Scan(&id)
 	return id, err
 }
 
 func resolveTenantIDFromEmailAlias(ctx context.Context, db DB, aliasID string) (string, error) {
 	var id string
-	err := db.QueryRow(ctx, "SELECT w.tenant_id FROM webroots w JOIN fqdns f ON f.webroot_id = w.id JOIN email_accounts ea ON ea.fqdn_id = f.id JOIN email_aliases al ON al.email_account_id = ea.id WHERE al.id = $1", aliasID).Scan(&id)
+	err := db.QueryRow(ctx, "SELECT f.tenant_id FROM fqdns f JOIN email_accounts ea ON ea.fqdn_id = f.id JOIN email_aliases al ON al.email_account_id = ea.id WHERE al.id = $1", aliasID).Scan(&id)
 	return id, err
 }
 
 func resolveTenantIDFromEmailForward(ctx context.Context, db DB, forwardID string) (string, error) {
 	var id string
-	err := db.QueryRow(ctx, "SELECT w.tenant_id FROM webroots w JOIN fqdns f ON f.webroot_id = w.id JOIN email_accounts ea ON ea.fqdn_id = f.id JOIN email_forwards ef ON ef.email_account_id = ea.id WHERE ef.id = $1", forwardID).Scan(&id)
+	err := db.QueryRow(ctx, "SELECT f.tenant_id FROM fqdns f JOIN email_accounts ea ON ea.fqdn_id = f.id JOIN email_forwards ef ON ef.email_account_id = ea.id WHERE ef.id = $1", forwardID).Scan(&id)
 	return id, err
 }
 
 func resolveTenantIDFromEmailAutoReply(ctx context.Context, db DB, autoReplyID string) (string, error) {
 	var id string
-	err := db.QueryRow(ctx, "SELECT w.tenant_id FROM webroots w JOIN fqdns f ON f.webroot_id = w.id JOIN email_accounts ea ON ea.fqdn_id = f.id JOIN email_autoreplies ar ON ar.email_account_id = ea.id WHERE ar.id = $1", autoReplyID).Scan(&id)
+	err := db.QueryRow(ctx, "SELECT f.tenant_id FROM fqdns f JOIN email_accounts ea ON ea.fqdn_id = f.id JOIN email_autoreplies ar ON ar.email_account_id = ea.id WHERE ar.id = $1", autoReplyID).Scan(&id)
 	return id, err
 }
 
 func resolveTenantIDFromCertificate(ctx context.Context, db DB, certID string) (string, error) {
 	var id string
-	err := db.QueryRow(ctx, "SELECT w.tenant_id FROM webroots w JOIN fqdns f ON f.webroot_id = w.id JOIN certificates c ON c.fqdn_id = f.id WHERE c.id = $1", certID).Scan(&id)
+	err := db.QueryRow(ctx, "SELECT f.tenant_id FROM fqdns f JOIN certificates c ON c.fqdn_id = f.id WHERE c.id = $1", certID).Scan(&id)
 	return id, err
 }
 
 func resolveTenantIDFromZone(ctx context.Context, db DB, zoneID string) (string, error) {
-	var id *string
+	var id string
 	err := db.QueryRow(ctx, "SELECT tenant_id FROM zones WHERE id = $1", zoneID).Scan(&id)
-	if err != nil {
-		return "", err
-	}
-	if id == nil {
-		return "", nil
-	}
-	return *id, nil
+	return id, err
 }
 
 func resolveTenantIDFromZoneRecord(ctx context.Context, db DB, recordID string) (string, error) {
-	var id *string
+	var id string
 	err := db.QueryRow(ctx, "SELECT z.tenant_id FROM zones z JOIN zone_records zr ON zr.zone_id = z.id WHERE zr.id = $1", recordID).Scan(&id)
-	if err != nil {
-		return "", err
-	}
-	if id == nil {
-		return "", nil
-	}
-	return *id, nil
+	return id, err
 }

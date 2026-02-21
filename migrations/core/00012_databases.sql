@@ -1,7 +1,8 @@
 -- +goose Up
 CREATE TABLE databases (
     id         TEXT PRIMARY KEY,
-    tenant_id  TEXT REFERENCES tenants(id) ON DELETE SET NULL,
+    tenant_id       TEXT NOT NULL REFERENCES tenants(id),
+    subscription_id TEXT NOT NULL REFERENCES subscriptions(id),
     name       TEXT NOT NULL,
     node_id    TEXT REFERENCES nodes(id),
     status     TEXT NOT NULL DEFAULT 'pending',

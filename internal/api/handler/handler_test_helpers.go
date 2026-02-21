@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	mw "github.com/edvin/hosting/internal/api/middleware"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -49,6 +50,17 @@ func decodeErrorResponse(rec *httptest.ResponseRecorder) map[string]string {
 	var body map[string]string
 	json.Unmarshal(rec.Body.Bytes(), &body)
 	return body
+}
+
+// withPlatformAdmin injects a platform-admin identity (brands: ["*"]) into the request context.
+func withPlatformAdmin(r *http.Request) *http.Request {
+	identity := &mw.APIKeyIdentity{
+		ID:     "test-admin-key",
+		Scopes: []string{"*:*"},
+		Brands: []string{"*"},
+	}
+	ctx := context.WithValue(r.Context(), mw.APIKeyIdentityKey, identity)
+	return r.WithContext(ctx)
 }
 
 const validID = "test-id-1"

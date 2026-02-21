@@ -2,6 +2,7 @@
 CREATE TABLE email_accounts (
     id           TEXT PRIMARY KEY,
     fqdn_id      TEXT NOT NULL REFERENCES fqdns(id),
+    subscription_id TEXT NOT NULL REFERENCES subscriptions(id),
     address      TEXT NOT NULL UNIQUE,
     display_name TEXT NOT NULL DEFAULT '',
     quota_bytes  BIGINT NOT NULL DEFAULT 0,

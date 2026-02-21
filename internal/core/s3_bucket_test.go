@@ -36,7 +36,7 @@ func TestS3BucketService_Create_Success(t *testing.T) {
 	tenantID := "test-tenant-1"
 	bucket := &model.S3Bucket{
 		ID:         "test-bucket-1",
-		TenantID:   &tenantID,
+		TenantID:   tenantID,
 		Name:       "my-bucket",
 		Public:     false,
 		QuotaBytes: 1073741824,
@@ -114,17 +114,18 @@ func TestS3BucketService_GetByID_Success(t *testing.T) {
 
 	row := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = bucketID
-		*(dest[1].(**string)) = &tenantID
-		*(dest[2].(*string)) = "my-bucket"
-		*(dest[3].(**string)) = &shardID
-		*(dest[4].(*bool)) = false
-		*(dest[5].(*int64)) = 1073741824
-		*(dest[6].(*string)) = model.StatusActive
-		*(dest[7].(**string)) = nil // status_message
-		*(dest[8].(*string)) = ""  // suspend_reason
-		*(dest[9].(*time.Time)) = now
+		*(dest[1].(*string)) = tenantID
+		*(dest[2].(*string)) = "" // subscription_id
+		*(dest[3].(*string)) = "my-bucket"
+		*(dest[4].(**string)) = &shardID
+		*(dest[5].(*bool)) = false
+		*(dest[6].(*int64)) = 1073741824
+		*(dest[7].(*string)) = model.StatusActive
+		*(dest[8].(**string)) = nil // status_message
+		*(dest[9].(*string)) = ""  // suspend_reason
 		*(dest[10].(*time.Time)) = now
-		*(dest[11].(**string)) = &shardName
+		*(dest[11].(*time.Time)) = now
+		*(dest[12].(**string)) = &shardName
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -134,7 +135,7 @@ func TestS3BucketService_GetByID_Success(t *testing.T) {
 	require.NotNil(t, result)
 	assert.Equal(t, bucketID, result.ID)
 	assert.Equal(t, "my-bucket", result.Name)
-	assert.Equal(t, &tenantID, result.TenantID)
+	assert.Equal(t, tenantID, result.TenantID)
 	assert.Equal(t, &shardID, result.ShardID)
 	assert.Equal(t, false, result.Public)
 	assert.Equal(t, int64(1073741824), result.QuotaBytes)
@@ -180,17 +181,18 @@ func TestS3BucketService_ListByTenant_Success(t *testing.T) {
 	rows := newMockRows(
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
-			*(dest[1].(**string)) = &tenantID
-			*(dest[2].(*string)) = "my-bucket"
-			*(dest[3].(**string)) = &shardID
-			*(dest[4].(*bool)) = false
-			*(dest[5].(*int64)) = 1073741824
-			*(dest[6].(*string)) = model.StatusActive
-			*(dest[7].(**string)) = nil // status_message
-			*(dest[8].(*string)) = ""  // suspend_reason
-			*(dest[9].(*time.Time)) = now
+			*(dest[1].(*string)) = tenantID
+			*(dest[2].(*string)) = "" // subscription_id
+			*(dest[3].(*string)) = "my-bucket"
+			*(dest[4].(**string)) = &shardID
+			*(dest[5].(*bool)) = false
+			*(dest[6].(*int64)) = 1073741824
+			*(dest[7].(*string)) = model.StatusActive
+			*(dest[8].(**string)) = nil // status_message
+			*(dest[9].(*string)) = ""  // suspend_reason
 			*(dest[10].(*time.Time)) = now
-			*(dest[11].(**string)) = &shardName
+			*(dest[11].(*time.Time)) = now
+			*(dest[12].(**string)) = &shardName
 			return nil
 		},
 	)
@@ -238,7 +240,7 @@ func TestS3BucketService_Delete_Success(t *testing.T) {
 	// resolveTenantIDFromS3Bucket
 	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(**string)) = &tenantID
+		*(dest[0].(*string)) = tenantID
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()

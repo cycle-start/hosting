@@ -88,8 +88,8 @@ func (h *Zone) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Derive brand_id: from tenant if provided, otherwise from request.
 	brandID := req.BrandID
-	if req.TenantID != nil && *req.TenantID != "" {
-		tenant, err := h.services.Tenant.GetByID(r.Context(), *req.TenantID)
+	if req.TenantID != "" {
+		tenant, err := h.services.Tenant.GetByID(r.Context(), req.TenantID)
 		if err != nil {
 			response.WriteError(w, http.StatusBadRequest, "invalid tenant_id: "+err.Error())
 			return
@@ -108,14 +108,15 @@ func (h *Zone) Create(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	zone := &model.Zone{
-		ID:        platform.NewID(),
-		BrandID:   brandID,
-		TenantID:  req.TenantID,
-		Name:      req.Name,
-		RegionID:  req.RegionID,
-		Status:    model.StatusPending,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:             platform.NewID(),
+		BrandID:        brandID,
+		TenantID:       req.TenantID,
+		SubscriptionID: req.SubscriptionID,
+		Name:           req.Name,
+		RegionID:       req.RegionID,
+		Status:         model.StatusPending,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 
 	if err := h.svc.Create(r.Context(), zone); err != nil {
@@ -195,7 +196,9 @@ func (h *Zone) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	zone.TenantID = req.TenantID
+	if req.TenantID != nil {
+		zone.TenantID = *req.TenantID
+	}
 
 	if err := h.svc.Update(r.Context(), zone); err != nil {
 		response.WriteServiceError(w, err)
@@ -233,49 +236,6 @@ func (h *Zone) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusAccepted)
-}
-
-// ReassignTenant godoc
-//
-//	@Summary		Reassign zone to a different tenant
-//	@Description	Changes the tenant ownership of a DNS zone without affecting the zone data in PowerDNS. This is a synchronous operation. Pass null tenant_id to detach the zone from its current tenant.
-//	@Tags			Zones
-//	@Security		ApiKeyAuth
-//	@Param			id		path		string						true	"Zone ID"
-//	@Param			body	body		request.ReassignZoneTenant	true	"New tenant ID"
-//	@Success		200		{object}	model.Zone
-//	@Failure		400		{object}	response.ErrorResponse
-//	@Failure		500		{object}	response.ErrorResponse
-//	@Router			/zones/{id}/tenant [put]
-func (h *Zone) ReassignTenant(w http.ResponseWriter, r *http.Request) {
-	id, err := request.RequireID(chi.URLParam(r, "id"))
-	if err != nil {
-		response.WriteError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	var req request.ReassignZoneTenant
-	if err := request.Decode(r, &req); err != nil {
-		response.WriteError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	if !h.checkZoneBrandAccess(w, r, id) {
-		return
-	}
-
-	if err := h.svc.ReassignTenant(r.Context(), id, req.TenantID); err != nil {
-		response.WriteServiceError(w, err)
-		return
-	}
-
-	zone, err := h.svc.GetByID(r.Context(), id)
-	if err != nil {
-		response.WriteServiceError(w, err)
-		return
-	}
-
-	response.WriteJSON(w, http.StatusOK, zone)
 }
 
 // Retry godoc

@@ -20,7 +20,8 @@ API request --> Core DB (desired state) --> Temporal workflow --> Node agent (va
 | Field            | Type      | JSON                | Description                           |
 |------------------|-----------|---------------------|---------------------------------------|
 | `ID`             | `string`  | `id`                | Platform-generated unique ID          |
-| `TenantID`       | `*string` | `tenant_id`         | Owning tenant (nullable)              |
+| `TenantID`       | `string`  | `tenant_id`         | Owning tenant (required)              |
+| `SubscriptionID` | `string`  | `subscription_id`   | Subscription grouping                 |
 | `Name`           | `string`  | `name`              | Instance name (slug)                  |
 | `ShardID`        | `*string` | `shard_id`          | Valkey shard assignment               |
 | `Port`           | `int`     | `port`              | TCP port (auto-assigned)              |

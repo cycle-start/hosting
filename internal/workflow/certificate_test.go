@@ -85,7 +85,7 @@ func (s *ProvisionLECertWorkflowTestSuite) TestSuccess() {
 	fqdn := model.FQDN{
 		ID:         fqdnID,
 		FQDN:       "secure.example.com",
-		WebrootID:  webrootID,
+		WebrootID:  &webrootID,
 		SSLEnabled: true,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
@@ -117,7 +117,7 @@ func (s *ProvisionLECertWorkflowTestSuite) TestCreateOrderFails_SetsStatusFailed
 	fqdn := model.FQDN{
 		ID:         fqdnID,
 		FQDN:       "secure.example.com",
-		WebrootID:  webrootID,
+		WebrootID:  &webrootID,
 		SSLEnabled: true,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
@@ -149,7 +149,7 @@ func (s *ProvisionLECertWorkflowTestSuite) TestStoreCertificateFails_SetsStatusF
 	fqdn := model.FQDN{
 		ID:         fqdnID,
 		FQDN:       "secure.example.com",
-		WebrootID:  webrootID,
+		WebrootID:  &webrootID,
 		SSLEnabled: true,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
@@ -206,7 +206,7 @@ func (s *ProvisionLECertWorkflowTestSuite) TestInstallCertificateFails_SetsStatu
 	fqdn := model.FQDN{
 		ID:         fqdnID,
 		FQDN:       "secure.example.com",
-		WebrootID:  webrootID,
+		WebrootID:  &webrootID,
 		SSLEnabled: true,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
@@ -264,7 +264,7 @@ func (s *ProvisionLECertWorkflowTestSuite) TestDeactivateOtherCertsFails_SetsSta
 	fqdn := model.FQDN{
 		ID:         fqdnID,
 		FQDN:       "secure.example.com",
-		WebrootID:  webrootID,
+		WebrootID:  &webrootID,
 		SSLEnabled: true,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
@@ -323,7 +323,7 @@ func (s *ProvisionLECertWorkflowTestSuite) TestActivateCertificateFails_SetsStat
 	fqdn := model.FQDN{
 		ID:         fqdnID,
 		FQDN:       "secure.example.com",
-		WebrootID:  webrootID,
+		WebrootID:  &webrootID,
 		SSLEnabled: true,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
@@ -410,7 +410,7 @@ func (s *UploadCustomCertWorkflowTestSuite) TestSuccess() {
 	fqdn := model.FQDN{
 		ID:        fqdnID,
 		FQDN:      "custom.example.com",
-		WebrootID: webrootID,
+		WebrootID: &webrootID,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
 	tenant := model.Tenant{ID: tenantID, Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID}
@@ -494,10 +494,11 @@ func (s *UploadCustomCertWorkflowTestSuite) TestInstallFails_SetsStatusFailed() 
 		KeyPEM:   "KEY_PEM_DATA",
 		ChainPEM: "CHAIN_PEM_DATA",
 	}
+	webrootID4 := "test-webroot-4"
 	fqdn := model.FQDN{
 		ID:        fqdnID,
 		FQDN:      "custom.example.com",
-		WebrootID: "test-webroot-4",
+		WebrootID: &webrootID4,
 	}
 	webroot := model.Webroot{ID: "test-webroot-4", TenantID: "test-tenant-4"}
 	tenant := model.Tenant{ID: "test-tenant-4", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID}
@@ -537,10 +538,11 @@ func (s *UploadCustomCertWorkflowTestSuite) TestDeactivateOtherCertsFails_SetsSt
 		KeyPEM:   "KEY_PEM_DATA",
 		ChainPEM: "CHAIN_PEM_DATA",
 	}
+	webrootID5 := "test-webroot-5"
 	fqdn := model.FQDN{
 		ID:        fqdnID,
 		FQDN:      "custom.example.com",
-		WebrootID: "test-webroot-5",
+		WebrootID: &webrootID5,
 	}
 	webroot := model.Webroot{ID: "test-webroot-5", TenantID: "test-tenant-5"}
 	tenant := model.Tenant{ID: "test-tenant-5", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID}
@@ -581,10 +583,11 @@ func (s *UploadCustomCertWorkflowTestSuite) TestActivateCertFails_SetsStatusFail
 		KeyPEM:   "KEY_PEM_DATA",
 		ChainPEM: "CHAIN_PEM_DATA",
 	}
+	webrootID6 := "test-webroot-6"
 	fqdn := model.FQDN{
 		ID:        fqdnID,
 		FQDN:      "custom.example.com",
-		WebrootID: "test-webroot-6",
+		WebrootID: &webrootID6,
 	}
 	webroot := model.Webroot{ID: "test-webroot-6", TenantID: "test-tenant-6"}
 	tenant := model.Tenant{ID: "test-tenant-6", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID}

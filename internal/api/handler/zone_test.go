@@ -83,9 +83,10 @@ func TestZoneCreate_ValidBody(t *testing.T) {
 	h := newZoneHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/zones", map[string]any{
-		"name":      "example.com",
-		"brand_id":  "test-brand",
-		"region_id": "test-region-1",
+		"name":            "example.com",
+		"brand_id":        "test-brand",
+		"subscription_id": "sub-1",
+		"region_id":       "test-region-1",
 	})
 
 	func() {
@@ -100,9 +101,10 @@ func TestZoneCreate_ValidBodyWithTenantID(t *testing.T) {
 	h := newZoneHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/zones", map[string]any{
-		"name":      "example.com",
-		"region_id": "test-region-1",
-		"tenant_id": "test-tenant-1",
+		"name":            "example.com",
+		"subscription_id": "sub-1",
+		"region_id":       "test-region-1",
+		"tenant_id":       "test-tenant-1",
 	})
 
 	func() {
@@ -117,9 +119,10 @@ func TestZoneCreate_OptionalTenantID(t *testing.T) {
 	h := newZoneHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/zones", map[string]any{
-		"name":      "example.com",
-		"brand_id":  "test-brand",
-		"region_id": "test-region-2",
+		"name":            "example.com",
+		"brand_id":        "test-brand",
+		"subscription_id": "sub-1",
+		"region_id":       "test-region-2",
 	})
 
 	func() {
@@ -199,47 +202,6 @@ func TestZoneDelete_EmptyID(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	body := decodeErrorResponse(rec)
 	assert.Contains(t, body["error"], "missing required ID")
-}
-
-// --- ReassignTenant ---
-
-func TestZoneReassignTenant_EmptyID(t *testing.T) {
-	h := newZoneHandler()
-	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/zones//reassign", map[string]any{
-		"tenant_id": validID,
-	})
-	r = withChiURLParam(r, "id", "")
-
-	h.ReassignTenant(rec, r)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	body := decodeErrorResponse(rec)
-	assert.Contains(t, body["error"], "missing required ID")
-}
-
-func TestZoneReassignTenant_InvalidJSON(t *testing.T) {
-	h := newZoneHandler()
-	rec := httptest.NewRecorder()
-	r := newRequestRaw(http.MethodPost, "/zones/"+validID+"/reassign", "{bad json")
-	r = withChiURLParam(r, "id", validID)
-
-	h.ReassignTenant(rec, r)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	body := decodeErrorResponse(rec)
-	assert.Contains(t, body["error"], "invalid JSON")
-}
-
-func TestZoneReassignTenant_EmptyBody(t *testing.T) {
-	h := newZoneHandler()
-	rec := httptest.NewRecorder()
-	r := newRequestRaw(http.MethodPost, "/zones/"+validID+"/reassign", "")
-	r = withChiURLParam(r, "id", validID)
-
-	h.ReassignTenant(rec, r)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
 // --- Error response format ---

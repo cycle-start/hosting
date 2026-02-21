@@ -19,9 +19,9 @@ func NewWebrootService(db DB, tc temporalclient.Client) *WebrootService {
 
 func (s *WebrootService) Create(ctx context.Context, webroot *model.Webroot) error {
 	_, err := s.db.Exec(ctx,
-		`INSERT INTO webroots (id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, env_shell_source, service_hostname_enabled, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-		webroot.ID, webroot.TenantID, webroot.Name, webroot.Runtime, webroot.RuntimeVersion,
+		`INSERT INTO webroots (id, tenant_id, subscription_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, env_shell_source, service_hostname_enabled, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+		webroot.ID, webroot.TenantID, webroot.SubscriptionID, webroot.Name, webroot.Runtime, webroot.RuntimeVersion,
 		webroot.RuntimeConfig, webroot.PublicFolder, webroot.EnvFileName, webroot.EnvShellSource,
 		webroot.ServiceHostnameEnabled, webroot.Status, webroot.CreatedAt, webroot.UpdatedAt,
 	)
@@ -43,9 +43,9 @@ func (s *WebrootService) Create(ctx context.Context, webroot *model.Webroot) err
 func (s *WebrootService) GetByID(ctx context.Context, id string) (*model.Webroot, error) {
 	var w model.Webroot
 	err := s.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, env_shell_source, service_hostname_enabled, status, status_message, suspend_reason, created_at, updated_at
+		`SELECT id, tenant_id, subscription_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, env_shell_source, service_hostname_enabled, status, status_message, suspend_reason, created_at, updated_at
 		 FROM webroots WHERE id = $1`, id,
-	).Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion,
+	).Scan(&w.ID, &w.TenantID, &w.SubscriptionID, &w.Name, &w.Runtime, &w.RuntimeVersion,
 		&w.RuntimeConfig, &w.PublicFolder, &w.EnvFileName, &w.EnvShellSource,
 		&w.ServiceHostnameEnabled, &w.Status, &w.StatusMessage, &w.SuspendReason, &w.CreatedAt, &w.UpdatedAt)
 	if err != nil {
@@ -55,7 +55,7 @@ func (s *WebrootService) GetByID(ctx context.Context, id string) (*model.Webroot
 }
 
 func (s *WebrootService) ListByTenant(ctx context.Context, tenantID string, limit int, cursor string) ([]model.Webroot, bool, error) {
-	query := `SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, env_shell_source, service_hostname_enabled, status, status_message, suspend_reason, created_at, updated_at FROM webroots WHERE tenant_id = $1`
+	query := `SELECT id, tenant_id, subscription_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, env_shell_source, service_hostname_enabled, status, status_message, suspend_reason, created_at, updated_at FROM webroots WHERE tenant_id = $1`
 	args := []any{tenantID}
 	argIdx := 2
 
@@ -78,7 +78,7 @@ func (s *WebrootService) ListByTenant(ctx context.Context, tenantID string, limi
 	var webroots []model.Webroot
 	for rows.Next() {
 		var w model.Webroot
-		if err := rows.Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion,
+		if err := rows.Scan(&w.ID, &w.TenantID, &w.SubscriptionID, &w.Name, &w.Runtime, &w.RuntimeVersion,
 			&w.RuntimeConfig, &w.PublicFolder, &w.EnvFileName, &w.EnvShellSource,
 			&w.ServiceHostnameEnabled, &w.Status, &w.StatusMessage, &w.SuspendReason, &w.CreatedAt, &w.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan webroot: %w", err)

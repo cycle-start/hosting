@@ -38,13 +38,14 @@ func TestEmailAccountService_GetByID_Success(t *testing.T) {
 	row := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = accountID
 		*(dest[1].(*string)) = fqdnID
-		*(dest[2].(*string)) = "user@example.com"
-		*(dest[3].(*string)) = "Test User"
-		*(dest[4].(*int64)) = 1073741824
-		*(dest[5].(*string)) = model.StatusActive
-		*(dest[6].(**string)) = nil // status_message
-		*(dest[7].(*time.Time)) = now
+		*(dest[2].(*string)) = "" // subscription_id
+		*(dest[3].(*string)) = "user@example.com"
+		*(dest[4].(*string)) = "Test User"
+		*(dest[5].(*int64)) = 1073741824
+		*(dest[6].(*string)) = model.StatusActive
+		*(dest[7].(**string)) = nil // status_message
 		*(dest[8].(*time.Time)) = now
+		*(dest[9].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -97,13 +98,14 @@ func TestEmailAccountService_ListByFQDN_Success(t *testing.T) {
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
 			*(dest[1].(*string)) = fqdnID
-			*(dest[2].(*string)) = "alice@example.com"
-			*(dest[3].(*string)) = "Alice"
-			*(dest[4].(*int64)) = 536870912
-			*(dest[5].(*string)) = model.StatusActive
-			*(dest[6].(**string)) = nil // status_message
-			*(dest[7].(*time.Time)) = now
+			*(dest[2].(*string)) = "" // subscription_id
+			*(dest[3].(*string)) = "alice@example.com"
+			*(dest[4].(*string)) = "Alice"
+			*(dest[5].(*int64)) = 536870912
+			*(dest[6].(*string)) = model.StatusActive
+			*(dest[7].(**string)) = nil // status_message
 			*(dest[8].(*time.Time)) = now
+			*(dest[9].(*time.Time)) = now
 			return nil
 		},
 	)

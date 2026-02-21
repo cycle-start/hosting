@@ -93,7 +93,8 @@ func TestDatabaseCreate_ValidBody(t *testing.T) {
 	rec := httptest.NewRecorder()
 	tid := "test-tenant-1"
 	r := newRequest(http.MethodPost, "/tenants/"+tid+"/databases", map[string]any{
-		"shard_id": "test-shard-1",
+		"subscription_id": "sub-1",
+		"shard_id":        "test-shard-1",
 	})
 	r = withChiURLParam(r, "tenantID", tid)
 
@@ -112,7 +113,8 @@ func TestDatabaseCreate_WithNestedUsers_ValidationPasses(t *testing.T) {
 	rec := httptest.NewRecorder()
 	tid := "test-tenant-1"
 	r := newRequest(http.MethodPost, "/tenants/"+tid+"/databases", map[string]any{
-		"shard_id": "test-shard-1",
+		"subscription_id": "sub-1",
+		"shard_id":        "test-shard-1",
 		"users": []map[string]any{
 			{
 				"username":   "db_placeholder_admin",
@@ -212,72 +214,63 @@ func TestDatabaseDelete_EmptyID(t *testing.T) {
 	assert.Contains(t, body["error"], "missing required ID")
 }
 
-// --- ReassignTenant ---
-
-func TestDatabaseReassignTenant_EmptyID(t *testing.T) {
-	h := newDatabaseHandler()
-	rec := httptest.NewRecorder()
-	r := newRequest(http.MethodPost, "/databases//reassign", map[string]any{
-		"tenant_id": validID,
-	})
-	r = withChiURLParam(r, "id", "")
-
-	h.ReassignTenant(rec, r)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	body := decodeErrorResponse(rec)
-	assert.Contains(t, body["error"], "missing required ID")
-}
-
-func TestDatabaseReassignTenant_InvalidJSON(t *testing.T) {
-	h := newDatabaseHandler()
-	rec := httptest.NewRecorder()
-	r := newRequestRaw(http.MethodPost, "/databases/"+validID+"/reassign", "{bad json")
-	r = withChiURLParam(r, "id", validID)
-
-	h.ReassignTenant(rec, r)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	body := decodeErrorResponse(rec)
-	assert.Contains(t, body["error"], "invalid JSON")
-}
-
-func TestDatabaseReassignTenant_EmptyBody(t *testing.T) {
-	h := newDatabaseHandler()
-	rec := httptest.NewRecorder()
-	r := newRequestRaw(http.MethodPost, "/databases/"+validID+"/reassign", "")
-	r = withChiURLParam(r, "id", validID)
-
-	h.ReassignTenant(rec, r)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-}
-
 // --- Migrate ---
 
 func TestDatabaseMigrate_Success(t *testing.T) {
 	db := &handlerMockDB{}
+	tenantDB := &handlerMockDB{}
 	tc := &temporalmocks.Client{}
 	svc := core.NewDatabaseService(db, tc)
-	h := &Database{svc: svc, userSvc: nil, tenantSvc: nil}
+	tenantSvc := core.NewTenantService(tenantDB, tc)
+	h := &Database{svc: svc, userSvc: nil, tenantSvc: tenantSvc}
 
-	// GetByID call from brand check (return database with nil TenantID to skip brand check)
+	tenantID := "test-tenant-1"
+
+	// GetByID call for the database
 	now := time.Now()
 	getRow := &handlerMockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = validID
-		*(dest[1].(**string)) = nil // nil TenantID — skips brand check
-		*(dest[2].(*string)) = "mydb"
-		*(dest[3].(**string)) = nil
+		*(dest[1].(*string)) = tenantID
+		*(dest[2].(*string)) = "" // SubscriptionID
+		*(dest[3].(*string)) = "mydb"
 		*(dest[4].(**string)) = nil
-		*(dest[5].(*string)) = "active"
-		*(dest[6].(**string)) = nil
-		*(dest[7].(*string)) = ""
-		*(dest[8].(*time.Time)) = now
+		*(dest[5].(**string)) = nil
+		*(dest[6].(*string)) = "active"
+		*(dest[7].(**string)) = nil
+		*(dest[8].(*string)) = ""
 		*(dest[9].(*time.Time)) = now
-		*(dest[10].(**string)) = nil
+		*(dest[10].(*time.Time)) = now
+		*(dest[11].(**string)) = nil
 		return nil
 	}}
 	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(getRow).Once()
+
+	// Brand check: tenant GetByID
+	// Scan order: ID, Name, BrandID, RegionID, ClusterID, ShardID, UID,
+	//   SFTPEnabled, SSHEnabled, DiskQuotaBytes, Status, StatusMessage, SuspendReason,
+	//   CreatedAt, UpdatedAt, RegionName, ClusterName, ShardName
+	tenantRow := &handlerMockRow{scanFunc: func(dest ...any) error {
+		*(dest[0].(*string)) = tenantID         // ID
+		*(dest[1].(*string)) = "t_testtenant01" // Name
+		*(dest[2].(*string)) = "test-brand"     // BrandID
+		*(dest[3].(*string)) = "dev"            // RegionID
+		*(dest[4].(*string)) = "dev"            // ClusterID
+		*(dest[5].(**string)) = nil             // ShardID
+		*(dest[6].(*int)) = 1000                // UID
+		*(dest[7].(*bool)) = false              // SFTPEnabled
+		*(dest[8].(*bool)) = false              // SSHEnabled
+		*(dest[9].(*int64)) = 0                 // DiskQuotaBytes
+		*(dest[10].(*string)) = "active"        // Status
+		*(dest[11].(**string)) = nil            // StatusMessage
+		*(dest[12].(*string)) = ""              // SuspendReason
+		*(dest[13].(*time.Time)) = now          // CreatedAt
+		*(dest[14].(*time.Time)) = now          // UpdatedAt
+		*(dest[15].(*string)) = "dev"           // RegionName
+		*(dest[16].(*string)) = "dev"           // ClusterName
+		*(dest[17].(**string)) = nil            // ShardName
+		return nil
+	}}
+	tenantDB.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(tenantRow).Once()
 
 	updateRow := &handlerMockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = "mydb"
@@ -286,8 +279,7 @@ func TestDatabaseMigrate_Success(t *testing.T) {
 	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 
 	resolveRow := &handlerMockRow{scanFunc: func(dest ...any) error {
-		tid := "test-tenant-1"
-		*(dest[0].(**string)) = &tid
+		*(dest[0].(*string)) = tenantID
 		return nil
 	}}
 	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
@@ -308,6 +300,7 @@ func TestDatabaseMigrate_Success(t *testing.T) {
 		"target_shard_id": "test-shard-2",
 	})
 	r = withChiURLParam(r, "id", validID)
+	r = withPlatformAdmin(r)
 
 	h.Migrate(rec, r)
 

@@ -9,6 +9,7 @@ type CreateTenant struct {
 	SSHEnabled     *bool  `json:"ssh_enabled"`
 	DiskQuotaBytes *int64 `json:"disk_quota_bytes"`
 	// Nested (all optional)
+	Subscriptions   []CreateSubscriptionNested   `json:"subscriptions" validate:"omitempty,dive"`
 	Zones           []CreateZoneNested           `json:"zones" validate:"omitempty,dive"`
 	Webroots        []CreateWebrootNested        `json:"webroots" validate:"omitempty,dive"`
 	Databases       []CreateDatabaseNested       `json:"databases" validate:"omitempty,dive"`
@@ -16,6 +17,7 @@ type CreateTenant struct {
 	S3Buckets       []CreateS3BucketNested       `json:"s3_buckets" validate:"omitempty,dive"`
 	SSHKeys         []CreateSSHKeyNested         `json:"ssh_keys" validate:"omitempty,dive"`
 	EgressRules     []CreateEgressRuleNested     `json:"egress_rules" validate:"omitempty,dive"`
+	FQDNs           []CreateFQDNNested           `json:"fqdns" validate:"omitempty,dive"`
 }
 
 type UpdateTenant struct {

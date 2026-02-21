@@ -1,8 +1,9 @@
 -- +goose Up
 CREATE TABLE fqdns (
     id          TEXT PRIMARY KEY,
+    tenant_id   TEXT NOT NULL REFERENCES tenants(id),
     fqdn        TEXT NOT NULL,
-    webroot_id  TEXT NOT NULL REFERENCES webroots(id),
+    webroot_id  TEXT REFERENCES webroots(id),
     ssl_enabled BOOLEAN NOT NULL DEFAULT true,
     status      TEXT NOT NULL DEFAULT 'pending',
     status_message TEXT,

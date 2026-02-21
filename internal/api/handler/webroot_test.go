@@ -141,7 +141,8 @@ func TestWebrootCreate_ValidRuntimes(t *testing.T) {
 			h := newWebrootHandler()
 			rec := httptest.NewRecorder()
 			r := newRequest(http.MethodPost, "/tenants/"+validID+"/webroots", map[string]any{
-					"runtime":         runtime,
+				"subscription_id": "sub-1",
+				"runtime":         runtime,
 				"runtime_version": "1.0",
 			})
 			r = withChiURLParam(r, "tenantID", validID)
@@ -161,6 +162,7 @@ func TestWebrootCreate_ValidBody(t *testing.T) {
 	h := newWebrootHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants/"+validID+"/webroots", map[string]any{
+		"subscription_id": "sub-1",
 		"runtime":         "php",
 		"runtime_version": "8.3",
 		"public_folder":   "public",
@@ -182,6 +184,7 @@ func TestWebrootCreate_WithNestedFQDNs_ValidationPasses(t *testing.T) {
 	h := newWebrootHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants/"+validID+"/webroots", map[string]any{
+		"subscription_id": "sub-1",
 		"runtime":         "php",
 		"runtime_version": "8.5",
 		"fqdns": []map[string]any{
@@ -222,6 +225,7 @@ func TestWebrootCreate_WithNestedFQDNAndEmail_ValidationPasses(t *testing.T) {
 	h := newWebrootHandler()
 	rec := httptest.NewRecorder()
 	r := newRequest(http.MethodPost, "/tenants/"+validID+"/webroots", map[string]any{
+		"subscription_id": "sub-1",
 		"runtime":         "php",
 		"runtime_version": "8.5",
 		"fqdns": []map[string]any{
@@ -229,8 +233,9 @@ func TestWebrootCreate_WithNestedFQDNAndEmail_ValidationPasses(t *testing.T) {
 				"fqdn": "example.com",
 				"email_accounts": []map[string]any{
 					{
-						"address":      "admin@example.com",
-						"display_name": "Admin",
+						"subscription_id": "sub-1",
+						"address":         "admin@example.com",
+						"display_name":    "Admin",
 					},
 				},
 			},
@@ -345,6 +350,7 @@ func TestWebrootCreate_OptionalFieldsOmitted(t *testing.T) {
 	rec := httptest.NewRecorder()
 	tid := "test-tenant-1"
 	r := newRequest(http.MethodPost, "/tenants/"+tid+"/webroots", map[string]any{
+		"subscription_id": "sub-1",
 		"runtime":         "php",
 		"runtime_version": "8.3",
 	})

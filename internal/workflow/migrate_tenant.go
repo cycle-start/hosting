@@ -125,9 +125,13 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 
 		fqdnParams := make([]activity.FQDNParam, len(fqdns))
 		for i, f := range fqdns {
+			var webrootID string
+			if f.WebrootID != nil {
+				webrootID = *f.WebrootID
+			}
 			fqdnParams[i] = activity.FQDNParam{
 				FQDN:       f.FQDN,
-				WebrootID:  f.WebrootID,
+				WebrootID:  webrootID,
 				SSLEnabled: f.SSLEnabled,
 			}
 		}

@@ -86,9 +86,19 @@ export interface Tenant {
   shard_name?: string
 }
 
+export interface Subscription {
+  id: string
+  tenant_id: string
+  name: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Webroot {
   id: string
   tenant_id: string
+  subscription_id: string
   name: string
   runtime: string
   runtime_version: string
@@ -111,8 +121,9 @@ export interface WebrootEnvVar {
 
 export interface FQDN {
   id: string
+  tenant_id: string
   fqdn: string
-  webroot_id: string
+  webroot_id?: string | null
   ssl_enabled: boolean
   status: string
   status_message?: string
@@ -139,7 +150,8 @@ export interface Certificate {
 export interface Zone {
   id: string
   brand_id: string
-  tenant_id?: string | null
+  tenant_id: string
+  subscription_id: string
   tenant_name?: string | null
   name: string
   region_id: string
@@ -168,7 +180,8 @@ export interface ZoneRecord {
 
 export interface Database {
   id: string
-  tenant_id?: string | null
+  tenant_id: string
+  subscription_id: string
   name: string
   shard_id?: string | null
   node_id?: string | null
@@ -193,7 +206,8 @@ export interface DatabaseUser {
 
 export interface ValkeyInstance {
   id: string
-  tenant_id?: string | null
+  tenant_id: string
+  subscription_id: string
   name: string
   shard_id?: string | null
   port: number
@@ -222,6 +236,7 @@ export interface ValkeyUser {
 export interface EmailAccount {
   id: string
   fqdn_id: string
+  subscription_id: string
   address: string
   display_name: string
   quota_bytes: number
@@ -317,7 +332,8 @@ export interface SSHKey {
 
 export interface S3Bucket {
   id: string
-  tenant_id?: string | null
+  tenant_id: string
+  subscription_id: string
   name: string
   shard_id?: string | null
   public: boolean
@@ -463,9 +479,10 @@ export interface AuditListParams extends ListParams {
 
 // --- Nested creation form data types ---
 
-export interface ZoneFormData { name: string }
+export interface SubscriptionFormData { id: string; name: string }
+export interface ZoneFormData { subscription_id: string; name: string }
 export interface WebrootFormData {
-  runtime: string; runtime_version: string
+  subscription_id: string; runtime: string; runtime_version: string
   public_folder: string; fqdns?: FQDNFormData[]
 }
 export interface FQDNFormData {
@@ -473,20 +490,20 @@ export interface FQDNFormData {
   email_accounts?: EmailAccountFormData[]
 }
 export interface EmailAccountFormData {
-  address: string; display_name?: string; quota_bytes?: number
+  subscription_id: string; address: string; display_name?: string; quota_bytes?: number
   aliases?: { address: string }[]
   forwards?: { destination: string; keep_copy?: boolean }[]
   autoreply?: { subject: string; body: string; enabled: boolean }
 }
 export interface DatabaseFormData {
-  shard_id: string
+  subscription_id: string; shard_id: string
   users?: DatabaseUserFormData[]
 }
 export interface DatabaseUserFormData {
   username: string; password: string; privileges: string[]
 }
 export interface ValkeyInstanceFormData {
-  shard_id: string; max_memory_mb?: number
+  subscription_id: string; shard_id: string; max_memory_mb?: number
   users?: ValkeyUserFormData[]
 }
 export interface ValkeyUserFormData {
@@ -494,7 +511,7 @@ export interface ValkeyUserFormData {
   key_pattern?: string
 }
 export interface S3BucketFormData {
-  shard_id: string; public?: boolean; quota_bytes?: number
+  subscription_id: string; shard_id: string; public?: boolean; quota_bytes?: number
 }
 
 export interface Incident {
@@ -568,10 +585,12 @@ export interface CreateTenantRequest {
   cluster_id: string
   shard_id: string
   sftp_enabled?: boolean
+  subscriptions?: SubscriptionFormData[]
   zones?: ZoneFormData[]
   webroots?: WebrootFormData[]
   databases?: DatabaseFormData[]
   valkey_instances?: ValkeyInstanceFormData[]
   s3_buckets?: S3BucketFormData[]
   ssh_keys?: SSHKeyFormData[]
+  fqdns?: FQDNFormData[]
 }

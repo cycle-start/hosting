@@ -108,7 +108,7 @@ export function CreateTenantPage() {
         title="Zones"
         items={zones}
         onChange={setZones}
-        defaultItem={() => ({ name: '' })}
+        defaultItem={() => ({ subscription_id: '', name: '' })}
         renderItem={(item, _, onChange) => <ZoneFields value={item} onChange={onChange} />}
       />
 
@@ -116,7 +116,7 @@ export function CreateTenantPage() {
         title="Webroots"
         items={webroots}
         onChange={setWebroots}
-        defaultItem={() => ({ runtime: 'php', runtime_version: '8.5', public_folder: 'public' })}
+        defaultItem={() => ({ subscription_id: '', runtime: 'php', runtime_version: '8.5', public_folder: 'public' })}
         renderItem={(item, _, onChange) => <WebrootFields value={item} onChange={onChange} />}
       />
 
@@ -124,7 +124,7 @@ export function CreateTenantPage() {
         title="Databases"
         items={databases}
         onChange={setDatabases}
-        defaultItem={() => ({ shard_id: '' })}
+        defaultItem={() => ({ subscription_id: '', shard_id: '' })}
         renderItem={(item, _, onChange) => <DatabaseFields value={item} onChange={onChange} clusterId={clusterId} />}
       />
 
@@ -132,7 +132,7 @@ export function CreateTenantPage() {
         title="Valkey Instances"
         items={valkeyInstances}
         onChange={setValkeyInstances}
-        defaultItem={() => ({ shard_id: '', max_memory_mb: 64 })}
+        defaultItem={() => ({ subscription_id: '', shard_id: '', max_memory_mb: 64 })}
         renderItem={(item, _, onChange) => <ValkeyInstanceFields value={item} onChange={onChange} clusterId={clusterId} />}
       />
 
@@ -140,7 +140,7 @@ export function CreateTenantPage() {
         title="S3 Buckets"
         items={s3Buckets}
         onChange={setS3Buckets}
-        defaultItem={() => ({ shard_id: '' })}
+        defaultItem={() => ({ subscription_id: '', shard_id: '' })}
         renderItem={(item, _, onChange) => <S3BucketFields value={item} onChange={onChange} clusterId={clusterId} />}
       />
 

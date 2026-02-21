@@ -44,9 +44,13 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 
 	fqdnParams := make([]activity.FQDNParam, len(wctx.FQDNs))
 	for i, f := range wctx.FQDNs {
+		var webrootID string
+		if f.WebrootID != nil {
+			webrootID = *f.WebrootID
+		}
 		fqdnParams[i] = activity.FQDNParam{
 			FQDN:       f.FQDN,
-			WebrootID:  f.WebrootID,
+			WebrootID:  webrootID,
 			SSLEnabled: f.SSLEnabled,
 		}
 	}
@@ -169,9 +173,13 @@ func UpdateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 
 	fqdnParams := make([]activity.FQDNParam, len(wctx.FQDNs))
 	for i, f := range wctx.FQDNs {
+		var webrootID string
+		if f.WebrootID != nil {
+			webrootID = *f.WebrootID
+		}
 		fqdnParams[i] = activity.FQDNParam{
 			FQDN:       f.FQDN,
-			WebrootID:  f.WebrootID,
+			WebrootID:  webrootID,
 			SSLEnabled: f.SSLEnabled,
 		}
 	}

@@ -37,7 +37,7 @@ func TestDatabaseService_Create_Success(t *testing.T) {
 	shardID := "test-shard-1"
 	database := &model.Database{
 		ID:        "test-database-1",
-		TenantID:  &tenantID,
+		TenantID:  tenantID,
 		Name:      "mydb",
 		ShardID:   &shardID,
 		Status:    model.StatusPending,
@@ -115,16 +115,17 @@ func TestDatabaseService_GetByID_Success(t *testing.T) {
 
 	row := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = databaseID
-		*(dest[1].(**string)) = &tenantID
-		*(dest[2].(*string)) = "mydb"
-		*(dest[3].(**string)) = &shardID
-		*(dest[4].(**string)) = &nodeID
-		*(dest[5].(*string)) = model.StatusActive
-		*(dest[6].(**string)) = nil // status_message
-		*(dest[7].(*string)) = ""  // suspend_reason
-		*(dest[8].(*time.Time)) = now
+		*(dest[1].(*string)) = tenantID
+		*(dest[2].(*string)) = "" // subscription_id
+		*(dest[3].(*string)) = "mydb"
+		*(dest[4].(**string)) = &shardID
+		*(dest[5].(**string)) = &nodeID
+		*(dest[6].(*string)) = model.StatusActive
+		*(dest[7].(**string)) = nil // status_message
+		*(dest[8].(*string)) = ""  // suspend_reason
 		*(dest[9].(*time.Time)) = now
-		*(dest[10].(**string)) = &shardName
+		*(dest[10].(*time.Time)) = now
+		*(dest[11].(**string)) = &shardName
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -134,7 +135,7 @@ func TestDatabaseService_GetByID_Success(t *testing.T) {
 	require.NotNil(t, result)
 	assert.Equal(t, databaseID, result.ID)
 	assert.Equal(t, "mydb", result.Name)
-	assert.Equal(t, &tenantID, result.TenantID)
+	assert.Equal(t, tenantID, result.TenantID)
 	assert.Equal(t, &shardID, result.ShardID)
 	assert.Equal(t, &nodeID, result.NodeID)
 	assert.Equal(t, &shardName, result.ShardName)
@@ -177,16 +178,17 @@ func TestDatabaseService_ListByTenant_Success(t *testing.T) {
 	rows := newMockRows(
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
-			*(dest[1].(**string)) = &tenantID
-			*(dest[2].(*string)) = "mydb"
-			*(dest[3].(**string)) = &shardID
-			*(dest[4].(**string)) = &nodeID
-			*(dest[5].(*string)) = model.StatusActive
-			*(dest[6].(**string)) = nil // status_message
-			*(dest[7].(*string)) = ""  // suspend_reason
-			*(dest[8].(*time.Time)) = now
+			*(dest[1].(*string)) = tenantID
+			*(dest[2].(*string)) = "" // subscription_id
+			*(dest[3].(*string)) = "mydb"
+			*(dest[4].(**string)) = &shardID
+			*(dest[5].(**string)) = &nodeID
+			*(dest[6].(*string)) = model.StatusActive
+			*(dest[7].(**string)) = nil // status_message
+			*(dest[8].(*string)) = ""  // suspend_reason
 			*(dest[9].(*time.Time)) = now
-			*(dest[10].(**string)) = &shardName
+			*(dest[10].(*time.Time)) = now
+			*(dest[11].(**string)) = &shardName
 			return nil
 		},
 	)
@@ -233,30 +235,32 @@ func TestDatabaseService_ListByShard_Success(t *testing.T) {
 	rows := newMockRows(
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
-			*(dest[1].(**string)) = &tenantID
-			*(dest[2].(*string)) = "db_alpha"
-			*(dest[3].(**string)) = &shardID
-			*(dest[4].(**string)) = &nodeID
-			*(dest[5].(*string)) = model.StatusActive
-			*(dest[6].(**string)) = nil // status_message
-			*(dest[7].(*string)) = ""  // suspend_reason
-			*(dest[8].(*time.Time)) = now
+			*(dest[1].(*string)) = tenantID
+			*(dest[2].(*string)) = "" // subscription_id
+			*(dest[3].(*string)) = "db_alpha"
+			*(dest[4].(**string)) = &shardID
+			*(dest[5].(**string)) = &nodeID
+			*(dest[6].(*string)) = model.StatusActive
+			*(dest[7].(**string)) = nil // status_message
+			*(dest[8].(*string)) = ""  // suspend_reason
 			*(dest[9].(*time.Time)) = now
-			*(dest[10].(**string)) = &shardName
+			*(dest[10].(*time.Time)) = now
+			*(dest[11].(**string)) = &shardName
 			return nil
 		},
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id2
-			*(dest[1].(**string)) = &tenantID
-			*(dest[2].(*string)) = "db_beta"
-			*(dest[3].(**string)) = &shardID
-			*(dest[4].(**string)) = &nodeID
-			*(dest[5].(*string)) = model.StatusPending
-			*(dest[6].(**string)) = nil // status_message
-			*(dest[7].(*string)) = ""  // suspend_reason
-			*(dest[8].(*time.Time)) = now
+			*(dest[1].(*string)) = tenantID
+			*(dest[2].(*string)) = "" // subscription_id
+			*(dest[3].(*string)) = "db_beta"
+			*(dest[4].(**string)) = &shardID
+			*(dest[5].(**string)) = &nodeID
+			*(dest[6].(*string)) = model.StatusPending
+			*(dest[7].(**string)) = nil // status_message
+			*(dest[8].(*string)) = ""  // suspend_reason
 			*(dest[9].(*time.Time)) = now
-			*(dest[10].(**string)) = &shardName
+			*(dest[10].(*time.Time)) = now
+			*(dest[11].(**string)) = &shardName
 			return nil
 		},
 	)
@@ -340,7 +344,7 @@ func TestDatabaseService_Delete_Success(t *testing.T) {
 	// resolveTenantIDFromDatabase
 	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(**string)) = &tenantID
+		*(dest[0].(*string)) = tenantID
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
@@ -395,7 +399,7 @@ func TestDatabaseService_Delete_WorkflowError(t *testing.T) {
 	// resolveTenantIDFromDatabase
 	tenantID := "test-tenant-1"
 	resolveRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(**string)) = &tenantID
+		*(dest[0].(*string)) = tenantID
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
@@ -416,47 +420,3 @@ func TestDatabaseService_Delete_WorkflowError(t *testing.T) {
 	tc.AssertExpectations(t)
 }
 
-// ---------- ReassignTenant ----------
-
-func TestDatabaseService_ReassignTenant_Success(t *testing.T) {
-	db := &mockDB{}
-	tc := &temporalmocks.Client{}
-	svc := NewDatabaseService(db, tc)
-	ctx := context.Background()
-
-	databaseID := "test-database-1"
-	tenantID := "test-tenant-1"
-
-	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-
-	err := svc.ReassignTenant(ctx, databaseID, &tenantID)
-	require.NoError(t, err)
-	db.AssertExpectations(t)
-}
-
-func TestDatabaseService_ReassignTenant_NilTenant(t *testing.T) {
-	db := &mockDB{}
-	tc := &temporalmocks.Client{}
-	svc := NewDatabaseService(db, tc)
-	ctx := context.Background()
-
-	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
-
-	err := svc.ReassignTenant(ctx, "test-database-1", nil)
-	require.NoError(t, err)
-	db.AssertExpectations(t)
-}
-
-func TestDatabaseService_ReassignTenant_DBError(t *testing.T) {
-	db := &mockDB{}
-	tc := &temporalmocks.Client{}
-	svc := NewDatabaseService(db, tc)
-	ctx := context.Background()
-
-	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
-
-	err := svc.ReassignTenant(ctx, "test-database-1", nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "reassign database")
-	db.AssertExpectations(t)
-}

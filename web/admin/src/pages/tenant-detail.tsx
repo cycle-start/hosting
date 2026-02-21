@@ -77,12 +77,12 @@ export function TenantDetailPage() {
   const [deleteZoneTarget, setDeleteZoneTarget] = useState<Zone | null>(null)
 
   // Form state
-  const defaultWebroot: WebrootFormData = { runtime: 'php', runtime_version: '8.5', public_folder: 'public' }
-  const defaultDatabase: DatabaseFormData = { shard_id: '' }
-  const defaultValkey: ValkeyInstanceFormData = { shard_id: '', max_memory_mb: 64 }
-  const defaultS3: S3BucketFormData = { shard_id: '' }
+  const defaultWebroot: WebrootFormData = { subscription_id: '', runtime: 'php', runtime_version: '8.5', public_folder: 'public' }
+  const defaultDatabase: DatabaseFormData = { subscription_id: '', shard_id: '' }
+  const defaultValkey: ValkeyInstanceFormData = { subscription_id: '', shard_id: '', max_memory_mb: 64 }
+  const defaultS3: S3BucketFormData = { subscription_id: '', shard_id: '' }
   const defaultSftp: SSHKeyFormData = { name: '', public_key: '' }
-  const defaultZone: ZoneFormData = { name: '' }
+  const defaultZone: ZoneFormData = { subscription_id: '', name: '' }
 
   const [wrForm, setWrForm] = useState<WebrootFormData>(defaultWebroot)
   const [dbForm, setDbForm] = useState<DatabaseFormData>(defaultDatabase)
@@ -197,7 +197,8 @@ export function TenantDetailPage() {
     if (!wrForm.runtime || !wrForm.runtime_version) return
     try {
       await createWebrootMut.mutateAsync({
-        tenant_id: id, runtime: wrForm.runtime,
+        tenant_id: id, subscription_id: wrForm.subscription_id,
+        runtime: wrForm.runtime,
         runtime_version: wrForm.runtime_version, public_folder: wrForm.public_folder || undefined,
         fqdns: wrForm.fqdns?.length ? wrForm.fqdns : undefined,
       })
@@ -209,7 +210,8 @@ export function TenantDetailPage() {
     if (!dbForm.shard_id) return
     try {
       await createDbMut.mutateAsync({
-        tenant_id: id, shard_id: dbForm.shard_id,
+        tenant_id: id, subscription_id: dbForm.subscription_id,
+        shard_id: dbForm.shard_id,
         users: dbForm.users?.length ? dbForm.users : undefined,
       })
       toast.success('Database created'); setCreateDbOpen(false); resetForm()
@@ -220,7 +222,8 @@ export function TenantDetailPage() {
     if (!vkForm.shard_id) return
     try {
       await createValkeyMut.mutateAsync({
-        tenant_id: id, shard_id: vkForm.shard_id,
+        tenant_id: id, subscription_id: vkForm.subscription_id,
+        shard_id: vkForm.shard_id,
         max_memory_mb: vkForm.max_memory_mb || 64,
         users: vkForm.users?.length ? vkForm.users : undefined,
       })
@@ -232,7 +235,8 @@ export function TenantDetailPage() {
     if (!s3Form.shard_id) return
     try {
       await createS3Mut.mutateAsync({
-        tenant_id: id, shard_id: s3Form.shard_id,
+        tenant_id: id, subscription_id: s3Form.subscription_id,
+        shard_id: s3Form.shard_id,
         public: s3Form.public, quota_bytes: s3Form.quota_bytes,
       })
       toast.success('S3 bucket created'); setCreateS3Open(false); resetForm()
@@ -258,7 +262,7 @@ export function TenantDetailPage() {
   const handleCreateZone = async () => {
     if (!znForm.name) return
     try {
-      await createZoneMut.mutateAsync({ name: znForm.name, tenant_id: id, region_id: tenant.region_id })
+      await createZoneMut.mutateAsync({ name: znForm.name, subscription_id: znForm.subscription_id, tenant_id: id, region_id: tenant.region_id })
       toast.success('Zone created'); setCreateZoneOpen(false); resetForm()
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }

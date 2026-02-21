@@ -456,9 +456,13 @@ func regenerateWebrootNginxOnNodes(ctx workflow.Context, webroot model.Webroot, 
 	var fqdnParams []activity.FQDNParam
 	for _, f := range fqdns {
 		if f.Status != model.StatusDeleted {
+			var webrootID string
+			if f.WebrootID != nil {
+				webrootID = *f.WebrootID
+			}
 			fqdnParams = append(fqdnParams, activity.FQDNParam{
 				FQDN:       f.FQDN,
-				WebrootID:  f.WebrootID,
+				WebrootID:  webrootID,
 				SSLEnabled: f.SSLEnabled,
 			})
 		}

@@ -53,7 +53,7 @@ func (s *CreateWebrootWorkflowTestSuite) TestSuccess() {
 		ShardID: &shardID,
 	}
 	fqdns := []model.FQDN{
-		{ID: fqdnID, FQDN: "example.com", WebrootID: webrootID, SSLEnabled: true},
+		{ID: fqdnID, FQDN: "example.com", WebrootID: &webrootID, SSLEnabled: true},
 	}
 	nodes := []model.Node{
 		{ID: "node-1"},

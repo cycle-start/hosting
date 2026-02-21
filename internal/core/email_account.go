@@ -19,9 +19,9 @@ func NewEmailAccountService(db DB, tc temporalclient.Client) *EmailAccountServic
 
 func (s *EmailAccountService) Create(ctx context.Context, a *model.EmailAccount) error {
 	_, err := s.db.Exec(ctx,
-		`INSERT INTO email_accounts (id, fqdn_id, address, display_name, quota_bytes, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		a.ID, a.FQDNID, a.Address, a.DisplayName, a.QuotaBytes, a.Status, a.CreatedAt, a.UpdatedAt,
+		`INSERT INTO email_accounts (id, fqdn_id, subscription_id, address, display_name, quota_bytes, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		a.ID, a.FQDNID, a.SubscriptionID, a.Address, a.DisplayName, a.QuotaBytes, a.Status, a.CreatedAt, a.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("insert email account: %w", err)
@@ -45,9 +45,9 @@ func (s *EmailAccountService) Create(ctx context.Context, a *model.EmailAccount)
 func (s *EmailAccountService) GetByID(ctx context.Context, id string) (*model.EmailAccount, error) {
 	var a model.EmailAccount
 	err := s.db.QueryRow(ctx,
-		`SELECT id, fqdn_id, address, display_name, quota_bytes, status, status_message, created_at, updated_at
+		`SELECT id, fqdn_id, subscription_id, address, display_name, quota_bytes, status, status_message, created_at, updated_at
 		 FROM email_accounts WHERE id = $1`, id,
-	).Scan(&a.ID, &a.FQDNID, &a.Address, &a.DisplayName, &a.QuotaBytes, &a.Status, &a.StatusMessage, &a.CreatedAt, &a.UpdatedAt)
+	).Scan(&a.ID, &a.FQDNID, &a.SubscriptionID, &a.Address, &a.DisplayName, &a.QuotaBytes, &a.Status, &a.StatusMessage, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get email account %s: %w", id, err)
 	}
@@ -55,7 +55,7 @@ func (s *EmailAccountService) GetByID(ctx context.Context, id string) (*model.Em
 }
 
 func (s *EmailAccountService) ListByFQDN(ctx context.Context, fqdnID string, limit int, cursor string) ([]model.EmailAccount, bool, error) {
-	query := `SELECT id, fqdn_id, address, display_name, quota_bytes, status, status_message, created_at, updated_at FROM email_accounts WHERE fqdn_id = $1`
+	query := `SELECT id, fqdn_id, subscription_id, address, display_name, quota_bytes, status, status_message, created_at, updated_at FROM email_accounts WHERE fqdn_id = $1`
 	args := []any{fqdnID}
 	argIdx := 2
 
@@ -78,7 +78,7 @@ func (s *EmailAccountService) ListByFQDN(ctx context.Context, fqdnID string, lim
 	var accounts []model.EmailAccount
 	for rows.Next() {
 		var a model.EmailAccount
-		if err := rows.Scan(&a.ID, &a.FQDNID, &a.Address, &a.DisplayName, &a.QuotaBytes, &a.Status, &a.StatusMessage, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.FQDNID, &a.SubscriptionID, &a.Address, &a.DisplayName, &a.QuotaBytes, &a.Status, &a.StatusMessage, &a.CreatedAt, &a.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan email account: %w", err)
 		}
 		accounts = append(accounts, a)
@@ -95,11 +95,10 @@ func (s *EmailAccountService) ListByFQDN(ctx context.Context, fqdnID string, lim
 }
 
 func (s *EmailAccountService) ListByTenant(ctx context.Context, tenantID string, limit int, cursor string) ([]model.EmailAccount, bool, error) {
-	query := `SELECT ea.id, ea.fqdn_id, ea.address, ea.display_name, ea.quota_bytes, ea.status, ea.status_message, ea.created_at, ea.updated_at
+	query := `SELECT ea.id, ea.fqdn_id, ea.subscription_id, ea.address, ea.display_name, ea.quota_bytes, ea.status, ea.status_message, ea.created_at, ea.updated_at
 		 FROM email_accounts ea
 		 JOIN fqdns f ON ea.fqdn_id = f.id
-		 JOIN webroots w ON f.webroot_id = w.id
-		 WHERE w.tenant_id = $1`
+		 WHERE f.tenant_id = $1`
 	args := []any{tenantID}
 	argIdx := 2
 
@@ -122,7 +121,7 @@ func (s *EmailAccountService) ListByTenant(ctx context.Context, tenantID string,
 	var accounts []model.EmailAccount
 	for rows.Next() {
 		var a model.EmailAccount
-		if err := rows.Scan(&a.ID, &a.FQDNID, &a.Address, &a.DisplayName, &a.QuotaBytes, &a.Status, &a.StatusMessage, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.FQDNID, &a.SubscriptionID, &a.Address, &a.DisplayName, &a.QuotaBytes, &a.Status, &a.StatusMessage, &a.CreatedAt, &a.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan email account: %w", err)
 		}
 		accounts = append(accounts, a)
