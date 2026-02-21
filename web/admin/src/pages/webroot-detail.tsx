@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Trash2, Pencil, Globe, Play, Pause, RotateCcw, Terminal, Clock, Key, Eye, EyeOff, Lock } from 'lucide-react'
+import { Plus, Trash2, Pencil, Globe, Play, Pause, RotateCcw, Terminal, Clock, Key, Lock, ScrollText, ChevronDown, ChevronRight, CheckCircle, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { ResourceHeader } from '@/components/shared/resource-header'
@@ -20,24 +21,87 @@ import { Breadcrumb } from '@/components/shared/breadcrumb'
 import { CopyButton } from '@/components/shared/copy-button'
 import { LogViewer } from '@/components/shared/log-viewer'
 import { TenantLogViewer } from '@/components/shared/tenant-log-viewer'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatRelative } from '@/lib/utils'
 import { rules, validateField } from '@/lib/validation'
 import {
+  useTenant,
   useWebroot, useFQDNs, useDaemons, useCronJobs,
   useUpdateWebroot, useCreateFQDN, useDeleteFQDN,
   useCreateDaemon, useUpdateDaemon, useDeleteDaemon, useEnableDaemon, useDisableDaemon, useRetryDaemon,
   useCreateCronJob, useUpdateCronJob, useDeleteCronJob, useEnableCronJob, useDisableCronJob, useRetryCronJob,
   useEnvVars, useSetEnvVars, useDeleteEnvVar,
+  useCronExecutions,
 } from '@/lib/hooks'
-import type { FQDN, Daemon, CronJob, WebrootEnvVar } from '@/lib/types'
+import type { FQDN, Daemon, CronJob, WebrootEnvVar, CronExecution } from '@/lib/types'
 
 const runtimes = ['php', 'node', 'python', 'ruby', 'static']
 const stopSignals = ['TERM', 'INT', 'QUIT', 'KILL', 'HUP']
 
+const webrootTabs = ['fqdns', 'daemons', 'cron-jobs', 'env-vars', 'logs']
+function getWebrootTabFromHash() {
+  const hash = window.location.hash.slice(1)
+  return webrootTabs.includes(hash) ? hash : 'fqdns'
+}
+
+function CronExecutionHistory({ cronJobId, tenantId }: { cronJobId: string; tenantId: string }) {
+  const { data, isLoading } = useCronExecutions(cronJobId)
+  const execs = data?.items ?? []
+
+  return (
+    <div className="space-y-4 p-4 bg-muted/30 rounded-md">
+      <div>
+        <h4 className="text-sm font-medium mb-2">Recent Executions</h4>
+        {isLoading ? (
+          <Skeleton className="h-16 w-full" />
+        ) : execs.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No executions recorded yet.</p>
+        ) : (
+          <div className="rounded-md border bg-background">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="px-3 py-1.5 text-left font-medium">Time</th>
+                  <th className="px-3 py-1.5 text-left font-medium">Result</th>
+                  <th className="px-3 py-1.5 text-left font-medium">Exit Code</th>
+                  <th className="px-3 py-1.5 text-left font-medium">Node</th>
+                </tr>
+              </thead>
+              <tbody>
+                {execs.slice(0, 10).map((e: CronExecution) => (
+                  <tr key={e.id} className="border-b last:border-0">
+                    <td className="px-3 py-1.5 text-xs text-muted-foreground" title={formatDate(e.started_at)}>
+                      {formatRelative(e.started_at)}
+                    </td>
+                    <td className="px-3 py-1.5">
+                      {e.success ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-green-600"><CheckCircle className="h-3 w-3" /> OK</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs text-red-600"><XCircle className="h-3 w-3" /> Failed</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5 font-mono text-xs">{e.exit_code ?? '-'}</td>
+                    <td className="px-3 py-1.5 font-mono text-xs truncate max-w-[120px]">{e.node_id || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      <div>
+        <h4 className="text-sm font-medium mb-2">Cron Logs</h4>
+        <TenantLogViewer tenantId={tenantId} cronJobId={cronJobId} />
+      </div>
+    </div>
+  )
+}
+
 export function WebrootDetailPage() {
   const { id: tenantId, webrootId } = useParams({ from: '/auth/tenants/$id/webroots/$webrootId' as never })
+  const { data: tenant } = useTenant(tenantId)
   const navigate = useNavigate()
 
+  const [activeTab, setActiveTab] = useState(getWebrootTabFromHash)
   const [editOpen, setEditOpen] = useState(false)
   const [createFqdnOpen, setCreateFqdnOpen] = useState(false)
   const [deleteFqdn, setDeleteFqdn] = useState<FQDN | null>(null)
@@ -76,6 +140,7 @@ export function WebrootDetailPage() {
   const [cronWorkDir, setCronWorkDir] = useState('')
   const [cronTimeout, setCronTimeout] = useState('300')
   const [cronMaxMem, setCronMaxMem] = useState('512')
+  const [expandedCronId, setExpandedCronId] = useState<string | null>(null)
 
   // Env var state
   const [addEnvOpen, setAddEnvOpen] = useState(false)
@@ -83,7 +148,6 @@ export function WebrootDetailPage() {
   const [envValue, setEnvValue] = useState('')
   const [envSecret, setEnvSecret] = useState(false)
   const [deleteEnvVar, setDeleteEnvVar] = useState<WebrootEnvVar | null>(null)
-  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({})
 
   const { data: webroot, isLoading } = useWebroot(webrootId)
   const { data: fqdnsData, isLoading: fqdnsLoading } = useFQDNs(webrootId)
@@ -331,17 +395,17 @@ export function WebrootDetailPage() {
         return (
           <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
             {d.status === 'failed' && (
-              <Button variant="ghost" size="icon" title="Retry" onClick={() => retryDaemonMut.mutateAsync(d.id).then(() => toast.success('Retrying')).catch(() => toast.error('Failed'))}>
+              <Button variant="ghost" size="icon" title="Retry" onClick={() => retryDaemonMut.mutateAsync(d.id).then(() => toast.success('Retrying')).catch((e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed to retry'))}>
                 <RotateCcw className="h-4 w-4" />
               </Button>
             )}
             {d.status === 'active' && d.enabled && (
-              <Button variant="ghost" size="icon" title="Disable" onClick={() => disableDaemonMut.mutateAsync(d.id).then(() => toast.success('Disabling')).catch(() => toast.error('Failed'))}>
+              <Button variant="ghost" size="icon" title="Disable" onClick={() => disableDaemonMut.mutateAsync(d.id).then(() => toast.success('Disabling')).catch((e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed to disable'))}>
                 <Pause className="h-4 w-4" />
               </Button>
             )}
             {d.status === 'active' && !d.enabled && (
-              <Button variant="ghost" size="icon" title="Enable" onClick={() => enableDaemonMut.mutateAsync(d.id).then(() => toast.success('Enabling')).catch(() => toast.error('Failed'))}>
+              <Button variant="ghost" size="icon" title="Enable" onClick={() => enableDaemonMut.mutateAsync(d.id).then(() => toast.success('Enabling')).catch((e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed to enable'))}>
                 <Play className="h-4 w-4" />
               </Button>
             )}
@@ -359,6 +423,14 @@ export function WebrootDetailPage() {
 
   const cronColumns: ColumnDef<CronJob>[] = [
     {
+      id: 'expand',
+      cell: ({ row }) => (
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setExpandedCronId(expandedCronId === row.original.id ? null : row.original.id) }}>
+          {expandedCronId === row.original.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </Button>
+      ),
+    },
+    {
       accessorKey: 'name', header: 'Name',
       cell: ({ row }) => <span className="font-mono text-sm">{row.original.name}</span>,
     },
@@ -369,6 +441,19 @@ export function WebrootDetailPage() {
     {
       accessorKey: 'command', header: 'Command',
       cell: ({ row }) => <span className="font-mono text-xs truncate max-w-[200px] block">{row.original.command}</span>,
+    },
+    {
+      id: 'failures', header: 'Failures',
+      cell: ({ row }) => {
+        const c = row.original
+        const failures = c.consecutive_failures ?? 0
+        const max = c.max_failures ?? 5
+        return (
+          <span className={failures > 0 ? 'text-amber-600 font-medium' : 'text-muted-foreground'}>
+            {failures}/{max}
+          </span>
+        )
+      },
     },
     {
       accessorKey: 'enabled', header: 'Enabled',
@@ -387,17 +472,17 @@ export function WebrootDetailPage() {
         return (
           <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
             {c.status === 'failed' && (
-              <Button variant="ghost" size="icon" title="Retry" onClick={() => retryCronMut.mutateAsync(c.id).then(() => toast.success('Retrying')).catch(() => toast.error('Failed'))}>
+              <Button variant="ghost" size="icon" title="Retry" onClick={() => retryCronMut.mutateAsync(c.id).then(() => toast.success('Retrying')).catch((e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed to retry'))}>
                 <RotateCcw className="h-4 w-4" />
               </Button>
             )}
             {c.status === 'active' && c.enabled && (
-              <Button variant="ghost" size="icon" title="Disable" onClick={() => disableCronMut.mutateAsync(c.id).then(() => toast.success('Disabling')).catch(() => toast.error('Failed'))}>
+              <Button variant="ghost" size="icon" title="Disable" onClick={() => disableCronMut.mutateAsync(c.id).then(() => toast.success('Disabling')).catch((e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed to disable'))}>
                 <Pause className="h-4 w-4" />
               </Button>
             )}
             {c.status === 'active' && !c.enabled && (
-              <Button variant="ghost" size="icon" title="Enable" onClick={() => enableCronMut.mutateAsync(c.id).then(() => toast.success('Enabling')).catch(() => toast.error('Failed'))}>
+              <Button variant="ghost" size="icon" title="Enable" onClick={() => enableCronMut.mutateAsync(c.id).then(() => toast.success('Enabling')).catch((e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed to enable'))}>
                 <Play className="h-4 w-4" />
               </Button>
             )}
@@ -487,16 +572,28 @@ export function WebrootDetailPage() {
     </div>
   )
 
+  // Render cron jobs with expandable rows
+  const cronJobsList = cronJobsData?.items ?? []
+  const cronTableWithExpand = (
+    <div>
+      <DataTable columns={cronColumns} data={cronJobsList} loading={cronJobsLoading} searchColumn="name" searchPlaceholder="Search cron jobs..." />
+      {expandedCronId && cronJobsList.some(c => c.id === expandedCronId) && (
+        <CronExecutionHistory cronJobId={expandedCronId} tenantId={tenantId} />
+      )}
+    </div>
+  )
+
   return (
     <div className="space-y-6">
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
-        { label: tenantId, href: `/tenants/${tenantId}` },
+        { label: tenant?.name ?? tenantId, href: `/tenants/${tenantId}` },
         { label: 'Webroots', href: `/tenants/${tenantId}`, hash: 'webroots' },
         { label: webroot.name },
       ]} />
 
       <ResourceHeader
+        icon={Globe}
         title={webroot.name}
         subtitle={`${webroot.runtime} ${webroot.runtime_version} | Public: ${webroot.public_folder} | Env: ${webroot.env_file_name || '.env.hosting'}${webroot.env_shell_source ? ' (shell-sourced)' : ''} | Service hostname: ${webroot.service_hostname_enabled ? 'on' : 'off'}`}
         status={webroot.status}
@@ -513,105 +610,110 @@ export function WebrootDetailPage() {
         <span className="ml-4">Created: {formatDate(webroot.created_at)}</span>
       </div>
 
-      {/* FQDNs */}
-      <div>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">FQDNs</h2>
-          <Button size="sm" onClick={() => { setFqdnValue(''); setFqdnSsl(true); setTouched({}); setCreateFqdnOpen(true) }}>
-            <Plus className="mr-2 h-4 w-4" /> Add FQDN
-          </Button>
-        </div>
-        {!fqdnsLoading && (fqdnsData?.items?.length ?? 0) === 0 ? (
-          <EmptyState icon={Globe} title="No FQDNs" description="Add a domain name to this webroot." action={{ label: 'Add FQDN', onClick: () => setCreateFqdnOpen(true) }} />
-        ) : (
-          <DataTable columns={fqdnColumns} data={fqdnsData?.items ?? []} loading={fqdnsLoading} searchColumn="fqdn" searchPlaceholder="Search FQDNs..."
-            onRowClick={(f) => navigate({ to: '/tenants/$id/fqdns/$fqdnId', params: { id: tenantId, fqdnId: f.id } })} />
-        )}
-      </div>
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); window.history.replaceState(null, '', `#${v}`) }}>
+        <TabsList>
+          <TabsTrigger value="fqdns"><Globe className="mr-1.5 h-4 w-4" /> FQDNs ({fqdnsData?.items?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="daemons"><Terminal className="mr-1.5 h-4 w-4" /> Daemons ({daemonsData?.items?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="cron-jobs"><Clock className="mr-1.5 h-4 w-4" /> Cron Jobs ({cronJobsData?.items?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="env-vars"><Key className="mr-1.5 h-4 w-4" /> Env Vars ({envVarsData?.items?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="logs"><ScrollText className="mr-1.5 h-4 w-4" /> Logs</TabsTrigger>
+        </TabsList>
 
-      {/* Daemons */}
-      <div>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Daemons</h2>
-          <Button size="sm" onClick={openCreateDaemon}>
-            <Plus className="mr-2 h-4 w-4" /> Add Daemon
-          </Button>
-        </div>
-        {!daemonsLoading && (daemonsData?.items?.length ?? 0) === 0 ? (
-          <EmptyState icon={Terminal} title="No Daemons" description="Add a long-running process (WebSocket server, queue worker, etc.)." action={{ label: 'Add Daemon', onClick: openCreateDaemon }} />
-        ) : (
-          <DataTable columns={daemonColumns} data={daemonsData?.items ?? []} loading={daemonsLoading} searchColumn="name" searchPlaceholder="Search daemons..." />
-        )}
-      </div>
-
-      {/* Cron Jobs */}
-      <div>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Cron Jobs</h2>
-          <Button size="sm" onClick={openCreateCron}>
-            <Plus className="mr-2 h-4 w-4" /> Add Cron Job
-          </Button>
-        </div>
-        {!cronJobsLoading && (cronJobsData?.items?.length ?? 0) === 0 ? (
-          <EmptyState icon={Clock} title="No Cron Jobs" description="Schedule recurring tasks for this webroot." action={{ label: 'Add Cron Job', onClick: openCreateCron }} />
-        ) : (
-          <DataTable columns={cronColumns} data={cronJobsData?.items ?? []} loading={cronJobsLoading} searchColumn="name" searchPlaceholder="Search cron jobs..." />
-        )}
-      </div>
-
-      {/* Environment Variables */}
-      <div>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Environment Variables</h2>
-          <Button size="sm" onClick={() => { setEnvName(''); setEnvValue(''); setEnvSecret(false); setTouched({}); setAddEnvOpen(true) }}>
-            <Plus className="mr-2 h-4 w-4" /> Add Variable
-          </Button>
-        </div>
-        {(envVarsData?.items?.length ?? 0) === 0 ? (
-          <EmptyState icon={Key} title="No Environment Variables" description="Add env vars for this webroot. Secrets are encrypted at rest." action={{ label: 'Add Variable', onClick: () => setAddEnvOpen(true) }} />
-        ) : (
-          <div className="rounded-md border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-2 text-left font-medium">Name</th>
-                  <th className="px-4 py-2 text-left font-medium">Value</th>
-                  <th className="px-4 py-2 text-left font-medium w-20">Secret</th>
-                  <th className="px-4 py-2 w-16"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {envVarsData?.items?.map((v) => (
-                  <tr key={v.name} className="border-b last:border-0">
-                    <td className="px-4 py-2 font-mono text-sm">{v.name}</td>
-                    <td className="px-4 py-2 font-mono text-xs">
-                      {v.is_secret ? (
-                        <span className="flex items-center gap-1 text-muted-foreground">
-                          <Lock className="h-3 w-3" /> ***
-                        </span>
-                      ) : (
-                        <span className="truncate max-w-[300px] block">{v.value}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2">
-                      {v.is_secret ? <span className="text-amber-600">Yes</span> : <span className="text-muted-foreground">No</span>}
-                    </td>
-                    <td className="px-4 py-2">
-                      <Button variant="ghost" size="icon" onClick={() => setDeleteEnvVar(v)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <TabsContent value="fqdns">
+          <div className="mb-4 flex justify-end">
+            <Button size="sm" onClick={() => { setFqdnValue(''); setFqdnSsl(true); setTouched({}); setCreateFqdnOpen(true) }}>
+              <Plus className="mr-2 h-4 w-4" /> Add FQDN
+            </Button>
           </div>
-        )}
-      </div>
+          {!fqdnsLoading && (fqdnsData?.items?.length ?? 0) === 0 ? (
+            <EmptyState icon={Globe} title="No FQDNs" description="Add a domain name to this webroot." action={{ label: 'Add FQDN', onClick: () => setCreateFqdnOpen(true) }} />
+          ) : (
+            <DataTable columns={fqdnColumns} data={fqdnsData?.items ?? []} loading={fqdnsLoading} searchColumn="fqdn" searchPlaceholder="Search FQDNs..."
+              onRowClick={(f) => navigate({ to: '/tenants/$id/fqdns/$fqdnId', params: { id: tenantId, fqdnId: f.id } })} />
+          )}
+        </TabsContent>
 
-      {/* Logs */}
-      <TenantLogViewer tenantId={tenantId} webrootId={webrootId} title="Access Logs" />
-      <LogViewer query={`{app=~"core-api|worker|node-agent"} |= "${webrootId}"`} title="Platform Logs" />
+        <TabsContent value="daemons">
+          <div className="mb-4 flex justify-end">
+            <Button size="sm" onClick={openCreateDaemon}>
+              <Plus className="mr-2 h-4 w-4" /> Add Daemon
+            </Button>
+          </div>
+          {!daemonsLoading && (daemonsData?.items?.length ?? 0) === 0 ? (
+            <EmptyState icon={Terminal} title="No Daemons" description="Add a long-running process (WebSocket server, queue worker, etc.)." action={{ label: 'Add Daemon', onClick: openCreateDaemon }} />
+          ) : (
+            <DataTable columns={daemonColumns} data={daemonsData?.items ?? []} loading={daemonsLoading} searchColumn="name" searchPlaceholder="Search daemons..." />
+          )}
+        </TabsContent>
+
+        <TabsContent value="cron-jobs">
+          <div className="mb-4 flex justify-end">
+            <Button size="sm" onClick={openCreateCron}>
+              <Plus className="mr-2 h-4 w-4" /> Add Cron Job
+            </Button>
+          </div>
+          {!cronJobsLoading && (cronJobsData?.items?.length ?? 0) === 0 ? (
+            <EmptyState icon={Clock} title="No Cron Jobs" description="Schedule recurring tasks for this webroot." action={{ label: 'Add Cron Job', onClick: openCreateCron }} />
+          ) : (
+            cronTableWithExpand
+          )}
+        </TabsContent>
+
+        <TabsContent value="env-vars">
+          <div className="mb-4 flex justify-end">
+            <Button size="sm" onClick={() => { setEnvName(''); setEnvValue(''); setEnvSecret(false); setTouched({}); setAddEnvOpen(true) }}>
+              <Plus className="mr-2 h-4 w-4" /> Add Variable
+            </Button>
+          </div>
+          {(envVarsData?.items?.length ?? 0) === 0 ? (
+            <EmptyState icon={Key} title="No Environment Variables" description="Add env vars for this webroot. Secrets are encrypted at rest." action={{ label: 'Add Variable', onClick: () => setAddEnvOpen(true) }} />
+          ) : (
+            <div className="rounded-md border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-4 py-2 text-left font-medium">Name</th>
+                    <th className="px-4 py-2 text-left font-medium">Value</th>
+                    <th className="px-4 py-2 text-left font-medium w-20">Secret</th>
+                    <th className="px-4 py-2 w-16"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {envVarsData?.items?.map((v) => (
+                    <tr key={v.name} className="border-b last:border-0">
+                      <td className="px-4 py-2 font-mono text-sm">{v.name}</td>
+                      <td className="px-4 py-2 font-mono text-xs">
+                        {v.is_secret ? (
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <Lock className="h-3 w-3" /> ***
+                          </span>
+                        ) : (
+                          <span className="truncate max-w-[300px] block">{v.value}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2">
+                        {v.is_secret ? <span className="text-amber-600">Yes</span> : <span className="text-muted-foreground">No</span>}
+                      </td>
+                      <td className="px-4 py-2">
+                        <Button variant="ghost" size="icon" onClick={() => setDeleteEnvVar(v)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="logs">
+          <div className="space-y-6">
+            <TenantLogViewer tenantId={tenantId} webrootId={webrootId} title="Access Logs" />
+            <LogViewer query={`{app=~"core-api|worker|node-agent"} |= "${webrootId}"`} title="Platform Logs" />
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Edit Webroot */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

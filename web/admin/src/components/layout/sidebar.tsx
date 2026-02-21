@@ -152,7 +152,7 @@ export function Sidebar({ onSearchClick }: SidebarProps) {
                 <Separator className="my-2" />
               )}
               {!collapsed && (
-                <p className="mb-1 px-2 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <p className="mb-1.5 px-2 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   {section.title}
                 </p>
               )}
@@ -161,7 +161,7 @@ export function Sidebar({ onSearchClick }: SidebarProps) {
                 const className = cn(
                   'flex items-center gap-3 rounded-md px-2 py-2 text-sm font-medium transition-colors',
                   active
-                    ? 'bg-primary/10 text-primary'
+                    ? cn('bg-primary/10 text-primary', !collapsed && 'border-l-2 border-primary pl-1.5')
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
                   collapsed && 'justify-center px-0'
                 )

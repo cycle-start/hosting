@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Trash2, Shield, Mail, ScrollText } from 'lucide-react'
+import { Plus, Trash2, Shield, Mail, ScrollText, Globe } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,9 +21,12 @@ import { TenantLogViewer } from '@/components/shared/tenant-log-viewer'
 import { CopyButton } from '@/components/shared/copy-button'
 import { formatDate } from '@/lib/utils'
 import { rules, validateField } from '@/lib/validation'
+import { Switch } from '@/components/ui/switch'
 import {
+  useTenant,
   useFQDN, useCertificates, useEmailAccounts,
   useUploadCertificate, useCreateEmailAccount, useDeleteEmailAccount,
+  useUpdateFQDN,
 } from '@/lib/hooks'
 import type { Certificate, EmailAccount } from '@/lib/types'
 
@@ -35,6 +38,7 @@ function getFQDNTabFromHash() {
 
 export function FQDNDetailPage() {
   const { id: tenantId, fqdnId } = useParams({ from: '/auth/tenants/$id/fqdns/$fqdnId' as never })
+  const { data: tenant } = useTenant(tenantId)
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState(getFQDNTabFromHash)
 
@@ -59,6 +63,7 @@ export function FQDNDetailPage() {
   const uploadCertMut = useUploadCertificate()
   const createEmailMut = useCreateEmailAccount()
   const deleteEmailMut = useDeleteEmailAccount()
+  const updateFqdnMut = useUpdateFQDN()
 
   if (isLoading || !fqdn) {
     return <div className="space-y-6"><Skeleton className="h-10 w-64" /><Skeleton className="h-64 w-full" /></div>
@@ -134,14 +139,15 @@ export function FQDNDetailPage() {
     <div className="space-y-6">
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
-        { label: tenantId, href: `/tenants/${tenantId}` },
+        { label: tenant?.name ?? tenantId, href: `/tenants/${tenantId}` },
         { label: 'FQDNs', href: `/tenants/${tenantId}`, hash: 'webroots' },
         { label: fqdn.fqdn },
       ]} />
 
       <ResourceHeader
+        icon={Globe}
         title={fqdn.fqdn}
-        subtitle={`SSL: ${fqdn.ssl_enabled ? 'Enabled' : 'Disabled'} | Webroot: ${fqdn.webroot_id}`}
+        subtitle={`Webroot: ${fqdn.webroot_id}`}
         status={fqdn.status}
       />
 
@@ -149,6 +155,18 @@ export function FQDNDetailPage() {
         <span>ID: <code>{fqdn.id}</code></span>
         <CopyButton value={fqdn.id} />
         <span className="ml-4">Created: {formatDate(fqdn.created_at)}</span>
+        <span className="ml-4 flex items-center gap-2">
+          <Switch
+            checked={fqdn.ssl_enabled}
+            disabled={updateFqdnMut.isPending}
+            onCheckedChange={(checked) =>
+              updateFqdnMut.mutateAsync({ id: fqdnId, ssl_enabled: checked })
+                .then(() => toast.success(checked ? 'SSL enabled' : 'SSL disabled'))
+                .catch((e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed to update SSL'))
+            }
+          />
+          <span>SSL {fqdn.ssl_enabled ? 'Enabled' : 'Disabled'}</span>
+        </span>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); window.history.replaceState(null, '', `#${v}`) }}>

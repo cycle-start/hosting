@@ -21,6 +21,7 @@ import { CopyButton } from '@/components/shared/copy-button'
 import { formatDate } from '@/lib/utils'
 import { rules, validateField } from '@/lib/validation'
 import {
+  useTenant,
   useEmailAccount, useEmailAliases, useEmailForwards, useEmailAutoReply,
   useCreateEmailAlias, useDeleteEmailAlias,
   useCreateEmailForward, useDeleteEmailForward,
@@ -36,6 +37,7 @@ function getEmailTabFromHash() {
 
 export function EmailAccountDetailPage() {
   const { id: tenantId, accountId } = useParams({ from: '/auth/tenants/$id/email-accounts/$accountId' as never })
+  const { data: tenant } = useTenant(tenantId)
   const [activeTab, setActiveTab] = useState(getEmailTabFromHash)
 
   const [createAliasOpen, setCreateAliasOpen] = useState(false)
@@ -152,12 +154,13 @@ export function EmailAccountDetailPage() {
     <div className="space-y-6">
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
-        { label: tenantId, href: `/tenants/${tenantId}` },
+        { label: tenant?.name ?? tenantId, href: `/tenants/${tenantId}` },
         { label: 'Email' },
         { label: account.address },
       ]} />
 
       <ResourceHeader
+        icon={Mail}
         title={account.address}
         subtitle={`${account.display_name || 'No display name'} | Quota: ${Math.round(account.quota_bytes / 1024 / 1024)} MB`}
         status={account.status}

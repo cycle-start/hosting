@@ -292,11 +292,24 @@ export interface CronJob {
   working_directory: string
   timeout_seconds: number
   max_memory_mb: number
+  consecutive_failures: number
+  max_failures: number
   enabled: boolean
   status: string
   status_message?: string
   created_at: string
   updated_at: string
+}
+
+export interface CronExecution {
+  id: string
+  cron_job_id: string
+  node_id: string
+  success: boolean
+  exit_code?: number
+  duration_ms?: number
+  started_at: string
+  created_at: string
 }
 
 export interface Daemon {

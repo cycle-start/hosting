@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Trash2, Key, Copy, Check, ScrollText } from 'lucide-react'
+import { Plus, Trash2, Key, Copy, Check, ScrollText, HardDrive } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,7 @@ import { LogViewer } from '@/components/shared/log-viewer'
 import { CopyButton } from '@/components/shared/copy-button'
 import { formatDate } from '@/lib/utils'
 import {
+  useTenant,
   useS3Bucket, useUpdateS3Bucket,
   useS3AccessKeys, useCreateS3AccessKey, useDeleteS3AccessKey,
 } from '@/lib/hooks'
@@ -27,6 +28,7 @@ import type { S3AccessKey } from '@/lib/types'
 
 export function S3BucketDetailPage() {
   const { id: tenantId, bucketId } = useParams({ from: '/auth/tenants/$id/s3-buckets/$bucketId' as never })
+  const { data: tenant } = useTenant(tenantId)
 
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<S3AccessKey | null>(null)
@@ -95,12 +97,13 @@ export function S3BucketDetailPage() {
     <div className="space-y-6">
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
-        { label: tenantId, href: `/tenants/${tenantId}` },
+        { label: tenant?.name ?? tenantId, href: `/tenants/${tenantId}` },
         { label: 'S3 Buckets', href: `/tenants/${tenantId}`, hash: 's3' },
         { label: bucket.name },
       ]} />
 
       <ResourceHeader
+        icon={HardDrive}
         title={bucket.name}
         subtitle={`Shard: ${bucket.shard_name || bucket.shard_id || '-'} | Quota: ${formatQuota(bucket.quota_bytes)}`}
         status={bucket.status}

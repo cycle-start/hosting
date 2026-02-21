@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Pause, Play, Trash2, Plus, RotateCcw, Loader2, FolderOpen, Database as DatabaseIcon, Globe, Boxes, HardDrive, Key, Archive, AlertCircle, ScrollText, Mail } from 'lucide-react'
+import { Pause, Play, Trash2, Plus, RotateCcw, Loader2, FolderOpen, Database as DatabaseIcon, Globe, Boxes, HardDrive, Key, Archive, AlertCircle, ScrollText, Mail, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -42,6 +42,7 @@ import { SSHKeyFields } from '@/components/forms/ssh-key-fields'
 import { ZoneFields } from '@/components/forms/zone-fields'
 import { LogViewer } from '@/components/shared/log-viewer'
 import { TenantLogViewer } from '@/components/shared/tenant-log-viewer'
+import { Separator } from '@/components/ui/separator'
 
 const defaultTab = 'webroots'
 const validTabs = ['webroots', 'databases', 'zones', 'valkey', 's3', 'sftp', 'email', 'backups', 'access-logs', 'platform-logs']
@@ -638,6 +639,7 @@ export function TenantDetailPage() {
       ]} />
 
       <ResourceHeader
+        icon={Users}
         title={tenant.name}
         subtitle={`UID: ${tenant.uid} | Customer: ${tenant.customer_id} | Brand: ${brand?.name || tenant.brand_id} | Region: ${tenant.region_name || tenant.region_id} | Cluster: ${tenant.cluster_name || tenant.cluster_id}`}
         status={tenant.status}
@@ -720,15 +722,16 @@ export function TenantDetailPage() {
       )}
 
       <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); window.history.replaceState(null, '', `#${v}`) }}>
-        <TabsList>
-          <TabsTrigger value="webroots">Webroots ({webrootsData?.items?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="databases">Databases ({databasesData?.items?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="zones">Zones ({tenantZones.length})</TabsTrigger>
-          <TabsTrigger value="valkey">Valkey ({valkeyData?.items?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="s3">S3 Buckets ({s3Data?.items?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="sftp">SSH Keys ({sftpData?.items?.length ?? 0})</TabsTrigger>
+        <TabsList className="flex-wrap h-auto gap-1 p-1">
+          <TabsTrigger value="webroots"><FolderOpen className="mr-1.5 h-4 w-4" /> Webroots ({webrootsData?.items?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="databases"><DatabaseIcon className="mr-1.5 h-4 w-4" /> Databases ({databasesData?.items?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="zones"><Globe className="mr-1.5 h-4 w-4" /> Zones ({tenantZones.length})</TabsTrigger>
+          <TabsTrigger value="valkey"><Boxes className="mr-1.5 h-4 w-4" /> Valkey ({valkeyData?.items?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="s3"><HardDrive className="mr-1.5 h-4 w-4" /> S3 ({s3Data?.items?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="sftp"><Key className="mr-1.5 h-4 w-4" /> SSH Keys ({sftpData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="email"><Mail className="mr-1.5 h-4 w-4" /> Email ({emailData?.items?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="backups">Backups ({backupsData?.items?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="backups"><Archive className="mr-1.5 h-4 w-4" /> Backups ({backupsData?.items?.length ?? 0})</TabsTrigger>
+          <Separator orientation="vertical" className="mx-1 h-6" />
           <TabsTrigger value="access-logs"><ScrollText className="mr-1.5 h-4 w-4" /> Access Logs</TabsTrigger>
           <TabsTrigger value="platform-logs"><ScrollText className="mr-1.5 h-4 w-4" /> Platform Logs</TabsTrigger>
         </TabsList>

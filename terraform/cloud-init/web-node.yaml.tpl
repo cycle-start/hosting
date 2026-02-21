@@ -76,7 +76,7 @@ write_files:
       curl -sf -X POST \
         -H "Authorization: Bearer $CORE_API_TOKEN" \
         -H "Content-Type: application/json" \
-        -d "{\"success\":$SUCCESS}" \
+        -d "{\"success\":$SUCCESS,\"exit_code\":$EXIT_STATUS,\"node_id\":\"$NODE_ID\"}" \
         "$CORE_API_URL/internal/v1/cron-jobs/$CRON_JOB_ID/outcome" \
         >/dev/null 2>&1 || true
 

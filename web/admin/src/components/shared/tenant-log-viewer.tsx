@@ -13,6 +13,7 @@ import type { LogEntry } from '@/lib/types'
 interface TenantLogViewerProps {
   tenantId: string
   webrootId?: string
+  cronJobId?: string
   title?: string
 }
 
@@ -38,6 +39,7 @@ const LOG_TYPES = [
   { label: 'PHP Error', value: 'php-error' },
   { label: 'PHP Slow', value: 'php-slow' },
   { label: 'Application', value: 'app' },
+  { label: 'Cron', value: 'cron' },
 ]
 
 const LOG_TYPE_COLORS: Record<string, string> = {
@@ -46,6 +48,7 @@ const LOG_TYPE_COLORS: Record<string, string> = {
   'php-error': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
   'php-slow': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
   'app': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+  'cron': 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200',
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -134,10 +137,10 @@ function TenantLogEntryRow({ entry }: { entry: LogEntry }) {
   )
 }
 
-export function TenantLogViewer({ tenantId, webrootId: fixedWebrootId, title }: TenantLogViewerProps) {
+export function TenantLogViewer({ tenantId, webrootId: fixedWebrootId, cronJobId, title }: TenantLogViewerProps) {
   const [timeRange, setTimeRange] = useState('1h')
   const [paused, setPaused] = useState(false)
-  const [logType, setLogType] = useState<string>('all')
+  const [logType, setLogType] = useState<string>(cronJobId ? 'cron' : 'all')
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const { data, isLoading } = useTenantLogs(
@@ -146,6 +149,7 @@ export function TenantLogViewer({ tenantId, webrootId: fixedWebrootId, title }: 
     fixedWebrootId || undefined,
     timeRange,
     !paused,
+    cronJobId,
   )
 
   const entries = data?.entries ?? []

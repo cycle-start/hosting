@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams } from '@tanstack/react-router'
-import { CheckCircle, ArrowUpCircle, XCircle, Plus, MessageSquarePlus, Send, Bot, User } from 'lucide-react'
+import { CheckCircle, ArrowUpCircle, XCircle, Plus, MessageSquarePlus, Send, Bot, User, AlertCircle } from 'lucide-react'
 import {
   useIncident,
   useIncidentEvents,
@@ -105,6 +105,7 @@ export function IncidentDetailPage() {
       />
 
       <ResourceHeader
+        icon={AlertCircle}
         title={incident.title}
         subtitle={`${incident.type} | ${incident.source}`}
         status={incident.status}

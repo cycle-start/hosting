@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Trash2, Pencil, Users, ExternalLink, ScrollText } from 'lucide-react'
+import { Plus, Trash2, Pencil, Users, ExternalLink, ScrollText, Database as DatabaseIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +19,7 @@ import { CopyButton } from '@/components/shared/copy-button'
 import { formatDate } from '@/lib/utils'
 import { rules, validateField } from '@/lib/validation'
 import {
+  useTenant,
   useDatabase, useDatabaseUsers,
   useCreateDatabaseUser, useUpdateDatabaseUser, useDeleteDatabaseUser,
   useCreateLoginSession,
@@ -29,6 +30,7 @@ const allPrivileges = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP',
 
 export function DatabaseDetailPage() {
   const { id: tenantId, databaseId } = useParams({ from: '/auth/tenants/$id/databases/$databaseId' as never })
+  const { data: tenant } = useTenant(tenantId)
 
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<DatabaseUser | null>(null)
@@ -151,12 +153,13 @@ export function DatabaseDetailPage() {
     <div className="space-y-6">
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
-        { label: tenantId, href: `/tenants/${tenantId}` },
+        { label: tenant?.name ?? tenantId, href: `/tenants/${tenantId}` },
         { label: 'Databases', href: `/tenants/${tenantId}`, hash: 'databases' },
         { label: database.name },
       ]} />
 
       <ResourceHeader
+        icon={DatabaseIcon}
         title={database.name}
         subtitle={`Shard: ${database.shard_name || database.shard_id || '-'}`}
         status={database.status}

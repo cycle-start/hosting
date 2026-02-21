@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft, Save, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -92,6 +92,7 @@ export function APIKeyDetailPage() {
       ]} />
 
       <ResourceHeader
+        icon={KeyRound}
         title={apiKey.name}
         actions={
           <div className="flex gap-2">

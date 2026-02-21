@@ -51,7 +51,7 @@ Designed for scale: millions of tenants across multiple regions, clusters, and b
 
 **Load Balancing** — HAProxy with runtime map updates (no reload for FQDN changes), consistent hashing on Host header within shards.
 
-**Observability** — Prometheus metrics, Grafana dashboards, Loki log aggregation, Vector/Alloy log shipping, alerting with runbooks.
+**Observability** — Prometheus metrics, Grafana dashboards, Loki log aggregation with granular filtering (per-tenant, per-webroot, per-cron-job), Vector/Alloy log shipping, alerting with runbooks.
 
 **Admin UI** — React SPA with 25+ pages: dashboard, resource management, log viewer, forms with inline sub-resource creation.
 

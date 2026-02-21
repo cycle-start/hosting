@@ -5,7 +5,7 @@ import type {
   Zone, ZoneRecord, Database, DatabaseUser,
   ValkeyInstance, ValkeyUser, EmailAccount, EmailAlias, EmailForward, EmailAutoReply,
   S3Bucket, S3AccessKey, Subscription,
-  SSHKey, CronJob, Daemon, Backup, Brand,
+  SSHKey, CronJob, CronExecution, Daemon, Backup, Brand,
   APIKey, APIKeyCreateResponse, AuditLogEntry, DashboardStats,
   PlatformConfig, ListParams, AuditListParams, TenantResourceSummary,
   CreateTenantRequest, WebrootEnvVar,
@@ -939,6 +939,14 @@ export function useRetryCronJob() {
   })
 }
 
+export function useCronExecutions(cronJobId: string) {
+  return useQuery({
+    queryKey: ['cron-executions', cronJobId],
+    queryFn: () => api.get<PaginatedResponse<CronExecution>>(`/cron-jobs/${cronJobId}/executions`),
+    enabled: !!cronJobId,
+  })
+}
+
 // Daemons
 export function useDaemons(webrootId: string) {
   return useQuery({
@@ -1203,13 +1211,15 @@ export function useTenantLogs(
   webrootId?: string,
   range: string = '1h',
   enabled = true,
+  cronJobId?: string,
 ) {
   const params = new URLSearchParams({ start: range, limit: '500' })
   if (logType && logType !== 'all') params.set('log_type', logType)
   if (webrootId && webrootId !== 'all') params.set('webroot_id', webrootId)
+  if (cronJobId) params.set('cron_job_id', cronJobId)
 
   return useQuery({
-    queryKey: ['tenant-logs', tenantId, logType, webrootId, range],
+    queryKey: ['tenant-logs', tenantId, logType, webrootId, range, cronJobId],
     queryFn: () =>
       api.get<LogQueryResponse>(
         `/tenants/${tenantId}/logs?${params.toString()}`

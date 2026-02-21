@@ -20,7 +20,7 @@ export function AuthLayout() {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar onSearchClick={() => setCmdOpen(true)} />
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto bg-surface">
         <div className="container mx-auto p-6">
           <Outlet />
         </div>

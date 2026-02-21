@@ -2,6 +2,17 @@ package model
 
 import "time"
 
+type CronExecution struct {
+	ID         string    `json:"id"`
+	CronJobID  string    `json:"cron_job_id"`
+	NodeID     string    `json:"node_id"`
+	Success    bool      `json:"success"`
+	ExitCode   *int      `json:"exit_code,omitempty"`
+	DurationMs *int      `json:"duration_ms,omitempty"`
+	StartedAt  time.Time `json:"started_at"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
 type CronJob struct {
 	ID                  string    `json:"id"`
 	TenantID            string    `json:"tenant_id"`
