@@ -40,17 +40,7 @@ This places the public key at `/etc/ssh/hosting_ca.pub` and configures sshd to t
 
 ### 3. Configure Core API
 
-Add the CA private key (PEM contents) to Helm values:
-
-```yaml
-secrets:
-  sshCaPrivateKey: |
-    -----BEGIN OPENSSH PRIVATE KEY-----
-    ...
-    -----END OPENSSH PRIVATE KEY-----
-```
-
-Deploy:
+The `ssh_ca` file is automatically picked up by `just vm-deploy` (via `--set-file`). Just deploy:
 
 ```bash
 just vm-deploy

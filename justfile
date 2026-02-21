@@ -133,10 +133,19 @@ gen-certs:
 
 # Generate SSH CA key pair for web terminal certificate signing
 generate-ssh-ca:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -f ssh_ca ]; then
+        echo "SSH CA key already exists (ssh_ca). Delete it first to regenerate."
+        exit 0
+    fi
     ssh-keygen -t ed25519 -f ssh_ca -C "hosting-platform-ca" -N ""
-    @echo "Generated ssh_ca (private key) and ssh_ca.pub (public key)"
-    @echo "Add private key to Helm values: secrets.sshCaPrivateKey"
-    @echo "Add public key to Ansible: ssh_ca_public_key variable"
+    echo ""
+    echo "Generated ssh_ca (private key) and ssh_ca.pub (public key)"
+    echo "The private key will be injected into Helm automatically on vm-deploy."
+    echo "Add the public key to Ansible group vars (ssh_ca_public_key):"
+    echo ""
+    cat ssh_ca.pub
 
 # --- Utilities ---
 
@@ -415,9 +424,16 @@ vm-deploy:
       --from-file=contact-points.yaml=docker/grafana/provisioning/alerting/contact-points.yaml \
       --from-file=notification-policies.yaml=docker/grafana/provisioning/alerting/notification-policies.yaml \
       --from-file=alert-rules.yaml=docker/grafana/provisioning/alerting/alert-rules.yaml
-    # Install/upgrade Helm chart
+    # Install/upgrade Helm chart (secrets from .env, SSH CA key from file)
     helm --kube-context hosting upgrade --install hosting \
-      deploy/helm/hosting -f deploy/helm/hosting/values-dev.yaml
+      deploy/helm/hosting -f deploy/helm/hosting/values-dev.yaml \
+      --set secrets.coreDatabaseUrl="$CORE_DATABASE_URL" \
+      --set secrets.powerdnsDatabaseUrl="$POWERDNS_DATABASE_URL" \
+      --set secrets.stalwartAdminToken="$STALWART_ADMIN_TOKEN" \
+      --set secrets.secretEncryptionKey="$SECRET_ENCRYPTION_KEY" \
+      --set secrets.llmApiKey="$LLM_API_KEY" \
+      --set secrets.agentApiKey="$AGENT_API_KEY" \
+      {{ if path_exists("ssh_ca") == "true" { "--set-file secrets.sshCaPrivateKey=ssh_ca" } else { "" } }}
 
 # Fetch kubeconfig from controlplane VM and merge into ~/.kube/config
 vm-kubeconfig:

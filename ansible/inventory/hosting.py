@@ -132,6 +132,9 @@ def build_inventory():
             for node in nodes:
                 hostname = node.get("hostname", "")
                 ip = node.get("ip_address", "")
+                # Strip CIDR suffix (Postgres INET returns e.g. "10.10.10.10/32")
+                if ip and "/" in ip:
+                    ip = ip.split("/")[0]
                 if not hostname or not ip:
                     continue
 

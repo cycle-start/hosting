@@ -39,11 +39,8 @@ config:
   regionId: "dev"
   clusterId: "vm-cluster-1"
 
-secrets:
-  coreDatabaseUrl: "postgres://hosting:hosting@127.0.0.1:5432/hosting_core"
-  powerdnsDatabaseUrl: "postgres://hosting:hosting@127.0.0.1:5433/hosting_powerdns"
-  stalwartAdminToken: "dev-token"
-  secretEncryptionKey: "2ffaaf0ef3079215a6b4210ee0c203f87288aa9f769c388b6b812b450d67e58a"
+# Secrets are loaded from .env via --set flags in `just vm-deploy`
+secrets: {}
 
 temporal:
   address: "127.0.0.1:7233"

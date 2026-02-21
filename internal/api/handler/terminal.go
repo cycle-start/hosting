@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/coder/websocket"
@@ -229,6 +230,10 @@ func (h *Terminal) resolveNodeIP(ctx context.Context, shardID string) (string, e
 	`, shardID).Scan(&ip)
 	if err != nil {
 		return "", fmt.Errorf("resolve node IP for shard %s: %w", shardID, err)
+	}
+	// Strip CIDR suffix — Postgres INET returns e.g. "10.10.10.10/32".
+	if idx := strings.IndexByte(ip, '/'); idx != -1 {
+		ip = ip[:idx]
 	}
 	return ip, nil
 }
