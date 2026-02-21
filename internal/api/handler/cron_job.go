@@ -26,49 +26,6 @@ func NewCronJob(services *core.Services) *CronJob {
 	return &CronJob{svc: services.CronJob, services: services}
 }
 
-// ListExecutions godoc
-//
-//	@Summary		List cron job executions
-//	@Description	Returns recent execution history for a cron job.
-//	@Tags			Cron Jobs
-//	@Security		ApiKeyAuth
-//	@Param			cronJobID path string true "Cron Job ID"
-//	@Success		200 {object} response.PaginatedResponse{items=[]model.CronExecution}
-//	@Failure		400 {object} response.ErrorResponse
-//	@Failure		404 {object} response.ErrorResponse
-//	@Failure		500 {object} response.ErrorResponse
-//	@Router			/cron-jobs/{cronJobID}/executions [get]
-func (h *CronJob) ListExecutions(w http.ResponseWriter, r *http.Request) {
-	cronJobID, err := request.RequireID(chi.URLParam(r, "cronJobID"))
-	if err != nil {
-		response.WriteError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	cronJob, err := h.svc.GetByID(r.Context(), cronJobID)
-	if err != nil {
-		response.WriteError(w, http.StatusNotFound, err.Error())
-		return
-	}
-	if !checkTenantBrand(w, r, h.services.Tenant, cronJob.TenantID) {
-		return
-	}
-
-	execs, err := h.svc.ListCronExecutions(r.Context(), cronJobID, 50)
-	if err != nil {
-		response.WriteServiceError(w, err)
-		return
-	}
-	if execs == nil {
-		execs = []model.CronExecution{}
-	}
-
-	response.WriteJSON(w, http.StatusOK, map[string]any{
-		"items":    execs,
-		"has_more": false,
-	})
-}
-
 // ListByWebroot godoc
 //
 //	@Summary		List cron jobs for a webroot

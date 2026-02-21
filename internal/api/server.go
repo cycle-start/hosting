@@ -398,8 +398,7 @@ func (s *Server) setupRoutes() {
 			r.Use(mw.RequireScope("cron_jobs", "read"))
 			r.Get("/webroots/{webrootID}/cron-jobs", cronJob.ListByWebroot)
 			r.Get("/cron-jobs/{id}", cronJob.Get)
-			r.Get("/cron-jobs/{cronJobID}/executions", cronJob.ListExecutions)
-		})
+})
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireScope("cron_jobs", "write"))
 			r.Post("/webroots/{webrootID}/cron-jobs", cronJob.Create)

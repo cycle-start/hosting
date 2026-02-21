@@ -116,17 +116,14 @@ func (h *InternalNode) ReportCronOutcome(w http.ResponseWriter, r *http.Request)
 	}
 
 	var req struct {
-		Success    bool   `json:"success"`
-		ExitCode   *int   `json:"exit_code,omitempty"`
-		DurationMs *int   `json:"duration_ms,omitempty"`
-		NodeID     string `json:"node_id,omitempty"`
+		Success bool `json:"success"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	if err := h.cronJobSvc.ReportCronOutcome(r.Context(), cronJobID, req.Success, req.ExitCode, req.DurationMs, req.NodeID); err != nil {
+	if err := h.cronJobSvc.ReportCronOutcome(r.Context(), cronJobID, req.Success); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "failed to report cron outcome")
 		return
 	}

@@ -22,20 +22,5 @@ CREATE TABLE cron_jobs (
 CREATE INDEX idx_cron_jobs_tenant_id ON cron_jobs(tenant_id);
 CREATE INDEX idx_cron_jobs_webroot_id ON cron_jobs(webroot_id);
 
-CREATE TABLE cron_executions (
-    id              TEXT PRIMARY KEY,
-    cron_job_id     TEXT NOT NULL REFERENCES cron_jobs(id) ON DELETE CASCADE,
-    node_id         TEXT NOT NULL,
-    success         BOOLEAN NOT NULL,
-    exit_code       INT,
-    duration_ms     INT,
-    started_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX idx_cron_executions_cron_job_id ON cron_executions(cron_job_id);
-CREATE INDEX idx_cron_executions_started_at ON cron_executions(started_at DESC);
-
 -- +goose Down
-DROP TABLE cron_executions;
 DROP TABLE cron_jobs;

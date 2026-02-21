@@ -5,7 +5,7 @@ import type {
   Zone, ZoneRecord, Database, DatabaseUser,
   ValkeyInstance, ValkeyUser, EmailAccount, EmailAlias, EmailForward, EmailAutoReply,
   S3Bucket, S3AccessKey, Subscription,
-  SSHKey, CronJob, CronExecution, Daemon, Backup, Brand,
+  SSHKey, CronJob, Daemon, Backup, Brand,
   APIKey, APIKeyCreateResponse, AuditLogEntry, DashboardStats,
   PlatformConfig, ListParams, AuditListParams, TenantResourceSummary,
   CreateTenantRequest, WebrootEnvVar,
@@ -936,14 +936,6 @@ export function useRetryCronJob() {
   return useMutation({
     mutationFn: (id: string) => api.post(`/cron-jobs/${id}/retry`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cron-jobs'] }),
-  })
-}
-
-export function useCronExecutions(cronJobId: string) {
-  return useQuery({
-    queryKey: ['cron-executions', cronJobId],
-    queryFn: () => api.get<PaginatedResponse<CronExecution>>(`/cron-jobs/${cronJobId}/executions`),
-    enabled: !!cronJobId,
   })
 }
 

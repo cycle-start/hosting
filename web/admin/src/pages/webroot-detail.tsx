@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Trash2, Pencil, Globe, Play, Pause, RotateCcw, Terminal, Clock, Key, Lock, ScrollText, ChevronDown, ChevronRight, CheckCircle, XCircle } from 'lucide-react'
+import { Plus, Trash2, Pencil, Globe, Play, Pause, RotateCcw, Terminal, Clock, Key, Lock, ScrollText, ChevronDown, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,7 +21,7 @@ import { Breadcrumb } from '@/components/shared/breadcrumb'
 import { CopyButton } from '@/components/shared/copy-button'
 import { LogViewer } from '@/components/shared/log-viewer'
 import { TenantLogViewer } from '@/components/shared/tenant-log-viewer'
-import { formatDate, formatRelative } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { rules, validateField } from '@/lib/validation'
 import {
   useTenant,
@@ -30,9 +30,8 @@ import {
   useCreateDaemon, useUpdateDaemon, useDeleteDaemon, useEnableDaemon, useDisableDaemon, useRetryDaemon,
   useCreateCronJob, useUpdateCronJob, useDeleteCronJob, useEnableCronJob, useDisableCronJob, useRetryCronJob,
   useEnvVars, useSetEnvVars, useDeleteEnvVar,
-  useCronExecutions,
 } from '@/lib/hooks'
-import type { FQDN, Daemon, CronJob, WebrootEnvVar, CronExecution } from '@/lib/types'
+import type { FQDN, Daemon, CronJob, WebrootEnvVar } from '@/lib/types'
 
 const runtimes = ['php', 'node', 'python', 'ruby', 'static']
 const stopSignals = ['TERM', 'INT', 'QUIT', 'KILL', 'HUP']
@@ -41,59 +40,6 @@ const webrootTabs = ['fqdns', 'daemons', 'cron-jobs', 'env-vars', 'access-logs',
 function getWebrootTabFromHash() {
   const hash = window.location.hash.slice(1)
   return webrootTabs.includes(hash) ? hash : 'fqdns'
-}
-
-function CronExecutionHistory({ cronJobId, tenantId }: { cronJobId: string; tenantId: string }) {
-  const { data, isLoading } = useCronExecutions(cronJobId)
-  const execs = data?.items ?? []
-
-  return (
-    <div className="space-y-4 p-4 bg-muted/30 rounded-md">
-      <div>
-        <h4 className="text-sm font-medium mb-2">Recent Executions</h4>
-        {isLoading ? (
-          <Skeleton className="h-16 w-full" />
-        ) : execs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No executions recorded yet.</p>
-        ) : (
-          <div className="rounded-md border bg-background">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-3 py-1.5 text-left font-medium">Time</th>
-                  <th className="px-3 py-1.5 text-left font-medium">Result</th>
-                  <th className="px-3 py-1.5 text-left font-medium">Exit Code</th>
-                  <th className="px-3 py-1.5 text-left font-medium">Node</th>
-                </tr>
-              </thead>
-              <tbody>
-                {execs.slice(0, 10).map((e: CronExecution) => (
-                  <tr key={e.id} className="border-b last:border-0">
-                    <td className="px-3 py-1.5 text-xs text-muted-foreground" title={formatDate(e.started_at)}>
-                      {formatRelative(e.started_at)}
-                    </td>
-                    <td className="px-3 py-1.5">
-                      {e.success ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-green-600"><CheckCircle className="h-3 w-3" /> OK</span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs text-red-600"><XCircle className="h-3 w-3" /> Failed</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-1.5 font-mono text-xs">{e.exit_code ?? '-'}</td>
-                    <td className="px-3 py-1.5 font-mono text-xs truncate max-w-[120px]">{e.node_id || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-      <div>
-        <h4 className="text-sm font-medium mb-2">Cron Logs</h4>
-        <TenantLogViewer tenantId={tenantId} cronJobId={cronJobId} />
-      </div>
-    </div>
-  )
 }
 
 export function WebrootDetailPage() {
@@ -583,7 +529,10 @@ export function WebrootDetailPage() {
     <div>
       <DataTable columns={cronColumns} data={cronJobsList} loading={cronJobsLoading} searchColumn="name" searchPlaceholder="Search cron jobs..." />
       {expandedCronId && cronJobsList.some(c => c.id === expandedCronId) && (
-        <CronExecutionHistory cronJobId={expandedCronId} tenantId={tenantId} />
+        <div className="p-4 bg-muted/30 rounded-md">
+          <h4 className="text-sm font-medium mb-2">Cron Logs</h4>
+          <TenantLogViewer tenantId={tenantId} cronJobId={expandedCronId} />
+        </div>
       )}
     </div>
   )

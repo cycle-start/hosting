@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/edvin/hosting/internal/model"
-	"github.com/edvin/hosting/internal/platform"
 	temporalclient "go.temporal.io/sdk/client"
 )
 
@@ -220,15 +219,7 @@ func (s *CronJobService) Retry(ctx context.Context, id string) error {
 // On success, resets consecutive_failures to 0. On failure, increments it.
 // If consecutive_failures reaches max_failures, auto-disables the job and triggers
 // a DisableCronJobWorkflow.
-func (s *CronJobService) ReportCronOutcome(ctx context.Context, id string, success bool, exitCode *int, durationMs *int, nodeID string) error {
-	// Insert execution record
-	execID := platform.NewID()
-	_, _ = s.db.Exec(ctx,
-		`INSERT INTO cron_executions (id, cron_job_id, node_id, success, exit_code, duration_ms, started_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, now())`,
-		execID, id, nodeID, success, exitCode, durationMs,
-	)
-
+func (s *CronJobService) ReportCronOutcome(ctx context.Context, id string, success bool) error {
 	if success {
 		_, err := s.db.Exec(ctx,
 			"UPDATE cron_jobs SET consecutive_failures = 0, updated_at = now() WHERE id = $1",
@@ -274,27 +265,4 @@ func (s *CronJobService) ReportCronOutcome(ctx context.Context, id string, succe
 	}
 
 	return nil
-}
-
-// ListCronExecutions returns the most recent executions for a cron job.
-func (s *CronJobService) ListCronExecutions(ctx context.Context, cronJobID string, limit int) ([]model.CronExecution, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT id, cron_job_id, node_id, success, exit_code, duration_ms, started_at, created_at
-		 FROM cron_executions WHERE cron_job_id = $1 ORDER BY started_at DESC LIMIT $2`,
-		cronJobID, limit,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("list cron executions: %w", err)
-	}
-	defer rows.Close()
-
-	var execs []model.CronExecution
-	for rows.Next() {
-		var e model.CronExecution
-		if err := rows.Scan(&e.ID, &e.CronJobID, &e.NodeID, &e.Success, &e.ExitCode, &e.DurationMs, &e.StartedAt, &e.CreatedAt); err != nil {
-			return nil, fmt.Errorf("scan cron execution: %w", err)
-		}
-		execs = append(execs, e)
-	}
-	return execs, rows.Err()
 }
