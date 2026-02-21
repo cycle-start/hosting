@@ -223,9 +223,11 @@ vm-rebuild:
         echo "Starting libvirt network 'hosting'..."; \
         sudo virsh net-start hosting; \
     fi
+    just _wait-ssh
+    just ansible-bootstrap
+    just _rerun-cloudinit
     just _wait-k3s
     just vm-kubeconfig
-    just ansible-bootstrap
     just vm-deploy
     just _wait-postgres
     just migrate
@@ -284,6 +286,67 @@ _wait-api:
     echo "  Check pods: kubectl --context hosting get pods"; \
     echo "  Check logs: kubectl --context hosting logs deploy/hosting-core-api --tail=50"; \
     exit 1
+
+# Wait for SSH on all VMs (after terraform creates them)
+[private]
+_wait-ssh:
+    #!/usr/bin/env bash
+    echo "Waiting for SSH on all VMs..."
+    ALL_IPS="10.10.10.2 10.10.10.10 10.10.10.11 10.10.10.20 10.10.10.30 10.10.10.40 10.10.10.50 10.10.10.60 10.10.10.70 10.10.10.80"
+    for ip in $ALL_IPS; do
+        printf "  %s: " "$ip"
+        for i in $(seq 1 60); do
+            if ssh {{ssh_opts}} -o ConnectTimeout=2 ubuntu@$ip "true" 2>/dev/null; then
+                echo "ready"
+                break
+            fi
+            if [ $i -eq 60 ]; then
+                echo "TIMEOUT"
+                echo "ERROR: VM $ip did not accept SSH after 5 minutes."
+                exit 1
+            fi
+            sleep 5
+        done
+    done
+    echo "All VMs accepting SSH."
+
+# Re-run cloud-init on all VMs (installs software first via Ansible, then runcmd succeeds)
+[private]
+_rerun-cloudinit:
+    #!/usr/bin/env bash
+    echo "Re-running cloud-init on all VMs (clean + reboot)..."
+    ALL_IPS="10.10.10.2 10.10.10.10 10.10.10.11 10.10.10.20 10.10.10.30 10.10.10.40 10.10.10.50 10.10.10.60 10.10.10.70 10.10.10.80"
+    for ip in $ALL_IPS; do
+        echo "  Rebooting $ip..."
+        ssh {{ssh_opts}} ubuntu@$ip "sudo cloud-init clean --logs && sudo reboot" 2>/dev/null || true
+    done
+    echo "Waiting 15s for VMs to go down..."
+    sleep 15
+    for ip in $ALL_IPS; do
+        printf "  %s: " "$ip"
+        for i in $(seq 1 90); do
+            if ssh {{ssh_opts}} -o ConnectTimeout=2 ubuntu@$ip "true" 2>/dev/null; then
+                echo "up"
+                break
+            fi
+            if [ $i -eq 90 ]; then
+                echo "TIMEOUT"
+                echo "ERROR: VM $ip did not come back after reboot."
+                exit 1
+            fi
+            sleep 5
+        done
+    done
+    echo "All VMs back up. Waiting for cloud-init to finish..."
+    for ip in $ALL_IPS; do
+        printf "  %s cloud-init: " "$ip"
+        if ssh {{ssh_opts}} ubuntu@$ip "sudo cloud-init status --wait" 2>/dev/null; then
+            echo "done"
+        else
+            echo "warning (may be OK)"
+        fi
+    done
+    echo "Cloud-init complete on all VMs."
 
 # Destroy VMs
 vm-down:
