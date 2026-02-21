@@ -639,7 +639,7 @@ export function TenantDetailPage() {
 
       <ResourceHeader
         title={tenant.name}
-        subtitle={`UID: ${tenant.uid} | Brand: ${brand?.name || tenant.brand_id} | Region: ${tenant.region_name || tenant.region_id} | Cluster: ${tenant.cluster_name || tenant.cluster_id}`}
+        subtitle={`UID: ${tenant.uid} | Customer: ${tenant.customer_id} | Brand: ${brand?.name || tenant.brand_id} | Region: ${tenant.region_name || tenant.region_id} | Cluster: ${tenant.cluster_name || tenant.cluster_id}`}
         status={tenant.status}
         actions={
           <div className="flex gap-2">

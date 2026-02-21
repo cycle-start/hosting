@@ -72,6 +72,7 @@ export interface Tenant {
   id: string
   name: string
   brand_id: string
+  customer_id: string
   region_id: string
   cluster_id: string
   shard_id?: string | null
@@ -581,6 +582,7 @@ export interface SSHKeyFormData { name: string; public_key: string }
 
 export interface CreateTenantRequest {
   brand_id: string
+  customer_id: string
   region_id: string
   cluster_id: string
   shard_id: string

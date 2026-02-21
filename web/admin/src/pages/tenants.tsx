@@ -63,6 +63,11 @@ export function TenantsPage() {
       ),
     },
     {
+      accessorKey: 'customer_id',
+      header: 'Customer',
+      cell: ({ row }) => <span className="text-sm">{row.original.customer_id}</span>,
+    },
+    {
       accessorKey: 'region_name',
       header: 'Region',
       cell: ({ row }) => row.original.region_name || row.original.region_id,

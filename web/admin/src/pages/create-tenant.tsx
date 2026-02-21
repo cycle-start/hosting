@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -29,6 +30,7 @@ export function CreateTenantPage() {
   const { data: brandsData } = useBrands()
 
   const [brandId, setBrandId] = useState('')
+  const [customerId, setCustomerId] = useState('')
   const [regionId, setRegionId] = useState('')
   const [clusterId, setClusterId] = useState('')
   const [shardId, setShardId] = useState('')
@@ -44,6 +46,7 @@ export function CreateTenantPage() {
   const handleSubmit = async () => {
     const payload: CreateTenantRequest = {
       brand_id: brandId,
+      customer_id: customerId,
       region_id: regionId,
       cluster_id: clusterId,
       shard_id: shardId,
@@ -65,7 +68,7 @@ export function CreateTenantPage() {
     }
   }
 
-  const canSubmit = brandId && regionId && clusterId && shardId && !createMutation.isPending
+  const canSubmit = brandId && customerId && regionId && clusterId && shardId && !createMutation.isPending
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -89,6 +92,14 @@ export function CreateTenantPage() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Customer ID</Label>
+            <Input
+              placeholder="External customer identifier"
+              value={customerId}
+              onChange={(e) => setCustomerId(e.target.value)}
+            />
           </div>
           <RegionClusterShardSelect
             regionId={regionId} onRegionChange={setRegionId}
