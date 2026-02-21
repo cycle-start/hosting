@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { ResourceHeader } from '@/components/shared/resource-header'
@@ -26,9 +27,16 @@ import {
 } from '@/lib/hooks'
 import type { S3AccessKey } from '@/lib/types'
 
+const s3Tabs = ['access-keys', 'logs']
+function getS3TabFromHash() {
+  const hash = window.location.hash.slice(1)
+  return s3Tabs.includes(hash) ? hash : 'access-keys'
+}
+
 export function S3BucketDetailPage() {
   const { id: tenantId, bucketId } = useParams({ from: '/auth/tenants/$id/s3-buckets/$bucketId' as never })
   const { data: tenant } = useTenant(tenantId)
+  const [activeTab, setActiveTab] = useState(getS3TabFromHash)
 
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<S3AccessKey | null>(null)
@@ -125,19 +133,29 @@ export function S3BucketDetailPage() {
         </div>
       </div>
 
-      <div>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Access Keys</h2>
-          <Button size="sm" onClick={() => { setPermissions('read-write'); setCreateOpen(true) }}>
-            <Plus className="mr-2 h-4 w-4" /> Create Access Key
-          </Button>
-        </div>
-        {!keysLoading && (keysData?.items?.length ?? 0) === 0 ? (
-          <EmptyState icon={Key} title="No access keys" description="Create an access key to use S3 APIs." action={{ label: 'Create Access Key', onClick: () => setCreateOpen(true) }} />
-        ) : (
-          <DataTable columns={columns} data={keysData?.items ?? []} loading={keysLoading} searchColumn="access_key_id" searchPlaceholder="Search keys..." />
-        )}
-      </div>
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); window.history.replaceState(null, '', `#${v}`) }}>
+        <TabsList>
+          <TabsTrigger value="access-keys"><Key className="mr-1.5 h-4 w-4" /> Access Keys ({keysData?.items?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="logs"><ScrollText className="mr-1.5 h-4 w-4" /> Logs</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="access-keys">
+          <div className="mb-4 flex justify-end">
+            <Button size="sm" onClick={() => { setPermissions('read-write'); setCreateOpen(true) }}>
+              <Plus className="mr-2 h-4 w-4" /> Create Access Key
+            </Button>
+          </div>
+          {!keysLoading && (keysData?.items?.length ?? 0) === 0 ? (
+            <EmptyState icon={Key} title="No access keys" description="Create an access key to use S3 APIs." action={{ label: 'Create Access Key', onClick: () => setCreateOpen(true) }} />
+          ) : (
+            <DataTable columns={columns} data={keysData?.items ?? []} loading={keysLoading} searchColumn="access_key_id" searchPlaceholder="Search keys..." />
+          )}
+        </TabsContent>
+
+        <TabsContent value="logs">
+          <LogViewer query={`{app=~"core-api|worker|node-agent"} |= "${bucketId}"`} />
+        </TabsContent>
+      </Tabs>
 
       {/* Create Access Key */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -200,9 +218,6 @@ export function S3BucketDetailPage() {
       </Dialog>
 
       {/* Delete Access Key */}
-      {/* Logs */}
-      <LogViewer query={`{app=~"core-api|worker|node-agent"} |= "${bucketId}"`} title="Logs" />
-
       <ConfirmDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)} title="Delete Access Key"
         description={`Delete access key "${deleteTarget?.access_key_id}"? Any applications using this key will lose access.`}
         confirmLabel="Delete" variant="destructive" loading={deleteMut.isPending}
