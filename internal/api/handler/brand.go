@@ -70,8 +70,12 @@ func (h *Brand) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
+	id := req.ID
+	if id == "" {
+		id = platform.NewID()
+	}
 	brand := &model.Brand{
-		ID:              platform.NewID(),
+		ID:              id,
 		Name:            req.Name,
 		BaseHostname:    req.BaseHostname,
 		PrimaryNS:       req.PrimaryNS,

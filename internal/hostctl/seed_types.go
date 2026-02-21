@@ -20,6 +20,7 @@ type OIDCClientDef struct {
 }
 
 type BrandDef struct {
+	ID              string   `yaml:"id"`
 	Name            string   `yaml:"name"`
 	BaseHostname    string   `yaml:"base_hostname"`
 	PrimaryNS       string   `yaml:"primary_ns"`
@@ -43,6 +44,7 @@ type ZoneDef struct {
 type TenantDef struct {
 	Name            string              `yaml:"name"`
 	Brand           string              `yaml:"brand"`
+	CustomerID      string              `yaml:"customer_id"`
 	Shard           string              `yaml:"shard"`
 	SFTPEnabled     bool                `yaml:"sftp_enabled"`
 	SSHEnabled      bool                `yaml:"ssh_enabled"`
@@ -58,6 +60,7 @@ type TenantDef struct {
 }
 
 type SubscriptionDef struct {
+	ID   string `yaml:"id"`
 	Name string `yaml:"name"`
 }
 

@@ -87,7 +87,7 @@ func Seed(configPath string, timeout time.Duration) error {
 			brandMap[b.Name] = brandID
 		} else {
 			fmt.Printf("Creating brand %q...\n", b.Name)
-			resp, err := client.Post("/brands", map[string]any{
+			body := map[string]any{
 				"name":             b.Name,
 				"base_hostname":    b.BaseHostname,
 				"primary_ns":       b.PrimaryNS,
@@ -98,7 +98,11 @@ func Seed(configPath string, timeout time.Duration) error {
 				"dkim_selector":    b.DKIMSelector,
 				"dkim_public_key":  b.DKIMPublicKey,
 				"dmarc_policy":     b.DMARCPolicy,
-			})
+			}
+			if b.ID != "" {
+				body["id"] = b.ID
+			}
+			resp, err := client.Post("/brands", body)
 			if err != nil {
 				return fmt.Errorf("create brand %q: %w", b.Name, err)
 			}
@@ -175,7 +179,10 @@ func Seed(configPath string, timeout time.Duration) error {
 			t.Subscriptions = []SubscriptionDef{{Name: "default"}}
 		}
 		for _, s := range t.Subscriptions {
-			id := generateUUID()
+			id := s.ID
+			if id == "" {
+				id = generateUUID()
+			}
 			subMap[s.Name] = id
 			subscriptions = append(subscriptions, map[string]any{
 				"id":   id,
@@ -211,6 +218,10 @@ func Seed(configPath string, timeout time.Duration) error {
 			}
 			tenantBody["brand_id"] = brandID
 		}
+		if t.CustomerID == "" {
+			return fmt.Errorf("tenant %q: customer_id is required", t.Name)
+		}
+		tenantBody["customer_id"] = t.CustomerID
 
 		// Nested SSH keys
 		if len(t.SSHKeys) > 0 {

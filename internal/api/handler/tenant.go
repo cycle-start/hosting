@@ -57,6 +57,7 @@ func (h *Tenant) checkTenantBrandAccess(w http.ResponseWriter, r *http.Request, 
 func (h *Tenant) List(w http.ResponseWriter, r *http.Request) {
 	params := request.ParseListParams(r, "created_at")
 	params.BrandIDs = mw.BrandIDs(r.Context())
+	params.CustomerID = r.URL.Query().Get("customer_id")
 
 	tenants, hasMore, err := h.svc.List(r.Context(), params)
 	if err != nil {
@@ -121,10 +122,11 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 		now := time.Now()
 		shardID := req.ShardID
 		tenant = &model.Tenant{
-			ID:        platform.NewID(),
-			Name:      platform.NewName("t"),
-			BrandID:   req.BrandID,
-			RegionID:  req.RegionID,
+			ID:         platform.NewID(),
+			Name:       platform.NewName("t"),
+			BrandID:    req.BrandID,
+			CustomerID: req.CustomerID,
+			RegionID:   req.RegionID,
 			ClusterID: req.ClusterID,
 			ShardID:   &shardID,
 			Status:    model.StatusPending,
@@ -559,6 +561,9 @@ func (h *Tenant) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.CustomerID != nil {
+		tenant.CustomerID = *req.CustomerID
+	}
 	if req.SFTPEnabled != nil {
 		tenant.SFTPEnabled = *req.SFTPEnabled
 	}

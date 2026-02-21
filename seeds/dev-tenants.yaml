@@ -6,7 +6,8 @@ region: dev
 cluster: vm-cluster-1
 
 brands:
-  - name: "Acme Hosting"
+  - id: "brand_acme_dev_000000000001"
+    name: "Acme Hosting"
     base_hostname: "acme-hosting.test"
     primary_ns: "ns1.acme-hosting.test"
     secondary_ns: "ns2.acme-hosting.test"
@@ -34,9 +35,13 @@ oidc_clients:
 tenants:
   - name: acme-corp
     brand: "Acme Hosting"
+    customer_id: "cust_acme_dev_000000000001"
     shard: web-1
     sftp_enabled: true
     ssh_enabled: true
+    subscriptions:
+      - id: "sub_acme_dev_000000000001"
+        name: default
     egress_rules:
       - cidr: "0.0.0.0/0"
         description: "Allow all IPv4 (dev)"

@@ -3,6 +3,7 @@ CREATE TABLE tenants (
     id           TEXT PRIMARY KEY,
     name         TEXT NOT NULL UNIQUE,
     brand_id     TEXT NOT NULL REFERENCES brands(id),
+    customer_id  TEXT NOT NULL,
     region_id    TEXT NOT NULL REFERENCES regions(id),
     cluster_id   TEXT NOT NULL REFERENCES clusters(id),
     uid          INT NOT NULL UNIQUE,
@@ -15,6 +16,8 @@ CREATE TABLE tenants (
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE INDEX idx_tenants_customer_id ON tenants(customer_id);
 
 CREATE SEQUENCE tenant_uid_seq START 5000;
 

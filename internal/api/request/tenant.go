@@ -1,7 +1,8 @@
 package request
 
 type CreateTenant struct {
-	BrandID        string `json:"brand_id" validate:"required"`
+	BrandID        string  `json:"brand_id" validate:"required"`
+	CustomerID     string  `json:"customer_id" validate:"required"`
 	RegionID       string `json:"region_id" validate:"required"`
 	ClusterID      string `json:"cluster_id" validate:"required"`
 	ShardID        string `json:"shard_id" validate:"required"`
@@ -21,7 +22,8 @@ type CreateTenant struct {
 }
 
 type UpdateTenant struct {
-	SFTPEnabled    *bool  `json:"sftp_enabled"`
-	SSHEnabled     *bool  `json:"ssh_enabled"`
-	DiskQuotaBytes *int64 `json:"disk_quota_bytes"`
+	CustomerID     *string `json:"customer_id"`
+	SFTPEnabled    *bool   `json:"sftp_enabled"`
+	SSHEnabled     *bool   `json:"ssh_enabled"`
+	DiskQuotaBytes *int64  `json:"disk_quota_bytes"`
 }

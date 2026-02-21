@@ -10,7 +10,8 @@ type ListParams struct {
 	Status   string
 	Sort     string
 	Order    string // "asc" or "desc"
-	BrandIDs []string // populated from auth context, not query params
+	BrandIDs   []string // populated from auth context, not query params
+	CustomerID string   // optional filter from query params
 }
 
 // ParseListParams extracts list parameters from the query string.

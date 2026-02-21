@@ -8,6 +8,7 @@ A **tenant** is the fundamental unit of hosting. Each tenant maps to a Linux use
 |-------|------|-------------|
 | `id` | string | Auto-generated short ID |
 | `brand_id` | string | Brand this tenant belongs to |
+| `customer_id` | string | Customer identifier (opaque, from control panel or CRM) |
 | `region_id` | string | Region ID |
 | `cluster_id` | string | Cluster ID |
 | `shard_id` | string | Web shard ID (nullable) |
