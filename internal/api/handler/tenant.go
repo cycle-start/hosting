@@ -204,9 +204,6 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 				CreatedAt:      now2,
 				UpdatedAt:      now2,
 			}
-			if wr.EnvShellSource != nil {
-				webroot.EnvShellSource = *wr.EnvShellSource
-			}
 			if err := tx.Webroot.Create(skipCtx, webroot); err != nil {
 				return fmt.Errorf("create webroot: %w", err)
 			}

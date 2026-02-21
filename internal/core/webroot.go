@@ -19,10 +19,10 @@ func NewWebrootService(db DB, tc temporalclient.Client) *WebrootService {
 
 func (s *WebrootService) Create(ctx context.Context, webroot *model.Webroot) error {
 	_, err := s.db.Exec(ctx,
-		`INSERT INTO webroots (id, tenant_id, subscription_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, env_shell_source, service_hostname_enabled, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+		`INSERT INTO webroots (id, tenant_id, subscription_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, service_hostname_enabled, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 		webroot.ID, webroot.TenantID, webroot.SubscriptionID, webroot.Name, webroot.Runtime, webroot.RuntimeVersion,
-		webroot.RuntimeConfig, webroot.PublicFolder, webroot.EnvFileName, webroot.EnvShellSource,
+		webroot.RuntimeConfig, webroot.PublicFolder, webroot.EnvFileName,
 		webroot.ServiceHostnameEnabled, webroot.Status, webroot.CreatedAt, webroot.UpdatedAt,
 	)
 	if err != nil {
@@ -43,10 +43,10 @@ func (s *WebrootService) Create(ctx context.Context, webroot *model.Webroot) err
 func (s *WebrootService) GetByID(ctx context.Context, id string) (*model.Webroot, error) {
 	var w model.Webroot
 	err := s.db.QueryRow(ctx,
-		`SELECT id, tenant_id, subscription_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, env_shell_source, service_hostname_enabled, status, status_message, suspend_reason, created_at, updated_at
+		`SELECT id, tenant_id, subscription_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, service_hostname_enabled, status, status_message, suspend_reason, created_at, updated_at
 		 FROM webroots WHERE id = $1`, id,
 	).Scan(&w.ID, &w.TenantID, &w.SubscriptionID, &w.Name, &w.Runtime, &w.RuntimeVersion,
-		&w.RuntimeConfig, &w.PublicFolder, &w.EnvFileName, &w.EnvShellSource,
+		&w.RuntimeConfig, &w.PublicFolder, &w.EnvFileName,
 		&w.ServiceHostnameEnabled, &w.Status, &w.StatusMessage, &w.SuspendReason, &w.CreatedAt, &w.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get webroot %s: %w", id, err)
@@ -55,7 +55,7 @@ func (s *WebrootService) GetByID(ctx context.Context, id string) (*model.Webroot
 }
 
 func (s *WebrootService) ListByTenant(ctx context.Context, tenantID string, limit int, cursor string) ([]model.Webroot, bool, error) {
-	query := `SELECT id, tenant_id, subscription_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, env_shell_source, service_hostname_enabled, status, status_message, suspend_reason, created_at, updated_at FROM webroots WHERE tenant_id = $1`
+	query := `SELECT id, tenant_id, subscription_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, service_hostname_enabled, status, status_message, suspend_reason, created_at, updated_at FROM webroots WHERE tenant_id = $1`
 	args := []any{tenantID}
 	argIdx := 2
 
@@ -79,7 +79,7 @@ func (s *WebrootService) ListByTenant(ctx context.Context, tenantID string, limi
 	for rows.Next() {
 		var w model.Webroot
 		if err := rows.Scan(&w.ID, &w.TenantID, &w.SubscriptionID, &w.Name, &w.Runtime, &w.RuntimeVersion,
-			&w.RuntimeConfig, &w.PublicFolder, &w.EnvFileName, &w.EnvShellSource,
+			&w.RuntimeConfig, &w.PublicFolder, &w.EnvFileName,
 			&w.ServiceHostnameEnabled, &w.Status, &w.StatusMessage, &w.SuspendReason, &w.CreatedAt, &w.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan webroot: %w", err)
 		}
@@ -99,9 +99,9 @@ func (s *WebrootService) ListByTenant(ctx context.Context, tenantID string, limi
 func (s *WebrootService) Update(ctx context.Context, webroot *model.Webroot) error {
 	_, err := s.db.Exec(ctx,
 		`UPDATE webroots SET name = $1, runtime = $2, runtime_version = $3, runtime_config = $4,
-		 public_folder = $5, env_file_name = $6, env_shell_source = $7, service_hostname_enabled = $8, status = $9, updated_at = now() WHERE id = $10`,
+		 public_folder = $5, env_file_name = $6, service_hostname_enabled = $7, status = $8, updated_at = now() WHERE id = $9`,
 		webroot.Name, webroot.Runtime, webroot.RuntimeVersion, webroot.RuntimeConfig,
-		webroot.PublicFolder, webroot.EnvFileName, webroot.EnvShellSource, webroot.ServiceHostnameEnabled, webroot.Status, webroot.ID,
+		webroot.PublicFolder, webroot.EnvFileName, webroot.ServiceHostnameEnabled, webroot.Status, webroot.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update webroot %s: %w", webroot.ID, err)

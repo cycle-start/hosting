@@ -301,7 +301,7 @@ export function useWebroot(id: string) {
 export function useCreateWebroot() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { tenant_id: string; subscription_id: string; runtime: string; runtime_version: string; runtime_config?: Record<string, unknown>; public_folder?: string; fqdns?: FQDNFormData[] }) =>
+    mutationFn: (data: { tenant_id: string; subscription_id: string; runtime: string; runtime_version: string; runtime_config?: Record<string, unknown>; public_folder?: string; env_file_name?: string; fqdns?: FQDNFormData[] }) =>
       api.post<Webroot>(`/tenants/${data.tenant_id}/webroots`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['webroots'] }),
   })
@@ -310,7 +310,7 @@ export function useCreateWebroot() {
 export function useUpdateWebroot() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { id: string; runtime?: string; runtime_version?: string; runtime_config?: Record<string, unknown>; public_folder?: string; env_file_name?: string; env_shell_source?: boolean; service_hostname_enabled?: boolean }) =>
+    mutationFn: (data: { id: string; runtime?: string; runtime_version?: string; runtime_config?: Record<string, unknown>; public_folder?: string; env_file_name?: string; service_hostname_enabled?: boolean }) =>
       api.put<Webroot>(`/webroots/${data.id}`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['webroots'] })

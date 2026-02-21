@@ -61,15 +61,13 @@ Two new fields on the webroot control env var behavior:
 | Field | Default | Description |
 |-------|---------|-------------|
 | `env_file_name` | `.env.hosting` | Filename for the env file written to the webroot directory |
-| `env_shell_source` | `false` | Whether to auto-source the env file in SSH shell sessions |
 
 Set via webroot create/update:
 ```json
 {
   "runtime": "php",
   "runtime_version": "8.5",
-  "env_file_name": ".env",
-  "env_shell_source": true
+  "env_file_name": ".env"
 }
 ```
 
@@ -96,16 +94,6 @@ Cron job systemd units can reference the env file via `EnvironmentFile=`.
 ### Daemons
 
 Webroot env vars are available in the env file. Daemon-specific `Environment` vars take precedence.
-
-### SSH sessions
-
-When `env_shell_source = true`, a block is managed in the tenant's `.bashrc`:
-
-```bash
-# hosting-env-start (auto-generated, do not edit)
-[ -f /webroots/myapp/.env ] && set -a && . /webroots/myapp/.env && set +a
-# hosting-env-end
-```
 
 ## Encryption Architecture
 
@@ -194,4 +182,3 @@ Stores env vars per webroot. Secret values are encrypted. Cascading delete on we
 ### Webroot columns
 
 - `env_file_name` (TEXT, default `.env.hosting`): Name of the env file.
-- `env_shell_source` (BOOLEAN, default false): Auto-source in SSH sessions.

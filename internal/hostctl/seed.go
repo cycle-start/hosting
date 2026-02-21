@@ -272,10 +272,7 @@ func Seed(configPath string, timeout time.Duration) error {
 				if w.EnvFileName != "" {
 					wr["env_file_name"] = w.EnvFileName
 				}
-				if w.EnvShellSource != nil {
-					wr["env_shell_source"] = *w.EnvShellSource
-				}
-
+	
 				// FQDNs with nested email accounts
 				if len(w.FQDNs) > 0 {
 					var fqdns []map[string]any

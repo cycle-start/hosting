@@ -43,7 +43,6 @@ type CreateWebrootParams struct {
 	PublicFolder   string
 	EnvVars        map[string]string
 	EnvFileName    string
-	EnvShellSource bool
 	FQDNs          []FQDNParam
 	Daemons        []DaemonProxyInfo
 }
@@ -59,7 +58,6 @@ type UpdateWebrootParams struct {
 	PublicFolder   string
 	EnvVars        map[string]string
 	EnvFileName    string
-	EnvShellSource bool
 	FQDNs          []FQDNParam
 	Daemons        []DaemonProxyInfo
 }

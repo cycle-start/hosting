@@ -27,9 +27,15 @@ export function WebrootFields({ value, onChange }: Props) {
           <Input placeholder="8.5" value={value.runtime_version} onChange={(e) => onChange({ ...value, runtime_version: e.target.value })} />
         </div>
       </div>
-      <div className="space-y-2">
-        <Label>Public Folder</Label>
-        <Input placeholder="public" value={value.public_folder} onChange={(e) => onChange({ ...value, public_folder: e.target.value })} />
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Public Folder</Label>
+          <Input placeholder="public" value={value.public_folder} onChange={(e) => onChange({ ...value, public_folder: e.target.value })} />
+        </div>
+        <div className="space-y-2">
+          <Label>Env File Name</Label>
+          <Input placeholder=".env.hosting" value={value.env_file_name} onChange={(e) => onChange({ ...value, env_file_name: e.target.value })} />
+        </div>
       </div>
       <ArraySection<FQDNFormData>
         title="FQDNs"

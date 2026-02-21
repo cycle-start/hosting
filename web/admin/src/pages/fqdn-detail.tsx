@@ -141,7 +141,8 @@ export function FQDNDetailPage() {
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
         { label: tenant?.name ?? tenantId, href: `/tenants/${tenantId}` },
-        { label: webroot?.name ?? fqdn.webroot_id ?? 'Webroot', href: `/tenants/${tenantId}/webroots/${fqdn.webroot_id}` },
+        { label: 'Webroots', href: `/tenants/${tenantId}`, hash: 'webroots' },
+        { label: webroot?.name ?? fqdn.webroot_id ?? 'Webroot', href: `/tenants/${tenantId}/webroots/${fqdn.webroot_id}`, hash: 'fqdns' },
         { label: fqdn.fqdn },
       ]} />
 

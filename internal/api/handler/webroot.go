@@ -109,10 +109,6 @@ func (h *Webroot) Create(w http.ResponseWriter, r *http.Request) {
 	if envFileName == "" {
 		envFileName = ".env.hosting"
 	}
-	envShellSource := false
-	if req.EnvShellSource != nil {
-		envShellSource = *req.EnvShellSource
-	}
 	serviceHostnameEnabled := true
 	if req.ServiceHostnameEnabled != nil {
 		serviceHostnameEnabled = *req.ServiceHostnameEnabled
@@ -127,7 +123,6 @@ func (h *Webroot) Create(w http.ResponseWriter, r *http.Request) {
 		RuntimeConfig:          runtimeConfig,
 		PublicFolder:            req.PublicFolder,
 		EnvFileName:             envFileName,
-		EnvShellSource:          envShellSource,
 		ServiceHostnameEnabled: serviceHostnameEnabled,
 		Status:                 model.StatusPending,
 		CreatedAt:              now,
@@ -229,9 +224,6 @@ func (h *Webroot) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.EnvFileName != nil {
 		webroot.EnvFileName = *req.EnvFileName
-	}
-	if req.EnvShellSource != nil {
-		webroot.EnvShellSource = *req.EnvShellSource
 	}
 	if req.ServiceHostnameEnabled != nil {
 		webroot.ServiceHostnameEnabled = *req.ServiceHostnameEnabled

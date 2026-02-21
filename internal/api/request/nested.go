@@ -23,7 +23,6 @@ type CreateWebrootNested struct {
 	RuntimeConfig  json.RawMessage    `json:"runtime_config"`
 	PublicFolder   string             `json:"public_folder"`
 	EnvFileName    string             `json:"env_file_name"`
-	EnvShellSource *bool              `json:"env_shell_source"`
 	FQDNs          []CreateFQDNNested `json:"fqdns" validate:"omitempty,dive"`
 	Daemons        []CreateDaemonNested  `json:"daemons" validate:"omitempty,dive"`
 	CronJobs       []CreateCronJobNested `json:"cron_jobs" validate:"omitempty,dive"`

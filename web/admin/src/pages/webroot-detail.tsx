@@ -58,7 +58,6 @@ export function WebrootDetailPage() {
   const [editVersion, setEditVersion] = useState('')
   const [editPublicFolder, setEditPublicFolder] = useState('')
   const [editEnvFileName, setEditEnvFileName] = useState('')
-  const [editEnvShellSource, setEditEnvShellSource] = useState(false)
   const [editServiceHostname, setEditServiceHostname] = useState(true)
 
   // Create FQDN form
@@ -132,14 +131,13 @@ export function WebrootDetailPage() {
     setEditVersion(webroot.runtime_version)
     setEditPublicFolder(webroot.public_folder)
     setEditEnvFileName(webroot.env_file_name || '.env.hosting')
-    setEditEnvShellSource(webroot.env_shell_source || false)
     setEditServiceHostname(webroot.service_hostname_enabled ?? true)
     setEditOpen(true)
   }
 
   const handleUpdate = async () => {
     try {
-      await updateMut.mutateAsync({ id: webrootId, runtime: editRuntime, runtime_version: editVersion, public_folder: editPublicFolder, env_file_name: editEnvFileName, env_shell_source: editEnvShellSource, service_hostname_enabled: editServiceHostname })
+      await updateMut.mutateAsync({ id: webrootId, runtime: editRuntime, runtime_version: editVersion, public_folder: editPublicFolder, env_file_name: editEnvFileName, service_hostname_enabled: editServiceHostname })
       toast.success('Webroot updated'); setEditOpen(false)
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }
@@ -291,7 +289,7 @@ export function WebrootDetailPage() {
   const fqdnColumns: ColumnDef<FQDN>[] = [
     {
       accessorKey: 'fqdn', header: 'Hostname',
-      cell: ({ row }) => <span className="font-medium">{row.original.fqdn}</span>,
+      cell: ({ row }) => <span className="flex items-center gap-1 font-medium">{row.original.fqdn} <CopyButton value={row.original.fqdn} /></span>,
     },
     {
       accessorKey: 'ssl_enabled', header: 'SSL',
@@ -558,7 +556,7 @@ export function WebrootDetailPage() {
       <ResourceHeader
         icon={Globe}
         title={webroot.name}
-        subtitle={`${webroot.runtime} ${webroot.runtime_version} | Public: ${webroot.public_folder} | Env: ${webroot.env_file_name || '.env.hosting'}${webroot.env_shell_source ? ' (shell-sourced)' : ''} | Service hostname: ${webroot.service_hostname_enabled ? 'on' : 'off'}`}
+        subtitle={`${webroot.runtime} ${webroot.runtime_version} | Public: ${webroot.public_folder} | Env: ${webroot.env_file_name || '.env.hosting'} | Service hostname: ${webroot.service_hostname_enabled ? 'on' : 'off'}`}
         status={webroot.status}
         actions={
           <Button variant="outline" size="sm" onClick={openEdit}>
@@ -720,13 +718,6 @@ export function WebrootDetailPage() {
                 <Label>Env File Name</Label>
                 <Input placeholder=".env.hosting" value={editEnvFileName} onChange={(e) => setEditEnvFileName(e.target.value)} />
                 <p className="text-xs text-muted-foreground">Filename for the env file in the webroot directory</p>
-              </div>
-              <div className="space-y-2 flex flex-col justify-center pt-4">
-                <div className="flex items-center gap-2">
-                  <Switch checked={editEnvShellSource} onCheckedChange={setEditEnvShellSource} />
-                  <Label>Auto-source in SSH</Label>
-                </div>
-                <p className="text-xs text-muted-foreground">Source env file in SSH shell sessions via .bashrc</p>
               </div>
             </div>
             <div className="space-y-2 flex flex-col justify-center pt-4">

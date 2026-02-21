@@ -1002,63 +1002,6 @@ func shellEscape(s string) string {
 	return r.Replace(s)
 }
 
-// webrootEnvInfo describes a webroot's env sourcing config for .bashrc generation.
-type webrootEnvInfo struct {
-	Name           string
-	EnvFileName    string
-	EnvShellSource bool
-}
-
-// syncBashrcEnvBlock rewrites the hosting env block in a tenant's .bashrc.
-func syncBashrcEnvBlock(tenantName string, webroots []webrootEnvInfo) error {
-	bashrcPath := filepath.Join("/var/www/storage", tenantName, "home", ".bashrc")
-
-	// Read existing .bashrc content.
-	existing, err := os.ReadFile(bashrcPath)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("read .bashrc: %w", err)
-	}
-
-	content := string(existing)
-
-	// Remove existing block.
-	startMarker := "# hosting-env-start (auto-generated, do not edit)"
-	endMarker := "# hosting-env-end"
-	if startIdx := strings.Index(content, startMarker); startIdx >= 0 {
-		if endIdx := strings.Index(content[startIdx:], endMarker); endIdx >= 0 {
-			content = content[:startIdx] + content[startIdx+endIdx+len(endMarker):]
-			// Trim extra newlines.
-			content = strings.TrimRight(content, "\n") + "\n"
-		}
-	}
-
-	// Build new block.
-	var block strings.Builder
-	hasSourceLines := false
-	for _, wr := range webroots {
-		if !wr.EnvShellSource {
-			continue
-		}
-		hasSourceLines = true
-		envPath := filepath.Join("/webroots", wr.Name, wr.EnvFileName)
-		block.WriteString(fmt.Sprintf("[ -f %s ] && set -a && . %s && set +a\n", envPath, envPath))
-	}
-
-	if hasSourceLines {
-		newBlock := startMarker + "\n" + block.String() + endMarker + "\n"
-		content = strings.TrimRight(content, "\n") + "\n" + newBlock
-	}
-
-	if err := os.MkdirAll(filepath.Dir(bashrcPath), 0755); err != nil {
-		return fmt.Errorf("create home dir: %w", err)
-	}
-
-	if err := os.WriteFile(bashrcPath, []byte(content), 0644); err != nil {
-		return fmt.Errorf("write .bashrc: %w", err)
-	}
-
-	return nil
-}
 
 // --------------------------------------------------------------------------
 // Disk usage activities

@@ -53,7 +53,6 @@ tenants:
         runtime_version: "8.5"
         public_folder: public
         env_file_name: ".env"
-        env_shell_source: true
         runtime_config:
           pm:
             max_children: 10

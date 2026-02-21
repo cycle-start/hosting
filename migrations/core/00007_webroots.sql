@@ -9,7 +9,6 @@ CREATE TABLE webroots (
     runtime_config           JSONB NOT NULL DEFAULT '{}',
     public_folder            TEXT NOT NULL DEFAULT '',
     env_file_name            TEXT NOT NULL DEFAULT '.env.hosting',
-    env_shell_source         BOOLEAN NOT NULL DEFAULT false,
     service_hostname_enabled BOOLEAN NOT NULL DEFAULT true,
     status                   TEXT NOT NULL DEFAULT 'pending',
     status_message           TEXT,

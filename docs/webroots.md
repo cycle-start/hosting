@@ -15,7 +15,6 @@ A **webroot** is a website document root belonging to a tenant. Each webroot has
 | `runtime_config` | JSON | Runtime-specific configuration (default: `{}`) |
 | `public_folder` | string | Subfolder to serve as document root (e.g. `public`) |
 | `env_file_name` | string | Env file name (default: `.env.hosting`) |
-| `env_shell_source` | bool | Auto-source env vars in SSH sessions |
 | `service_hostname_enabled` | bool | Enable per-webroot service hostname (default: `true`) |
 | `status` | string | Current lifecycle status |
 | `status_message` | string | Error message when `failed` |

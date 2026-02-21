@@ -363,7 +363,6 @@ interface Webroot {
   runtime_config: Record<string, unknown> | null
   public_folder: string
   env_file_name: string
-  env_shell_source: boolean
   service_hostname_enabled: boolean
   status: string
   status_message?: string

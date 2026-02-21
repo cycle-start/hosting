@@ -49,7 +49,6 @@ type DesiredWebroot struct {
 	PublicFolder   string            `json:"public_folder"`
 	EnvVars        map[string]string `json:"env_vars,omitempty"`
 	EnvFileName    string            `json:"env_file_name"`
-	EnvShellSource bool              `json:"env_shell_source"`
 	Status         string            `json:"status"`
 	FQDNs          []DesiredFQDN     `json:"fqdns,omitempty"`
 	CronJobs       []DesiredCronJob  `json:"cron_jobs,omitempty"`

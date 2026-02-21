@@ -360,7 +360,6 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				RuntimeConfig:  string(e.webroot.RuntimeConfig),
 				PublicFolder:   e.webroot.PublicFolder,
 				EnvFileName:    e.webroot.EnvFileName,
-				EnvShellSource: e.webroot.EnvShellSource,
 				FQDNs:          e.fqdns,
 				Daemons:        dp,
 			}).Get(gCtx, nil); err != nil {

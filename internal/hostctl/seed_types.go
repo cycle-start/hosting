@@ -76,7 +76,6 @@ type WebrootDef struct {
 	RuntimeConfig  map[string]any    `yaml:"runtime_config"`
 	PublicFolder   string            `yaml:"public_folder"`
 	EnvFileName    string            `yaml:"env_file_name"`
-	EnvShellSource *bool             `yaml:"env_shell_source"`
 	EnvVars        []EnvVarDef       `yaml:"env_vars"`
 	FQDNs          []FQDNDef         `yaml:"fqdns"`
 	Fixture        *FixtureDef       `yaml:"fixture"`

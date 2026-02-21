@@ -117,7 +117,7 @@ func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, 
 	// 2. Batch-fetch all active webroots for those tenants.
 	wrRows, err := s.db.Query(ctx, `
 		SELECT id, tenant_id, name, runtime, runtime_version, runtime_config::text,
-		       public_folder, env_file_name, env_shell_source, status
+		       public_folder, env_file_name, status
 		FROM webroots WHERE tenant_id = ANY($1) AND status = 'active'
 		ORDER BY name`, tenantIDs)
 	if err != nil {
@@ -136,7 +136,7 @@ func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, 
 		var wr model.DesiredWebroot
 		var tenantID string
 		if err := wrRows.Scan(&wr.ID, &tenantID, &wr.Name, &wr.Runtime, &wr.RuntimeVersion,
-			&wr.RuntimeConfig, &wr.PublicFolder, &wr.EnvFileName, &wr.EnvShellSource, &wr.Status); err != nil {
+			&wr.RuntimeConfig, &wr.PublicFolder, &wr.EnvFileName, &wr.Status); err != nil {
 			return fmt.Errorf("scan webroot: %w", err)
 		}
 		idx := len(webroots)

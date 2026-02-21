@@ -11,7 +11,6 @@ type CreateWebroot struct {
 	RuntimeConfig          json.RawMessage    `json:"runtime_config"`
 	PublicFolder           string             `json:"public_folder"`
 	EnvFileName            string             `json:"env_file_name"`
-	EnvShellSource         *bool              `json:"env_shell_source"`
 	ServiceHostnameEnabled *bool              `json:"service_hostname_enabled"`
 	FQDNs                  []CreateFQDNNested `json:"fqdns" validate:"omitempty,dive"`
 }
@@ -22,6 +21,5 @@ type UpdateWebroot struct {
 	RuntimeConfig          json.RawMessage `json:"runtime_config"`
 	PublicFolder           *string         `json:"public_folder"`
 	EnvFileName            *string         `json:"env_file_name"`
-	EnvShellSource         *bool           `json:"env_shell_source"`
 	ServiceHostnameEnabled *bool           `json:"service_hostname_enabled"`
 }
