@@ -37,7 +37,7 @@ import type { FQDN, Daemon, CronJob, WebrootEnvVar, CronExecution } from '@/lib/
 const runtimes = ['php', 'node', 'python', 'ruby', 'static']
 const stopSignals = ['TERM', 'INT', 'QUIT', 'KILL', 'HUP']
 
-const webrootTabs = ['fqdns', 'daemons', 'cron-jobs', 'env-vars', 'logs']
+const webrootTabs = ['fqdns', 'daemons', 'cron-jobs', 'env-vars', 'access-logs', 'platform-logs']
 function getWebrootTabFromHash() {
   const hash = window.location.hash.slice(1)
   return webrootTabs.includes(hash) ? hash : 'fqdns'
@@ -144,6 +144,7 @@ export function WebrootDetailPage() {
 
   // Env var state
   const [addEnvOpen, setAddEnvOpen] = useState(false)
+  const [editingEnvVar, setEditingEnvVar] = useState(false)
   const [envName, setEnvName] = useState('')
   const [envValue, setEnvValue] = useState('')
   const [envSecret, setEnvSecret] = useState(false)
@@ -199,14 +200,18 @@ export function WebrootDetailPage() {
   const handleAddEnvVar = async () => {
     setTouched({ envName: true })
     if (!envName.trim()) return
+    // When editing a secret and value is left empty, skip it (keep existing)
+    if (editingEnvVar && envSecret && !envValue) {
+      toast.success('No changes'); setAddEnvOpen(false); return
+    }
     const existing = envVarsData?.items ?? []
     const newVars = [...existing.filter(v => v.name !== envName).map(v => ({
       name: v.name, value: v.is_secret ? '' : v.value, secret: v.is_secret,
     })), { name: envName, value: envValue, secret: envSecret }]
     try {
       await setEnvVarsMut.mutateAsync({ webroot_id: webrootId, vars: newVars })
-      toast.success('Env var added'); setAddEnvOpen(false)
-      setEnvName(''); setEnvValue(''); setEnvSecret(false); setTouched({})
+      toast.success(editingEnvVar ? 'Env var updated' : 'Env var added'); setAddEnvOpen(false)
+      setEnvName(''); setEnvValue(''); setEnvSecret(false); setEditingEnvVar(false); setTouched({})
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }
 
@@ -616,7 +621,8 @@ export function WebrootDetailPage() {
           <TabsTrigger value="daemons"><Terminal className="mr-1.5 h-4 w-4" /> Daemons ({daemonsData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="cron-jobs"><Clock className="mr-1.5 h-4 w-4" /> Cron Jobs ({cronJobsData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="env-vars"><Key className="mr-1.5 h-4 w-4" /> Env Vars ({envVarsData?.items?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="logs"><ScrollText className="mr-1.5 h-4 w-4" /> Logs</TabsTrigger>
+          <TabsTrigger value="access-logs"><ScrollText className="mr-1.5 h-4 w-4" /> Access Logs</TabsTrigger>
+          <TabsTrigger value="platform-logs"><ScrollText className="mr-1.5 h-4 w-4" /> Platform Logs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="fqdns">
@@ -661,7 +667,7 @@ export function WebrootDetailPage() {
 
         <TabsContent value="env-vars">
           <div className="mb-4 flex justify-end">
-            <Button size="sm" onClick={() => { setEnvName(''); setEnvValue(''); setEnvSecret(false); setTouched({}); setAddEnvOpen(true) }}>
+            <Button size="sm" onClick={() => { setEnvName(''); setEnvValue(''); setEnvSecret(false); setEditingEnvVar(false); setTouched({}); setAddEnvOpen(true) }}>
               <Plus className="mr-2 h-4 w-4" /> Add Variable
             </Button>
           </div>
@@ -694,7 +700,10 @@ export function WebrootDetailPage() {
                       <td className="px-4 py-2">
                         {v.is_secret ? <span className="text-amber-600">Yes</span> : <span className="text-muted-foreground">No</span>}
                       </td>
-                      <td className="px-4 py-2">
+                      <td className="px-4 py-2 flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => { setEnvName(v.name); setEnvValue(v.is_secret ? '' : v.value); setEnvSecret(v.is_secret); setEditingEnvVar(true); setTouched({}); setAddEnvOpen(true) }}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => setDeleteEnvVar(v)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -707,11 +716,12 @@ export function WebrootDetailPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="logs">
-          <div className="space-y-6">
-            <TenantLogViewer tenantId={tenantId} webrootId={webrootId} title="Access Logs" />
-            <LogViewer query={`{app=~"core-api|worker|node-agent"} |= "${webrootId}"`} title="Platform Logs" />
-          </div>
+        <TabsContent value="access-logs">
+          <TenantLogViewer tenantId={tenantId} webrootId={webrootId} />
+        </TabsContent>
+
+        <TabsContent value="platform-logs">
+          <LogViewer query={`{app=~"core-api|worker|node-agent"} |= "${webrootId}"`} />
         </TabsContent>
       </Tabs>
 
@@ -868,20 +878,20 @@ export function WebrootDetailPage() {
         confirmLabel="Delete" variant="destructive" loading={deleteCronMut.isPending}
         onConfirm={async () => { try { await deleteCronMut.mutateAsync(deleteCron!.id); toast.success('Cron job deleted'); setDeleteCron(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
 
-      {/* Add Env Var */}
+      {/* Add/Edit Env Var */}
       <Dialog open={addEnvOpen} onOpenChange={setAddEnvOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add Environment Variable</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingEnvVar ? 'Edit Environment Variable' : 'Add Environment Variable'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Name *</Label>
-              <Input placeholder="DATABASE_URL" value={envName} onChange={(e) => setEnvName(e.target.value.toUpperCase())} onBlur={() => touch('envName')} className="font-mono" />
+              <Input placeholder="DATABASE_URL" value={envName} onChange={(e) => setEnvName(e.target.value.toUpperCase())} onBlur={() => touch('envName')} className="font-mono" readOnly={editingEnvVar} disabled={editingEnvVar} />
               {touched['envName'] && !envName.trim() && <p className="text-xs text-destructive">Required</p>}
-              <p className="text-xs text-muted-foreground">Letters, digits, underscores. Must start with letter or underscore.</p>
+              {!editingEnvVar && <p className="text-xs text-muted-foreground">Letters, digits, underscores. Must start with letter or underscore.</p>}
             </div>
             <div className="space-y-2">
               <Label>Value</Label>
-              <Input placeholder="value" value={envValue} onChange={(e) => setEnvValue(e.target.value)} className="font-mono" type={envSecret ? 'password' : 'text'} />
+              <Input placeholder={editingEnvVar && envSecret ? 'Enter new value (leave empty to keep current)' : 'value'} value={envValue} onChange={(e) => setEnvValue(e.target.value)} className="font-mono" type={envSecret ? 'password' : 'text'} />
             </div>
             <div className="flex items-center gap-2">
               <Switch checked={envSecret} onCheckedChange={setEnvSecret} />
@@ -891,7 +901,7 @@ export function WebrootDetailPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddEnvOpen(false)}>Cancel</Button>
             <Button onClick={handleAddEnvVar} disabled={setEnvVarsMut.isPending}>
-              {setEnvVarsMut.isPending ? 'Adding...' : 'Add'}
+              {setEnvVarsMut.isPending ? 'Saving...' : editingEnvVar ? 'Save' : 'Add'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -23,7 +23,7 @@ import { formatDate } from '@/lib/utils'
 import { rules, validateField } from '@/lib/validation'
 import { Switch } from '@/components/ui/switch'
 import {
-  useTenant,
+  useTenant, useWebroot,
   useFQDN, useCertificates, useEmailAccounts,
   useUploadCertificate, useCreateEmailAccount, useDeleteEmailAccount,
   useUpdateFQDN,
@@ -58,6 +58,7 @@ export function FQDNDetailPage() {
   const [emailQuota, setEmailQuota] = useState('')
 
   const { data: fqdn, isLoading } = useFQDN(fqdnId)
+  const { data: webroot } = useWebroot(fqdn?.webroot_id ?? '')
   const { data: certsData, isLoading: certsLoading } = useCertificates(fqdnId)
   const { data: emailsData, isLoading: emailsLoading } = useEmailAccounts(fqdnId)
   const uploadCertMut = useUploadCertificate()
@@ -140,7 +141,7 @@ export function FQDNDetailPage() {
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
         { label: tenant?.name ?? tenantId, href: `/tenants/${tenantId}` },
-        { label: 'FQDNs', href: `/tenants/${tenantId}`, hash: 'webroots' },
+        { label: webroot?.name ?? fqdn.webroot_id ?? 'Webroot', href: `/tenants/${tenantId}/webroots/${fqdn.webroot_id}` },
         { label: fqdn.fqdn },
       ]} />
 

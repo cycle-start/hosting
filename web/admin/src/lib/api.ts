@@ -54,7 +54,11 @@ class ApiClient {
       return undefined as T
     }
 
-    const data = await res.json()
+    const text = await res.text()
+    if (!text) {
+      return undefined as T
+    }
+    const data = JSON.parse(text)
 
     if (!res.ok) {
       throw new Error(data.error || `Request failed: ${res.status}`)
