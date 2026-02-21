@@ -1,0 +1,17 @@
+- name: Check if k3s is installed
+  stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Install k3s
+  shell: curl -sfL https://get.k3s.io | INSTALL_K3S_SKIP_START=true sh -s - --disable=servicelb
+  when: not k3s_binary.stat.exists
+
+- name: Check if Helm is installed
+  stat:
+    path: /usr/local/bin/helm
+  register: helm_binary
+
+- name: Install Helm
+  shell: curl -sfL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  when: not helm_binary.stat.exists

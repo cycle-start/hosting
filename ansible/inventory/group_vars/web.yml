@@ -1,0 +1,12 @@
+php_versions:
+  - "8.3"
+  - "8.5"
+
+php_extensions:
+  - fpm
+  - cli
+  - mysql
+  - curl
+  - mbstring
+  - xml
+  - zip

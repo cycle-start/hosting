@@ -93,4 +93,3 @@ runcmd:
   - chown haproxy:haproxy /var/run/haproxy
   - systemctl daemon-reload
   - systemctl restart haproxy
-  - systemctl start node-agent

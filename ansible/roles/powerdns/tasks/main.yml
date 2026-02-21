@@ -1,0 +1,7 @@
+- name: Install PowerDNS
+  apt:
+    name:
+      - pdns-server
+      - pdns-backend-pgsql
+    state: present
+    update_cache: true

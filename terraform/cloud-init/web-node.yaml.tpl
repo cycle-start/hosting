@@ -146,4 +146,3 @@ runcmd:
   # from /etc/systemd/network/50-tenant0.netdev).
   - modprobe dummy
   - systemctl restart systemd-networkd
-  - systemctl start node-agent

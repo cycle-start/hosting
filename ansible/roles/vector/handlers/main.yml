@@ -1,0 +1,5 @@
+- name: restart vector
+  systemd:
+    name: vector
+    daemon_reload: true
+    state: restarted

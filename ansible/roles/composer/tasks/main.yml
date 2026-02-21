@@ -1,0 +1,7 @@
+- name: Install Composer
+  shell: |
+    php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php');"
+    php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
+    rm /tmp/composer-setup.php
+  args:
+    creates: /usr/local/bin/composer

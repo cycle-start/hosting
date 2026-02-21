@@ -38,4 +38,3 @@ runcmd:
       FLUSH PRIVILEGES;
     "
   - systemctl daemon-reload
-  - systemctl start node-agent

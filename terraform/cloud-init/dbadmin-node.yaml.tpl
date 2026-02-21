@@ -161,4 +161,3 @@ runcmd:
   - systemctl start cloudbeaver
   - systemctl start dbadmin-proxy
   - systemctl restart nginx
-  - systemctl start node-agent

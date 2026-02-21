@@ -26,4 +26,3 @@ write_files:
 
 runcmd:
   - systemctl daemon-reload
-  - systemctl start node-agent

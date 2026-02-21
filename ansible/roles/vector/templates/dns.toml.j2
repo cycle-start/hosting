@@ -1,0 +1,27 @@
+# Additional Vector sources for DNS nodes.
+
+[sources.journald_pdns]
+type = "journald"
+include_units = ["pdns"]
+
+[transforms.label_pdns]
+type = "remap"
+inputs = ["journald_pdns"]
+source = '''
+.service = "powerdns"
+.level = "info"
+'''
+
+[sinks.loki_dns]
+type = "loki"
+inputs = ["label_pdns"]
+endpoint = "{{ loki_endpoint }}"
+encoding.codec = "text"
+
+{% raw %}
+[sinks.loki_dns.labels]
+service = "{{ service }}"
+hostname = "{{ host }}"
+level = "{{ level }}"
+job = "powerdns"
+{% endraw %}

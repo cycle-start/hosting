@@ -1,0 +1,54 @@
+- name: Create Stalwart directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /opt/stalwart-mail/bin
+    - /opt/stalwart-mail/etc
+    - /opt/stalwart-mail/data
+
+- name: Create stalwart-mail system user
+  user:
+    name: stalwart-mail
+    system: true
+    home: /opt/stalwart-mail
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Check if Stalwart binary exists
+  stat:
+    path: /opt/stalwart-mail/bin/stalwart-mail
+  register: stalwart_binary
+
+- name: Download and install Stalwart
+  unarchive:
+    src: "https://github.com/stalwartlabs/mail-server/releases/download/v{{ stalwart_version }}/stalwart-mail-x86_64-unknown-linux-gnu.tar.gz"
+    dest: /opt/stalwart-mail/bin
+    remote_src: true
+  when: not stalwart_binary.stat.exists
+
+- name: Set Stalwart binary permissions
+  file:
+    path: /opt/stalwart-mail/bin/stalwart-mail
+    mode: "0755"
+
+- name: Set Stalwart directory ownership
+  file:
+    path: /opt/stalwart-mail
+    state: directory
+    recurse: true
+    owner: stalwart-mail
+    group: stalwart-mail
+
+- name: Deploy Stalwart systemd unit
+  template:
+    src: stalwart-mail.service.j2
+    dest: /etc/systemd/system/stalwart-mail.service
+  notify: reload systemd for stalwart
+
+- name: Disable Stalwart (cloud-init enables after config)
+  systemd:
+    name: stalwart-mail
+    daemon_reload: true
+    enabled: false

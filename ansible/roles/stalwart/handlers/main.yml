@@ -1,0 +1,3 @@
+- name: reload systemd for stalwart
+  systemd:
+    daemon_reload: true

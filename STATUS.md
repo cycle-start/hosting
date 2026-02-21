@@ -183,7 +183,8 @@ React SPA (TypeScript, Vite, Tailwind, shadcn/ui) served by Go binary on port 30
 
 ### Infrastructure
 
-- **VM provisioning:** Terraform + libvirt with Packer golden images (9 roles: web, db, dns, valkey, storage, s3, dbadmin, lb, controlplane)
+- **VM provisioning:** Terraform + libvirt with single Packer base image (Ubuntu + HWE kernel), Ansible for role-specific software
+- **Ansible configuration management:** Dynamic API-backed inventory, 17 roles covering all VM types, tag-based selective deployment (`just deploy-node-agent`, `just ansible-role web --tags php`)
 - **k3s control plane:** Helm chart deploys core-api, worker, admin-ui, MCP server; k3s manifests for Temporal, PostgreSQL, Loki, Grafana, Prometheus, Alloy, Traefik ingress
 - **Image delivery:** `docker build` -> `docker save` -> SSH pipe -> `k3s ctr images import`
 - **Networking:** `*.hosting.test` domain via Traefik ingress, WSL2 -> libvirt routing via `just forward`

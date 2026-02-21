@@ -1,0 +1,16 @@
+- name: Install software-properties-common
+  apt:
+    name: software-properties-common
+    state: present
+
+- name: Add ondrej PHP PPA
+  apt_repository:
+    repo: ppa:ondrej/php
+    state: present
+    update_cache: true
+
+- name: Install PHP packages
+  apt:
+    name: "{{ php_versions | product(php_extensions) | map('join', '-') | map('regex_replace', '^', 'php') | list }}"
+    state: present
+    update_cache: true

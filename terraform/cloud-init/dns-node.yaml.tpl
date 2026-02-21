@@ -42,4 +42,3 @@ runcmd:
   - rm -f /etc/powerdns/pdns.d/bind.conf
   - systemctl restart pdns
   - systemctl daemon-reload
-  - systemctl start node-agent

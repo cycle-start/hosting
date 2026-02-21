@@ -57,7 +57,7 @@ resource "libvirt_volume" "web_node" {
   capacity = 10737418240 # 10 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
-    path   = libvirt_volume.image_web.path
+    path   = libvirt_volume.image_base.path
     format = { type = "qcow2" }
   }
 }
@@ -69,7 +69,7 @@ resource "libvirt_volume" "db_node" {
   capacity = 21474836480 # 20 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
-    path   = libvirt_volume.image_db.path
+    path   = libvirt_volume.image_base.path
     format = { type = "qcow2" }
   }
 }
@@ -81,7 +81,7 @@ resource "libvirt_volume" "dns_node" {
   capacity = 10737418240 # 10 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
-    path   = libvirt_volume.image_dns.path
+    path   = libvirt_volume.image_base.path
     format = { type = "qcow2" }
   }
 }
@@ -93,7 +93,7 @@ resource "libvirt_volume" "valkey_node" {
   capacity = 10737418240 # 10 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
-    path   = libvirt_volume.image_valkey.path
+    path   = libvirt_volume.image_base.path
     format = { type = "qcow2" }
   }
 }
@@ -105,7 +105,7 @@ resource "libvirt_volume" "email_node" {
   capacity = 10737418240 # 10 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
-    path   = libvirt_volume.image_email.path
+    path   = libvirt_volume.image_base.path
     format = { type = "qcow2" }
   }
 }
@@ -117,7 +117,7 @@ resource "libvirt_volume" "storage_node" {
   capacity = 21474836480 # 20 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
-    path   = libvirt_volume.image_storage.path
+    path   = libvirt_volume.image_base.path
     format = { type = "qcow2" }
   }
 }
@@ -365,7 +365,7 @@ resource "libvirt_volume" "dbadmin_node" {
   capacity = 10737418240 # 10 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
-    path   = libvirt_volume.image_dbadmin.path
+    path   = libvirt_volume.image_base.path
     format = { type = "qcow2" }
   }
 }
@@ -770,7 +770,7 @@ resource "libvirt_volume" "lb_node" {
   capacity = 10737418240 # 10 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
-    path   = libvirt_volume.image_lb.path
+    path   = libvirt_volume.image_base.path
     format = { type = "qcow2" }
   }
 }
@@ -870,7 +870,7 @@ resource "libvirt_volume" "controlplane_node" {
   capacity = 21474836480 # 20 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
-    path   = libvirt_volume.image_controlplane.path
+    path   = libvirt_volume.image_base.path
     format = { type = "qcow2" }
   }
 }

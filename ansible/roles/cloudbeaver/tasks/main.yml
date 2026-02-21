@@ -1,0 +1,47 @@
+- name: Install nginx
+  apt:
+    name: nginx
+    state: present
+    update_cache: true
+
+- name: Pull CloudBeaver Docker image
+  shell: docker pull dbeaver/cloudbeaver:latest
+  register: docker_pull
+  changed_when: "'Downloaded newer image' in docker_pull.stdout or 'Pull complete' in docker_pull.stdout"
+
+- name: Create CloudBeaver directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /opt/cloudbeaver/workspace
+    - /opt/cloudbeaver/conf
+
+- name: Copy dbadmin-proxy binary
+  copy:
+    src: "{{ dbadmin_proxy_binary_path }}"
+    dest: /opt/hosting/bin/dbadmin-proxy
+    mode: "0755"
+  notify: restart dbadmin-proxy
+
+- name: Deploy CloudBeaver systemd unit
+  template:
+    src: cloudbeaver.service.j2
+    dest: /etc/systemd/system/cloudbeaver.service
+  notify: restart cloudbeaver
+
+- name: Deploy dbadmin-proxy systemd unit
+  template:
+    src: dbadmin-proxy.service.j2
+    dest: /etc/systemd/system/dbadmin-proxy.service
+  notify: restart dbadmin-proxy
+
+- name: Enable CloudBeaver and dbadmin-proxy
+  systemd:
+    name: "{{ item }}"
+    daemon_reload: true
+    enabled: true
+  loop:
+    - cloudbeaver
+    - dbadmin-proxy

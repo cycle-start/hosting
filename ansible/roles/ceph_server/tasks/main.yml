@@ -1,0 +1,13 @@
+- name: Install Ceph packages
+  apt:
+    name:
+      - ceph
+      - ceph-mon
+      - ceph-osd
+      - ceph-mgr
+      - ceph-mds
+      - radosgw
+      - lvm2
+      - jq
+    state: present
+    update_cache: true

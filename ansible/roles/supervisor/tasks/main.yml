@@ -1,0 +1,17 @@
+- name: Install supervisor
+  apt:
+    name: supervisor
+    state: present
+    update_cache: true
+
+- name: Deploy hosting supervisor config
+  template:
+    src: hosting.conf.j2
+    dest: /etc/supervisor/conf.d/hosting.conf
+  notify: restart supervisor
+
+- name: Enable supervisor
+  systemd:
+    name: supervisor
+    enabled: true
+    state: started

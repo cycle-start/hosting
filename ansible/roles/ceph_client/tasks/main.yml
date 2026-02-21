@@ -1,0 +1,41 @@
+- name: Install CephFS client packages
+  apt:
+    name:
+      - ceph-common
+      - openssh-server
+    state: present
+    update_cache: true
+
+- name: Create required directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /var/www/storage
+    - /etc/ssl/hosting
+    - /etc/ceph
+
+- name: Load dummy kernel module on boot
+  copy:
+    content: "dummy\n"
+    dest: /etc/modules-load.d/dummy.conf
+
+- name: Hide other users' processes (hidepid=2)
+  lineinfile:
+    path: /etc/fstab
+    line: "proc /proc proc defaults,hidepid=2 0 0"
+    regexp: "^proc /proc"
+    state: present
+
+- name: Create node-agent CephFS mount ordering drop-in directory
+  file:
+    path: /etc/systemd/system/node-agent.service.d
+    state: directory
+    mode: "0755"
+
+- name: Deploy CephFS mount ordering drop-in
+  template:
+    src: cephfs-drop-in.conf.j2
+    dest: /etc/systemd/system/node-agent.service.d/cephfs.conf
+  notify: reload systemd

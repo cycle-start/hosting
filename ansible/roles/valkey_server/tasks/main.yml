@@ -1,0 +1,21 @@
+- name: Install Valkey
+  apt:
+    name: valkey
+    state: present
+    update_cache: true
+
+- name: Disable system-wide valkey-server service
+  systemd:
+    name: valkey-server
+    enabled: false
+    state: stopped
+  ignore_errors: true
+
+- name: Create Valkey directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /etc/valkey
+    - /var/lib/valkey

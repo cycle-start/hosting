@@ -1,0 +1,16 @@
+[Unit]
+Description=Stalwart Mail Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=stalwart-mail
+Group=stalwart-mail
+ExecStart=/opt/stalwart-mail/bin/stalwart-mail --config /opt/stalwart-mail/etc/config.toml
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

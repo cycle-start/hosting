@@ -1,0 +1,24 @@
+- name: Install MySQL server
+  apt:
+    name: mysql-server
+    state: present
+    update_cache: true
+
+- name: Configure MySQL root for passwordless TCP access
+  shell: |
+    systemctl start mysql
+    mysql -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY ''; FLUSH PRIVILEGES;"
+    systemctl stop mysql
+  args:
+    creates: /etc/mysql/mysql.conf.d/replication.cnf
+
+- name: Deploy GTID replication config
+  template:
+    src: replication.cnf.j2
+    dest: /etc/mysql/mysql.conf.d/replication.cnf
+  notify: restart mysql
+
+- name: Remove auto.cnf for unique server UUID
+  file:
+    path: /var/lib/mysql/auto.cnf
+    state: absent

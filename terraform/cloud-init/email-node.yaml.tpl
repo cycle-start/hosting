@@ -75,4 +75,3 @@ runcmd:
   - chown -R stalwart-mail:stalwart-mail /opt/stalwart-mail
   - systemctl daemon-reload
   - systemctl enable --now stalwart-mail
-  - systemctl start node-agent

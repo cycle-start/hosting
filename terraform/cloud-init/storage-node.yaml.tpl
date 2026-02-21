@@ -177,4 +177,3 @@ write_files:
 runcmd:
   - /opt/hosting/setup-ceph.sh
   - systemctl daemon-reload
-  - systemctl start node-agent

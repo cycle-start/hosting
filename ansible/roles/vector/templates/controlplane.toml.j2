@@ -1,0 +1,66 @@
+# Vector config for the control plane VM.
+# Collects k3s pod logs (CRI format) and ships to Loki.
+
+[sources.k3s_pods]
+type = "file"
+include = ["/var/log/pods/**/*.log"]
+read_from = "end"
+
+[transforms.parse_k3s]
+type = "remap"
+inputs = ["k3s_pods"]
+source = '''
+# CRI log format: <timestamp> <stream> <flags> <message>
+raw = string!(.message)
+parts = split(raw, " ", limit: 4)
+if length(parts) >= 4 {
+  .message = parts[3]
+  .stream = parts[1]
+}
+
+# Extract pod name from file path: /var/log/pods/<namespace>_<pod>_<uid>/<container>/0.log
+file_str = to_string!(.file)
+file_parts = split(file_str, "/")
+if length(file_parts) >= 5 {
+  pod_part = to_string!(file_parts[4])
+  pod_segments = split(pod_part, "_")
+  if length(pod_segments) >= 2 {
+    .pod = pod_segments[1]
+    .namespace = pod_segments[0]
+  }
+}
+
+# Try to parse JSON (core-api and worker use zerolog JSON output).
+parsed, err = parse_json(.message)
+if err == null {
+  msg = del(parsed.message)
+  if msg != null { .message = to_string!(msg) }
+  level = del(parsed.level)
+  .level = if level != null { to_string!(level) } else { "info" }
+  svc = del(parsed.service)
+  pod_name = to_string(.pod) ?? "unknown"
+  .service = if svc != null { to_string!(svc) } else { pod_name }
+  region = del(parsed.region)
+  .region = if region != null { to_string!(region) } else { "" }
+  cluster = del(parsed.cluster)
+  .cluster = if cluster != null { to_string!(cluster) } else { "" }
+} else {
+  .level = "info"
+  .service = to_string(.pod) ?? "unknown"
+}
+'''
+
+[sinks.loki_controlplane]
+type = "loki"
+inputs = ["parse_k3s"]
+endpoint = "http://127.0.0.1:3100"
+encoding.codec = "text"
+
+{% raw %}
+[sinks.loki_controlplane.labels]
+service = "{{ service }}"
+hostname = "{{ host }}"
+level = "{{ level }}"
+pod = "{{ pod }}"
+job = "k3s"
+{% endraw %}

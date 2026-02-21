@@ -44,6 +44,13 @@ internal/api/docs/
 # Packer output images
 packer/output/
 
+# Python
+__pycache__/
+*.pyc
+
+# Ansible
+/tmp/ansible_facts_cache/
+
 # Test/build artifacts
 coverage.out
 *.prof

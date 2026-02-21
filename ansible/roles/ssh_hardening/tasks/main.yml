@@ -1,0 +1,12 @@
+- name: Ensure sshd_config.d directory exists
+  file:
+    path: /etc/ssh/sshd_config.d
+    state: directory
+    mode: "0755"
+
+- name: Deploy SSH hardening config
+  copy:
+    src: 00-hosting-base.conf
+    dest: /etc/ssh/sshd_config.d/00-hosting-base.conf
+    mode: "0644"
+  notify: restart sshd

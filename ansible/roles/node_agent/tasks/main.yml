@@ -1,0 +1,25 @@
+- name: Create hosting bin directory
+  file:
+    path: /opt/hosting/bin
+    state: directory
+    mode: "0755"
+
+- name: Copy node-agent binary
+  copy:
+    src: "{{ node_agent_binary_path }}"
+    dest: /opt/hosting/bin/node-agent
+    mode: "0755"
+  notify: restart node-agent
+
+- name: Install node-agent systemd unit
+  template:
+    src: node-agent.service.j2
+    dest: /etc/systemd/system/node-agent.service
+  notify: restart node-agent
+
+- name: Enable and start node-agent
+  systemd:
+    name: node-agent
+    daemon_reload: true
+    enabled: true
+    state: started

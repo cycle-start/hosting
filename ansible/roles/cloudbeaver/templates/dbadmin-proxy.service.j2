@@ -1,0 +1,14 @@
+[Unit]
+Description=DB Admin Auth Proxy
+After=network-online.target cloudbeaver.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/default/dbadmin-proxy
+ExecStart=/opt/hosting/bin/dbadmin-proxy
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

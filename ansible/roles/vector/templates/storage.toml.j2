@@ -1,0 +1,28 @@
+# Additional Vector sources for storage (Ceph) nodes.
+
+[sources.ceph_log]
+type = "file"
+include = ["/var/log/ceph/*.log"]
+read_from = "end"
+
+[transforms.label_ceph]
+type = "remap"
+inputs = ["ceph_log"]
+source = '''
+.service = "ceph"
+.level = "info"
+'''
+
+[sinks.loki_storage]
+type = "loki"
+inputs = ["label_ceph"]
+endpoint = "{{ loki_endpoint }}"
+encoding.codec = "text"
+
+{% raw %}
+[sinks.loki_storage.labels]
+service = "{{ service }}"
+hostname = "{{ host }}"
+level = "{{ level }}"
+job = "ceph"
+{% endraw %}

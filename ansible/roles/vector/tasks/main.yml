@@ -1,0 +1,120 @@
+- name: Add Vector APT repository
+  shell: curl -1sLf https://setup.vector.dev | bash
+  args:
+    creates: /etc/apt/sources.list.d/timber-vector.list
+
+- name: Install Vector
+  apt:
+    name: vector
+    state: present
+    update_cache: true
+
+- name: Create Vector config directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /etc/vector
+    - /etc/vector/config.d
+
+- name: Remove default Vector config
+  file:
+    path: /etc/vector/vector.yaml
+    state: absent
+
+# Controlplane uses a single config file (no config.d split)
+- name: Deploy controlplane Vector config
+  template:
+    src: controlplane.toml.j2
+    dest: /etc/vector/vector.toml
+  when: "'controlplane' in group_names"
+  notify: restart vector
+
+- name: Configure Vector environment (controlplane)
+  copy:
+    content: |
+      VECTOR_CONFIG=/etc/vector/vector.toml
+    dest: /etc/default/vector
+  when: "'controlplane' in group_names"
+  notify: restart vector
+
+- name: Add vector user to root group (controlplane)
+  user:
+    name: vector
+    groups: root
+    append: true
+  when: "'controlplane' in group_names"
+  notify: restart vector
+
+# All other roles use base.toml + role-specific config.d
+- name: Deploy base Vector config
+  template:
+    src: base.toml.j2
+    dest: /etc/vector/vector.toml
+  when: "'controlplane' not in group_names"
+  notify: restart vector
+
+- name: Configure Vector environment
+  copy:
+    content: |
+      VECTOR_CONFIG=/etc/vector/vector.toml
+      VECTOR_CONFIG_DIR=/etc/vector/config.d
+    dest: /etc/default/vector
+  when: "'controlplane' not in group_names"
+  notify: restart vector
+
+- name: Deploy web Vector config
+  template:
+    src: web.toml.j2
+    dest: /etc/vector/config.d/web.toml
+  when: "'web' in group_names"
+  notify: restart vector
+
+- name: Deploy db Vector config
+  template:
+    src: db.toml.j2
+    dest: /etc/vector/config.d/db.toml
+  when: "'db' in group_names"
+  notify: restart vector
+
+- name: Deploy dns Vector config
+  template:
+    src: dns.toml.j2
+    dest: /etc/vector/config.d/dns.toml
+  when: "'dns' in group_names"
+  notify: restart vector
+
+- name: Deploy valkey Vector config
+  template:
+    src: valkey.toml.j2
+    dest: /etc/vector/config.d/valkey.toml
+  when: "'valkey' in group_names"
+  notify: restart vector
+
+- name: Deploy email Vector config
+  template:
+    src: email.toml.j2
+    dest: /etc/vector/config.d/email.toml
+  when: "'email' in group_names"
+  notify: restart vector
+
+- name: Deploy storage Vector config
+  template:
+    src: storage.toml.j2
+    dest: /etc/vector/config.d/storage.toml
+  when: "'storage' in group_names"
+  notify: restart vector
+
+- name: Deploy lb Vector config
+  template:
+    src: lb.toml.j2
+    dest: /etc/vector/config.d/lb.toml
+  when: "'lb' in group_names"
+  notify: restart vector
+
+- name: Enable and start Vector
+  systemd:
+    name: vector
+    enabled: true
+    state: started

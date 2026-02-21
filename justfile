@@ -161,19 +161,45 @@ lb-del fqdn:
 lb-show:
     echo "show map /var/lib/haproxy/maps/fqdn-to-shard.map" | nc {{lb}} 9999
 
-# --- Packer (Golden Images) ---
+# --- Packer (Base Image) ---
 
 # Build the node-agent binary for Linux (for VM deployment)
 build-node-agent:
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/node-agent ./cmd/node-agent
 
-# Build all golden images (requires node-agent binary)
-packer-all: build-node-agent
+# Build the dbadmin-proxy binary for Linux
+build-dbadmin-proxy:
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/dbadmin-proxy ./cmd/dbadmin-proxy
+
+# Build the base golden image (Ansible handles role-specific software)
+packer-base:
     cd packer && packer init . && packer build .
 
-# Build a specific role image (e.g. just packer-role web)
-packer-role role: build-node-agent
-    cd packer && packer init . && packer build -only="*.{{role}}" .
+# --- Ansible (Configuration Management) ---
+
+# Run Ansible against all nodes (full convergence)
+ansible-all: build-node-agent build-dbadmin-proxy
+    cd ansible && HOSTING_API_KEY=$HOSTING_API_KEY ansible-playbook site.yml
+
+# Run Ansible against a specific role group (e.g. just ansible-role web)
+ansible-role role *args: build-node-agent
+    cd ansible && HOSTING_API_KEY=$HOSTING_API_KEY ansible-playbook site.yml --limit {{role}} {{args}}
+
+# Run Ansible against a single node by IP (e.g. just ansible-node 10.10.10.10)
+ansible-node ip *args: build-node-agent
+    cd ansible && HOSTING_API_KEY=$HOSTING_API_KEY ansible-playbook site.yml --limit {{ip}} {{args}}
+
+# Deploy only the node-agent binary to all nodes
+deploy-node-agent: build-node-agent
+    cd ansible && HOSTING_API_KEY=$HOSTING_API_KEY ansible-playbook site.yml --tags node-agent
+
+# Deploy only Vector config to all nodes
+deploy-vector:
+    cd ansible && HOSTING_API_KEY=$HOSTING_API_KEY ansible-playbook site.yml --tags vector
+
+# Run Ansible with static inventory (for bootstrap before API is up)
+ansible-bootstrap: build-node-agent build-dbadmin-proxy
+    cd ansible && ansible-playbook site.yml -i inventory/static.ini
 
 # --- VM Infrastructure ---
 
@@ -188,9 +214,9 @@ vm-up:
     just _wait-api
     go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml
 
-# Rebuild everything: new golden images, recreate VMs, deploy control plane
+# Rebuild everything: base image, recreate VMs, Ansible provision, deploy control plane
 vm-rebuild:
-    just packer-all
+    just packer-base
     just vm-down
     cd terraform && terraform apply -auto-approve
     @if sudo virsh net-info hosting 2>/dev/null | grep -q 'Active:.*no'; then \
@@ -199,6 +225,7 @@ vm-rebuild:
     fi
     just _wait-k3s
     just vm-kubeconfig
+    just ansible-bootstrap
     just vm-deploy
     just _wait-postgres
     just migrate
@@ -427,9 +454,9 @@ vm-grafana:
 vm-prometheus:
     @echo "http://prometheus.hosting.test"
 
-# Bootstrap Vector on all running VMs (Phase A — no Packer rebuild needed)
+# Deploy Vector config to all running VMs
 vm-bootstrap-vector:
-    bash scripts/bootstrap-vector.sh
+    just deploy-vector
 
 # --- Test Fixtures ---
 

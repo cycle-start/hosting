@@ -1,0 +1,11 @@
+- name: restart cloudbeaver
+  systemd:
+    name: cloudbeaver
+    daemon_reload: true
+    state: restarted
+
+- name: restart dbadmin-proxy
+  systemd:
+    name: dbadmin-proxy
+    daemon_reload: true
+    state: restarted

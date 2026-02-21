@@ -1,0 +1,52 @@
+- name: Install HAProxy and socat
+  apt:
+    name:
+      - haproxy
+      - socat
+    state: present
+    update_cache: true
+
+- name: Create HAProxy map directory
+  file:
+    path: /var/lib/haproxy/maps
+    state: directory
+    owner: haproxy
+    group: haproxy
+    mode: "0755"
+
+- name: Create empty FQDN map file
+  file:
+    path: /var/lib/haproxy/maps/fqdn-to-shard.map
+    state: touch
+    owner: haproxy
+    group: haproxy
+    mode: "0644"
+    modification_time: preserve
+    access_time: preserve
+
+- name: Create HAProxy run directory
+  file:
+    path: /var/run/haproxy
+    state: directory
+    owner: haproxy
+    group: haproxy
+    mode: "0755"
+
+- name: Create HAProxy certs directory
+  file:
+    path: /etc/haproxy/certs
+    state: directory
+    mode: "0755"
+
+- name: Set HAProxy directory ownership
+  file:
+    path: /var/lib/haproxy
+    state: directory
+    recurse: true
+    owner: haproxy
+    group: haproxy
+
+- name: Enable HAProxy
+  systemd:
+    name: haproxy
+    enabled: true
