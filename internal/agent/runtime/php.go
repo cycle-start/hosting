@@ -221,6 +221,7 @@ func (p *PHP) Configure(ctx context.Context, webroot *WebrootInfo) error {
 }
 
 // Start reloads PHP-FPM to pick up the new pool configuration.
+// If PHP-FPM is not running, it starts the service.
 func (p *PHP) Start(ctx context.Context, webroot *WebrootInfo) error {
 	service := p.fpmServiceName(webroot)
 	p.logger.Info().
@@ -228,8 +229,7 @@ func (p *PHP) Start(ctx context.Context, webroot *WebrootInfo) error {
 		Str("service", service).
 		Msg("reloading PHP-FPM to start pool")
 
-	// PHP-FPM uses USR2 for graceful reload.
-	return p.svcMgr.Signal(ctx, service, "USR2")
+	return p.reloadOrStart(ctx, service)
 }
 
 // Stop removes the pool configuration and reloads PHP-FPM.
@@ -250,6 +250,7 @@ func (p *PHP) Stop(ctx context.Context, webroot *WebrootInfo) error {
 }
 
 // Reload triggers a graceful reload of the PHP-FPM service.
+// If PHP-FPM is not running, it starts the service.
 func (p *PHP) Reload(ctx context.Context, webroot *WebrootInfo) error {
 	service := p.fpmServiceName(webroot)
 	p.logger.Info().
@@ -257,7 +258,7 @@ func (p *PHP) Reload(ctx context.Context, webroot *WebrootInfo) error {
 		Str("service", service).
 		Msg("reloading PHP-FPM")
 
-	return p.svcMgr.Signal(ctx, service, "USR2")
+	return p.reloadOrStart(ctx, service)
 }
 
 // Remove removes the pool configuration and reloads PHP-FPM.
@@ -293,7 +294,7 @@ func (p *PHP) ReloadAll(ctx context.Context) error {
 		version := filepath.Base(filepath.Dir(filepath.Dir(poolDir)))
 		service := fmt.Sprintf("php%s-fpm", version)
 		p.logger.Info().Str("service", service).Msg("reloading PHP-FPM")
-		if err := p.svcMgr.Signal(ctx, service, "USR2"); err != nil {
+		if err := p.reloadOrStart(ctx, service); err != nil {
 			return fmt.Errorf("reload %s: %w", service, err)
 		}
 	}
@@ -342,6 +343,15 @@ func (p *PHP) CleanOrphanedPools(expectedPools map[string]bool) ([]string, error
 	}
 
 	return removed, nil
+}
+
+// reloadOrStart reloads PHP-FPM if running, otherwise starts it.
+func (p *PHP) reloadOrStart(ctx context.Context, service string) error {
+	if err := p.svcMgr.Reload(ctx, service); err != nil {
+		p.logger.Info().Str("service", service).Msg("PHP-FPM not running, starting service")
+		return p.svcMgr.Start(ctx, service)
+	}
+	return nil
 }
 
 func intOrDefault(pm *PHPPMConfig, getter func(*PHPPMConfig) *int, def int) int {

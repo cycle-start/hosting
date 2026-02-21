@@ -737,11 +737,10 @@ func seedFixture(tenantName, webrootName string, def *FixtureDef, ctx *tenantSee
 	if def.SetupPath != "" && lbURL != "" {
 		setupURL := lbURL + def.SetupPath
 		fmt.Printf("    Running setup at %s (Host: %s)...\n", setupURL, fqdn)
-		if err := retrySetup(setupURL, fqdn, 30*time.Second); err != nil {
-			fmt.Printf("    WARNING: setup failed (non-fatal): %v\n", err)
-		} else {
-			fmt.Printf("    Setup complete\n")
+		if err := retrySetup(setupURL, fqdn, 120*time.Second); err != nil {
+			return fmt.Errorf("setup at %s failed: %w", setupURL, err)
 		}
+		fmt.Printf("    Setup complete\n")
 	}
 
 	return nil
