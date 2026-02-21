@@ -131,6 +131,13 @@ bootstrap: migrate create-dev-key create-agent-key cluster-apply seed
 gen-certs:
     bash scripts/gen-temporal-certs.sh
 
+# Generate SSH CA key pair for web terminal certificate signing
+generate-ssh-ca:
+    ssh-keygen -t ed25519 -f ssh_ca -C "hosting-platform-ca" -N ""
+    @echo "Generated ssh_ca (private key) and ssh_ca.pub (public key)"
+    @echo "Add private key to Helm values: secrets.sshCaPrivateKey"
+    @echo "Add public key to Ansible: ssh_ca_public_key variable"
+
 # --- Utilities ---
 
 # Connect to core DB via psql

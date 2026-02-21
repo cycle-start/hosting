@@ -18,6 +18,7 @@ import (
 	mw "github.com/edvin/hosting/internal/api/middleware"
 	"github.com/edvin/hosting/internal/config"
 	"github.com/edvin/hosting/internal/core"
+	"github.com/edvin/hosting/internal/sshca"
 )
 
 //go:embed docs/swagger.json
@@ -85,6 +86,17 @@ func (s *Server) setupRoutes() {
 	s.router.Get("/oidc/jwks", oidc.JWKS)
 	s.router.Get("/oidc/authorize", oidc.Authorize)
 	s.router.Post("/oidc/token", oidc.Token)
+
+	// Terminal WebSocket endpoint — uses query param auth (WebSocket API can't send headers).
+	// Registered outside the standard auth middleware group.
+	if s.cfg.SSHCAPrivateKey != "" {
+		ca, err := sshca.New([]byte(s.cfg.SSHCAPrivateKey))
+		if err != nil {
+			s.logger.Fatal().Err(err).Msg("failed to parse SSH CA private key")
+		}
+		terminal := handler.NewTerminal(ca, s.corePool)
+		s.router.Get("/api/v1/tenants/{tenantID}/terminal", terminal.Connect)
+	}
 
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Use(mw.Auth(s.corePool))

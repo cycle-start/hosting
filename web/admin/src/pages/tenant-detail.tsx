@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Pause, Play, Trash2, Plus, RotateCcw, Loader2, FolderOpen, Database as DatabaseIcon, Globe, Boxes, HardDrive, Key, Archive, AlertCircle, ScrollText, Mail, Users } from 'lucide-react'
+import { Pause, Play, Trash2, Plus, RotateCcw, Loader2, FolderOpen, Database as DatabaseIcon, Globe, Boxes, HardDrive, Key, Archive, AlertCircle, ScrollText, Mail, Users, TerminalSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -42,6 +42,7 @@ import { SSHKeyFields } from '@/components/forms/ssh-key-fields'
 import { ZoneFields } from '@/components/forms/zone-fields'
 import { LogViewer } from '@/components/shared/log-viewer'
 import { TenantLogViewer } from '@/components/shared/tenant-log-viewer'
+import { WebTerminal } from '@/components/shared/web-terminal'
 import { Separator } from '@/components/ui/separator'
 
 const defaultTab = 'webroots'
@@ -57,6 +58,7 @@ export function TenantDetailPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState(getTabFromHash)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [terminalOpen, setTerminalOpen] = useState(false)
 
   // Create dialogs
   const [createWebrootOpen, setCreateWebrootOpen] = useState(false)
@@ -78,7 +80,7 @@ export function TenantDetailPage() {
   const [deleteZoneTarget, setDeleteZoneTarget] = useState<Zone | null>(null)
 
   // Form state
-  const defaultWebroot: WebrootFormData = { subscription_id: '', runtime: 'php', runtime_version: '8.5', public_folder: 'public' }
+  const defaultWebroot: WebrootFormData = { subscription_id: '', runtime: 'php', runtime_version: '8.5', public_folder: 'public', env_file_name: '.env.hosting' }
   const defaultDatabase: DatabaseFormData = { subscription_id: '', shard_id: '' }
   const defaultValkey: ValkeyInstanceFormData = { subscription_id: '', shard_id: '', max_memory_mb: 64 }
   const defaultS3: S3BucketFormData = { subscription_id: '', shard_id: '' }
@@ -201,6 +203,7 @@ export function TenantDetailPage() {
         tenant_id: id, subscription_id: wrForm.subscription_id,
         runtime: wrForm.runtime,
         runtime_version: wrForm.runtime_version, public_folder: wrForm.public_folder || undefined,
+        env_file_name: wrForm.env_file_name || undefined,
         fqdns: wrForm.fqdns?.length ? wrForm.fqdns : undefined,
       })
       toast.success('Webroot created'); setCreateWebrootOpen(false); resetForm()
@@ -655,6 +658,11 @@ export function TenantDetailPage() {
                 <Play className="mr-2 h-4 w-4" /> Unsuspend
               </Button>
             )}
+            {tenant.ssh_enabled && (
+              <Button variant="outline" size="sm" onClick={() => setTerminalOpen(true)}>
+                <TerminalSquare className="mr-2 h-4 w-4" /> Terminal
+              </Button>
+            )}
             <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" /> Delete
             </Button>
@@ -902,6 +910,18 @@ export function TenantDetailPage() {
         description={`Delete zone "${deleteZoneTarget?.name}"? All DNS records will be removed.`}
         confirmLabel="Delete" variant="destructive" loading={deleteZoneMut.isPending}
         onConfirm={async () => { try { await deleteZoneMut.mutateAsync(deleteZoneTarget!.id); toast.success('Zone deleted'); setDeleteZoneTarget(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
+
+      {/* Terminal Dialog */}
+      <Dialog open={terminalOpen} onOpenChange={setTerminalOpen}>
+        <DialogContent className="max-w-4xl p-0">
+          <DialogHeader className="px-6 pt-6 pb-2">
+            <DialogTitle>Terminal — {tenant.name}</DialogTitle>
+          </DialogHeader>
+          <div className="px-4 pb-4">
+            {terminalOpen && <WebTerminal tenantId={id} onClose={() => setTerminalOpen(false)} />}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Webroot Dialog */}
       <Dialog open={createWebrootOpen} onOpenChange={setCreateWebrootOpen}>

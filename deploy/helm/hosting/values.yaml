@@ -77,6 +77,7 @@ secrets:
   secretEncryptionKey: ""
   llmApiKey: ""
   agentApiKey: "" # Dev: hst_agent_key_000000000000000 (created by `just create-agent-key`)
+  sshCaPrivateKey: "" # PEM-encoded SSH CA private key (for web terminal)
 
 # Temporal connection
 temporal:

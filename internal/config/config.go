@@ -60,6 +60,8 @@ type Config struct {
 	LLMAPIKey         string // LLM_API_KEY — API key for the LLM endpoint
 	LLMModel          string // LLM_MODEL — model name (default: Qwen/Qwen2.5-72B-Instruct)
 	LLMMaxTurns       int    // LLM_MAX_TURNS — max conversation turns per investigation (default: 10)
+
+	SSHCAPrivateKey string // SSH_CA_PRIVATE_KEY — PEM-encoded SSH CA private key (for web terminal)
 }
 
 func Load() (*Config, error) {
@@ -105,6 +107,8 @@ func Load() (*Config, error) {
 		LLMAPIKey:          getEnv("LLM_API_KEY", ""),
 		LLMModel:           getEnv("LLM_MODEL", "Qwen/Qwen2.5-72B-Instruct"),
 		LLMMaxTurns:        getEnvInt("LLM_MAX_TURNS", 10),
+
+		SSHCAPrivateKey: getEnv("SSH_CA_PRIVATE_KEY", ""),
 	}
 
 	return cfg, nil

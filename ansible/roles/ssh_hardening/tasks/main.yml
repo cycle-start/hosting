@@ -10,3 +10,11 @@
     dest: /etc/ssh/sshd_config.d/00-hosting-base.conf
     mode: "0644"
   notify: restart sshd
+
+- name: Deploy SSH CA public key
+  copy:
+    content: "{{ ssh_ca_public_key }}"
+    dest: /etc/ssh/hosting_ca.pub
+    mode: "0644"
+  when: ssh_ca_public_key is defined and ssh_ca_public_key | length > 0
+  notify: restart sshd

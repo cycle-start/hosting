@@ -78,6 +78,7 @@ export interface Tenant {
   shard_id?: string | null
   uid: number
   sftp_enabled: boolean
+  ssh_enabled: boolean
   status: string
   status_message?: string
   created_at: string
@@ -106,7 +107,6 @@ export interface Webroot {
   runtime_config: Record<string, unknown> | null
   public_folder: string
   env_file_name: string
-  env_shell_source: boolean
   service_hostname_enabled: boolean
   status: string
   status_message?: string
@@ -486,7 +486,7 @@ export interface SubscriptionFormData { id: string; name: string }
 export interface ZoneFormData { subscription_id: string; name: string }
 export interface WebrootFormData {
   subscription_id: string; runtime: string; runtime_version: string
-  public_folder: string; fqdns?: FQDNFormData[]
+  public_folder: string; env_file_name: string; fqdns?: FQDNFormData[]
 }
 export interface FQDNFormData {
   fqdn: string; ssl_enabled?: boolean
