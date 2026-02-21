@@ -87,6 +87,7 @@ export function WebrootDetailPage() {
   const [cronTimeout, setCronTimeout] = useState('300')
   const [cronMaxMem, setCronMaxMem] = useState('512')
   const [expandedCronId, setExpandedCronId] = useState<string | null>(null)
+  const [expandedDaemonId, setExpandedDaemonId] = useState<string | null>(null)
 
   // Env var state
   const [addEnvOpen, setAddEnvOpen] = useState(false)
@@ -315,6 +316,14 @@ export function WebrootDetailPage() {
   ]
 
   const daemonColumns: ColumnDef<Daemon>[] = [
+    {
+      id: 'expand',
+      cell: ({ row }) => (
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setExpandedDaemonId(expandedDaemonId === row.original.id ? null : row.original.id) }}>
+          {expandedDaemonId === row.original.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </Button>
+      ),
+    },
     {
       accessorKey: 'name', header: 'Name',
       cell: ({ row }) => <span className="font-mono text-sm">{row.original.name}</span>,
@@ -597,7 +606,15 @@ export function WebrootDetailPage() {
           {!daemonsLoading && (daemonsData?.items?.length ?? 0) === 0 ? (
             <EmptyState icon={Terminal} title="No Daemons" description="Add a long-running process (WebSocket server, queue worker, etc.)." action={{ label: 'Add Daemon', onClick: openCreateDaemon }} />
           ) : (
-            <DataTable columns={daemonColumns} data={daemonsData?.items ?? []} loading={daemonsLoading} searchColumn="name" searchPlaceholder="Search daemons..." />
+            <div>
+              <DataTable columns={daemonColumns} data={daemonsData?.items ?? []} loading={daemonsLoading} searchColumn="name" searchPlaceholder="Search daemons..." />
+              {expandedDaemonId && (daemonsData?.items ?? []).some(d => d.id === expandedDaemonId) && (
+                <div className="p-4 bg-muted/30 rounded-md">
+                  <h4 className="text-sm font-medium mb-2">Daemon Logs</h4>
+                  <TenantLogViewer tenantId={tenantId} daemonName={(daemonsData?.items ?? []).find(d => d.id === expandedDaemonId)?.name} />
+                </div>
+              )}
+            </div>
           )}
         </TabsContent>
 

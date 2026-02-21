@@ -1204,14 +1204,16 @@ export function useTenantLogs(
   range: string = '1h',
   enabled = true,
   cronJobId?: string,
+  daemonName?: string,
 ) {
   const params = new URLSearchParams({ start: range, limit: '500' })
   if (logType && logType !== 'all') params.set('log_type', logType)
   if (webrootId && webrootId !== 'all') params.set('webroot_id', webrootId)
   if (cronJobId) params.set('cron_job_id', cronJobId)
+  if (daemonName) params.set('daemon_name', daemonName)
 
   return useQuery({
-    queryKey: ['tenant-logs', tenantId, logType, webrootId, range, cronJobId],
+    queryKey: ['tenant-logs', tenantId, logType, webrootId, range, cronJobId, daemonName],
     queryFn: () =>
       api.get<LogQueryResponse>(
         `/tenants/${tenantId}/logs?${params.toString()}`

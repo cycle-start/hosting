@@ -73,9 +73,10 @@ func (h *Logs) Query(w http.ResponseWriter, r *http.Request) {
 //	@Tags			Tenants
 //	@Security		ApiKeyAuth
 //	@Param			tenantID   path  string true  "Tenant ID"
-//	@Param			log_type   query string false "Log type filter (access, error, php-error, php-slow, app, cron)"
-//	@Param			webroot_id  query string false "Filter by webroot ID"
-//	@Param			cron_job_id query string false "Filter by cron job ID (for log_type=cron)"
+//	@Param			log_type    query string false "Log type filter (access, error, php-error, php-slow, app, cron, daemon)"
+//	@Param			webroot_id  query string false "Filter by webroot ID (JSON line filter)"
+//	@Param			cron_job_id query string false "Filter by cron job ID (JSON line filter, for log_type=cron)"
+//	@Param			daemon_name query string false "Filter by daemon name (JSON line filter, for log_type=daemon)"
 //	@Param			start      query string false "Start time (RFC3339 or relative like '1h')"
 //	@Param			end        query string false "End time (RFC3339, default now)"
 //	@Param			limit      query int    false "Max entries (default 500, max 5000)"
@@ -100,9 +101,10 @@ func (h *Logs) TenantLogs(w http.ResponseWriter, r *http.Request) {
 			"php-slow":  true,
 			"app":       true,
 			"cron":      true,
+			"daemon":    true,
 		}
 		if !validTypes[logType] {
-			response.WriteError(w, http.StatusBadRequest, "invalid log_type: must be one of access, error, php-error, php-slow, app, cron")
+			response.WriteError(w, http.StatusBadRequest, "invalid log_type: must be one of access, error, php-error, php-slow, app, cron, daemon")
 			return
 		}
 	}
@@ -112,13 +114,22 @@ func (h *Logs) TenantLogs(w http.ResponseWriter, r *http.Request) {
 	if logType != "" {
 		query += fmt.Sprintf(`, log_type="%s"`, logType)
 	}
+	query += "}"
+
+	// Add JSON line filters for metadata fields (no longer Loki labels)
+	var lineFilters []string
 	if webrootID := r.URL.Query().Get("webroot_id"); webrootID != "" {
-		query += fmt.Sprintf(`, webroot_id="%s"`, webrootID)
+		lineFilters = append(lineFilters, fmt.Sprintf(`webroot_id="%s"`, webrootID))
 	}
 	if cronJobID := r.URL.Query().Get("cron_job_id"); cronJobID != "" {
-		query += fmt.Sprintf(`, cron_job_id="%s"`, cronJobID)
+		lineFilters = append(lineFilters, fmt.Sprintf(`cron_job_id="%s"`, cronJobID))
 	}
-	query += "}"
+	if daemonName := r.URL.Query().Get("daemon_name"); daemonName != "" {
+		lineFilters = append(lineFilters, fmt.Sprintf(`daemon_name="%s"`, daemonName))
+	}
+	if len(lineFilters) > 0 {
+		query += " | json | " + strings.Join(lineFilters, " | ")
+	}
 
 	h.queryLoki(w, r, h.tenantLokiURL, query)
 }

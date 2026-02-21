@@ -156,9 +156,41 @@ if priority <= 3 {
 }
 '''
 
-# Ship all tenant logs to TENANT Loki (port 3101, NOT platform Loki 3100)
-[sinks.loki_tenant]
-type = "loki"
+# Daemon logs from supervisord (stdout + stderr)
+[sources.tenant_daemon_logs]
+type = "file"
+include = ["/var/www/storage/*/logs/daemon-*.log", "/var/www/storage/*/logs/daemon-*.error.log"]
+read_from = "end"
+glob_minimum_cooldown_ms = 5000
+
+[transforms.parse_tenant_daemon]
+type = "remap"
+inputs = ["tenant_daemon_logs"]
+source = '''
+file_str = string(.file) ?? ""
+parts = split(file_str, "/")
+# Path: /var/www/storage/{tenant_name}/logs/daemon-{daemon_name}[.error].log
+if length(parts) >= 7 {
+  .tenant_id = parts[4]
+  filename = string(parts[6]) ?? ""
+  # Remove daemon- prefix and .log or .error.log suffix
+  name = replace(filename, r'^daemon-', "")
+  name = replace(name, r'\.error\.log$', "")
+  name = replace(name, r'\.log$', "")
+  .daemon_name = name
+}
+.log_type = "daemon"
+.job = "supervisor"
+if contains(file_str, ".error.log") {
+  .level = "error"
+} else {
+  .level = "info"
+}
+'''
+
+# Enrich all log lines with metadata as JSON (demotes high-cardinality fields from labels to line content)
+[transforms.enrich_message]
+type = "remap"
 inputs = [
   "parse_tenant_access",
   "parse_tenant_error",
@@ -166,7 +198,22 @@ inputs = [
   "parse_tenant_php_slow",
   "parse_tenant_app",
   "parse_tenant_cron",
+  "parse_tenant_daemon",
 ]
+source = '''
+meta = {}
+meta.msg = .message
+if exists(.webroot_id) && .webroot_id != "" { meta.webroot_id = string!(.webroot_id) }
+if exists(.cron_job_id) && .cron_job_id != "" { meta.cron_job_id = string!(.cron_job_id) }
+if exists(.daemon_name) && .daemon_name != "" { meta.daemon_name = string!(.daemon_name) }
+if exists(.structured) { meta = merge(object!(.structured), meta) }
+.message = encode_json(meta)
+'''
+
+# Ship all tenant logs to TENANT Loki (port 3101, NOT platform Loki 3100)
+[sinks.loki_tenant]
+type = "loki"
+inputs = ["enrich_message"]
 endpoint = "{{ loki_tenant_endpoint }}"
 encoding.codec = "text"
 
@@ -174,8 +221,6 @@ encoding.codec = "text"
 [sinks.loki_tenant.labels]
 job = "{{ job }}"
 tenant_id = "{{ tenant_id }}"
-webroot_id = "{{ webroot_id }}"
-cron_job_id = "{{ cron_job_id }}"
 log_type = "{{ log_type }}"
 hostname = "{{ host }}"
 level = "{{ level }}"
