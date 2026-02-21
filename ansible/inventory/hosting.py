@@ -51,7 +51,7 @@ def api_get(path):
     while True:
         req = urllib.request.Request(url)
         if API_KEY:
-            req.add_header("X-API-Key", API_KEY)
+            req.add_header("Authorization", f"Bearer {API_KEY}")
 
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
