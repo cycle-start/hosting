@@ -18,6 +18,12 @@
     - /opt/cloudbeaver/workspace
     - /opt/cloudbeaver/conf
 
+- name: Create hosting bin directory
+  file:
+    path: /opt/hosting/bin
+    state: directory
+    mode: "0755"
+
 - name: Copy dbadmin-proxy binary
   copy:
     src: "{{ dbadmin_proxy_binary_path }}"

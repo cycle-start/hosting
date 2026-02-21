@@ -3,69 +3,69 @@
   roles:
     - { role: ssh_hardening, tags: [ssh] }
     - { role: vector, tags: [vector] }
-    - { role: node_agent, tags: [node-agent] }
     - { role: nginx, tags: [nginx] }
     - { role: php, tags: [php] }
     - { role: composer, tags: [composer] }
     - { role: ceph_client, tags: [ceph-client] }
     - { role: supervisor, tags: [supervisor] }
+    - { role: node_agent, tags: [node-agent] }
 
 - name: Database nodes
   hosts: db
   roles:
     - { role: ssh_hardening, tags: [ssh] }
     - { role: vector, tags: [vector] }
-    - { role: node_agent, tags: [node-agent] }
     - { role: mysql, tags: [mysql] }
+    - { role: node_agent, tags: [node-agent] }
 
 - name: DNS nodes
   hosts: dns
   roles:
     - { role: ssh_hardening, tags: [ssh] }
     - { role: vector, tags: [vector] }
-    - { role: node_agent, tags: [node-agent] }
     - { role: powerdns, tags: [powerdns] }
+    - { role: node_agent, tags: [node-agent] }
 
 - name: Valkey nodes
   hosts: valkey
   roles:
     - { role: ssh_hardening, tags: [ssh] }
     - { role: vector, tags: [vector] }
-    - { role: node_agent, tags: [node-agent] }
     - { role: valkey_server, tags: [valkey] }
+    - { role: node_agent, tags: [node-agent] }
 
 - name: Email nodes
   hosts: email
   roles:
     - { role: ssh_hardening, tags: [ssh] }
     - { role: vector, tags: [vector] }
-    - { role: node_agent, tags: [node-agent] }
     - { role: stalwart, tags: [stalwart] }
+    - { role: node_agent, tags: [node-agent] }
 
 - name: Storage nodes
   hosts: storage
   roles:
     - { role: ssh_hardening, tags: [ssh] }
     - { role: vector, tags: [vector] }
-    - { role: node_agent, tags: [node-agent] }
     - { role: ceph_server, tags: [ceph-server] }
+    - { role: node_agent, tags: [node-agent] }
 
 - name: Load balancer nodes
   hosts: lb
   roles:
     - { role: ssh_hardening, tags: [ssh] }
     - { role: vector, tags: [vector] }
-    - { role: node_agent, tags: [node-agent] }
     - { role: haproxy, tags: [haproxy] }
+    - { role: node_agent, tags: [node-agent] }
 
 - name: DB Admin nodes
   hosts: dbadmin
   roles:
     - { role: ssh_hardening, tags: [ssh] }
     - { role: vector, tags: [vector] }
-    - { role: node_agent, tags: [node-agent] }
     - { role: docker, tags: [docker] }
     - { role: cloudbeaver, tags: [cloudbeaver] }
+    - { role: node_agent, tags: [node-agent] }
 
 - name: Control plane nodes
   hosts: controlplane

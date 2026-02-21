@@ -14,10 +14,11 @@ inputs = ["tenant_access_logs"]
 source = '''
 # Extract tenant_id and webroot_id from file path
 # Path: /var/log/hosting/{tenant_id}/{webroot_id}-access.log
-parts = split(to_string(.file) ?? "", "/")
+file_str = string(.file) ?? ""
+parts = split(file_str, "/")
 if length(parts) >= 6 {
   .tenant_id = parts[4]
-  filename = parts[5] ?? ""
+  filename = string(parts[5]) ?? ""
   .webroot_id = replace(filename, r'-access\.log$', "")
 }
 .log_type = "access"
@@ -26,9 +27,9 @@ if length(parts) >= 6 {
 # Parse the JSON access log line
 parsed, err = parse_json(.message)
 if err == null {
-  .message = to_string(parsed.method ?? "") + " " +
-             to_string(parsed.uri ?? "") + " " +
-             to_string(parsed.status ?? "")
+  .message = string(parsed.method) ?? "" + " " +
+             string(parsed.uri) ?? "" + " " +
+             string(parsed.status) ?? ""
   .structured = parsed
 }
 '''
@@ -44,10 +45,11 @@ glob_minimum_cooldown_ms = 5000
 type = "remap"
 inputs = ["tenant_error_logs"]
 source = '''
-parts = split(to_string(.file) ?? "", "/")
+file_str = string(.file) ?? ""
+parts = split(file_str, "/")
 if length(parts) >= 6 {
   .tenant_id = parts[4]
-  filename = parts[5] ?? ""
+  filename = string(parts[5]) ?? ""
   .webroot_id = replace(filename, r'-error\.log$', "")
 }
 .log_type = "error"
@@ -66,7 +68,8 @@ glob_minimum_cooldown_ms = 5000
 type = "remap"
 inputs = ["tenant_php_logs"]
 source = '''
-parts = split(to_string(.file) ?? "", "/")
+file_str = string(.file) ?? ""
+parts = split(file_str, "/")
 if length(parts) >= 5 {
   .tenant_id = parts[4]
 }
@@ -90,7 +93,8 @@ multiline.timeout_ms = 1000
 type = "remap"
 inputs = ["tenant_php_slow"]
 source = '''
-parts = split(to_string(.file) ?? "", "/")
+file_str = string(.file) ?? ""
+parts = split(file_str, "/")
 if length(parts) >= 5 {
   .tenant_id = parts[4]
 }
@@ -110,10 +114,11 @@ glob_minimum_cooldown_ms = 5000
 type = "remap"
 inputs = ["tenant_app_logs"]
 source = '''
-parts = split(to_string(.file) ?? "", "/")
+file_str = string(.file) ?? ""
+parts = split(file_str, "/")
 if length(parts) >= 6 {
   .tenant_id = parts[4]
-  filename = parts[5] ?? ""
+  filename = string(parts[5]) ?? ""
   .webroot_id = replace(filename, r'-app\.log$', "")
 }
 .log_type = "app"
@@ -124,14 +129,14 @@ if length(parts) >= 6 {
 [sources.tenant_cron_logs]
 type = "journald"
 include_units = []
-include_matches._SYSTEMD_UNIT = "cron-*.service"
+include_matches._SYSTEMD_UNIT = ["cron-*.service"]
 
 [transforms.parse_tenant_cron]
 type = "remap"
 inputs = ["tenant_cron_logs"]
 source = '''
 # Extract tenant name and cron job ID from SYSLOG_IDENTIFIER: cron-{tenantName}-{cronJobID}
-ident = to_string(.SYSLOG_IDENTIFIER) ?? ""
+ident = string(.SYSLOG_IDENTIFIER) ?? ""
 parts = split(ident, "-")
 if length(parts) >= 3 {
   .tenant_id = parts[1]

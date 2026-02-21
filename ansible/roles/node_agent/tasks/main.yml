@@ -17,9 +17,8 @@
     dest: /etc/systemd/system/node-agent.service
   notify: restart node-agent
 
-- name: Enable and start node-agent
+- name: Enable node-agent
   systemd:
     name: node-agent
     daemon_reload: true
     enabled: true
-    state: started

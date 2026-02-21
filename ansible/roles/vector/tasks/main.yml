@@ -33,8 +33,7 @@
 
 - name: Configure Vector environment (controlplane)
   copy:
-    content: |
-      VECTOR_CONFIG=/etc/vector/vector.toml
+    content: ""
     dest: /etc/default/vector
   when: "'controlplane' in group_names"
   notify: restart vector
@@ -47,19 +46,23 @@
   when: "'controlplane' in group_names"
   notify: restart vector
 
-# All other roles use base.toml + role-specific config.d
+# All other roles use config.d with base + role-specific configs
 - name: Deploy base Vector config
   template:
     src: base.toml.j2
-    dest: /etc/vector/vector.toml
+    dest: /etc/vector/config.d/base.toml
   when: "'controlplane' not in group_names"
   notify: restart vector
 
+- name: Remove old base config from default path
+  file:
+    path: /etc/vector/vector.toml
+    state: absent
+  when: "'controlplane' not in group_names"
+
 - name: Configure Vector environment
   copy:
-    content: |
-      VECTOR_CONFIG=/etc/vector/vector.toml
-      VECTOR_CONFIG_DIR=/etc/vector/config.d
+    content: ""
     dest: /etc/default/vector
   when: "'controlplane' not in group_names"
   notify: restart vector
@@ -113,8 +116,52 @@
   when: "'lb' in group_names"
   notify: restart vector
 
+- name: Create Vector systemd override directory
+  file:
+    path: /etc/systemd/system/vector.service.d
+    state: directory
+    mode: "0755"
+
+- name: Deploy Vector systemd override (config paths)
+  copy:
+    content: |
+      [Service]
+      ExecStartPre=
+      ExecStartPre=/usr/bin/vector validate --skip-healthchecks --config-dir /etc/vector/config.d
+      ExecStart=
+      ExecStart=/usr/bin/vector --config-dir /etc/vector/config.d --no-healthchecks
+    dest: /etc/systemd/system/vector.service.d/override.conf
+  when: "'controlplane' not in group_names"
+  notify: restart vector
+
+- name: Deploy Vector systemd override for controlplane (single config)
+  copy:
+    content: |
+      [Service]
+      ExecStartPre=
+      ExecStartPre=/usr/bin/vector validate --skip-healthchecks --config-toml /etc/vector/vector.toml
+      ExecStart=
+      ExecStart=/usr/bin/vector --config-toml /etc/vector/vector.toml --no-healthchecks
+    dest: /etc/systemd/system/vector.service.d/override.conf
+  when: "'controlplane' in group_names"
+  notify: restart vector
+
+- name: Ensure Vector data directory permissions
+  file:
+    path: /var/lib/vector
+    state: directory
+    owner: vector
+    group: vector
+    mode: "0755"
+
+- name: Reset Vector failure state
+  command: systemctl reset-failed vector
+  changed_when: false
+  failed_when: false
+
 - name: Enable and start Vector
   systemd:
     name: vector
+    daemon_reload: true
     enabled: true
     state: started

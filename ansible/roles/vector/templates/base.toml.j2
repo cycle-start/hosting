@@ -13,21 +13,21 @@ source = '''
 parsed, err = parse_json(.message)
 if err == null {
   msg = del(parsed.message)
-  if msg != null { .message = to_string(msg) ?? .message }
+  if msg != null { .message = to_string!(msg) }
   level = del(parsed.level)
-  .level = if level != null { to_string(level) ?? "info" } else { "info" }
+  .level = if level != null { to_string!(level) } else { "info" }
   svc = del(parsed.service)
-  .service = if svc != null { to_string(svc) ?? "node-agent" } else { "node-agent" }
+  .service = if svc != null { to_string!(svc) } else { "node-agent" }
   region = del(parsed.region)
-  .region = if region != null { to_string(region) ?? "" } else { "" }
+  .region = if region != null { to_string!(region) } else { "" }
   cluster = del(parsed.cluster)
-  .cluster = if cluster != null { to_string(cluster) ?? "" } else { "" }
+  .cluster = if cluster != null { to_string!(cluster) } else { "" }
   shard = del(parsed.shard)
-  .shard = if shard != null { to_string(shard) ?? "" } else { "" }
+  .shard = if shard != null { to_string!(shard) } else { "" }
   node_id = del(parsed.node_id)
-  .node_id = if node_id != null { to_string(node_id) ?? "" } else { "" }
+  .node_id = if node_id != null { to_string!(node_id) } else { "" }
   node_role = del(parsed.node_role)
-  .node_role = if node_role != null { to_string(node_role) ?? "" } else { "" }
+  .node_role = if node_role != null { to_string!(node_role) } else { "" }
 } else {
   .level = "info"
   .service = "node-agent"

@@ -3,3 +3,4 @@
     name: node-agent
     daemon_reload: true
     state: restarted
+  ignore_errors: true

@@ -54,7 +54,7 @@ resource "libvirt_volume" "web_node" {
   count    = length(var.web_nodes)
   name     = "${var.web_nodes[count.index].name}.qcow2"
   pool     = libvirt_pool.hosting.name
-  capacity = 10737418240 # 10 GB
+  capacity = 21474836480 # 20 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
     path   = libvirt_volume.image_base.path
@@ -78,7 +78,7 @@ resource "libvirt_volume" "dns_node" {
   count    = length(var.dns_nodes)
   name     = "${var.dns_nodes[count.index].name}.qcow2"
   pool     = libvirt_pool.hosting.name
-  capacity = 10737418240 # 10 GB
+  capacity = 21474836480 # 20 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
     path   = libvirt_volume.image_base.path
@@ -90,7 +90,7 @@ resource "libvirt_volume" "valkey_node" {
   count    = length(var.valkey_nodes)
   name     = "${var.valkey_nodes[count.index].name}.qcow2"
   pool     = libvirt_pool.hosting.name
-  capacity = 10737418240 # 10 GB
+  capacity = 21474836480 # 20 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
     path   = libvirt_volume.image_base.path
@@ -102,7 +102,7 @@ resource "libvirt_volume" "email_node" {
   count    = length(var.email_nodes)
   name     = "${var.email_nodes[count.index].name}.qcow2"
   pool     = libvirt_pool.hosting.name
-  capacity = 10737418240 # 10 GB
+  capacity = 21474836480 # 20 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
     path   = libvirt_volume.image_base.path
@@ -362,7 +362,7 @@ resource "libvirt_volume" "dbadmin_node" {
   count    = length(var.dbadmin_nodes)
   name     = "${var.dbadmin_nodes[count.index].name}.qcow2"
   pool     = libvirt_pool.hosting.name
-  capacity = 10737418240 # 10 GB
+  capacity = 21474836480 # 20 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
     path   = libvirt_volume.image_base.path
@@ -767,7 +767,7 @@ resource "libvirt_volume" "lb_node" {
   count    = length(var.lb_nodes)
   name     = "${var.lb_nodes[count.index].name}.qcow2"
   pool     = libvirt_pool.hosting.name
-  capacity = 10737418240 # 10 GB
+  capacity = 21474836480 # 20 GB
   target   = { format = { type = "qcow2" } }
   backing_store = {
     path   = libvirt_volume.image_base.path

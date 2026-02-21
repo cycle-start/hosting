@@ -19,7 +19,7 @@ if length(parts) >= 4 {
 }
 
 # Extract pod name from file path: /var/log/pods/<namespace>_<pod>_<uid>/<container>/0.log
-file_str = to_string!(.file)
+file_str = string!(.file)
 file_parts = split(file_str, "/")
 if length(file_parts) >= 5 {
   pod_part = to_string!(file_parts[4])
@@ -38,7 +38,7 @@ if err == null {
   level = del(parsed.level)
   .level = if level != null { to_string!(level) } else { "info" }
   svc = del(parsed.service)
-  pod_name = to_string(.pod) ?? "unknown"
+  pod_name = to_string!(.pod)
   .service = if svc != null { to_string!(svc) } else { pod_name }
   region = del(parsed.region)
   .region = if region != null { to_string!(region) } else { "" }
@@ -46,7 +46,7 @@ if err == null {
   .cluster = if cluster != null { to_string!(cluster) } else { "" }
 } else {
   .level = "info"
-  .service = to_string(.pod) ?? "unknown"
+  .service = to_string!(.pod)
 }
 '''
 
