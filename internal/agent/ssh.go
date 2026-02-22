@@ -186,6 +186,20 @@ func (m *SSHManager) setupChrootBindMounts(ctx context.Context, name, chrootDir 
 		}
 	}
 
+	// Mount /proc with hidepid=2 so tenants can only see their own processes.
+	procDir := filepath.Join(chrootDir, "proc")
+	if err := os.MkdirAll(procDir, 0755); err != nil {
+		return fmt.Errorf("mkdir proc: %w", err)
+	}
+	if !m.isMounted(procDir) {
+		cmd := exec.CommandContext(ctx, "mount", "-t", "proc", "proc", procDir,
+			"-o", "hidepid=2")
+		m.logger.Debug().Strs("cmd", cmd.Args).Msg("mounting proc")
+		if output, err := cmd.CombinedOutput(); err != nil {
+			m.logger.Warn().Str("output", string(output)).Err(err).Msg("proc mount failed")
+		}
+	}
+
 	// Symlink ~/webroots -> /webroots so tenant sees webroots in home dir.
 	homeWebroots := filepath.Join(chrootDir, "home", "webroots")
 	if _, err := os.Lstat(homeWebroots); os.IsNotExist(err) {
