@@ -23,6 +23,7 @@ type CronJobInfo struct {
 	WorkingDirectory string
 	TimeoutSeconds   int
 	MaxMemoryMB      int
+	EnvFileName      string
 }
 
 // CronManager manages systemd timer units for tenant cron jobs.
@@ -159,6 +160,9 @@ User={{ .TenantName }}
 Group={{ .TenantName }}
 WorkingDirectory={{ .WorkDir }}
 Environment=CRON_JOB_ID={{ .ID }}
+{{- if .EnvFilePath }}
+EnvironmentFile=-{{ .EnvFilePath }}
+{{- end }}
 ExecStartPre=/bin/mkdir -p {{ .LockDir }}
 ExecStart=/usr/bin/flock --nonblock --conflict-exit-code 75 {{ .LockFile }} /bin/bash -c {{ .Command }}
 ExecStopPost=+/usr/local/bin/cron-outcome
@@ -194,6 +198,7 @@ type serviceData struct {
 	WebrootPath string
 	LockDir     string
 	LockFile    string
+	EnvFilePath string
 }
 
 type timerData struct {
@@ -210,12 +215,18 @@ func (m *CronManager) lockFile(info *CronJobInfo) string {
 }
 
 func (m *CronManager) renderService(info *CronJobInfo) (string, error) {
+	webrootPath := filepath.Join(m.webStorageDir, info.TenantName, "webroots", info.WebrootName)
+	envFileName := info.EnvFileName
+	if envFileName == "" {
+		envFileName = ".env.hosting"
+	}
 	data := serviceData{
 		CronJobInfo: *info,
 		WorkDir:     m.workDir(info),
-		WebrootPath: filepath.Join(m.webStorageDir, info.TenantName, "webroots", info.WebrootName),
+		WebrootPath: webrootPath,
 		LockDir:     m.lockDir(info),
 		LockFile:    m.lockFile(info),
+		EnvFilePath: filepath.Join(webrootPath, envFileName),
 	}
 	var buf strings.Builder
 	if err := serviceTemplate.Execute(&buf, data); err != nil {

@@ -104,7 +104,7 @@ func newServicesFromDB(db DB, tc temporalclient.Client, oidcIssuerURL string, se
 		APIKey:             NewAPIKeyService(db),
 		OIDC:               NewOIDCService(db, oidcIssuerURL),
 		Search:             NewSearchService(db),
-		DesiredState:       NewDesiredStateService(db),
+		DesiredState:       NewDesiredStateService(db, secretEncryptionKey),
 		NodeHealth:         NewNodeHealthService(db),
 		Incident:           NewIncidentService(db),
 		CapabilityGap:      NewCapabilityGapService(db),

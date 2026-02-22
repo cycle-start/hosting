@@ -279,6 +279,7 @@ type CreateCronJobParams struct {
 	WorkingDirectory string
 	TimeoutSeconds   int
 	MaxMemoryMB      int
+	EnvFileName      string
 }
 
 // UpdateCronJobParams holds parameters for updating a cron job on a node.
@@ -310,7 +311,7 @@ type CreateDaemonParams struct {
 	StopSignal   string
 	StopWaitSecs int
 	MaxMemoryMB  int
-	Environment  map[string]string
+	EnvFileName  string
 }
 
 // UpdateDaemonParams holds parameters for updating a daemon on a node.

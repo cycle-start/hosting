@@ -8,6 +8,7 @@ type WebrootContext struct {
 	Tenant            model.Tenant             `json:"tenant"`
 	Nodes             []model.Node             `json:"nodes"`
 	FQDNs             []model.FQDN             `json:"fqdns"`
+	EnvVars           map[string]string        `json:"env_vars"`
 	BrandBaseHostname string                   `json:"brand_base_hostname"`
 	Shard             model.Shard              `json:"shard"`
 	LBAddresses       []model.ClusterLBAddress `json:"lb_addresses"`

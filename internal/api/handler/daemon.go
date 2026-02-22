@@ -109,10 +109,6 @@ func (h *Daemon) Create(w http.ResponseWriter, r *http.Request) {
 	if maxMemoryMB == 0 {
 		maxMemoryMB = 512
 	}
-	env := req.Environment
-	if env == nil {
-		env = make(map[string]string)
-	}
 
 	// Resolve tenant name for port computation
 	tenant, err := h.services.Tenant.GetByID(r.Context(), webroot.TenantID)
@@ -143,7 +139,6 @@ func (h *Daemon) Create(w http.ResponseWriter, r *http.Request) {
 		StopSignal:   stopSignal,
 		StopWaitSecs: stopWaitSecs,
 		MaxMemoryMB:  maxMemoryMB,
-		Environment:  env,
 		Enabled:      true,
 		Status:       model.StatusPending,
 		CreatedAt:    now,
@@ -241,9 +236,6 @@ func (h *Daemon) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.MaxMemoryMB != nil {
 		daemon.MaxMemoryMB = *req.MaxMemoryMB
-	}
-	if req.Environment != nil {
-		daemon.Environment = req.Environment
 	}
 
 	if err := h.svc.Update(r.Context(), daemon); err != nil {

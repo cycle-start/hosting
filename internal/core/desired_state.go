@@ -2,17 +2,20 @@ package core
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 
+	"github.com/edvin/hosting/internal/crypto"
 	"github.com/edvin/hosting/internal/model"
 )
 
 type DesiredStateService struct {
-	db DB
+	db     DB
+	kekHex string
 }
 
-func NewDesiredStateService(db DB) *DesiredStateService {
-	return &DesiredStateService{db: db}
+func NewDesiredStateService(db DB, kekHex string) *DesiredStateService {
+	return &DesiredStateService{db: db, kekHex: kekHex}
 }
 
 // GetForNode builds the complete desired state for a node across all its shard assignments.
@@ -159,20 +162,72 @@ func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, 
 		}
 		defer envRows.Close()
 
-		envVarsByWebroot := make(map[string]map[string]string)
+		// Collect env var rows for decryption.
+		type envRow struct {
+			webrootID string
+			tenantID  string
+			name      string
+			value     string
+			isSecret  bool
+		}
+		var envVarRows []envRow
 		for envRows.Next() {
-			var webrootID, name, value string
-			var isSecret bool
-			if err := envRows.Scan(&webrootID, &name, &value, &isSecret); err != nil {
+			var r envRow
+			if err := envRows.Scan(&r.webrootID, &r.name, &r.value, &r.isSecret); err != nil {
 				return fmt.Errorf("scan env var: %w", err)
 			}
-			if envVarsByWebroot[webrootID] == nil {
-				envVarsByWebroot[webrootID] = make(map[string]string)
-			}
-			envVarsByWebroot[webrootID][name] = value
+			envVarRows = append(envVarRows, r)
 		}
 		if err := envRows.Err(); err != nil {
 			return fmt.Errorf("iterate env vars: %w", err)
+		}
+
+		// Resolve tenant IDs for webroots that have secrets.
+		webrootTenantMap := make(map[string]string) // webroot ID -> tenant ID
+		for _, iwr := range webroots {
+			webrootTenantMap[iwr.webroot.ID] = iwr.tenantID
+		}
+
+		// Decrypt secret values using KEK -> tenant DEK.
+		var kek []byte
+		if s.kekHex != "" {
+			kek, _ = hex.DecodeString(s.kekHex)
+		}
+		tenantDEKs := make(map[string][]byte)
+		envVarsByWebroot := make(map[string]map[string]string)
+		for _, r := range envVarRows {
+			if envVarsByWebroot[r.webrootID] == nil {
+				envVarsByWebroot[r.webrootID] = make(map[string]string)
+			}
+			if !r.isSecret {
+				envVarsByWebroot[r.webrootID][r.name] = r.value
+				continue
+			}
+			if kek == nil {
+				envVarsByWebroot[r.webrootID][r.name] = r.value // can't decrypt without KEK
+				continue
+			}
+			tenantID := webrootTenantMap[r.webrootID]
+			dek, ok := tenantDEKs[tenantID]
+			if !ok {
+				var encryptedDEK string
+				err := s.db.QueryRow(ctx,
+					`SELECT encrypted_dek FROM tenant_encryption_keys WHERE tenant_id = $1`, tenantID,
+				).Scan(&encryptedDEK)
+				if err != nil {
+					return fmt.Errorf("get tenant encryption key for %s: %w", tenantID, err)
+				}
+				dek, err = crypto.Decrypt(encryptedDEK, kek)
+				if err != nil {
+					return fmt.Errorf("decrypt tenant DEK for %s: %w", tenantID, err)
+				}
+				tenantDEKs[tenantID] = dek
+			}
+			plaintext, err := crypto.Decrypt(r.value, dek)
+			if err != nil {
+				return fmt.Errorf("decrypt env var %s: %w", r.name, err)
+			}
+			envVarsByWebroot[r.webrootID][r.name] = string(plaintext)
 		}
 
 		// 4. Batch-fetch all active FQDNs for those webroots.

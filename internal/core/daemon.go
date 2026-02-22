@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"hash/fnv"
 
@@ -44,17 +43,12 @@ func (s *DaemonService) Create(ctx context.Context, daemon *model.Daemon) error 
 		daemon.NodeID = &nodeID
 	}
 
-	envJSON, err := json.Marshal(daemon.Environment)
-	if err != nil {
-		return fmt.Errorf("marshal environment: %w", err)
-	}
-
 	_, err = s.db.Exec(ctx,
-		`INSERT INTO daemons (id, tenant_id, node_id, webroot_id, name, command, proxy_path, proxy_port, num_procs, stop_signal, stop_wait_secs, max_memory_mb, environment, enabled, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+		`INSERT INTO daemons (id, tenant_id, node_id, webroot_id, name, command, proxy_path, proxy_port, num_procs, stop_signal, stop_wait_secs, max_memory_mb, enabled, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
 		daemon.ID, daemon.TenantID, daemon.NodeID, daemon.WebrootID, daemon.Name, daemon.Command,
 		daemon.ProxyPath, daemon.ProxyPort, daemon.NumProcs, daemon.StopSignal,
-		daemon.StopWaitSecs, daemon.MaxMemoryMB, envJSON,
+		daemon.StopWaitSecs, daemon.MaxMemoryMB,
 		daemon.Enabled, daemon.Status, daemon.CreatedAt, daemon.UpdatedAt,
 	)
 	if err != nil {
@@ -72,23 +66,16 @@ func (s *DaemonService) Create(ctx context.Context, daemon *model.Daemon) error 
 	return nil
 }
 
-const daemonColumns = `id, tenant_id, node_id, webroot_id, name, command, proxy_path, proxy_port, num_procs, stop_signal, stop_wait_secs, max_memory_mb, environment, enabled, status, status_message, created_at, updated_at`
+const daemonColumns = `id, tenant_id, node_id, webroot_id, name, command, proxy_path, proxy_port, num_procs, stop_signal, stop_wait_secs, max_memory_mb, enabled, status, status_message, created_at, updated_at`
 
 func scanDaemon(row interface{ Scan(dest ...any) error }) (model.Daemon, error) {
 	var d model.Daemon
-	var envJSON []byte
 	err := row.Scan(&d.ID, &d.TenantID, &d.NodeID, &d.WebrootID, &d.Name, &d.Command,
 		&d.ProxyPath, &d.ProxyPort, &d.NumProcs, &d.StopSignal,
-		&d.StopWaitSecs, &d.MaxMemoryMB, &envJSON,
+		&d.StopWaitSecs, &d.MaxMemoryMB,
 		&d.Enabled, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt)
 	if err != nil {
 		return d, err
-	}
-	if len(envJSON) > 0 {
-		_ = json.Unmarshal(envJSON, &d.Environment)
-	}
-	if d.Environment == nil {
-		d.Environment = make(map[string]string)
 	}
 	return d, nil
 }
@@ -145,17 +132,12 @@ func (s *DaemonService) ListByWebroot(ctx context.Context, webrootID string, lim
 }
 
 func (s *DaemonService) Update(ctx context.Context, daemon *model.Daemon) error {
-	envJSON, err := json.Marshal(daemon.Environment)
-	if err != nil {
-		return fmt.Errorf("marshal environment: %w", err)
-	}
-
-	_, err = s.db.Exec(ctx,
+	_, err := s.db.Exec(ctx,
 		`UPDATE daemons SET command = $1, proxy_path = $2, proxy_port = $3, num_procs = $4,
-		 stop_signal = $5, stop_wait_secs = $6, max_memory_mb = $7, environment = $8,
-		 status = $9, updated_at = now() WHERE id = $10`,
+		 stop_signal = $5, stop_wait_secs = $6, max_memory_mb = $7,
+		 status = $8, updated_at = now() WHERE id = $9`,
 		daemon.Command, daemon.ProxyPath, daemon.ProxyPort, daemon.NumProcs,
-		daemon.StopSignal, daemon.StopWaitSecs, daemon.MaxMemoryMB, envJSON,
+		daemon.StopSignal, daemon.StopWaitSecs, daemon.MaxMemoryMB,
 		daemon.Status, daemon.ID,
 	)
 	if err != nil {

@@ -313,7 +313,6 @@ export interface Daemon {
   stop_signal: string
   stop_wait_secs: number
   max_memory_mb: number
-  environment: Record<string, string>
   enabled: boolean
   status: string
   status_message?: string

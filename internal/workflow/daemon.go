@@ -93,7 +93,7 @@ func CreateDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 		StopSignal:   daemonCtx.Daemon.StopSignal,
 		StopWaitSecs: daemonCtx.Daemon.StopWaitSecs,
 		MaxMemoryMB:  daemonCtx.Daemon.MaxMemoryMB,
-		Environment:  daemonCtx.Daemon.Environment,
+		EnvFileName:  daemonCtx.Webroot.EnvFileName,
 	}
 
 	// Write config and start on the daemon's assigned node.
@@ -187,7 +187,7 @@ func UpdateDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 		StopSignal:   daemonCtx.Daemon.StopSignal,
 		StopWaitSecs: daemonCtx.Daemon.StopWaitSecs,
 		MaxMemoryMB:  daemonCtx.Daemon.MaxMemoryMB,
-		Environment:  daemonCtx.Daemon.Environment,
+		EnvFileName:  daemonCtx.Webroot.EnvFileName,
 	}
 
 	// Update config on the daemon's assigned node.

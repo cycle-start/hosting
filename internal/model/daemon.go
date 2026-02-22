@@ -14,9 +14,8 @@ type Daemon struct {
 	NumProcs      int               `json:"num_procs"`
 	StopSignal    string            `json:"stop_signal"`
 	StopWaitSecs  int               `json:"stop_wait_secs"`
-	MaxMemoryMB   int               `json:"max_memory_mb"`
-	Environment   map[string]string `json:"environment"`
-	Enabled       bool              `json:"enabled"`
+	MaxMemoryMB  int    `json:"max_memory_mb"`
+	Enabled      bool   `json:"enabled"`
 	Status        string            `json:"status"`
 	StatusMessage *string           `json:"status_message,omitempty"`
 	CreatedAt     time.Time         `json:"created_at"`

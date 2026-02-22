@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -74,7 +73,6 @@ export function WebrootDetailPage() {
   const [daemonStopSignal, setDaemonStopSignal] = useState('TERM')
   const [daemonStopWait, setDaemonStopWait] = useState('30')
   const [daemonMaxMem, setDaemonMaxMem] = useState('512')
-  const [daemonEnv, setDaemonEnv] = useState('')
 
   // Cron job state
   const [createCronOpen, setCreateCronOpen] = useState(false)
@@ -169,24 +167,9 @@ export function WebrootDetailPage() {
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }
 
-  // Daemon helpers
-  const parseEnvString = (s: string): Record<string, string> => {
-    const env: Record<string, string> = {}
-    for (const line of s.split('\n')) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith('#')) continue
-      const eqIdx = trimmed.indexOf('=')
-      if (eqIdx > 0) env[trimmed.substring(0, eqIdx)] = trimmed.substring(eqIdx + 1)
-    }
-    return env
-  }
-
-  const envToString = (env: Record<string, string>): string =>
-    Object.entries(env).map(([k, v]) => `${k}=${v}`).join('\n')
-
   const resetDaemonForm = () => {
     setDaemonCommand(''); setDaemonProxyPath(''); setDaemonNumProcs('1')
-    setDaemonStopSignal('TERM'); setDaemonStopWait('30'); setDaemonMaxMem('512'); setDaemonEnv('')
+    setDaemonStopSignal('TERM'); setDaemonStopWait('30'); setDaemonMaxMem('512')
     setTouched({})
   }
 
@@ -199,7 +182,6 @@ export function WebrootDetailPage() {
     setDaemonStopSignal(d.stop_signal)
     setDaemonStopWait(String(d.stop_wait_secs))
     setDaemonMaxMem(String(d.max_memory_mb))
-    setDaemonEnv(envToString(d.environment))
     setEditDaemon(d)
   }
 
@@ -215,7 +197,6 @@ export function WebrootDetailPage() {
         stop_signal: daemonStopSignal,
         stop_wait_secs: parseInt(daemonStopWait) || 30,
         max_memory_mb: parseInt(daemonMaxMem) || 512,
-        environment: parseEnvString(daemonEnv),
       })
       toast.success('Daemon created'); setCreateDaemonOpen(false); resetDaemonForm()
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
@@ -232,7 +213,6 @@ export function WebrootDetailPage() {
         stop_signal: daemonStopSignal,
         stop_wait_secs: parseInt(daemonStopWait) || 30,
         max_memory_mb: parseInt(daemonMaxMem) || 512,
-        environment: parseEnvString(daemonEnv),
       })
       toast.success('Daemon updated'); setEditDaemon(null)
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
@@ -492,10 +472,6 @@ export function WebrootDetailPage() {
           <Label>Max Memory (MB)</Label>
           <Input type="number" min="16" max="4096" value={daemonMaxMem} onChange={(e) => setDaemonMaxMem(e.target.value)} />
         </div>
-      </div>
-      <div className="space-y-2">
-        <Label>Environment</Label>
-        <Textarea placeholder="KEY=value (one per line)" value={daemonEnv} onChange={(e) => setDaemonEnv(e.target.value)} rows={3} className="font-mono text-sm" />
       </div>
     </div>
   )

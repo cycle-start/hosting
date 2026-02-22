@@ -59,6 +59,7 @@ func CreateCronJobWorkflow(ctx workflow.Context, cronJobID string) error {
 		WorkingDirectory: cronCtx.CronJob.WorkingDirectory,
 		TimeoutSeconds:   cronCtx.CronJob.TimeoutSeconds,
 		MaxMemoryMB:      cronCtx.CronJob.MaxMemoryMB,
+		EnvFileName:      cronCtx.Webroot.EnvFileName,
 	}
 
 	// Write unit files on all nodes.
@@ -153,6 +154,7 @@ func UpdateCronJobWorkflow(ctx workflow.Context, cronJobID string) error {
 		WorkingDirectory: cronCtx.CronJob.WorkingDirectory,
 		TimeoutSeconds:   cronCtx.CronJob.TimeoutSeconds,
 		MaxMemoryMB:      cronCtx.CronJob.MaxMemoryMB,
+		EnvFileName:      cronCtx.Webroot.EnvFileName,
 	}
 
 	var errs []string

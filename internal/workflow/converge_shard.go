@@ -359,6 +359,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				RuntimeVersion: e.webroot.RuntimeVersion,
 				RuntimeConfig:  string(e.webroot.RuntimeConfig),
 				PublicFolder:   e.webroot.PublicFolder,
+				EnvVars:        state.EnvVars[e.webroot.ID],
 				EnvFileName:    e.webroot.EnvFileName,
 				FQDNs:          e.fqdns,
 				Daemons:        dp,
@@ -388,6 +389,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				WorkingDirectory: job.WorkingDirectory,
 				TimeoutSeconds:   job.TimeoutSeconds,
 				MaxMemoryMB:      job.MaxMemoryMB,
+				EnvFileName:      entry.webroot.EnvFileName,
 			}
 
 			// Write unit files on all nodes (parallel).
@@ -448,7 +450,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 				StopSignal:   daemon.StopSignal,
 				StopWaitSecs: daemon.StopWaitSecs,
 				MaxMemoryMB:  daemon.MaxMemoryMB,
-				Environment:  daemon.Environment,
+				EnvFileName:  entry.webroot.EnvFileName,
 			}
 
 			// Write supervisord config on all nodes (parallel).

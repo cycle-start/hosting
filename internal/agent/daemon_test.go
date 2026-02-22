@@ -220,3 +220,36 @@ func TestCleanOrphanedDaemonConfigs_RemovesOrphaned(t *testing.T) {
 	assert.True(t, fileExists(filepath.Join(confDir, "hosting.conf")))
 	assert.False(t, fileExists(filepath.Join(confDir, "daemon-tenant2-old.conf")))
 }
+
+func TestReadEnvFile_Basic(t *testing.T) {
+	dir := t.TempDir()
+	content := "# comment\nAPP_ENV=\"production\"\nDEBUG=\"false\"\nSECRET=\"has\\\"quotes\"\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env.hosting"), []byte(content), 0644))
+
+	env := readEnvFile(dir, "")
+	assert.Equal(t, "production", env["APP_ENV"])
+	assert.Equal(t, "false", env["DEBUG"])
+	assert.Equal(t, `has"quotes`, env["SECRET"])
+}
+
+func TestReadEnvFile_Missing(t *testing.T) {
+	dir := t.TempDir()
+	env := readEnvFile(dir, ".env.hosting")
+	assert.Empty(t, env)
+}
+
+func TestReadEnvFile_CustomName(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env.custom"), []byte("FOO=\"bar\"\n"), 0644))
+
+	env := readEnvFile(dir, ".env.custom")
+	assert.Equal(t, "bar", env["FOO"])
+}
+
+func TestReadEnvFile_UnquotedValues(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env.hosting"), []byte("KEY=value\n"), 0644))
+
+	env := readEnvFile(dir, "")
+	assert.Equal(t, "value", env["KEY"])
+}

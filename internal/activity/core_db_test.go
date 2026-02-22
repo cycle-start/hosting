@@ -87,7 +87,7 @@ func (m *mockRows) Conn() *pgx.Conn                              { return nil }
 
 func TestCoreDB_ListTenantsByShard_Success(t *testing.T) {
 	db := &mockDB{}
-	a := NewCoreDB(db)
+	a := NewCoreDB(db, "")
 	ctx := context.Background()
 
 	shardID := "test-shard-1"
@@ -151,7 +151,7 @@ func TestCoreDB_ListTenantsByShard_Success(t *testing.T) {
 
 func TestCoreDB_ListTenantsByShard_Empty(t *testing.T) {
 	db := &mockDB{}
-	a := NewCoreDB(db)
+	a := NewCoreDB(db, "")
 	ctx := context.Background()
 
 	rows := newEmptyMockRows()
@@ -165,7 +165,7 @@ func TestCoreDB_ListTenantsByShard_Empty(t *testing.T) {
 
 func TestCoreDB_ListTenantsByShard_QueryError(t *testing.T) {
 	db := &mockDB{}
-	a := NewCoreDB(db)
+	a := NewCoreDB(db, "")
 	ctx := context.Background()
 
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("connection lost"))
@@ -179,7 +179,7 @@ func TestCoreDB_ListTenantsByShard_QueryError(t *testing.T) {
 
 func TestCoreDB_ListTenantsByShard_RowsErr(t *testing.T) {
 	db := &mockDB{}
-	a := NewCoreDB(db)
+	a := NewCoreDB(db, "")
 	ctx := context.Background()
 
 	rows := newEmptyMockRows()
@@ -196,7 +196,7 @@ func TestCoreDB_ListTenantsByShard_RowsErr(t *testing.T) {
 
 func TestCoreDB_ListNodesByShard_Success(t *testing.T) {
 	db := &mockDB{}
-	a := NewCoreDB(db)
+	a := NewCoreDB(db, "")
 	ctx := context.Background()
 
 	shardID := "test-shard-1"
@@ -255,7 +255,7 @@ func TestCoreDB_ListNodesByShard_Success(t *testing.T) {
 
 func TestCoreDB_ListNodesByShard_Empty(t *testing.T) {
 	db := &mockDB{}
-	a := NewCoreDB(db)
+	a := NewCoreDB(db, "")
 	ctx := context.Background()
 
 	rows := newEmptyMockRows()
@@ -269,7 +269,7 @@ func TestCoreDB_ListNodesByShard_Empty(t *testing.T) {
 
 func TestCoreDB_ListNodesByShard_QueryError(t *testing.T) {
 	db := &mockDB{}
-	a := NewCoreDB(db)
+	a := NewCoreDB(db, "")
 	ctx := context.Background()
 
 	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("connection lost"))
@@ -283,7 +283,7 @@ func TestCoreDB_ListNodesByShard_QueryError(t *testing.T) {
 
 func TestCoreDB_ListNodesByShard_RowsErr(t *testing.T) {
 	db := &mockDB{}
-	a := NewCoreDB(db)
+	a := NewCoreDB(db, "")
 	ctx := context.Background()
 
 	rows := newEmptyMockRows()

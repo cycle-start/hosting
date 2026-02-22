@@ -27,7 +27,7 @@ type DaemonInfo struct {
 	StopSignal   string
 	StopWaitSecs int
 	MaxMemoryMB  int
-	Environment  map[string]string
+	EnvFileName  string
 }
 
 // DaemonManager manages supervisord program configs for tenant daemons.
@@ -63,11 +63,8 @@ func (m *DaemonManager) Configure(ctx context.Context, info *DaemonInfo) error {
 
 	workDir := filepath.Join(m.webStorageDir, info.TenantName, "webroots", info.WebrootName)
 
-	// Build environment string with PORT if proxy_port is set.
-	env := make(map[string]string)
-	for k, v := range info.Environment {
-		env[k] = v
-	}
+	// Read env vars from the webroot's .env.hosting file and add PORT/HOST for proxy daemons.
+	env := readEnvFile(workDir, info.EnvFileName)
 	if info.ProxyPort != nil {
 		env["PORT"] = fmt.Sprintf("%d", *info.ProxyPort)
 		if info.HostIP != "" {
@@ -280,6 +277,39 @@ type daemonConfigData struct {
 	StopWaitSecs int
 	MaxMemoryMB  int
 	Environment  string
+}
+
+// readEnvFile reads and parses a KEY="value" env file from the webroot directory.
+// Returns an empty map if the file doesn't exist or can't be read.
+func readEnvFile(webrootDir, envFileName string) map[string]string {
+	if envFileName == "" {
+		envFileName = ".env.hosting"
+	}
+	data, err := os.ReadFile(filepath.Join(webrootDir, envFileName))
+	if err != nil {
+		return make(map[string]string)
+	}
+	env := make(map[string]string)
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		eqIdx := strings.IndexByte(line, '=')
+		if eqIdx <= 0 {
+			continue
+		}
+		key := line[:eqIdx]
+		val := line[eqIdx+1:]
+		// Strip surrounding double quotes.
+		if len(val) >= 2 && val[0] == '"' && val[len(val)-1] == '"' {
+			val = val[1 : len(val)-1]
+			// Unescape common sequences.
+			val = strings.NewReplacer(`\"`, `"`, `\$`, `$`, "\\`", "`", `\\`, `\`).Replace(val)
+		}
+		env[key] = val
+	}
+	return env
 }
 
 // formatDaemonEnvironment formats the environment map as a supervisord environment string.

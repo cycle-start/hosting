@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -746,6 +747,7 @@ func (a *NodeLocal) CreateCronJobUnits(ctx context.Context, params CreateCronJob
 		WorkingDirectory: params.WorkingDirectory,
 		TimeoutSeconds:   params.TimeoutSeconds,
 		MaxMemoryMB:      params.MaxMemoryMB,
+		EnvFileName:      params.EnvFileName,
 	})
 }
 
@@ -762,6 +764,7 @@ func (a *NodeLocal) UpdateCronJobUnits(ctx context.Context, params UpdateCronJob
 		WorkingDirectory: params.WorkingDirectory,
 		TimeoutSeconds:   params.TimeoutSeconds,
 		MaxMemoryMB:      params.MaxMemoryMB,
+		EnvFileName:      params.EnvFileName,
 	})
 }
 
@@ -811,7 +814,7 @@ func (a *NodeLocal) CreateDaemonConfig(ctx context.Context, params CreateDaemonP
 		StopSignal:   params.StopSignal,
 		StopWaitSecs: params.StopWaitSecs,
 		MaxMemoryMB:  params.MaxMemoryMB,
-		Environment:  params.Environment,
+		EnvFileName:  params.EnvFileName,
 	}
 	if err := a.daemon.Configure(ctx, info); err != nil {
 		return asNonRetryable(fmt.Errorf("configure daemon: %w", err))
@@ -837,7 +840,7 @@ func (a *NodeLocal) UpdateDaemonConfig(ctx context.Context, params UpdateDaemonP
 		StopSignal:   params.StopSignal,
 		StopWaitSecs: params.StopWaitSecs,
 		MaxMemoryMB:  params.MaxMemoryMB,
-		Environment:  params.Environment,
+		EnvFileName:  params.EnvFileName,
 	}
 	if err := a.daemon.Configure(ctx, info); err != nil {
 		return asNonRetryable(fmt.Errorf("configure daemon: %w", err))
@@ -955,10 +958,14 @@ func writeEnvFile(tenantName, webrootName, envFileName string, envVars map[strin
 	if envFileName == "" {
 		envFileName = ".env.hosting"
 	}
+	dir := filepath.Join("/var/www/storage", tenantName, "webroots", webrootName)
+	envrcPath := filepath.Join(dir, ".envrc")
+
 	if len(envVars) == 0 {
-		// Remove env file if it exists and there are no vars.
-		path := filepath.Join("/var/www/storage", tenantName, "webroots", webrootName, envFileName)
+		// Remove env file and .envrc if there are no vars.
+		path := filepath.Join(dir, envFileName)
 		_ = os.Remove(path)
+		_ = os.Remove(envrcPath)
 		return nil
 	}
 
@@ -978,14 +985,33 @@ func writeEnvFile(tenantName, webrootName, envFileName string, envVars map[strin
 		b.WriteString("\"\n")
 	}
 
-	dir := filepath.Join("/var/www/storage", tenantName, "webroots", webrootName)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("create env file dir: %w", err)
 	}
 
 	path := filepath.Join(dir, envFileName)
-	if err := os.WriteFile(path, []byte(b.String()), 0400); err != nil {
+	if err := os.WriteFile(path, []byte(b.String()), 0644); err != nil {
 		return fmt.Errorf("write env file: %w", err)
+	}
+
+	// Chown the env file to the tenant user so direnv (running as tenant) can read it.
+	if u, err := user.Lookup(tenantName); err == nil {
+		uid, _ := strconv.Atoi(u.Uid)
+		gid, _ := strconv.Atoi(u.Gid)
+		_ = os.Chown(path, uid, gid)
+	}
+
+	// Write .envrc for direnv to auto-load the env file in SSH sessions.
+	envrcContent := fmt.Sprintf("dotenv_if_exists %s\n", envFileName)
+	if err := os.WriteFile(envrcPath, []byte(envrcContent), 0644); err != nil {
+		return fmt.Errorf("write .envrc: %w", err)
+	}
+
+	// Chown .envrc to tenant too.
+	if u, err := user.Lookup(tenantName); err == nil {
+		uid, _ := strconv.Atoi(u.Uid)
+		gid, _ := strconv.Atoi(u.Gid)
+		_ = os.Chown(envrcPath, uid, gid)
 	}
 
 	return nil

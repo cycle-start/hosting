@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -257,13 +259,47 @@ func (m *SSHManager) setupChrootBindMounts(ctx context.Context, name, chrootDir 
 		}
 	}
 
-	// Copy /etc/passwd and /etc/group with just the tenant's entry.
-	passwdPath := filepath.Join(etcDir, "passwd")
-	if _, err := os.Stat(passwdPath); os.IsNotExist(err) {
-		content := fmt.Sprintf("root:x:0:0:root:/root:/bin/bash\n%s:x:%d:%d::%s:/bin/bash\n",
-			name, int(0), int(0), "/home") // uid/gid will be resolved by NSS, these are placeholders
-		_ = os.WriteFile(passwdPath, []byte(content), 0644)
+	// Write /etc/passwd with the tenant's real UID/GID so that
+	// hidepid=2 on /proc filters correctly and shell tools (whoami, ps) work.
+	uid, gid := 0, 0
+	if u, err := user.Lookup(name); err == nil {
+		uid, _ = strconv.Atoi(u.Uid)
+		gid, _ = strconv.Atoi(u.Gid)
 	}
+	passwdContent := fmt.Sprintf("root:x:0:0:root:/root:/bin/bash\n%s:x:%d:%d::%s:/bin/bash\n",
+		name, uid, gid, "/home")
+	_ = os.WriteFile(filepath.Join(etcDir, "passwd"), []byte(passwdContent), 0644)
+
+	groupContent := fmt.Sprintf("root:x:0:\n%s:x:%d:\n", name, gid)
+	_ = os.WriteFile(filepath.Join(etcDir, "group"), []byte(groupContent), 0644)
+
+	// Set up direnv so env vars auto-load when cd-ing into a webroot directory.
+	// The direnv binary is accessible via the /usr bind mount.
+	direnvHook := "eval \"$(direnv hook bash)\"\n"
+	_ = os.WriteFile(filepath.Join(etcDir, "bash.bashrc"), []byte(direnvHook), 0644)
+	_ = os.WriteFile(filepath.Join(etcDir, "profile"), []byte(direnvHook), 0644)
+
+	// Whitelist /webroots so .envrc files are auto-trusted without `direnv allow`.
+	// direnv reads config from $XDG_CONFIG_HOME/direnv/direnv.toml which defaults
+	// to ~/.config/direnv/direnv.toml. Inside the chroot, HOME=/home.
+	direnvConfDir := filepath.Join(chrootDir, "home", ".config", "direnv")
+	if err := os.MkdirAll(direnvConfDir, 0755); err != nil {
+		return fmt.Errorf("mkdir home/.config/direnv: %w", err)
+	}
+	direnvToml := "[global]\nhide_env_diff = true\n\n[whitelist]\nprefix = [\"/webroots\"]\n"
+	_ = os.WriteFile(filepath.Join(direnvConfDir, "direnv.toml"), []byte(direnvToml), 0644)
+	// Chown the .config tree to the tenant so direnv can read it.
+	_ = chownRecursive(filepath.Join(chrootDir, "home", ".config"), uid, gid)
 
 	return nil
+}
+
+// chownRecursive changes ownership of a directory tree.
+func chownRecursive(root string, uid, gid int) error {
+	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		return os.Chown(path, uid, gid)
+	})
 }

@@ -77,7 +77,7 @@ func main() {
 	})
 
 	// Register activities
-	coreDBActivities := activity.NewCoreDB(corePool)
+	coreDBActivities := activity.NewCoreDB(corePool, cfg.SecretEncryptionKey)
 	w.RegisterActivity(coreDBActivities)
 
 	powerdnsDBActivities := activity.NewPowerDNSDB(powerdnsPool)

@@ -12,7 +12,6 @@ CREATE TABLE daemons (
     stop_signal     TEXT NOT NULL DEFAULT 'TERM',
     stop_wait_secs  INT NOT NULL DEFAULT 30,
     max_memory_mb   INT NOT NULL DEFAULT 512,
-    environment     JSONB NOT NULL DEFAULT '{}',
     enabled         BOOLEAN NOT NULL DEFAULT true,
     status          TEXT NOT NULL DEFAULT 'pending',
     status_message  TEXT,

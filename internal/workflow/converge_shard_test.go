@@ -69,6 +69,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 		FQDNs: map[string][]activity.FQDNParam{
 			"wr-1": {{FQDN: "example.com", WebrootID: "wr-1", SSLEnabled: true}},
 		},
+		EnvVars:  map[string]map[string]string{},
 		Daemons:  map[string][]model.Daemon{},
 		CronJobs: map[string][]model.CronJob{},
 		SSHKeys:  map[string][]string{},
@@ -224,6 +225,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestSkipsInactiveResources() {
 		Tenants:  tenants,
 		Webroots: map[string][]model.Webroot{},
 		FQDNs:    map[string][]activity.FQDNParam{},
+		EnvVars:  map[string]map[string]string{},
 		Daemons:  map[string][]model.Daemon{},
 		CronJobs: map[string][]model.CronJob{},
 		SSHKeys:  map[string][]string{},

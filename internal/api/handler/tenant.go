@@ -239,7 +239,6 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 					StopSignal:   "TERM",
 					StopWaitSecs: 30,
 					MaxMemoryMB:  512,
-					Environment:  make(map[string]string),
 					Enabled:      true,
 					Status:       model.StatusPending,
 					CreatedAt:    now3,
