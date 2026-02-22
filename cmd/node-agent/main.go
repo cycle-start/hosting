@@ -41,7 +41,6 @@ func main() {
 		ValkeyConfigDir: getEnv("VALKEY_CONFIG_DIR", "/etc/valkey"),
 		ValkeyDataDir:   getEnv("VALKEY_DATA_DIR", "/var/lib/valkey"),
 		InitSystem:      getEnv("INIT_SYSTEM", "direct"),
-		SSHConfigDir:    getEnv("SSH_CONFIG_DIR", "/etc/ssh/sshd_config.d"),
 		ShardName:       cfg.ShardName,
 	}
 

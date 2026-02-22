@@ -1,8 +1,22 @@
+- name: Create hosting SSH groups
+  group:
+    name: "{{ item }}"
+    state: present
+    system: true
+  loop:
+    - hosting-ssh
+    - hosting-sftp
+    - hosting-noaccess
+
 - name: Ensure sshd_config.d directory exists
   file:
     path: /etc/ssh/sshd_config.d
     state: directory
     mode: "0755"
+
+- name: Remove legacy per-tenant SSH configs
+  shell: rm -f /etc/ssh/sshd_config.d/tenant-*.conf
+  changed_when: false
 
 - name: Deploy SSH hardening config
   copy:

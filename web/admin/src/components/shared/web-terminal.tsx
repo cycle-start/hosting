@@ -98,7 +98,7 @@ export function WebTerminal({ tenantId, onClose }: WebTerminalProps) {
   return (
     <div
       ref={containerRef}
-      className="w-full h-[500px] rounded-md overflow-hidden"
+      className="w-full h-[700px] rounded-md overflow-hidden"
       style={{ backgroundColor: '#1a1b26' }}
     />
   )

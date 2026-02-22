@@ -15,7 +15,6 @@ type Config struct {
 	CertDir         string
 	ValkeyConfigDir string
 	ValkeyDataDir   string
-	SSHConfigDir    string
 	// InitSystem selects the service manager implementation.
 	// "systemd" for production (VMs/bare metal), "direct" for Docker dev.
 	InitSystem string
@@ -71,7 +70,7 @@ func NewServer(logger zerolog.Logger, cfg Config) *Server {
 		nginx:    nginxMgr,
 		database: NewDatabaseManager(logger, cfg),
 		valkey:   NewValkeyManager(logger, cfg, svcMgr),
-		ssh:      NewSSHManager(logger, cfg.SSHConfigDir, cfg.WebStorageDir),
+		ssh:      NewSSHManager(logger, cfg.WebStorageDir),
 		cron:     NewCronManager(logger, cfg),
 		daemon:    NewDaemonManager(logger, cfg),
 		tenantULA: NewTenantULAManager(logger),

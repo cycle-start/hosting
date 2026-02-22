@@ -913,7 +913,7 @@ export function TenantDetailPage() {
 
       {/* Terminal Dialog */}
       <Dialog open={terminalOpen} onOpenChange={setTerminalOpen}>
-        <DialogContent className="max-w-4xl p-0">
+        <DialogContent className="max-w-6xl p-0" onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader className="px-6 pt-6 pb-2">
             <DialogTitle>Terminal — {tenant.name}</DialogTitle>
           </DialogHeader>
