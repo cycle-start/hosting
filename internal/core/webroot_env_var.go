@@ -180,6 +180,48 @@ func (s *WebrootEnvVarService) getWebrootByID(ctx context.Context, id string) (*
 	return &w, nil
 }
 
+// VaultEncrypt encrypts a plaintext value using the tenant's DEK and returns a vault token.
+func (s *WebrootEnvVarService) VaultEncrypt(ctx context.Context, webrootID, plaintext string) (string, error) {
+	var tenantID string
+	if err := s.db.QueryRow(ctx, "SELECT tenant_id FROM webroots WHERE id = $1", webrootID).Scan(&tenantID); err != nil {
+		return "", fmt.Errorf("resolve tenant: %w", err)
+	}
+
+	dek, err := s.getOrCreateTenantDEK(ctx, tenantID)
+	if err != nil {
+		return "", fmt.Errorf("get tenant dek: %w", err)
+	}
+
+	blob, err := crypto.Encrypt([]byte(plaintext), dek)
+	if err != nil {
+		return "", fmt.Errorf("encrypt vault value: %w", err)
+	}
+
+	return "vault:v1:" + blob, nil
+}
+
+// VaultDecrypt decrypts a vault token using the tenant's DEK and returns the plaintext.
+func (s *WebrootEnvVarService) VaultDecrypt(ctx context.Context, webrootID, token string) (string, error) {
+	blob := token[len("vault:v1:"):]
+
+	var tenantID string
+	if err := s.db.QueryRow(ctx, "SELECT tenant_id FROM webroots WHERE id = $1", webrootID).Scan(&tenantID); err != nil {
+		return "", fmt.Errorf("resolve tenant: %w", err)
+	}
+
+	dek, err := s.getTenantDEK(ctx, tenantID)
+	if err != nil {
+		return "", fmt.Errorf("get tenant dek: %w", err)
+	}
+
+	plaintext, err := crypto.Decrypt(blob, dek)
+	if err != nil {
+		return "", fmt.Errorf("decrypt vault value: %w", err)
+	}
+
+	return string(plaintext), nil
+}
+
 // getTenantDEK retrieves and decrypts the tenant's DEK using the KEK.
 func (s *WebrootEnvVarService) getTenantDEK(ctx context.Context, tenantID string) ([]byte, error) {
 	var encryptedDEK string

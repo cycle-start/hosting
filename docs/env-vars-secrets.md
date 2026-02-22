@@ -89,11 +89,15 @@ APP_KEY="base64:abc123"
 
 ### Cron jobs
 
-Cron job systemd units can reference the env file via `EnvironmentFile=`.
+Cron job systemd units automatically include `EnvironmentFile=-/var/www/storage/{tenant}/webroots/{webroot}/{env_file_name}` pointing to the webroot's env file. The `-` prefix means the unit still starts if the file doesn't exist.
 
 ### Daemons
 
-Webroot env vars are available in the env file. Daemon-specific `Environment` vars take precedence.
+Daemons read `.env.hosting` (or the configured `env_file_name`) from the webroot directory at configure time via direnv. For proxy daemons, `PORT` and `HOST` are auto-injected.
+
+### SSH sessions
+
+A direnv hook in the chroot's `bash.bashrc` and `profile` auto-loads env vars when a tenant `cd`s into a webroot directory. The direnv whitelist in `direnv.toml` auto-trusts all paths under `/webroots/`.
 
 ## Encryption Architecture
 
@@ -112,6 +116,54 @@ Webroot env vars are available in the env file. Daemon-specific `Environment` va
 **Read (convergence):** Fetch encrypted value -> decrypt DEK with KEK -> decrypt value with DEK -> plaintext flows to node agents via Temporal activity params.
 
 **On node:** Secrets arrive as plaintext, written to FPM config and env file (same security model as database passwords).
+
+## Vault Encryption
+
+Customers can encrypt secret values via the API to produce vault tokens (`vault:v1:...`) that are safe to commit to git. At convergence time (Phase 2), the platform resolves vault tokens automatically.
+
+### Token format
+
+```
+vault:v1:<base64(nonce || ciphertext || tag)>
+```
+
+Uses the same per-tenant envelope encryption (KEK -> tenant DEK -> AES-256-GCM).
+
+### Encrypt
+
+```
+POST /api/v1/webroots/{webrootID}/vault/encrypt
+```
+
+**Request body:**
+```json
+{"plaintext": "my-secret-value"}
+```
+
+**Response:**
+```json
+{"token": "vault:v1:abc123..."}
+```
+
+Plaintext max size: 64KB. Requires `webroots:write` scope.
+
+### Decrypt
+
+```
+POST /api/v1/webroots/{webrootID}/vault/decrypt
+```
+
+**Request body:**
+```json
+{"token": "vault:v1:abc123..."}
+```
+
+**Response:**
+```json
+{"plaintext": "my-secret-value"}
+```
+
+Token must start with `vault:v1:`. Requires `webroots:write` scope.
 
 ## PHP Runtime Config
 

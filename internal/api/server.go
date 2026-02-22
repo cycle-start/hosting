@@ -384,6 +384,14 @@ func (s *Server) setupRoutes() {
 			r.Delete("/webroots/{webrootID}/env-vars/{name}", envVar.Delete)
 		})
 
+		// Vault encrypt/decrypt
+		vault := handler.NewVault(s.services)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("webroots", "write"))
+			r.Post("/webroots/{webrootID}/vault/encrypt", vault.Encrypt)
+			r.Post("/webroots/{webrootID}/vault/decrypt", vault.Decrypt)
+		})
+
 		// Daemons
 		daemon := handler.NewDaemon(s.services)
 		r.Group(func(r chi.Router) {
