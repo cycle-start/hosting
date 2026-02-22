@@ -105,7 +105,7 @@ func (h *Terminal) Connect(w http.ResponseWriter, r *http.Request) {
 	tcpConn, err := net.DialTimeout("tcp", addr, 10*time.Second)
 	if err != nil {
 		log.Error().Err(err).Str("addr", addr).Msg("TCP dial to SSH node failed")
-		ws.Close(websocket.StatusInternalError, "SSH connection failed")
+		ws.Close(websocket.StatusInternalError, fmt.Sprintf("SSH connection failed: %s", err))
 		return
 	}
 	defer tcpConn.Close()
@@ -118,7 +118,7 @@ func (h *Terminal) Connect(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Error().Err(err).Str("node_ip", nodeIP).Str("tenant", tenantName).Msg("SSH handshake failed")
-		ws.Close(websocket.StatusInternalError, "SSH connection failed")
+		ws.Close(websocket.StatusInternalError, fmt.Sprintf("SSH connection failed: %s", err))
 		return
 	}
 	sshClient := ssh.NewClient(sshConn, chans, reqs)

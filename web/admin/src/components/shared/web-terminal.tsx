@@ -59,8 +59,12 @@ export function WebTerminal({ tenantId, onClose }: WebTerminalProps) {
       }
     }
 
-    ws.onclose = () => {
-      term.write('\r\n\x1b[33mConnection closed.\x1b[0m\r\n')
+    ws.onclose = (event) => {
+      if (event.reason) {
+        term.write(`\r\n\x1b[31m${event.reason}\x1b[0m\r\n`)
+      } else {
+        term.write('\r\n\x1b[33mConnection closed.\x1b[0m\r\n')
+      }
     }
 
     ws.onerror = () => {
