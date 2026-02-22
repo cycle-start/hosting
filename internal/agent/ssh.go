@@ -186,6 +186,12 @@ func (m *SSHManager) setupChrootBindMounts(ctx context.Context, name, chrootDir 
 		}
 	}
 
+	// Symlink ~/webroots -> /webroots so tenant sees webroots in home dir.
+	homeWebroots := filepath.Join(chrootDir, "home", "webroots")
+	if _, err := os.Lstat(homeWebroots); os.IsNotExist(err) {
+		_ = os.Symlink("/webroots", homeWebroots)
+	}
+
 	// Create minimal /etc inside the chroot (for shell utilities).
 	etcDir := filepath.Join(chrootDir, "etc")
 	if err := os.MkdirAll(etcDir, 0755); err != nil {
