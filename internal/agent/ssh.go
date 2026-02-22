@@ -198,6 +198,19 @@ func (m *SSHManager) setupChrootBindMounts(ctx context.Context, name, chrootDir 
 		return fmt.Errorf("mkdir etc: %w", err)
 	}
 
+	// Bind-mount /etc/alternatives so symlinked binaries (vim, vi, etc.) resolve.
+	altDir := filepath.Join(etcDir, "alternatives")
+	if err := os.MkdirAll(altDir, 0755); err != nil {
+		return fmt.Errorf("mkdir etc/alternatives: %w", err)
+	}
+	if !m.isMounted(altDir) {
+		cmd := exec.CommandContext(ctx, "mount", "--bind", "-o", "ro", "/etc/alternatives", altDir)
+		m.logger.Debug().Strs("cmd", cmd.Args).Msg("bind mounting /etc/alternatives")
+		if output, err := cmd.CombinedOutput(); err != nil {
+			m.logger.Warn().Str("output", string(output)).Err(err).Msg("/etc/alternatives bind mount failed")
+		}
+	}
+
 	// Copy /etc/passwd and /etc/group with just the tenant's entry.
 	passwdPath := filepath.Join(etcDir, "passwd")
 	if _, err := os.Stat(passwdPath); os.IsNotExist(err) {
