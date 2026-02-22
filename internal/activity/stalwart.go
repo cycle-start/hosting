@@ -97,6 +97,12 @@ type StalwartSyncForwardParams struct {
 // StalwartSyncForwardScript regenerates and deploys the forwarding Sieve script
 // based on the current active forwards in the database.
 func (a *Stalwart) StalwartSyncForwardScript(ctx context.Context, params StalwartSyncForwardParams) error {
+	// Resolve internal JMAP account ID from account name.
+	accountID, err := a.resolveJMAPAccountID(ctx, params.BaseURL, params.AdminToken, params.AccountName)
+	if err != nil {
+		return err
+	}
+
 	// Query active forwards from the core DB.
 	rows, err := a.db.Query(ctx,
 		`SELECT destination, keep_copy FROM email_forwards
@@ -126,10 +132,10 @@ func (a *Stalwart) StalwartSyncForwardScript(ctx context.Context, params Stalwar
 
 	if script == "" {
 		// No forwards — delete the script if it exists.
-		return a.jmapClient.DeleteSieveScript(ctx, params.BaseURL, params.AdminToken, params.AccountName, scriptName)
+		return a.jmapClient.DeleteSieveScript(ctx, params.BaseURL, params.AdminToken, accountID, scriptName)
 	}
 
-	return a.jmapClient.DeploySieveScript(ctx, params.BaseURL, params.AdminToken, params.AccountName, scriptName, script)
+	return a.jmapClient.DeploySieveScript(ctx, params.BaseURL, params.AdminToken, accountID, scriptName, script)
 }
 
 // StalwartVacationParams holds parameters for setting vacation auto-reply.
@@ -142,5 +148,19 @@ type StalwartVacationParams struct {
 
 // StalwartSetVacation sets or clears the vacation auto-reply via JMAP.
 func (a *Stalwart) StalwartSetVacation(ctx context.Context, params StalwartVacationParams) error {
-	return a.jmapClient.SetVacationResponse(ctx, params.BaseURL, params.AdminToken, params.AccountName, params.Vacation)
+	accountID, err := a.resolveJMAPAccountID(ctx, params.BaseURL, params.AdminToken, params.AccountName)
+	if err != nil {
+		return err
+	}
+	return a.jmapClient.SetVacationResponse(ctx, params.BaseURL, params.AdminToken, accountID, params.Vacation)
+}
+
+// resolveJMAPAccountID looks up the numeric principal ID for an account name
+// and encodes it as a Crockford base32 string for use as a JMAP account ID.
+func (a *Stalwart) resolveJMAPAccountID(ctx context.Context, baseURL, adminToken, accountName string) (string, error) {
+	principalID, err := a.client.GetPrincipalID(ctx, baseURL, adminToken, accountName)
+	if err != nil {
+		return "", fmt.Errorf("resolve jmap account id: %w", err)
+	}
+	return stalwart.EncodePrincipalID(principalID), nil
 }

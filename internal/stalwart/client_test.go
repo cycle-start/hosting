@@ -260,3 +260,39 @@ func TestClient_GetAccount_Error(t *testing.T) {
 	assert.Contains(t, err.Error(), "status 404")
 	assert.Contains(t, err.Error(), "not found")
 }
+
+// ---------- GetPrincipalID ----------
+
+func TestClient_GetPrincipalID_Success(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/api/principal/user@example.com", r.URL.Path)
+		user, pass, ok := r.BasicAuth()
+		assert.True(t, ok, "expected basic auth")
+		assert.Equal(t, "admin", user)
+		assert.Equal(t, "test-token", pass)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"data": map[string]any{"id": 82},
+		})
+	}))
+	defer srv.Close()
+
+	client := NewClient()
+	id, err := client.GetPrincipalID(context.Background(), srv.URL, "test-token", "user@example.com")
+	require.NoError(t, err)
+	assert.Equal(t, uint32(82), id)
+}
+
+func TestClient_GetPrincipalID_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("not found"))
+	}))
+	defer srv.Close()
+
+	client := NewClient()
+	_, err := client.GetPrincipalID(context.Background(), srv.URL, "test-token", "user@example.com")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "status 404")
+}

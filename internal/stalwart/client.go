@@ -186,3 +186,36 @@ func (c *Client) GetAccount(ctx context.Context, baseURL, adminToken, address st
 		QuotaBytes:  result.Quota,
 	}, nil
 }
+
+// GetPrincipalID retrieves the numeric principal ID for a given account name
+// from the Stalwart admin API. This ID is needed to derive the JMAP account ID
+// (Crockford base32 encoded).
+func (c *Client) GetPrincipalID(ctx context.Context, baseURL, adminToken, accountName string) (uint32, error) {
+	url := fmt.Sprintf("%s/api/principal/%s", baseURL, accountName)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return 0, fmt.Errorf("get principal id request: %w", err)
+	}
+	req.SetBasicAuth("admin", adminToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("get principal id: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return 0, fmt.Errorf("get principal id %s: status %d: %s", accountName, resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Data struct {
+			ID uint32 `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return 0, fmt.Errorf("decode principal id: %w", err)
+	}
+	return result.Data.ID, nil
+}
