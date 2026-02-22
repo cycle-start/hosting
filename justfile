@@ -227,6 +227,7 @@ vm-up:
         sudo virsh net-start hosting; \
     fi
     cd terraform && terraform apply -auto-approve
+    @sudo virsh list --all --name | xargs -I{} sudo virsh start {} 2>/dev/null; true
     just _wait-api
     go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml
 
