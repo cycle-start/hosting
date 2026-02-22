@@ -198,16 +198,23 @@ func (m *SSHManager) setupChrootBindMounts(ctx context.Context, name, chrootDir 
 		return fmt.Errorf("mkdir etc: %w", err)
 	}
 
-	// Bind-mount /etc/alternatives so symlinked binaries (vim, vi, etc.) resolve.
-	altDir := filepath.Join(etcDir, "alternatives")
-	if err := os.MkdirAll(altDir, 0755); err != nil {
-		return fmt.Errorf("mkdir etc/alternatives: %w", err)
-	}
-	if !m.isMounted(altDir) {
-		cmd := exec.CommandContext(ctx, "mount", "--bind", "-o", "ro", "/etc/alternatives", altDir)
-		m.logger.Debug().Strs("cmd", cmd.Args).Msg("bind mounting /etc/alternatives")
-		if output, err := cmd.CombinedOutput(); err != nil {
-			m.logger.Warn().Str("output", string(output)).Err(err).Msg("/etc/alternatives bind mount failed")
+	// Bind-mount /etc subdirs that tools need (read-only).
+	etcBindDirs := []string{"alternatives", "php"}
+	for _, sub := range etcBindDirs {
+		src := filepath.Join("/etc", sub)
+		if _, err := os.Stat(src); os.IsNotExist(err) {
+			continue
+		}
+		target := filepath.Join(etcDir, sub)
+		if err := os.MkdirAll(target, 0755); err != nil {
+			return fmt.Errorf("mkdir etc/%s: %w", sub, err)
+		}
+		if !m.isMounted(target) {
+			cmd := exec.CommandContext(ctx, "mount", "--bind", "-o", "ro", src, target)
+			m.logger.Debug().Strs("cmd", cmd.Args).Msg("bind mounting")
+			if output, err := cmd.CombinedOutput(); err != nil {
+				m.logger.Warn().Str("output", string(output)).Err(err).Msg("bind mount failed")
+			}
 		}
 	}
 
