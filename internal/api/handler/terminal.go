@@ -79,6 +79,7 @@ func (h *Terminal) Connect(w http.ResponseWriter, r *http.Request) {
 	// Find a web node for this shard.
 	nodeIP, err := h.resolveNodeIP(r.Context(), *shardID)
 	if err != nil {
+		log.Error().Err(err).Str("shard_id", *shardID).Msg("failed to resolve web node IP")
 		response.WriteError(w, http.StatusServiceUnavailable, "no available web node")
 		return
 	}
@@ -222,9 +223,9 @@ func (h *Terminal) validateToken(ctx context.Context, key string) error {
 func (h *Terminal) resolveNodeIP(ctx context.Context, shardID string) (string, error) {
 	var ip string
 	err := h.db.QueryRow(ctx, `
-		SELECT n.ip_address FROM nodes n
-		JOIN shard_nodes sn ON sn.node_id = n.id
-		WHERE sn.shard_id = $1 AND n.status = 'active' AND n.ip_address IS NOT NULL
+		SELECT host(n.ip_address) FROM nodes n
+		JOIN node_shard_assignments nsa ON nsa.node_id = n.id
+		WHERE nsa.shard_id = $1 AND n.status = 'active' AND n.ip_address IS NOT NULL
 		ORDER BY n.id
 		LIMIT 1
 	`, shardID).Scan(&ip)

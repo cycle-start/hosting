@@ -45,6 +45,11 @@ func (ca *CA) Sign(username string, ttl time.Duration) (ssh.Signer, error) {
 		ValidPrincipals: []string{username},
 		ValidAfter:      uint64(now.Add(-30 * time.Second).Unix()),
 		ValidBefore:     uint64(now.Add(ttl).Unix()),
+		Permissions: ssh.Permissions{
+			Extensions: map[string]string{
+				"permit-pty": "",
+			},
+		},
 	}
 
 	if err := cert.SignCert(rand.Reader, ca.signer); err != nil {

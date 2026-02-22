@@ -154,6 +154,7 @@ func (m *SSHManager) setupChrootBindMounts(ctx context.Context, name, chrootDir 
 		{"null", 1, 3},
 		{"zero", 1, 5},
 		{"urandom", 1, 9},
+		{"ptmx", 5, 2},
 	}
 
 	for _, dn := range devNodes {
@@ -168,6 +169,20 @@ func (m *SSHManager) setupChrootBindMounts(ctx context.Context, name, chrootDir 
 			m.logger.Warn().Str("path", path).Str("output", string(output)).Err(err).Msg("mknod failed, continuing")
 		} else {
 			_ = os.Chmod(path, 0666)
+		}
+	}
+
+	// Bind-mount host /dev/pts for PTY allocation. OpenSSH's privileged monitor
+	// allocates PTYs from the host namespace, so the chroot must share it.
+	ptsDir := filepath.Join(devDir, "pts")
+	if err := os.MkdirAll(ptsDir, 0755); err != nil {
+		return fmt.Errorf("mkdir dev/pts: %w", err)
+	}
+	if !m.isMounted(ptsDir) {
+		cmd := exec.CommandContext(ctx, "mount", "--bind", "/dev/pts", ptsDir)
+		m.logger.Debug().Strs("cmd", cmd.Args).Msg("bind mounting /dev/pts")
+		if output, err := cmd.CombinedOutput(); err != nil {
+			m.logger.Warn().Str("output", string(output)).Err(err).Msg("/dev/pts bind mount failed")
 		}
 	}
 
