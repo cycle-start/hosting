@@ -140,7 +140,7 @@ rebuild: vm-deploy reset-db migrate create-dev-key create-agent-key wait-api clu
 # Wait for Postgres to accept connections
 wait-db:
     @echo "Waiting for Postgres..."
-    @until pg_isready -h {{cp}} -p 5432 -U hosting -q 2>/dev/null; do sleep 2; done
+    @until nc -z {{cp}} 5432 2>/dev/null; do sleep 2; done
     @echo "Postgres is ready."
 
 # Nuclear rebuild: destroy VMs, recreate, deploy everything from scratch
