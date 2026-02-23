@@ -376,7 +376,7 @@ func convergeDatabaseShard(ctx workflow.Context, shardID string, nodes []model.N
             continue
         }
 
-        err = workflow.ExecuteActivity(primaryCtx, "CreateDatabase", database.Name).Get(ctx, nil)
+        err = workflow.ExecuteActivity(primaryCtx, "CreateDatabase", database.ID).Get(ctx, nil)
         if err != nil {
             errs = append(errs, fmt.Sprintf("create database %s on primary: %v", database.ID, err))
         }
@@ -393,7 +393,7 @@ func convergeDatabaseShard(ctx workflow.Context, shardID string, nodes []model.N
                 continue
             }
             err = workflow.ExecuteActivity(primaryCtx, "CreateDatabaseUser", activity.CreateDatabaseUserParams{
-                DatabaseName: database.Name,
+                DatabaseName: database.ID,
                 Username:     user.Username,
                 Password:     user.Password,
                 Privileges:   user.Privileges,
@@ -453,7 +453,7 @@ func CreateDatabaseWorkflow(ctx workflow.Context, databaseID string) error {
 
     // Create database on PRIMARY only.
     primaryCtx := nodeActivityCtx(ctx, primaryID)
-    err = workflow.ExecuteActivity(primaryCtx, "CreateDatabase", database.Name).Get(ctx, nil)
+    err = workflow.ExecuteActivity(primaryCtx, "CreateDatabase", database.ID).Get(ctx, nil)
     if err != nil {
         _ = setResourceFailed(ctx, "databases", databaseID, err)
         return err

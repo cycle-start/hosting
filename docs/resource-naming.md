@@ -1,93 +1,99 @@
 # Resource Naming
 
-All resources use UUID primary keys for database identity and API references. Resources that need system-level identifiers (Linux usernames, MySQL database names, file paths, systemd units, RGW buckets) get auto-generated **prefixed short names** via `platform.NewName(prefix)`.
+Resources that need system-level identifiers (Linux usernames, MySQL database names, file paths, systemd units, RGW buckets) use auto-generated **prefixed short names** as their primary key (`id`), generated via `platform.NewName(prefix)`. These short names serve double duty as both the database primary key and the system-level identifier — there is no separate UUID.
+
+Other resources (brands, zones, FQDNs, nodes, etc.) use UUIDs or user-supplied identifiers as appropriate.
 
 ## Naming Table
 
-| Resource | PK | Name Prefix | System Use |
+| Resource | PK (`id`) | Prefix | System Use |
 |---|---|---|---|
-| Tenant | UUID | `t_` | Linux username, CephFS paths, S3 RGW user UID |
-| Webroot | UUID | `web_` | File paths, nginx configs |
-| Database | UUID | `db_` | MySQL database name |
-| Valkey Instance | UUID | `kv_` | systemd unit, config file, data dir |
-| S3 Bucket | UUID | `s3_` | RGW bucket naming |
-| Cron Job | UUID | `cron_` | systemd timer/service unit names |
-| Daemon | UUID | `daemon_` | supervisord program config |
+| Tenant | short name | `t` | Linux username, CephFS paths, S3 RGW user UID |
+| Webroot | short name | `w` | File paths, nginx configs |
+| Database | short name | `db` | MySQL database name |
+| Valkey Instance | short name | `kv` | systemd unit, config file, data dir |
+| S3 Bucket | short name | `s3` | RGW bucket naming |
+| Cron Job | short name | `cj` | systemd timer/service unit names |
+| Daemon | short name | `d` | supervisord program config |
 | Brand | UUID | _(none)_ | User-supplied `name` for display |
+| Zone | UUID | _(none)_ | User-supplied `name` |
+| Region | user-supplied | _(none)_ | e.g. `osl-1` |
+| Cluster | user-supplied | _(none)_ | e.g. `dev` |
+| Node | UUID (Terraform) | _(none)_ | Temporal task queue routing |
 
 ## Name Format
 
-Names are generated as `{prefix}{10-char-random}`, using the character set `abcdefghijklmnopqrstuvwxyz0123456789`. Examples:
+IDs are generated as `{prefix}{10-char-random}`, using the character set `abcdefghijklmnopqrstuvwxyz0123456789`. Examples:
 
-- Tenant: `t_a7k3m9x2p1`
-- Database: `db_f4n8q1w5r2`
-- Valkey: `kv_j6t2y8e4h0`
-- S3 Bucket: `s3_b3g7l1v5d9`
-- Webroot: `web_c8m2p6s0x4`
-- Cron Job: `cron_k5n9r3w7a1`
-- Daemon: `daemon_h2q6v0z4b8`
+- Tenant: `t8k3pq7w2m`
+- Webroot: `w4n8q1w5r2`
+- Database: `dbf4n8q1w5r`
+- Valkey: `kvj6t2y8e4h`
+- S3 Bucket: `s3b3g7l1v5d`
+- Cron Job: `cjk5n9r3w7a`
+- Daemon: `dh2q6v0z4b8`
 
-Names are globally unique per resource type (enforced by `UNIQUE(name)` constraint in the database).
+IDs are globally unique per resource type (enforced by primary key constraint).
 
 ## System-Level Usage
 
-### Tenant (`t_xxx`)
+### Tenant (`t...`)
 
-- **Linux user:** `useradd t_a7k3m9x2p1`
-- **Home directory:** `/home/t_a7k3m9x2p1/`
-- **CephFS quota path:** `/mnt/ceph/tenants/t_a7k3m9x2p1/`
-- **SSH authorized_keys:** `/home/t_a7k3m9x2p1/.ssh/authorized_keys`
-- **S3 RGW user UID:** `t_a7k3m9x2p1`
+- **Linux user:** `useradd t8k3pq7w2m`
+- **Home directory:** `/home/t8k3pq7w2m/`
+- **CephFS storage:** `/var/www/storage/t8k3pq7w2m/`
+- **SSH authorized_keys:** `/home/t8k3pq7w2m/.ssh/authorized_keys`
+- **S3 RGW user UID:** `t8k3pq7w2m`
 
-### Webroot (`web_xxx`)
+### Webroot (`w...`)
 
-- **Document root:** `/home/t_xxx/webroots/web_c8m2p6s0x4/`
-- **Nginx config:** `/etc/nginx/sites-available/web_c8m2p6s0x4.conf`
-- **PHP-FPM socket:** `/run/php/web_c8m2p6s0x4.sock`
+- **Document root:** `/var/www/storage/t.../webroots/w4n8q1w5r2/`
+- **Nginx config:** `/etc/nginx/sites-available/w4n8q1w5r2.conf`
+- **PHP-FPM socket:** `/run/php/w4n8q1w5r2.sock`
 
-### Database (`db_xxx`)
+### Database (`db...`)
 
-- **MySQL database:** `CREATE DATABASE db_f4n8q1w5r2`
+- **MySQL database:** `CREATE DATABASE dbf4n8q1w5r`
 
-### Valkey Instance (`kv_xxx`)
+### Valkey Instance (`kv...`)
 
-- **systemd unit:** `valkey@kv_j6t2y8e4h0.service`
-- **Config file:** `/etc/valkey/instances/kv_j6t2y8e4h0.conf`
-- **Data directory:** `/var/lib/valkey/kv_j6t2y8e4h0/`
+- **systemd unit:** `valkey@kvj6t2y8e4h.service`
+- **Config file:** `/etc/valkey/instances/kvj6t2y8e4h.conf`
+- **Data directory:** `/var/lib/valkey/kvj6t2y8e4h/`
 
-### S3 Bucket (`s3_xxx`)
+### S3 Bucket (`s3...`)
 
-- **Internal RGW bucket:** `t_a7k3m9x2p1--s3_b3g7l1v5d9` (tenant name + `--` + bucket name)
+- **Internal RGW bucket:** `t8k3pq7w2m--s3b3g7l1v5d` (tenant ID + `--` + bucket ID)
 
-### Cron Job (`cron_xxx`)
+### Cron Job (`cj...`)
 
-- **systemd timer:** `cron-t_a7k3m9x2p1-cron_k5n9r3w7a1.timer`
-- **systemd service:** `cron-t_a7k3m9x2p1-cron_k5n9r3w7a1.service`
+- **systemd timer:** `cron-t8k3pq7w2m-cjk5n9r3w7a.timer`
+- **systemd service:** `cron-t8k3pq7w2m-cjk5n9r3w7a.service`
 
-### Daemon (`daemon_xxx`)
+### Daemon (`d...`)
 
-- **supervisord config:** `/etc/supervisor/conf.d/daemon-t_a7k3m9x2p1-daemon_h2q6v0z4b8.conf`
-- **supervisord program:** `daemon-t_a7k3m9x2p1-daemon_h2q6v0z4b8`
+- **supervisord config:** `/etc/supervisor/conf.d/daemon-t8k3pq7w2m-dh2q6v0z4b8.conf`
+- **supervisord program:** `daemon-t8k3pq7w2m-dh2q6v0z4b8`
 - **Working directory:** Inherits from parent webroot
 
 ## Database/Valkey User Naming
 
-Usernames for database and valkey users must start with the parent resource's name. This prevents collisions across resources on the same shard and makes ownership obvious.
+Usernames for database and valkey users must start with the parent resource's ID. This prevents collisions across resources on the same shard and makes ownership obvious.
 
-**Database users** (parent: `db_f4n8q1w5r2`):
-- `db_f4n8q1w5r2` — single-user shorthand
-- `db_f4n8q1w5r2_admin` — suffixed for multiple users
-- `db_f4n8q1w5r2_readonly` — read-only user
+**Database users** (parent: `dbf4n8q1w5r`):
+- `dbf4n8q1w5r` — single-user shorthand
+- `dbf4n8q1w5r_admin` — suffixed for multiple users
+- `dbf4n8q1w5r_readonly` — read-only user
 
-**Valkey users** (parent: `kv_j6t2y8e4h0`):
-- `kv_j6t2y8e4h0` — single-user shorthand
-- `kv_j6t2y8e4h0_reader` — restricted ACL user
+**Valkey users** (parent: `kvj6t2y8e4h`):
+- `kvj6t2y8e4h` — single-user shorthand
+- `kvj6t2y8e4h_reader` — restricted ACL user
 
-The API validates this prefix constraint on user creation. Usernames that don't start with the parent resource name are rejected.
+The API validates this prefix constraint on user creation. Usernames that don't start with the parent resource ID are rejected.
 
 ## API Behavior
 
-- **Creation requests** do not accept a `name` field — names are auto-generated server-side.
-- **Responses** include both `id` (UUID) and `name` (prefixed short name).
-- **Search** matches against both `id` and `name`.
-- **Brand** is the exception: it has a user-supplied `name` (display name) and UUID `id`. Brand creation does not accept an `id` field.
+- **Creation requests** do not accept an `id` field for short-name resources — IDs are auto-generated server-side.
+- **Responses** include `id` (the prefixed short name). There is no separate `name` field.
+- **Search** matches against `id`.
+- **Brand** is the exception: it has a user-supplied `name` (display name) and UUID `id`.

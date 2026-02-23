@@ -30,7 +30,6 @@ type ShardState struct {
 // DesiredTenant is a tenant in the desired state for web shards.
 type DesiredTenant struct {
 	ID          string           `json:"id"`
-	Name        string           `json:"name"`
 	UID         int32            `json:"uid"`
 	SFTPEnabled bool             `json:"sftp_enabled"`
 	SSHEnabled  bool             `json:"ssh_enabled"`
@@ -42,7 +41,6 @@ type DesiredTenant struct {
 // DesiredWebroot is a webroot in the desired state.
 type DesiredWebroot struct {
 	ID             string            `json:"id"`
-	Name           string            `json:"name"`
 	Runtime        string            `json:"runtime"`
 	RuntimeVersion string            `json:"runtime_version"`
 	RuntimeConfig  string            `json:"runtime_config"`
@@ -58,7 +56,6 @@ type DesiredWebroot struct {
 // DesiredCronJob is a cron job in the desired state.
 type DesiredCronJob struct {
 	ID      string `json:"id"`
-	Name    string `json:"name"`
 	Enabled bool   `json:"enabled"`
 }
 
@@ -66,7 +63,6 @@ type DesiredCronJob struct {
 type DesiredDaemon struct {
 	ID        string  `json:"id"`
 	NodeID    *string `json:"node_id,omitempty"`
-	Name      string  `json:"name"`
 	Enabled   bool    `json:"enabled"`
 	ProxyPath *string `json:"proxy_path,omitempty"`
 	ProxyPort *int    `json:"proxy_port,omitempty"`
@@ -82,7 +78,6 @@ type DesiredFQDN struct {
 // DesiredDatabase is a database in the desired state for database shards.
 type DesiredDatabase struct {
 	ID     string          `json:"id"`
-	Name   string          `json:"name"`
 	Status string          `json:"status"`
 	Users  []DesiredDBUser `json:"users,omitempty"`
 }
@@ -99,7 +94,6 @@ type DesiredDBUser struct {
 // DesiredValkeyInstance is a Valkey instance in the desired state.
 type DesiredValkeyInstance struct {
 	ID          string              `json:"id"`
-	Name        string              `json:"name"`
 	Port        int                 `json:"port"`
 	Password    string              `json:"password"`
 	MaxMemoryMB int                 `json:"max_memory_mb"`
@@ -126,7 +120,6 @@ type DesiredFQDNMapping struct {
 // DesiredS3Bucket is an S3 bucket in the desired state.
 type DesiredS3Bucket struct {
 	ID       string `json:"id"`
-	Name     string `json:"name"`
 	TenantID string `json:"tenant_id"`
 	Status   string `json:"status"`
 }

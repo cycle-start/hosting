@@ -90,7 +90,7 @@ func (s *DesiredStateService) GetForNode(ctx context.Context, nodeID string) (*m
 func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, ss *model.ShardState) error {
 	// 1. Fetch all active/suspended tenants for this shard.
 	rows, err := s.db.Query(ctx, `
-		SELECT t.id, t.name, t.uid, t.sftp_enabled, t.ssh_enabled, t.status
+		SELECT t.id, t.uid, t.sftp_enabled, t.ssh_enabled, t.status
 		FROM tenants t
 		WHERE t.shard_id = $1 AND t.status IN ('active', 'suspended')
 		ORDER BY t.id`, shardID)
@@ -103,7 +103,7 @@ func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, 
 	var tenantIDs []string
 	for rows.Next() {
 		var t model.DesiredTenant
-		if err := rows.Scan(&t.ID, &t.Name, &t.UID, &t.SFTPEnabled, &t.SSHEnabled, &t.Status); err != nil {
+		if err := rows.Scan(&t.ID, &t.UID, &t.SFTPEnabled, &t.SSHEnabled, &t.Status); err != nil {
 			return fmt.Errorf("scan tenant: %w", err)
 		}
 		tenants = append(tenants, t)
@@ -119,10 +119,10 @@ func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, 
 
 	// 2. Batch-fetch all active webroots for those tenants.
 	wrRows, err := s.db.Query(ctx, `
-		SELECT id, tenant_id, name, runtime, runtime_version, runtime_config::text,
+		SELECT id, tenant_id, runtime, runtime_version, runtime_config::text,
 		       public_folder, env_file_name, status
 		FROM webroots WHERE tenant_id = ANY($1) AND status = 'active'
-		ORDER BY name`, tenantIDs)
+		ORDER BY id`, tenantIDs)
 	if err != nil {
 		return fmt.Errorf("batch query webroots: %w", err)
 	}
@@ -138,7 +138,7 @@ func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, 
 	for wrRows.Next() {
 		var wr model.DesiredWebroot
 		var tenantID string
-		if err := wrRows.Scan(&wr.ID, &tenantID, &wr.Name, &wr.Runtime, &wr.RuntimeVersion,
+		if err := wrRows.Scan(&wr.ID, &tenantID, &wr.Runtime, &wr.RuntimeVersion,
 			&wr.RuntimeConfig, &wr.PublicFolder, &wr.EnvFileName, &wr.Status); err != nil {
 			return fmt.Errorf("scan webroot: %w", err)
 		}
@@ -255,7 +255,7 @@ func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, 
 
 		// 5. Batch-fetch all cron jobs for those webroots.
 		cronRows, err := s.db.Query(ctx, `
-			SELECT webroot_id, id, name, enabled FROM cron_jobs
+			SELECT webroot_id, id, enabled FROM cron_jobs
 			WHERE webroot_id = ANY($1) AND status IN ('active', 'auto_disabled')
 			ORDER BY id`, webrootIDs)
 		if err != nil {
@@ -267,7 +267,7 @@ func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, 
 		for cronRows.Next() {
 			var webrootID string
 			var cj model.DesiredCronJob
-			if err := cronRows.Scan(&webrootID, &cj.ID, &cj.Name, &cj.Enabled); err != nil {
+			if err := cronRows.Scan(&webrootID, &cj.ID, &cj.Enabled); err != nil {
 				return fmt.Errorf("scan cron job: %w", err)
 			}
 			cronsByWebroot[webrootID] = append(cronsByWebroot[webrootID], cj)
@@ -323,9 +323,9 @@ func (s *DesiredStateService) loadWebState(ctx context.Context, shardID string, 
 
 func (s *DesiredStateService) loadDatabaseState(ctx context.Context, shardID string, ss *model.ShardState) error {
 	rows, err := s.db.Query(ctx, `
-		SELECT id, name, status FROM databases
+		SELECT id, status FROM databases
 		WHERE shard_id = $1 AND status = 'active'
-		ORDER BY name`, shardID)
+		ORDER BY id`, shardID)
 	if err != nil {
 		return fmt.Errorf("query databases: %w", err)
 	}
@@ -333,7 +333,7 @@ func (s *DesiredStateService) loadDatabaseState(ctx context.Context, shardID str
 
 	for rows.Next() {
 		var d model.DesiredDatabase
-		if err := rows.Scan(&d.ID, &d.Name, &d.Status); err != nil {
+		if err := rows.Scan(&d.ID, &d.Status); err != nil {
 			return fmt.Errorf("scan database: %w", err)
 		}
 
@@ -364,9 +364,9 @@ func (s *DesiredStateService) loadDatabaseState(ctx context.Context, shardID str
 
 func (s *DesiredStateService) loadValkeyState(ctx context.Context, shardID string, ss *model.ShardState) error {
 	rows, err := s.db.Query(ctx, `
-		SELECT id, name, port, password, max_memory_mb, status
+		SELECT id, port, password, max_memory_mb, status
 		FROM valkey_instances WHERE shard_id = $1 AND status = 'active'
-		ORDER BY name`, shardID)
+		ORDER BY id`, shardID)
 	if err != nil {
 		return fmt.Errorf("query valkey instances: %w", err)
 	}
@@ -374,7 +374,7 @@ func (s *DesiredStateService) loadValkeyState(ctx context.Context, shardID strin
 
 	for rows.Next() {
 		var vi model.DesiredValkeyInstance
-		if err := rows.Scan(&vi.ID, &vi.Name, &vi.Port, &vi.Password, &vi.MaxMemoryMB, &vi.Status); err != nil {
+		if err := rows.Scan(&vi.ID, &vi.Port, &vi.Password, &vi.MaxMemoryMB, &vi.Status); err != nil {
 			return fmt.Errorf("scan valkey instance: %w", err)
 		}
 
@@ -437,9 +437,9 @@ func (s *DesiredStateService) loadLBState(ctx context.Context, shardID string, s
 
 func (s *DesiredStateService) loadStorageState(ctx context.Context, shardID string, ss *model.ShardState) error {
 	rows, err := s.db.Query(ctx, `
-		SELECT id, name, tenant_id, status FROM s3_buckets
+		SELECT id, tenant_id, status FROM s3_buckets
 		WHERE shard_id = $1 AND status = 'active'
-		ORDER BY name`, shardID)
+		ORDER BY id`, shardID)
 	if err != nil {
 		return fmt.Errorf("query s3 buckets: %w", err)
 	}
@@ -448,7 +448,7 @@ func (s *DesiredStateService) loadStorageState(ctx context.Context, shardID stri
 	for rows.Next() {
 		var b model.DesiredS3Bucket
 		var tenantID *string
-		if err := rows.Scan(&b.ID, &b.Name, &tenantID, &b.Status); err != nil {
+		if err := rows.Scan(&b.ID, &tenantID, &b.Status); err != nil {
 			return fmt.Errorf("scan s3 bucket: %w", err)
 		}
 		if tenantID != nil {

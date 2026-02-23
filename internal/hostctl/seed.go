@@ -422,10 +422,9 @@ func Seed(configPath string, timeout time.Duration) error {
 			return fmt.Errorf("parse tenant ID: %w", err)
 		}
 		tenantMap[t.Name] = tenantID
-		tenantName := extractNameFromResp(resp)
 
 		// Await ONE workflow — all nested resources provisioned when this returns
-		fmt.Printf("  Tenant %q: %s (name=%s), awaiting workflow...\n", t.Name, tenantID, tenantName)
+		fmt.Printf("  Tenant %q: %s, awaiting workflow...\n", t.Name, tenantID)
 		if err := client.AwaitWorkflow(fmt.Sprintf("create-tenant-%s", tenantID)); err != nil {
 			return fmt.Errorf("await tenant %q: %w", t.Name, err)
 		}
@@ -480,8 +479,7 @@ func Seed(configPath string, timeout time.Duration) error {
 
 		// List webroots (for fixture deployment paths and backup source IDs)
 		type resourceRef struct {
-			ID   string `json:"id"`
-			Name string `json:"name"`
+			ID string `json:"id"`
 		}
 		var webroots []resourceRef
 		if len(t.Webroots) > 0 {
@@ -522,13 +520,13 @@ func Seed(configPath string, timeout time.Duration) error {
 				break
 			}
 			db := databases[i]
-			ctx.dbName = db.Name
+			ctx.dbName = db.ID
 			if ctx.dbID == "" {
 				ctx.dbID = db.ID
 			}
 
 			for _, u := range d.Users {
-				username := db.Name + u.Suffix
+				username := db.ID + u.Suffix
 				fmt.Printf("  Creating database user %q...\n", username)
 				userResp, err := client.Post(fmt.Sprintf("/databases/%s/users", db.ID), map[string]any{
 					"username":   username,
@@ -571,18 +569,18 @@ func Seed(configPath string, timeout time.Duration) error {
 						"secret": ev.Secret,
 					})
 				}
-				fmt.Printf("  Setting %d env vars on webroot %s...\n", len(vars), wr.Name)
+				fmt.Printf("  Setting %d env vars on webroot %s...\n", len(vars), wr.ID)
 				if _, err := client.Put(fmt.Sprintf("/webroots/%s/env-vars", wr.ID), map[string]any{
 					"vars": vars,
 				}); err != nil {
-					return fmt.Errorf("set env vars for webroot %s: %w", wr.Name, err)
+					return fmt.Errorf("set env vars for webroot %s: %w", wr.ID, err)
 				}
 			}
 
 			// Deploy fixture
 			if w.Fixture != nil {
-				if err := seedFixture(tenantName, wr.Name, w.Fixture, ctx, cfg.LBTrafficURL, ctx.fqdn, webNodeIPs); err != nil {
-					return fmt.Errorf("fixture for webroot %s of tenant %q: %w", wr.Name, t.Name, err)
+				if err := seedFixture(tenantID, wr.ID, w.Fixture, ctx, cfg.LBTrafficURL, ctx.fqdn, webNodeIPs); err != nil {
+					return fmt.Errorf("fixture for webroot %s of tenant %q: %w", wr.ID, t.Name, err)
 				}
 			}
 		}
@@ -664,13 +662,13 @@ func buildEmailAccountEntries(emails []EmailAcctDef, resolveSubID func(string) s
 	return accounts
 }
 
-func seedFixture(tenantName, webrootName string, def *FixtureDef, ctx *tenantSeedCtx, lbURL, fqdn string, webNodeIPs []string) error {
+func seedFixture(tenantID, webrootID string, def *FixtureDef, ctx *tenantSeedCtx, lbURL, fqdn string, webNodeIPs []string) error {
 	// Verify tarball exists.
 	if _, err := os.Stat(def.Tarball); err != nil {
 		return fmt.Errorf("fixture tarball %q: %w", def.Tarball, err)
 	}
 
-	webrootPath := fmt.Sprintf("/var/www/storage/%s/webroots/%s", tenantName, webrootName)
+	webrootPath := fmt.Sprintf("/var/www/storage/%s/webroots/%s", tenantID, webrootID)
 
 	// Upload and extract tarball on the first web node only (CephFS is shared across nodes).
 	firstIP := webNodeIPs[0]
@@ -681,8 +679,8 @@ func seedFixture(tenantName, webrootName string, def *FixtureDef, ctx *tenantSee
 	// Extract as the tenant user so files are owned correctly without chown.
 	if _, err := sshExec(firstIP, fmt.Sprintf(
 		"sudo -u %s tar -xzf /tmp/seed-fixture.tar.gz -C %s && sudo -u %s chmod -R 775 %s/storage %s/bootstrap/cache 2>/dev/null; rm -f /tmp/seed-fixture.tar.gz",
-		tenantName, webrootPath,
-		tenantName, webrootPath, webrootPath,
+		tenantID, webrootPath,
+		tenantID, webrootPath, webrootPath,
 	)); err != nil {
 		return fmt.Errorf("extract on %s: %w", firstIP, err)
 	}
@@ -716,7 +714,7 @@ func seedFixture(tenantName, webrootName string, def *FixtureDef, ctx *tenantSee
 	)); err != nil {
 		return fmt.Errorf("write .env on %s: %w", firstIP, err)
 	}
-	if _, err := sshExec(firstIP, fmt.Sprintf("sudo chown %s:%s %s/.env", tenantName, tenantName, webrootPath)); err != nil {
+	if _, err := sshExec(firstIP, fmt.Sprintf("sudo chown %s:%s %s/.env", tenantID, tenantID, webrootPath)); err != nil {
 		return fmt.Errorf("chown .env on %s: %w", firstIP, err)
 	}
 
@@ -799,16 +797,6 @@ func generateUUID() string {
 	b[6] = (b[6] & 0x0f) | 0x40 // version 4
 	b[8] = (b[8] & 0x3f) | 0x80 // variant 10
 	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
-}
-
-func extractNameFromResp(resp *Response) string {
-	var resource struct {
-		Name string `json:"name"`
-	}
-	if err := json.Unmarshal(resp.Body, &resource); err != nil {
-		return "(unknown)"
-	}
-	return resource.Name
 }
 
 func seedBackups(client *Client, tenantID string, backups []BackupDef, webrootID, dbID string) error {

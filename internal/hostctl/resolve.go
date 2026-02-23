@@ -23,7 +23,7 @@ func (c *Client) FindShardByName(clusterID string, name string) (string, error) 
 }
 
 func (c *Client) FindTenantByName(name string) (string, error) {
-	return c.findByName("/tenants", name)
+	return c.findByID("/tenants", name)
 }
 
 func (c *Client) FindBrandByName(name string) (string, error) {
@@ -56,4 +56,28 @@ func (c *Client) findByName(path, name string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("%q not found at %s", name, path)
+}
+
+func (c *Client) findByID(path, id string) (string, error) {
+	resp, err := c.Get(path)
+	if err != nil {
+		return "", err
+	}
+
+	items, err := resp.Items()
+	if err != nil {
+		return "", fmt.Errorf("parse resources from %s: %w", path, err)
+	}
+
+	var resources []namedResource
+	if err := json.Unmarshal(items, &resources); err != nil {
+		return "", fmt.Errorf("parse resources from %s: %w", path, err)
+	}
+
+	for _, r := range resources {
+		if r.ID == id {
+			return r.ID, nil
+		}
+	}
+	return "", fmt.Errorf("%q not found at %s", id, path)
 }
