@@ -6,6 +6,7 @@
     - { role: nginx, tags: [nginx] }
     - { role: php, tags: [php] }
     - { role: composer, tags: [composer] }
+    - { role: client_tools, tags: [client-tools] }
     - { role: ceph_client, tags: [ceph-client] }
     - { role: supervisor, tags: [supervisor] }
     - { role: node_agent, tags: [node-agent] }

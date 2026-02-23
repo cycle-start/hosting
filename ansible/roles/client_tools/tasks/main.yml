@@ -1,0 +1,23 @@
+- name: Install client tools via apt
+  apt:
+    name:
+      - mysql-client
+      - valkey-tools
+      - unzip
+    state: present
+
+- name: Check if AWS CLI is installed
+  stat:
+    path: /usr/local/bin/aws
+  register: aws_cli
+
+- name: Download AWS CLI v2 installer
+  unarchive:
+    src: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+    dest: /tmp
+    remote_src: true
+  when: not aws_cli.stat.exists
+
+- name: Install AWS CLI v2
+  command: /tmp/aws/install
+  when: not aws_cli.stat.exists
