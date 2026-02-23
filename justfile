@@ -131,11 +131,17 @@ wait-api:
     @echo "core-api is ready."
 
 # Full bootstrap after DB reset: migrate, create dev key, create agent key, register cluster, seed tenants
-bootstrap: migrate create-dev-key create-agent-key wait-api cluster-apply seed
+bootstrap: wait-db migrate create-dev-key create-agent-key wait-api cluster-apply seed
 
 # Full rebuild: deploy control plane + node agents + wipe DB + bootstrap
 # Use when both control plane and node-agent code have changed.
 rebuild: vm-deploy reset-db migrate create-dev-key create-agent-key wait-api cluster-apply deploy-node-agent seed
+
+# Wait for Postgres to accept connections
+wait-db:
+    @echo "Waiting for Postgres..."
+    @until pg_isready -h {{cp}} -p 5432 -U hosting -q 2>/dev/null; do sleep 2; done
+    @echo "Postgres is ready."
 
 # Nuclear rebuild: destroy VMs, recreate, deploy everything from scratch
 rebuild-all:
@@ -146,6 +152,7 @@ rebuild-all:
     just ansible-bootstrap
     just vm-kubeconfig
     just vm-deploy
+    just wait-db
     just bootstrap
 
 # Generate Temporal mTLS certificates
