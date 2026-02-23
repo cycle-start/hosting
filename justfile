@@ -141,6 +141,8 @@ rebuild: vm-deploy reset-db migrate create-dev-key create-agent-key wait-api clu
 rebuild-all:
     just vm-down
     cd terraform && terraform apply -auto-approve
+    @echo "Waiting for VMs to boot..."
+    @sleep 30
     just ansible-bootstrap
     just vm-kubeconfig
     just vm-deploy
