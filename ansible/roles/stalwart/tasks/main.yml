@@ -47,8 +47,9 @@
     dest: /etc/systemd/system/stalwart-mail.service
   notify: reload systemd for stalwart
 
-- name: Disable Stalwart (cloud-init enables after config)
+- name: Enable and start Stalwart
   systemd:
     name: stalwart-mail
     daemon_reload: true
-    enabled: false
+    enabled: true
+    state: started

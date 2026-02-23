@@ -46,7 +46,8 @@
     owner: haproxy
     group: haproxy
 
-- name: Enable HAProxy
+- name: Enable and start HAProxy
   systemd:
     name: haproxy
     enabled: true
+    state: started

@@ -11,3 +11,23 @@
       - jq
     state: present
     update_cache: true
+
+- name: Check if Ceph is initialized
+  stat:
+    path: /etc/ceph/ceph.client.admin.keyring
+  register: ceph_admin_keyring
+
+- name: Run Ceph setup script
+  command: /opt/hosting/setup-ceph.sh
+  when: not ceph_admin_keyring.stat.exists
+
+- name: Start Ceph services
+  systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - "ceph-mon@{{ ansible_hostname }}"
+    - "ceph-mgr@{{ ansible_hostname }}"
+    - "ceph-mds@{{ ansible_hostname }}"
+  when: ceph_admin_keyring.stat.exists

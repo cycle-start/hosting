@@ -22,3 +22,9 @@
   file:
     path: /var/lib/mysql/auto.cnf
     state: absent
+
+- name: Enable and start MySQL
+  systemd:
+    name: mysql
+    enabled: true
+    state: started
