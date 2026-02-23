@@ -24,7 +24,7 @@ export function DashboardPage() {
   if (isLoading || !stats) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <h1 className="text-2xl font-bold tracking-tight">My Products</h1>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <Skeleton key={i} className="h-24" />
@@ -36,7 +36,7 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+      <h1 className="text-2xl font-bold tracking-tight">My Products</h1>
 
       {/* Health Overview */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">

@@ -29,15 +29,7 @@ just dev-k3s
 4. Deploys infrastructure (PostgreSQL, Temporal, Loki, Grafana, Prometheus) and the platform (core-api, worker, admin-ui, MCP server) to k3s
 5. Registers the cluster and nodes with the platform via `hostctl cluster apply`
 
-### 2. Run database migrations
-
-```bash
-just migrate
-```
-
-This runs goose migrations for both the core database and the PowerDNS database. Required after every fresh VM creation or database reset.
-
-### 3. Enable Windows access (WSL2 only)
+### 2. Enable Windows access (WSL2 only)
 
 The VMs run on a libvirt network (`10.10.10.0/24`) inside WSL2. Windows needs IP forwarding rules and a route to reach them.
 
@@ -64,21 +56,23 @@ route add 10.10.10.0 mask 255.255.255.0 <WSL2_IP>
 
 After this, all services are accessible from the Windows browser. See [Local Networking](local-networking.md) for details.
 
-### 4. Bootstrap: create API key, register cluster, seed data
+### 3. Bootstrap: migrate, create API keys, register cluster, seed data
 
 ```bash
 just bootstrap
 ```
 
-This single command runs three steps:
+This single command runs five steps:
 
-1. **`create-dev-key`** — creates a well-known dev API key (`hst_dev_e2e_test_key_00000000`) in the database. This key is used by seed configs, `hostctl cluster apply`, and e2e tests.
-2. **`cluster-apply`** — registers the cluster topology (regions, clusters, shards, nodes) with the platform via `hostctl cluster apply`.
-3. **`seed`** — creates test data: a brand ("Acme Hosting"), DNS zone, tenant with webroots, databases, Valkey, S3, email, and a Laravel fixture app.
+1. **`migrate`** — runs goose migrations for both core and PowerDNS databases.
+2. **`create-dev-key`** — creates a well-known dev API key (`hst_dev_e2e_test_key_00000000`) used by seed configs, `hostctl`, and e2e tests.
+3. **`create-agent-key`** — creates the agent API key (`hst_agent_key_000000000000000`) used by the LLM incident agent.
+4. **`cluster-apply`** — registers the cluster topology (regions, clusters, shards, nodes) via `hostctl cluster apply`.
+5. **`seed`** — creates test data: a brand ("Acme Hosting"), DNS zone, tenant with webroots, databases, Valkey, S3, email, and a Laravel fixture app.
 
-You can also run each step individually: `just create-dev-key`, `just cluster-apply`, `just seed`.
+You can also run each step individually: `just migrate`, `just create-dev-key`, `just cluster-apply`, `just seed`.
 
-### 5. Verify
+### 4. Verify
 
 ```bash
 # Admin UI
@@ -94,7 +88,7 @@ open http://temporal.hosting.test
 curl -k https://acme.hosting.test
 ```
 
-### 6. Run e2e tests
+### 5. Run e2e tests
 
 ```bash
 just test-e2e
@@ -118,43 +112,66 @@ If migrations have changed since your database was created (e.g. columns added t
 
 ```bash
 just reset-db
-just migrate
 just bootstrap
 ```
 
-`bootstrap` re-creates the dev API key, registers the cluster, and seeds test data — no manual key copying needed.
+`bootstrap` runs the full sequence: migrate, create API keys, register cluster, and seed test data.
 
 If VMs are in a bad state and `reset-db` fails, do a full rebuild instead (see below).
 
 ## Rebuilding after code changes
 
-**Control plane changes** (API, worker, admin UI):
+**Control plane only** (API, worker, admin UI — no node-agent changes):
 
 ```bash
 just vm-deploy
 ```
 
-This rebuilds all Docker images, imports them into k3s, and restarts the deployments. If you also reset the database, follow up with `just migrate && just bootstrap`.
+This rebuilds all Docker images, imports them into k3s, and restarts the deployments. If you also reset the database, follow up with `just reset-db && just bootstrap`.
 
-**Node agent changes** (anything under `internal/agent/`, `internal/activity/`):
-
-For a quick update without rebuilding golden images:
+**Node agent only** (anything under `internal/agent/`, `internal/activity/`):
 
 ```bash
-just build-node-agent
-# SCP to each node VM and restart:
-for ip in 10.10.10.{10,11,20,30,40,50}; do
-  scp bin/node-agent ubuntu@$ip:/tmp/node-agent
-  ssh ubuntu@$ip "sudo cp /tmp/node-agent /opt/hosting/bin/node-agent && sudo systemctl restart node-agent"
-done
+just deploy-node-agent
 ```
 
-For a full rebuild (new golden images + VMs):
+This builds the node-agent binary and deploys it to all VMs via Ansible (uses the dynamic inventory, so the API must be running with nodes registered).
+
+**Full rebuild** (control plane + node agent + database reset):
+
+When both control plane and node-agent code have changed, the bootstrap sequence has a dependency chain: `seed` requires running node-agents, and `deploy-node-agent` requires registered nodes (dynamic Ansible inventory queries the API). Split `bootstrap` into parts with node-agent deployment in between:
 
 ```bash
-just vm-rebuild
-just migrate
-just bootstrap
+just vm-deploy                  # 1. Rebuild control plane images → k3s
+just reset-db                   # 2. Wipe both databases
+just migrate                    # 3. Run migrations
+just create-dev-key             # 4. Create dev API key
+just create-agent-key           # 5. Create agent API key
+just cluster-apply              # 6. Register cluster topology (nodes now in API)
+just deploy-node-agent          # 7. Deploy updated node-agent to all VMs (dynamic inventory works)
+just seed                       # 8. Seed test data (requires node-agents running)
+```
+
+Steps 2–6 can be chained: `just reset-db && just migrate && just create-dev-key && just create-agent-key && just cluster-apply`.
+
+**Alternative**: If you don't need the dynamic inventory (e.g. VMs were just recreated), use the static Ansible inventory to deploy node-agent before the API is up:
+
+```bash
+just vm-deploy                  # 1. Rebuild control plane images → k3s
+just ansible-bootstrap          # 2. Deploy node-agent + all configs (static inventory, no API needed)
+just reset-db && just bootstrap # 3. Wipe DB and run full bootstrap
+```
+
+**Destroying and recreating VMs** (nuclear option):
+
+```bash
+just vm-down                    # Destroy all VMs
+just packer-base                # Rebuild base golden image (if needed)
+cd terraform && terraform apply # Recreate VMs
+just vm-kubeconfig              # Fetch kubeconfig
+just vm-deploy                  # Deploy control plane to k3s
+just ansible-bootstrap          # Deploy all software to VMs (static inventory)
+just bootstrap                  # Migrate, create keys, register cluster, seed
 ```
 
 ## Project layout

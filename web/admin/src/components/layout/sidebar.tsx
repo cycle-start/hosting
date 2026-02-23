@@ -43,7 +43,7 @@ const navSections: NavSection[] = [
   {
     title: 'Overview',
     items: [
-      { label: 'Dashboard', href: '/', icon: LayoutDashboard },
+      { label: 'My Products', href: '/', icon: LayoutDashboard },
     ],
   },
   {

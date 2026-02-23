@@ -4,7 +4,9 @@
       - mysql-client
       - valkey-tools
       - unzip
+      - direnv
     state: present
+    update_cache: true
 
 - name: Check if AWS CLI is installed
   stat:
