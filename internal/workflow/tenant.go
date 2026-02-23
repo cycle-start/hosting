@@ -68,7 +68,7 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		nodeCtx := nodeActivityCtx(gCtx, node.ID)
 		if err := workflow.ExecuteActivity(nodeCtx, "CreateTenant", activity.CreateTenantParams{
 			ID:             tenant.ID,
-			Name:           tenant.Name,
+			Name:           tenant.ID,
 			UID:            tenant.UID,
 			SFTPEnabled:    tenant.SFTPEnabled,
 			SSHEnabled:     tenant.SSHEnabled,
@@ -79,7 +79,7 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 
 		// Sync SSH/SFTP config on the node.
 		if err := workflow.ExecuteActivity(nodeCtx, "SyncSSHConfig", activity.SyncSSHConfigParams{
-			TenantName:  tenant.Name,
+			TenantName:  tenant.ID,
 			SSHEnabled:  tenant.SSHEnabled,
 			SFTPEnabled: tenant.SFTPEnabled,
 		}).Get(gCtx, nil); err != nil {
@@ -90,7 +90,7 @@ func CreateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		if node.ShardIndex != nil {
 			if err := workflow.ExecuteActivity(nodeCtx, "ConfigureTenantAddresses",
 				activity.ConfigureTenantAddressesParams{
-					TenantName:   tenant.Name,
+					TenantName:   tenant.ID,
 					TenantUID:    tenant.UID,
 					ClusterID:    clusterID,
 					NodeShardIdx: *node.ShardIndex,
@@ -239,7 +239,7 @@ func UpdateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		nodeCtx := nodeActivityCtx(gCtx, node.ID)
 		if err := workflow.ExecuteActivity(nodeCtx, "UpdateTenant", activity.UpdateTenantParams{
 			ID:          tenant.ID,
-			Name:        tenant.Name,
+			Name:        tenant.ID,
 			UID:         tenant.UID,
 			SFTPEnabled: tenant.SFTPEnabled,
 			SSHEnabled:  tenant.SSHEnabled,
@@ -249,7 +249,7 @@ func UpdateTenantWorkflow(ctx workflow.Context, tenantID string) error {
 
 		// Sync SSH/SFTP config on the node.
 		if err := workflow.ExecuteActivity(nodeCtx, "SyncSSHConfig", activity.SyncSSHConfigParams{
-			TenantName:  tenant.Name,
+			TenantName:  tenant.ID,
 			SSHEnabled:  tenant.SSHEnabled,
 			SFTPEnabled: tenant.SFTPEnabled,
 		}).Get(gCtx, nil); err != nil {
@@ -308,7 +308,7 @@ func SuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	// Suspend tenant on each node in the shard (parallel).
 	errs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
 		nodeCtx := nodeActivityCtx(gCtx, node.ID)
-		if err := workflow.ExecuteActivity(nodeCtx, "SuspendTenant", tenant.Name).Get(gCtx, nil); err != nil {
+		if err := workflow.ExecuteActivity(nodeCtx, "SuspendTenant", tenant.ID).Get(gCtx, nil); err != nil {
 			return fmt.Errorf("node %s: suspend tenant: %v", node.ID, err)
 		}
 		return nil
@@ -428,7 +428,7 @@ func UnsuspendTenantWorkflow(ctx workflow.Context, tenantID string) error {
 	// Unsuspend tenant on each node in the shard (parallel).
 	errs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
 		nodeCtx := nodeActivityCtx(gCtx, node.ID)
-		if err := workflow.ExecuteActivity(nodeCtx, "UnsuspendTenant", tenant.Name).Get(gCtx, nil); err != nil {
+		if err := workflow.ExecuteActivity(nodeCtx, "UnsuspendTenant", tenant.ID).Get(gCtx, nil); err != nil {
 			return fmt.Errorf("node %s: unsuspend tenant: %v", node.ID, err)
 		}
 		return nil
@@ -621,7 +621,7 @@ func DeleteTenantWorkflow(ctx workflow.Context, tenantID string) error {
 		if node.ShardIndex != nil {
 			if err := workflow.ExecuteActivity(nodeCtx, "RemoveTenantAddresses",
 				activity.ConfigureTenantAddressesParams{
-					TenantName:   tenant.Name,
+					TenantName:   tenant.ID,
 					TenantUID:    tenant.UID,
 					ClusterID:    clusterID,
 					NodeShardIdx: *node.ShardIndex,
@@ -630,11 +630,11 @@ func DeleteTenantWorkflow(ctx workflow.Context, tenantID string) error {
 			}
 		}
 
-		if err := workflow.ExecuteActivity(nodeCtx, "RemoveSSHConfig", tenant.Name).Get(gCtx, nil); err != nil {
+		if err := workflow.ExecuteActivity(nodeCtx, "RemoveSSHConfig", tenant.ID).Get(gCtx, nil); err != nil {
 			nodeErrs = append(nodeErrs, fmt.Sprintf("remove SSH config: %v", err))
 		}
 
-		if err := workflow.ExecuteActivity(nodeCtx, "DeleteTenant", tenant.Name).Get(gCtx, nil); err != nil {
+		if err := workflow.ExecuteActivity(nodeCtx, "DeleteTenant", tenant.ID).Get(gCtx, nil); err != nil {
 			nodeErrs = append(nodeErrs, fmt.Sprintf("delete tenant: %v", err))
 		}
 

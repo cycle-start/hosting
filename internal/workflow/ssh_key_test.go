@@ -42,7 +42,6 @@ func (s *AddSSHKeyWorkflowTestSuite) TestSuccess() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
@@ -56,7 +55,7 @@ func (s *AddSSHKeyWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("GetSSHKeysByTenant", mock.Anything, tenantID).Return([]model.SSHKey{}, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("SyncSSHKeys", mock.Anything, activity.SyncSSHKeysParams{
-		TenantName: "t_test123456",
+		TenantName: "test-tenant-1",
 		PublicKeys: []string{"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5 test@test"},
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -87,7 +86,6 @@ func (s *AddSSHKeyWorkflowTestSuite) TestWithExistingActiveKeys() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
@@ -101,7 +99,7 @@ func (s *AddSSHKeyWorkflowTestSuite) TestWithExistingActiveKeys() {
 	s.env.OnActivity("GetSSHKeysByTenant", mock.Anything, tenantID).Return([]model.SSHKey{existingKey}, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("SyncSSHKeys", mock.Anything, activity.SyncSSHKeysParams{
-		TenantName: "t_test123456",
+		TenantName: "test-tenant-1",
 		PublicKeys: []string{"ssh-ed25519 AAAAC3... first@test", "ssh-rsa AAAAB3... second@test"},
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -136,7 +134,6 @@ func (s *AddSSHKeyWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		// ShardID is nil
 	}
@@ -163,7 +160,6 @@ func (s *AddSSHKeyWorkflowTestSuite) TestSyncFails_SetsStatusFailed() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
@@ -225,7 +221,6 @@ func (s *RemoveSSHKeyWorkflowTestSuite) TestSuccess() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
@@ -239,7 +234,7 @@ func (s *RemoveSSHKeyWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("GetSSHKeysByTenant", mock.Anything, tenantID).Return([]model.SSHKey{}, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("SyncSSHKeys", mock.Anything, activity.SyncSSHKeysParams{
-		TenantName: "t_test123456",
+		TenantName: "test-tenant-1",
 		PublicKeys: []string{},
 	}).Return(nil)
 
@@ -266,7 +261,6 @@ func (s *RemoveSSHKeyWorkflowTestSuite) TestWithRemainingKeys() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
@@ -280,7 +274,7 @@ func (s *RemoveSSHKeyWorkflowTestSuite) TestWithRemainingKeys() {
 	s.env.OnActivity("GetSSHKeysByTenant", mock.Anything, tenantID).Return([]model.SSHKey{remainingKey}, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("SyncSSHKeys", mock.Anything, activity.SyncSSHKeysParams{
-		TenantName: "t_test123456",
+		TenantName: "test-tenant-1",
 		PublicKeys: []string{"ssh-rsa AAAAB3... other@test"},
 	}).Return(nil)
 
@@ -310,7 +304,6 @@ func (s *RemoveSSHKeyWorkflowTestSuite) TestNoShard() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		// ShardID is nil
 	}
@@ -337,7 +330,6 @@ func (s *RemoveSSHKeyWorkflowTestSuite) TestSyncFails() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		ShardID: &shardID,
 	}

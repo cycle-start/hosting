@@ -89,12 +89,12 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 	sourceNode := sourceNodes[0]
 	targetNode := targetNodes[0]
 
-	dumpPath := fmt.Sprintf("/var/backups/hosting/migrate/%s.rdb", instance.Name)
+	dumpPath := fmt.Sprintf("/var/backups/hosting/migrate/%s.rdb", instance.ID)
 
 	// Create the instance on the target node.
 	targetCtx := nodeActivityCtx(ctx, targetNode.ID)
 	err = workflow.ExecuteActivity(targetCtx, "CreateValkeyInstance", activity.CreateValkeyInstanceParams{
-		Name:        instance.Name,
+		Name:        instance.ID,
 		Port:        instance.Port,
 		Password:    instance.Password,
 		MaxMemoryMB: instance.MaxMemoryMB,
@@ -107,7 +107,7 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 	// Dump data on the source node.
 	sourceCtx := nodeActivityCtx(ctx, sourceNode.ID)
 	err = workflow.ExecuteActivity(sourceCtx, "DumpValkeyData", activity.DumpValkeyDataParams{
-		Name:     instance.Name,
+		Name:     instance.ID,
 		Port:     instance.Port,
 		Password: instance.Password,
 		DumpPath: dumpPath,
@@ -119,7 +119,7 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 
 	// Import data on the target node.
 	err = workflow.ExecuteActivity(targetCtx, "ImportValkeyData", activity.ImportValkeyDataParams{
-		Name:     instance.Name,
+		Name:     instance.ID,
 		Port:     instance.Port,
 		DumpPath: dumpPath,
 	}).Get(ctx, nil)
@@ -138,7 +138,7 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 
 	for _, user := range users {
 		err = workflow.ExecuteActivity(targetCtx, "CreateValkeyUser", activity.CreateValkeyUserParams{
-			InstanceName: instance.Name,
+			InstanceName: instance.ID,
 			Port:         instance.Port,
 			Username:     user.Username,
 			Password:     user.Password,
@@ -160,7 +160,7 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 
 	// Cleanup: delete instance on source node (best effort).
 	_ = workflow.ExecuteActivity(sourceCtx, "DeleteValkeyInstance", activity.DeleteValkeyInstanceParams{
-		Name: instance.Name,
+		Name: instance.ID,
 		Port: instance.Port,
 	}).Get(ctx, nil)
 

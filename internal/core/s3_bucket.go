@@ -20,9 +20,9 @@ func NewS3BucketService(db DB, tc temporalclient.Client) *S3BucketService {
 
 func (s *S3BucketService) Create(ctx context.Context, bucket *model.S3Bucket) error {
 	_, err := s.db.Exec(ctx,
-		`INSERT INTO s3_buckets (id, tenant_id, subscription_id, name, shard_id, public, quota_bytes, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		bucket.ID, bucket.TenantID, bucket.SubscriptionID, bucket.Name, bucket.ShardID,
+		`INSERT INTO s3_buckets (id, tenant_id, subscription_id, shard_id, public, quota_bytes, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		bucket.ID, bucket.TenantID, bucket.SubscriptionID, bucket.ShardID,
 		bucket.Public, bucket.QuotaBytes, bucket.Status, bucket.CreatedAt, bucket.UpdatedAt,
 	)
 	if err != nil {
@@ -43,12 +43,12 @@ func (s *S3BucketService) Create(ctx context.Context, bucket *model.S3Bucket) er
 func (s *S3BucketService) GetByID(ctx context.Context, id string) (*model.S3Bucket, error) {
 	var b model.S3Bucket
 	err := s.db.QueryRow(ctx,
-		`SELECT b.id, b.tenant_id, b.subscription_id, b.name, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.suspend_reason, b.created_at, b.updated_at,
+		`SELECT b.id, b.tenant_id, b.subscription_id, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.suspend_reason, b.created_at, b.updated_at,
 		        sh.name
 		 FROM s3_buckets b
 		 LEFT JOIN shards sh ON sh.id = b.shard_id
 		 WHERE b.id = $1`, id,
-	).Scan(&b.ID, &b.TenantID, &b.SubscriptionID, &b.Name, &b.ShardID,
+	).Scan(&b.ID, &b.TenantID, &b.SubscriptionID, &b.ShardID,
 		&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.SuspendReason, &b.CreatedAt, &b.UpdatedAt,
 		&b.ShardName)
 	if err != nil {
@@ -58,12 +58,12 @@ func (s *S3BucketService) GetByID(ctx context.Context, id string) (*model.S3Buck
 }
 
 func (s *S3BucketService) ListByTenant(ctx context.Context, tenantID string, params request.ListParams) ([]model.S3Bucket, bool, error) {
-	query := `SELECT b.id, b.tenant_id, b.subscription_id, b.name, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.suspend_reason, b.created_at, b.updated_at, sh.name FROM s3_buckets b LEFT JOIN shards sh ON sh.id = b.shard_id WHERE b.tenant_id = $1`
+	query := `SELECT b.id, b.tenant_id, b.subscription_id, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.suspend_reason, b.created_at, b.updated_at, sh.name FROM s3_buckets b LEFT JOIN shards sh ON sh.id = b.shard_id WHERE b.tenant_id = $1`
 	args := []any{tenantID}
 	argIdx := 2
 
 	if params.Search != "" {
-		query += fmt.Sprintf(` AND b.name ILIKE $%d`, argIdx)
+		query += fmt.Sprintf(` AND b.id ILIKE $%d`, argIdx)
 		args = append(args, "%"+params.Search+"%")
 		argIdx++
 	}
@@ -81,7 +81,7 @@ func (s *S3BucketService) ListByTenant(ctx context.Context, tenantID string, par
 	sortCol := "b.created_at"
 	switch params.Sort {
 	case "name":
-		sortCol = "b.name"
+		sortCol = "b.id"
 	case "status":
 		sortCol = "b.status"
 	case "created_at":
@@ -104,7 +104,7 @@ func (s *S3BucketService) ListByTenant(ctx context.Context, tenantID string, par
 	var buckets []model.S3Bucket
 	for rows.Next() {
 		var b model.S3Bucket
-		if err := rows.Scan(&b.ID, &b.TenantID, &b.SubscriptionID, &b.Name, &b.ShardID,
+		if err := rows.Scan(&b.ID, &b.TenantID, &b.SubscriptionID, &b.ShardID,
 			&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.SuspendReason, &b.CreatedAt, &b.UpdatedAt,
 			&b.ShardName); err != nil {
 			return nil, false, fmt.Errorf("scan s3 bucket: %w", err)
@@ -142,19 +142,13 @@ func (s *S3BucketService) Update(ctx context.Context, id string, public *bool, q
 		}
 	}
 
-	var name string
-	err := s.db.QueryRow(ctx, "SELECT name FROM s3_buckets WHERE id = $1", id).Scan(&name)
-	if err != nil {
-		return fmt.Errorf("get s3 bucket %s name: %w", id, err)
-	}
-
 	tenantID, err := resolveTenantIDFromS3Bucket(ctx, s.db, id)
 	if err != nil {
 		return fmt.Errorf("resolve tenant for s3 bucket %s: %w", id, err)
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateS3BucketWorkflow",
-		WorkflowID:   workflowID("s3-bucket", name, id),
+		WorkflowID:   workflowID("s3-bucket", id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("signal UpdateS3BucketWorkflow: %w", err)
@@ -164,11 +158,10 @@ func (s *S3BucketService) Update(ctx context.Context, id string, public *bool, q
 }
 
 func (s *S3BucketService) Delete(ctx context.Context, id string) error {
-	var name string
-	err := s.db.QueryRow(ctx,
-		"UPDATE s3_buckets SET status = $1, updated_at = now() WHERE id = $2 RETURNING name",
+	_, err := s.db.Exec(ctx,
+		"UPDATE s3_buckets SET status = $1, updated_at = now() WHERE id = $2",
 		model.StatusDeleting, id,
-	).Scan(&name)
+	)
 	if err != nil {
 		return fmt.Errorf("set s3 bucket %s status to deleting: %w", id, err)
 	}
@@ -179,7 +172,7 @@ func (s *S3BucketService) Delete(ctx context.Context, id string) error {
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteS3BucketWorkflow",
-		WorkflowID:   workflowID("s3-bucket", name, id),
+		WorkflowID:   workflowID("s3-bucket", id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("signal DeleteS3BucketWorkflow: %w", err)
@@ -189,8 +182,8 @@ func (s *S3BucketService) Delete(ctx context.Context, id string) error {
 }
 
 func (s *S3BucketService) Retry(ctx context.Context, id string) error {
-	var status, name string
-	err := s.db.QueryRow(ctx, "SELECT status, name FROM s3_buckets WHERE id = $1", id).Scan(&status, &name)
+	var status string
+	err := s.db.QueryRow(ctx, "SELECT status FROM s3_buckets WHERE id = $1", id).Scan(&status)
 	if err != nil {
 		return fmt.Errorf("get s3 bucket status: %w", err)
 	}
@@ -207,7 +200,7 @@ func (s *S3BucketService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateS3BucketWorkflow",
-		WorkflowID:   workflowID("s3-bucket", name, id),
+		WorkflowID:   workflowID("s3-bucket", id),
 		Arg:          id,
 	})
 }

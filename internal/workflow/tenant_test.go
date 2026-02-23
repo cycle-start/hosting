@@ -35,7 +35,6 @@ func (s *CreateTenantWorkflowTestSuite) TestSuccess() {
 	shardIdx := 1
 	tenant := model.Tenant{
 		ID:          tenantID,
-		Name:        "t_test123456",
 		BrandID:     "test-brand",
 		UID:         5001,
 		ShardID:     &shardID,
@@ -52,15 +51,15 @@ func (s *CreateTenantWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("CreateTenant", mock.Anything, activity.CreateTenantParams{
 		ID:          tenantID,
-		Name:        "t_test123456",
+		Name:        tenantID,
 		UID:         5001,
 		SFTPEnabled: true,
 	}).Return(nil)
 	s.env.OnActivity("SyncSSHConfig", mock.Anything, activity.SyncSSHConfigParams{
-		TenantName: "t_test123456", SFTPEnabled: true,
+		TenantName: "test-tenant-1", SFTPEnabled: true,
 	}).Return(nil)
 	s.env.OnActivity("ConfigureTenantAddresses", mock.Anything, activity.ConfigureTenantAddressesParams{
-		TenantName: "t_test123456", TenantUID: 5001, ClusterID: "dev-1", NodeShardIdx: 1,
+		TenantName: "test-tenant-1", TenantUID: 5001, ClusterID: "dev-1", NodeShardIdx: 1,
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "tenants", ID: tenantID, Status: model.StatusActive,
@@ -88,7 +87,6 @@ func (s *CreateTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	shardID := "test-shard-3"
 	tenant := model.Tenant{
 		ID:          tenantID,
-		Name:        "t_test123456",
 		BrandID:     "test-brand",
 			UID:         5001,
 		ShardID:     &shardID,
@@ -114,7 +112,6 @@ func (s *CreateTenantWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 	tenantID := "test-tenant-no-shard"
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		UID:     5001,
 	}
@@ -162,7 +159,6 @@ func (s *UpdateTenantWorkflowTestSuite) TestSuccess() {
 	shardID := "test-shard-1"
 	tenant := model.Tenant{
 		ID:          tenantID,
-		Name:        "t_test123456",
 		BrandID:     "test-brand",
 		UID:         5001,
 		ShardID:     &shardID,
@@ -179,12 +175,12 @@ func (s *UpdateTenantWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("UpdateTenant", mock.Anything, activity.UpdateTenantParams{
 		ID:          tenantID,
-		Name:        "t_test123456",
+		Name:        tenantID,
 		UID:         5001,
 		SFTPEnabled: true,
 	}).Return(nil)
 	s.env.OnActivity("SyncSSHConfig", mock.Anything, activity.SyncSSHConfigParams{
-		TenantName: "t_test123456", SFTPEnabled: true,
+		TenantName: "test-tenant-1", SFTPEnabled: true,
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "tenants", ID: tenantID, Status: model.StatusActive,
@@ -199,7 +195,6 @@ func (s *UpdateTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	shardID := "test-shard-2"
 	tenant := model.Tenant{
 		ID:          tenantID,
-		Name:        "t_test123456",
 		BrandID:     "test-brand",
 			UID:         5001,
 		ShardID:     &shardID,
@@ -216,8 +211,8 @@ func (s *UpdateTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("UpdateTenant", mock.Anything, activity.UpdateTenantParams{
 		ID:          tenantID,
-		Name:        "t_test123456",
-			UID:         5001,
+		Name:        tenantID,
+		UID:         5001,
 		SFTPEnabled: true,
 	}).Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("tenants", tenantID)).Return(nil)
@@ -248,7 +243,6 @@ func (s *SuspendTenantWorkflowTestSuite) TestSuccess() {
 	shardID := "test-shard-1"
 	tenant := model.Tenant{
 		ID:            tenantID,
-		Name:          "t_test123456",
 		BrandID:       "test-brand",
 		UID:           5001,
 		ShardID:       &shardID,
@@ -260,7 +254,7 @@ func (s *SuspendTenantWorkflowTestSuite) TestSuccess() {
 
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("SuspendTenant", mock.Anything, "t_test123456").Return(nil)
+	s.env.OnActivity("SuspendTenant", mock.Anything, "test-tenant-1").Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "tenants", ID: tenantID, Status: model.StatusSuspended,
 	}).Return(nil)
@@ -280,7 +274,6 @@ func (s *SuspendTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	shardID := "test-shard-2"
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		UID:     5001,
 		ShardID: &shardID,
@@ -291,7 +284,7 @@ func (s *SuspendTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("SuspendTenant", mock.Anything, "t_test123456").Return(fmt.Errorf("node agent down"))
+	s.env.OnActivity("SuspendTenant", mock.Anything, "test-tenant-2").Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("tenants", tenantID)).Return(nil)
 	s.env.ExecuteWorkflow(SuspendTenantWorkflow, tenantID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -329,7 +322,6 @@ func (s *UnsuspendTenantWorkflowTestSuite) TestSuccess() {
 	shardID := "test-shard-1"
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		UID:     5001,
 		ShardID: &shardID,
@@ -343,7 +335,7 @@ func (s *UnsuspendTenantWorkflowTestSuite) TestSuccess() {
 	}).Return(nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("UnsuspendTenant", mock.Anything, "t_test123456").Return(nil)
+	s.env.OnActivity("UnsuspendTenant", mock.Anything, "test-tenant-1").Return(nil)
 	s.env.OnActivity("UnsuspendResource", mock.Anything, activity.SuspendResourceParams{
 		Table: "tenants", ID: tenantID,
 	}).Return(nil)
@@ -363,7 +355,6 @@ func (s *UnsuspendTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	shardID := "test-shard-2"
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		UID:     5001,
 		ShardID: &shardID,
@@ -377,7 +368,7 @@ func (s *UnsuspendTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	}).Return(nil)
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
-	s.env.OnActivity("UnsuspendTenant", mock.Anything, "t_test123456").Return(fmt.Errorf("node agent down"))
+	s.env.OnActivity("UnsuspendTenant", mock.Anything, "test-tenant-2").Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("tenants", tenantID)).Return(nil)
 	s.env.ExecuteWorkflow(UnsuspendTenantWorkflow, tenantID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -417,7 +408,6 @@ func (s *DeleteTenantWorkflowTestSuite) TestSuccess() {
 	shardIdx := 1
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		UID:     5001,
 		ShardID: &shardID,
@@ -438,10 +428,10 @@ func (s *DeleteTenantWorkflowTestSuite) TestSuccess() {
 	// Phase 2: web-node cleanup.
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("RemoveTenantAddresses", mock.Anything, activity.ConfigureTenantAddressesParams{
-		TenantName: "t_test123456", TenantUID: 5001, ClusterID: "dev-1", NodeShardIdx: 1,
+		TenantName: "test-tenant-1", TenantUID: 5001, ClusterID: "dev-1", NodeShardIdx: 1,
 	}).Return(nil)
-	s.env.OnActivity("RemoveSSHConfig", mock.Anything, "t_test123456").Return(nil)
-	s.env.OnActivity("DeleteTenant", mock.Anything, "t_test123456").Return(nil)
+	s.env.OnActivity("RemoveSSHConfig", mock.Anything, "test-tenant-1").Return(nil)
+	s.env.OnActivity("DeleteTenant", mock.Anything, "test-tenant-1").Return(nil)
 
 	// Phase 3: convergence (child workflow).
 	s.env.OnWorkflow(ConvergeShardWorkflow, mock.Anything, ConvergeShardParams{ShardID: shardID}).Return(nil)
@@ -460,7 +450,6 @@ func (s *DeleteTenantWorkflowTestSuite) TestWithCrossShardResources() {
 	shardIdx := 1
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		UID:     5001,
 		ShardID: &shardID,
@@ -495,10 +484,10 @@ func (s *DeleteTenantWorkflowTestSuite) TestWithCrossShardResources() {
 	// Phase 2: web-node cleanup.
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("RemoveTenantAddresses", mock.Anything, activity.ConfigureTenantAddressesParams{
-		TenantName: "t_test123456", TenantUID: 5001, ClusterID: "dev-1", NodeShardIdx: 1,
+		TenantName: "test-tenant-cross", TenantUID: 5001, ClusterID: "dev-1", NodeShardIdx: 1,
 	}).Return(nil)
-	s.env.OnActivity("RemoveSSHConfig", mock.Anything, "t_test123456").Return(nil)
-	s.env.OnActivity("DeleteTenant", mock.Anything, "t_test123456").Return(nil)
+	s.env.OnActivity("RemoveSSHConfig", mock.Anything, "test-tenant-cross").Return(nil)
+	s.env.OnActivity("DeleteTenant", mock.Anything, "test-tenant-cross").Return(nil)
 
 	// Phase 3 + 4.
 	s.env.OnWorkflow(ConvergeShardWorkflow, mock.Anything, ConvergeShardParams{ShardID: shardID}).Return(nil)
@@ -515,7 +504,6 @@ func (s *DeleteTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	shardIdx := 1
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		UID:     5001,
 		ShardID: &shardID,
@@ -535,10 +523,10 @@ func (s *DeleteTenantWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	// Phase 2: node cleanup fails.
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("RemoveTenantAddresses", mock.Anything, activity.ConfigureTenantAddressesParams{
-		TenantName: "t_test123456", TenantUID: 5001, ClusterID: "dev-1", NodeShardIdx: 1,
+		TenantName: "test-tenant-2", TenantUID: 5001, ClusterID: "dev-1", NodeShardIdx: 1,
 	}).Return(nil)
-	s.env.OnActivity("RemoveSSHConfig", mock.Anything, "t_test123456").Return(nil)
-	s.env.OnActivity("DeleteTenant", mock.Anything, "t_test123456").Return(fmt.Errorf("node agent down"))
+	s.env.OnActivity("RemoveSSHConfig", mock.Anything, "test-tenant-2").Return(nil)
+	s.env.OnActivity("DeleteTenant", mock.Anything, "test-tenant-2").Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("tenants", tenantID)).Return(nil)
 	s.env.ExecuteWorkflow(DeleteTenantWorkflow, tenantID)
 	s.True(s.env.IsWorkflowCompleted())
@@ -564,7 +552,6 @@ func (s *DeleteTenantWorkflowTestSuite) TestDBRowCleanupFails_SetsStatusFailed()
 	shardIdx := 1
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		UID:     5001,
 		ShardID: &shardID,
@@ -580,8 +567,8 @@ func (s *DeleteTenantWorkflowTestSuite) TestDBRowCleanupFails_SetsStatusFailed()
 	mockDeleteTenantPhase1Empty(s.env, tenantID)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("RemoveTenantAddresses", mock.Anything, mock.Anything).Return(nil)
-	s.env.OnActivity("RemoveSSHConfig", mock.Anything, "t_test123456").Return(nil)
-	s.env.OnActivity("DeleteTenant", mock.Anything, "t_test123456").Return(nil)
+	s.env.OnActivity("RemoveSSHConfig", mock.Anything, "test-tenant-4").Return(nil)
+	s.env.OnActivity("DeleteTenant", mock.Anything, "test-tenant-4").Return(nil)
 	s.env.OnWorkflow(ConvergeShardWorkflow, mock.Anything, ConvergeShardParams{ShardID: shardID}).Return(nil)
 	s.env.OnActivity("DeleteTenantDBRows", mock.Anything, tenantID).Return(fmt.Errorf("FK violation"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("tenants", tenantID)).Return(nil)

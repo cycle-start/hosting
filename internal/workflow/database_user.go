@@ -58,7 +58,7 @@ func CreateDatabaseUserWorkflow(ctx workflow.Context, userID string) error {
 	// Create database user on the PRIMARY only (replicates to replicas).
 	primaryCtx := nodeActivityCtx(ctx, primaryID)
 	err = workflow.ExecuteActivity(primaryCtx, "CreateDatabaseUser", activity.CreateDatabaseUserParams{
-		DatabaseName: dctx.Database.Name,
+		DatabaseName: dctx.Database.ID,
 		Username:     dctx.User.Username,
 		Password:     dctx.User.Password,
 		Privileges:   dctx.User.Privileges,
@@ -123,7 +123,7 @@ func UpdateDatabaseUserWorkflow(ctx workflow.Context, userID string) error {
 	// Update database user on the PRIMARY only (replicates to replicas).
 	primaryCtx := nodeActivityCtx(ctx, primaryID)
 	err = workflow.ExecuteActivity(primaryCtx, "UpdateDatabaseUser", activity.UpdateDatabaseUserParams{
-		DatabaseName: dctx.Database.Name,
+		DatabaseName: dctx.Database.ID,
 		Username:     dctx.User.Username,
 		Password:     dctx.User.Password,
 		Privileges:   dctx.User.Privileges,
@@ -187,7 +187,7 @@ func DeleteDatabaseUserWorkflow(ctx workflow.Context, userID string) error {
 
 	// Delete database user on the PRIMARY only (replicates to replicas).
 	primaryCtx := nodeActivityCtx(ctx, primaryID)
-	err = workflow.ExecuteActivity(primaryCtx, "DeleteDatabaseUser", dctx.Database.Name, dctx.User.Username).Get(ctx, nil)
+	err = workflow.ExecuteActivity(primaryCtx, "DeleteDatabaseUser", dctx.Database.ID, dctx.User.Username).Get(ctx, nil)
 	if err != nil {
 		_ = setResourceFailed(ctx, "database_users", userID, err)
 		return err

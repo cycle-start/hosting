@@ -34,7 +34,6 @@ func (s *CreateValkeyInstanceWorkflowTestSuite) TestSuccess() {
 	shardID := "test-shard-1"
 	instance := model.ValkeyInstance{
 		ID:          instanceID,
-		Name:        "myvalkey",
 		ShardID:     &shardID,
 		Port:        6379,
 		Password:    "valkeypass",
@@ -50,7 +49,7 @@ func (s *CreateValkeyInstanceWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(&instance, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("CreateValkeyInstance", mock.Anything, activity.CreateValkeyInstanceParams{
-		Name:        "myvalkey",
+		Name:        instanceID,
 		Port:        6379,
 		Password:    "valkeypass",
 		MaxMemoryMB: 256,
@@ -81,7 +80,6 @@ func (s *CreateValkeyInstanceWorkflowTestSuite) TestAgentFails_SetsStatusFailed(
 	shardID := "test-shard-3"
 	instance := model.ValkeyInstance{
 		ID:          instanceID,
-		Name:        "myvalkey",
 		ShardID:     &shardID,
 		Port:        6379,
 		Password:    "valkeypass",
@@ -107,7 +105,6 @@ func (s *CreateValkeyInstanceWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 	instanceID := "test-valkey-no-shard"
 	instance := model.ValkeyInstance{
 		ID:          instanceID,
-		Name:        "myvalkey",
 		Port:        6379,
 		Password:    "valkeypass",
 		MaxMemoryMB: 256,
@@ -156,7 +153,6 @@ func (s *DeleteValkeyInstanceWorkflowTestSuite) TestSuccess() {
 	shardID := "test-shard-1"
 	instance := model.ValkeyInstance{
 		ID:      instanceID,
-		Name:    "myvalkey",
 		Port:    6379,
 		ShardID: &shardID,
 	}
@@ -168,7 +164,7 @@ func (s *DeleteValkeyInstanceWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(&instance, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("DeleteValkeyInstance", mock.Anything, activity.DeleteValkeyInstanceParams{
-		Name: "myvalkey",
+		Name: instanceID,
 		Port: 6379,
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -184,7 +180,6 @@ func (s *DeleteValkeyInstanceWorkflowTestSuite) TestAgentFails_SetsStatusFailed(
 	shardID := "test-shard-2"
 	instance := model.ValkeyInstance{
 		ID:      instanceID,
-		Name:    "myvalkey",
 		Port:    6379,
 		ShardID: &shardID,
 	}
@@ -196,7 +191,7 @@ func (s *DeleteValkeyInstanceWorkflowTestSuite) TestAgentFails_SetsStatusFailed(
 	s.env.OnActivity("GetValkeyInstanceByID", mock.Anything, instanceID).Return(&instance, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("DeleteValkeyInstance", mock.Anything, activity.DeleteValkeyInstanceParams{
-		Name: "myvalkey",
+		Name: instanceID,
 		Port: 6379,
 	}).Return(fmt.Errorf("node agent down"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("valkey_instances", instanceID)).Return(nil)

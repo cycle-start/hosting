@@ -26,9 +26,9 @@ func (s *TenantService) Create(ctx context.Context, tenant *model.Tenant) error 
 	tenant.UID = uid
 
 	_, err = s.db.Exec(ctx,
-		`INSERT INTO tenants (id, name, brand_id, customer_id, region_id, cluster_id, shard_id, uid, sftp_enabled, ssh_enabled, disk_quota_bytes, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-		tenant.ID, tenant.Name, tenant.BrandID, tenant.CustomerID, tenant.RegionID, tenant.ClusterID, tenant.ShardID, tenant.UID,
+		`INSERT INTO tenants (id, brand_id, customer_id, region_id, cluster_id, shard_id, uid, sftp_enabled, ssh_enabled, disk_quota_bytes, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+		tenant.ID, tenant.BrandID, tenant.CustomerID, tenant.RegionID, tenant.ClusterID, tenant.ShardID, tenant.UID,
 		tenant.SFTPEnabled, tenant.SSHEnabled, tenant.DiskQuotaBytes, tenant.Status, tenant.CreatedAt, tenant.UpdatedAt,
 	)
 	if err != nil {
@@ -49,14 +49,14 @@ func (s *TenantService) Create(ctx context.Context, tenant *model.Tenant) error 
 func (s *TenantService) GetByID(ctx context.Context, id string) (*model.Tenant, error) {
 	var t model.Tenant
 	err := s.db.QueryRow(ctx,
-		`SELECT t.id, t.name, t.brand_id, t.customer_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.suspend_reason, t.created_at, t.updated_at,
+		`SELECT t.id, t.brand_id, t.customer_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.suspend_reason, t.created_at, t.updated_at,
 		        r.name, c.name, s.name
 		 FROM tenants t
 		 JOIN regions r ON r.id = t.region_id
 		 JOIN clusters c ON c.id = t.cluster_id
 		 LEFT JOIN shards s ON s.id = t.shard_id
 		 WHERE t.id = $1`, id,
-	).Scan(&t.ID, &t.Name, &t.BrandID, &t.CustomerID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID,
+	).Scan(&t.ID, &t.BrandID, &t.CustomerID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID,
 		&t.SFTPEnabled, &t.SSHEnabled, &t.DiskQuotaBytes, &t.Status, &t.StatusMessage, &t.SuspendReason, &t.CreatedAt, &t.UpdatedAt,
 		&t.RegionName, &t.ClusterName, &t.ShardName)
 	if err != nil {
@@ -66,12 +66,12 @@ func (s *TenantService) GetByID(ctx context.Context, id string) (*model.Tenant, 
 }
 
 func (s *TenantService) List(ctx context.Context, params request.ListParams) ([]model.Tenant, bool, error) {
-	query := `SELECT t.id, t.name, t.brand_id, t.customer_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.suspend_reason, t.created_at, t.updated_at, r.name, c.name, s.name FROM tenants t JOIN regions r ON r.id = t.region_id JOIN clusters c ON c.id = t.cluster_id LEFT JOIN shards s ON s.id = t.shard_id WHERE true`
+	query := `SELECT t.id, t.brand_id, t.customer_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.suspend_reason, t.created_at, t.updated_at, r.name, c.name, s.name FROM tenants t JOIN regions r ON r.id = t.region_id JOIN clusters c ON c.id = t.cluster_id LEFT JOIN shards s ON s.id = t.shard_id WHERE true`
 	args := []any{}
 	argIdx := 1
 
 	if params.Search != "" {
-		query += fmt.Sprintf(` AND (t.id ILIKE $%d OR t.name ILIKE $%d)`, argIdx, argIdx)
+		query += fmt.Sprintf(` AND t.id ILIKE $%d`, argIdx)
 		args = append(args, "%"+params.Search+"%")
 		argIdx++
 	}
@@ -120,7 +120,7 @@ func (s *TenantService) List(ctx context.Context, params request.ListParams) ([]
 	var tenants []model.Tenant
 	for rows.Next() {
 		var t model.Tenant
-		if err := rows.Scan(&t.ID, &t.Name, &t.BrandID, &t.CustomerID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID,
+		if err := rows.Scan(&t.ID, &t.BrandID, &t.CustomerID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID,
 			&t.SFTPEnabled, &t.SSHEnabled, &t.DiskQuotaBytes, &t.Status, &t.StatusMessage, &t.SuspendReason, &t.CreatedAt, &t.UpdatedAt,
 			&t.RegionName, &t.ClusterName, &t.ShardName); err != nil {
 			return nil, false, fmt.Errorf("scan tenant: %w", err)
@@ -139,7 +139,7 @@ func (s *TenantService) List(ctx context.Context, params request.ListParams) ([]
 }
 
 func (s *TenantService) ListByShard(ctx context.Context, shardID string, limit int, cursor string) ([]model.Tenant, bool, error) {
-	query := `SELECT t.id, t.name, t.brand_id, t.customer_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.suspend_reason, t.created_at, t.updated_at, r.name, c.name, s.name FROM tenants t JOIN regions r ON r.id = t.region_id JOIN clusters c ON c.id = t.cluster_id LEFT JOIN shards s ON s.id = t.shard_id WHERE t.shard_id = $1`
+	query := `SELECT t.id, t.brand_id, t.customer_id, t.region_id, t.cluster_id, t.shard_id, t.uid, t.sftp_enabled, t.ssh_enabled, t.disk_quota_bytes, t.status, t.status_message, t.suspend_reason, t.created_at, t.updated_at, r.name, c.name, s.name FROM tenants t JOIN regions r ON r.id = t.region_id JOIN clusters c ON c.id = t.cluster_id LEFT JOIN shards s ON s.id = t.shard_id WHERE t.shard_id = $1`
 	args := []any{shardID}
 	argIdx := 2
 
@@ -162,7 +162,7 @@ func (s *TenantService) ListByShard(ctx context.Context, shardID string, limit i
 	var tenants []model.Tenant
 	for rows.Next() {
 		var t model.Tenant
-		if err := rows.Scan(&t.ID, &t.Name, &t.BrandID, &t.CustomerID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID,
+		if err := rows.Scan(&t.ID, &t.BrandID, &t.CustomerID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID,
 			&t.SFTPEnabled, &t.SSHEnabled, &t.DiskQuotaBytes, &t.Status, &t.StatusMessage, &t.SuspendReason, &t.CreatedAt, &t.UpdatedAt,
 			&t.RegionName, &t.ClusterName, &t.ShardName); err != nil {
 			return nil, false, fmt.Errorf("scan tenant: %w", err)
@@ -489,24 +489,24 @@ func (s *TenantService) RetryFailed(ctx context.Context, tenantID string) (int, 
 	}
 
 	specs := []retrySpec{
-		{"SELECT id, name FROM webroots WHERE tenant_id = $1 AND status = 'failed'", "webroots", "CreateWebrootWorkflow", "webroot"},
+		{"SELECT id, id FROM webroots WHERE tenant_id = $1 AND status = 'failed'", "webroots", "CreateWebrootWorkflow", "webroot"},
 		{`SELECT f.id, f.fqdn FROM fqdns f JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND f.status = 'failed'`, "fqdns", "CreateFQDNWorkflow", "fqdn"},
 		{`SELECT c.id, f.fqdn FROM certificates c JOIN fqdns f ON f.id = c.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND c.status = 'failed'`, "certificates", "UploadCustomCertWorkflow", "certificate"},
 		{"SELECT id, name FROM zones WHERE tenant_id = $1 AND status = 'failed'", "zones", "CreateZoneWorkflow", "zone"},
 		// zone_records handled separately below (needs ZoneRecordParams).
-		{"SELECT id, name FROM databases WHERE tenant_id = $1 AND status = 'failed'", "databases", "CreateDatabaseWorkflow", "database"},
+		{"SELECT id, id FROM databases WHERE tenant_id = $1 AND status = 'failed'", "databases", "CreateDatabaseWorkflow", "database"},
 		{`SELECT du.id, du.username FROM database_users du JOIN databases d ON d.id = du.database_id WHERE d.tenant_id = $1 AND du.status = 'failed'`, "database_users", "CreateDatabaseUserWorkflow", "database-user"},
-		{"SELECT id, name FROM valkey_instances WHERE tenant_id = $1 AND status = 'failed'", "valkey_instances", "CreateValkeyInstanceWorkflow", "valkey-instance"},
+		{"SELECT id, id FROM valkey_instances WHERE tenant_id = $1 AND status = 'failed'", "valkey_instances", "CreateValkeyInstanceWorkflow", "valkey-instance"},
 		{`SELECT vu.id, vu.username FROM valkey_users vu JOIN valkey_instances vi ON vi.id = vu.valkey_instance_id WHERE vi.tenant_id = $1 AND vu.status = 'failed'`, "valkey_users", "CreateValkeyUserWorkflow", "valkey-user"},
 		{`SELECT ea.id, ea.address FROM email_accounts ea JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND ea.status = 'failed'`, "email_accounts", "CreateEmailAccountWorkflow", "email-account"},
 		{`SELECT al.id, al.address FROM email_aliases al JOIN email_accounts ea ON ea.id = al.email_account_id JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND al.status = 'failed'`, "email_aliases", "CreateEmailAliasWorkflow", "email-alias"},
 		{`SELECT ef.id, ef.destination FROM email_forwards ef JOIN email_accounts ea ON ea.id = ef.email_account_id JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND ef.status = 'failed'`, "email_forwards", "CreateEmailForwardWorkflow", "email-forward"},
 		{`SELECT ar.id, ar.subject FROM email_autoreplies ar JOIN email_accounts ea ON ea.id = ar.email_account_id JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND ar.status = 'failed'`, "email_autoreplies", "UpdateEmailAutoReplyWorkflow", "email-autoreply"},
 		{"SELECT id, name FROM ssh_keys WHERE tenant_id = $1 AND status = 'failed'", "ssh_keys", "AddSSHKeyWorkflow", "ssh-key"},
-		{"SELECT id, name FROM s3_buckets WHERE tenant_id = $1 AND status = 'failed'", "s3_buckets", "CreateS3BucketWorkflow", "s3-bucket"},
+		{"SELECT id, id FROM s3_buckets WHERE tenant_id = $1 AND status = 'failed'", "s3_buckets", "CreateS3BucketWorkflow", "s3-bucket"},
 		{`SELECT k.id, k.access_key_id FROM s3_access_keys k JOIN s3_buckets b ON b.id = k.s3_bucket_id WHERE b.tenant_id = $1 AND k.status = 'failed'`, "s3_access_keys", "CreateS3AccessKeyWorkflow", "s3-access-key"},
 		{"SELECT id, type || '/' || source_name FROM backups WHERE tenant_id = $1 AND status = 'failed'", "backups", "CreateBackupWorkflow", "backup-create"},
-		{"SELECT id, name FROM cron_jobs WHERE tenant_id = $1 AND status = 'failed'", "cron_jobs", "CreateCronJobWorkflow", "cron-job"},
+		{"SELECT id, id FROM cron_jobs WHERE tenant_id = $1 AND status = 'failed'", "cron_jobs", "CreateCronJobWorkflow", "cron-job"},
 	}
 
 	type retryItem struct {
@@ -541,7 +541,7 @@ func (s *TenantService) RetryFailed(ctx context.Context, tenantID string) (int, 
 			}
 			if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 				WorkflowName: spec.workflowName,
-				WorkflowID:   workflowID(spec.workflowPrefix, item.name, item.id),
+				WorkflowID:   workflowID(spec.workflowPrefix, item.id),
 				Arg:          item.id,
 			}); err != nil {
 				return count, fmt.Errorf("signal %s for %s: %w", spec.workflowName, item.id, err)
@@ -579,7 +579,7 @@ func (s *TenantService) RetryFailed(ctx context.Context, tenantID string) (int, 
 			}
 			if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 				WorkflowName: "CreateZoneRecordWorkflow",
-				WorkflowID:   workflowID("zone-record", p.Name+"/"+p.Type, p.RecordID),
+				WorkflowID:   workflowID("zone-record", p.RecordID),
 				Arg:          p,
 			}); err != nil {
 				return count, fmt.Errorf("signal CreateZoneRecordWorkflow for %s: %w", p.RecordID, err)

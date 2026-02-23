@@ -88,8 +88,8 @@ func (s *ProvisionLECertWorkflowTestSuite) TestSuccess() {
 		WebrootID:  &webrootID,
 		SSLEnabled: true,
 	}
-	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
-	tenant := model.Tenant{ID: tenantID, Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID}
+	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, PublicFolder: "public"}
+	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 
 	s.setupACMESuccessMocks(fqdnID, shardID, fqdn, webroot, tenant, nodes)
@@ -120,8 +120,8 @@ func (s *ProvisionLECertWorkflowTestSuite) TestCreateOrderFails_SetsStatusFailed
 		WebrootID:  &webrootID,
 		SSLEnabled: true,
 	}
-	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
-	tenant := model.Tenant{ID: tenantID, Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID}
+	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, PublicFolder: "public"}
+	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 	shard := model.Shard{ID: shardID}
 
@@ -152,8 +152,8 @@ func (s *ProvisionLECertWorkflowTestSuite) TestStoreCertificateFails_SetsStatusF
 		WebrootID:  &webrootID,
 		SSLEnabled: true,
 	}
-	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
-	tenant := model.Tenant{ID: tenantID, Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID}
+	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, PublicFolder: "public"}
+	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 	shard := model.Shard{ID: shardID}
 
@@ -209,8 +209,8 @@ func (s *ProvisionLECertWorkflowTestSuite) TestInstallCertificateFails_SetsStatu
 		WebrootID:  &webrootID,
 		SSLEnabled: true,
 	}
-	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
-	tenant := model.Tenant{ID: tenantID, Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID}
+	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, PublicFolder: "public"}
+	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 	shard := model.Shard{ID: shardID}
 
@@ -267,8 +267,8 @@ func (s *ProvisionLECertWorkflowTestSuite) TestDeactivateOtherCertsFails_SetsSta
 		WebrootID:  &webrootID,
 		SSLEnabled: true,
 	}
-	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
-	tenant := model.Tenant{ID: tenantID, Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID}
+	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, PublicFolder: "public"}
+	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 	shard := model.Shard{ID: shardID}
 
@@ -326,8 +326,8 @@ func (s *ProvisionLECertWorkflowTestSuite) TestActivateCertificateFails_SetsStat
 		WebrootID:  &webrootID,
 		SSLEnabled: true,
 	}
-	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, Name: "main", PublicFolder: "public"}
-	tenant := model.Tenant{ID: tenantID, Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID}
+	webroot := model.Webroot{ID: webrootID, TenantID: tenantID, PublicFolder: "public"}
+	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ShardID: &shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 	shard := model.Shard{ID: shardID}
 
@@ -413,7 +413,7 @@ func (s *UploadCustomCertWorkflowTestSuite) TestSuccess() {
 		WebrootID: &webrootID,
 	}
 	webroot := model.Webroot{ID: webrootID, TenantID: tenantID}
-	tenant := model.Tenant{ID: tenantID, Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID}
+	tenant := model.Tenant{ID: tenantID, BrandID: "test-brand", ShardID: &shardID}
 	shard := model.Shard{ID: shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 
@@ -501,7 +501,7 @@ func (s *UploadCustomCertWorkflowTestSuite) TestInstallFails_SetsStatusFailed() 
 		WebrootID: &webrootID4,
 	}
 	webroot := model.Webroot{ID: "test-webroot-4", TenantID: "test-tenant-4"}
-	tenant := model.Tenant{ID: "test-tenant-4", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID}
+	tenant := model.Tenant{ID: "test-tenant-4", BrandID: "test-brand", ShardID: &shardID}
 	shard := model.Shard{ID: shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 
@@ -545,7 +545,7 @@ func (s *UploadCustomCertWorkflowTestSuite) TestDeactivateOtherCertsFails_SetsSt
 		WebrootID: &webrootID5,
 	}
 	webroot := model.Webroot{ID: "test-webroot-5", TenantID: "test-tenant-5"}
-	tenant := model.Tenant{ID: "test-tenant-5", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID}
+	tenant := model.Tenant{ID: "test-tenant-5", BrandID: "test-brand", ShardID: &shardID}
 	shard := model.Shard{ID: shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 
@@ -590,7 +590,7 @@ func (s *UploadCustomCertWorkflowTestSuite) TestActivateCertFails_SetsStatusFail
 		WebrootID: &webrootID6,
 	}
 	webroot := model.Webroot{ID: "test-webroot-6", TenantID: "test-tenant-6"}
-	tenant := model.Tenant{ID: "test-tenant-6", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID}
+	tenant := model.Tenant{ID: "test-tenant-6", BrandID: "test-brand", ShardID: &shardID}
 	shard := model.Shard{ID: shardID}
 	nodes := []model.Node{{ID: "node-1"}}
 

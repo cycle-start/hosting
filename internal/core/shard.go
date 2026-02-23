@@ -131,7 +131,7 @@ func (s *ShardService) Converge(ctx context.Context, shardID string) error {
 		return fmt.Errorf("get shard name for converge: %w", err)
 	}
 
-	wfID := workflowID("converge-shard", shardName, shardID)
+	wfID := workflowID("converge-shard", shardID)
 	_, err := s.tc.ExecuteWorkflow(ctx, temporalclient.StartWorkflowOptions{
 		ID:        wfID,
 		TaskQueue: "hosting-tasks",

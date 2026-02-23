@@ -108,7 +108,7 @@ func (s *BackupService) Delete(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteBackupWorkflow",
-		WorkflowID:   workflowID("backup-delete", name, id),
+		WorkflowID:   workflowID("backup-delete", id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("signal DeleteBackupWorkflow: %w", err)
@@ -129,7 +129,7 @@ func (s *BackupService) Restore(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, s.db, backup.TenantID, model.ProvisionTask{
 		WorkflowName: "RestoreBackupWorkflow",
-		WorkflowID:   workflowID("backup-restore", backup.Type+"/"+backup.SourceName, id),
+		WorkflowID:   workflowID("backup-restore", id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("signal RestoreBackupWorkflow: %w", err)
@@ -153,7 +153,7 @@ func (s *BackupService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateBackupWorkflow",
-		WorkflowID:   workflowID("backup-create", name, id),
+		WorkflowID:   workflowID("backup-create", id),
 		Arg:          id,
 	})
 }

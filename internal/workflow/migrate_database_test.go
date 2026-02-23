@@ -36,7 +36,6 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestSuccess() {
 
 	database := model.Database{
 		ID:      databaseID,
-		Name:    "mydb",
 		ShardID: &sourceShardID,
 	}
 	sourceNodes := []model.Node{{ID: "source-node-1"}}
@@ -51,7 +50,7 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestSuccess() {
 		},
 	}
 
-	dumpPath := fmt.Sprintf("/var/backups/hosting/migrate/%s.sql.gz", database.Name)
+	dumpPath := fmt.Sprintf("/var/backups/hosting/migrate/%s.sql.gz", database.ID)
 
 	// Set provisioning.
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -66,24 +65,24 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("ListNodesByShard", mock.Anything, targetShardID).Return(targetNodes, nil)
 
 	// Create database on target.
-	s.env.OnActivity("CreateDatabase", mock.Anything, "mydb").Return(nil)
+	s.env.OnActivity("CreateDatabase", mock.Anything, databaseID).Return(nil)
 
 	// Dump on source.
 	s.env.OnActivity("DumpMySQLDatabase", mock.Anything, activity.DumpMySQLDatabaseParams{
-		DatabaseName: "mydb",
+		DatabaseName: databaseID,
 		DumpPath:     dumpPath,
 	}).Return(nil)
 
 	// Import on target.
 	s.env.OnActivity("ImportMySQLDatabase", mock.Anything, activity.ImportMySQLDatabaseParams{
-		DatabaseName: "mydb",
+		DatabaseName: databaseID,
 		DumpPath:     dumpPath,
 	}).Return(nil)
 
 	// List and migrate users.
 	s.env.OnActivity("ListDatabaseUsersByDatabaseID", mock.Anything, databaseID).Return(users, nil)
 	s.env.OnActivity("CreateDatabaseUser", mock.Anything, activity.CreateDatabaseUserParams{
-		DatabaseName: "mydb",
+		DatabaseName: databaseID,
 		Username:     "appuser",
 		Password:     "secret123",
 		Privileges:   []string{"SELECT", "INSERT"},
@@ -93,7 +92,7 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("UpdateDatabaseShardID", mock.Anything, databaseID, targetShardID).Return(nil)
 
 	// Cleanup (best effort).
-	s.env.OnActivity("DeleteDatabase", mock.Anything, "mydb").Return(nil)
+	s.env.OnActivity("DeleteDatabase", mock.Anything, databaseID).Return(nil)
 	s.env.OnActivity("CleanupMigrateFile", mock.Anything, dumpPath).Return(nil)
 
 	// Set active.
@@ -116,13 +115,12 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestSuccessNoUsers() {
 
 	database := model.Database{
 		ID:      databaseID,
-		Name:    "emptydb",
 		ShardID: &sourceShardID,
 	}
 	sourceNodes := []model.Node{{ID: "source-node-2"}}
 	targetNodes := []model.Node{{ID: "target-node-2"}}
 
-	dumpPath := fmt.Sprintf("/var/backups/hosting/migrate/%s.sql.gz", database.Name)
+	dumpPath := fmt.Sprintf("/var/backups/hosting/migrate/%s.sql.gz", database.ID)
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "databases", ID: databaseID, Status: model.StatusProvisioning,
@@ -130,13 +128,13 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestSuccessNoUsers() {
 	s.env.OnActivity("GetDatabaseByID", mock.Anything, databaseID).Return(&database, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, sourceShardID).Return(sourceNodes, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, targetShardID).Return(targetNodes, nil)
-	s.env.OnActivity("CreateDatabase", mock.Anything, "emptydb").Return(nil)
+	s.env.OnActivity("CreateDatabase", mock.Anything, databaseID).Return(nil)
 	s.env.OnActivity("DumpMySQLDatabase", mock.Anything, activity.DumpMySQLDatabaseParams{
-		DatabaseName: "emptydb",
+		DatabaseName: databaseID,
 		DumpPath:     dumpPath,
 	}).Return(nil)
 	s.env.OnActivity("ImportMySQLDatabase", mock.Anything, activity.ImportMySQLDatabaseParams{
-		DatabaseName: "emptydb",
+		DatabaseName: databaseID,
 		DumpPath:     dumpPath,
 	}).Return(nil)
 
@@ -145,7 +143,7 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestSuccessNoUsers() {
 	s.env.OnActivity("ListDatabaseUsersByDatabaseID", mock.Anything, databaseID).Return(emptyUsers, nil)
 
 	s.env.OnActivity("UpdateDatabaseShardID", mock.Anything, databaseID, targetShardID).Return(nil)
-	s.env.OnActivity("DeleteDatabase", mock.Anything, "emptydb").Return(nil)
+	s.env.OnActivity("DeleteDatabase", mock.Anything, databaseID).Return(nil)
 	s.env.OnActivity("CleanupMigrateFile", mock.Anything, dumpPath).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "databases", ID: databaseID, Status: model.StatusActive,
@@ -181,7 +179,6 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 
 	database := model.Database{
 		ID:   databaseID,
-		Name: "mydb",
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -204,7 +201,6 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestDumpFails_SetsStatusFailed() {
 
 	database := model.Database{
 		ID:      databaseID,
-		Name:    "mydb",
 		ShardID: &sourceShardID,
 	}
 	sourceNodes := []model.Node{{ID: "source-node-5"}}
@@ -216,7 +212,7 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestDumpFails_SetsStatusFailed() {
 	s.env.OnActivity("GetDatabaseByID", mock.Anything, databaseID).Return(&database, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, sourceShardID).Return(sourceNodes, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, targetShardID).Return(targetNodes, nil)
-	s.env.OnActivity("CreateDatabase", mock.Anything, "mydb").Return(nil)
+	s.env.OnActivity("CreateDatabase", mock.Anything, databaseID).Return(nil)
 	s.env.OnActivity("DumpMySQLDatabase", mock.Anything, mock.Anything).Return(fmt.Errorf("mysqldump failed"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("databases", databaseID)).Return(nil)
 
@@ -235,13 +231,12 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestImportFails_SetsStatusFailed() {
 
 	database := model.Database{
 		ID:      databaseID,
-		Name:    "mydb",
 		ShardID: &sourceShardID,
 	}
 	sourceNodes := []model.Node{{ID: "source-node-6"}}
 	targetNodes := []model.Node{{ID: "target-node-6"}}
 
-	dumpPath := fmt.Sprintf("/var/backups/hosting/migrate/%s.sql.gz", database.Name)
+	dumpPath := fmt.Sprintf("/var/backups/hosting/migrate/%s.sql.gz", database.ID)
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "databases", ID: databaseID, Status: model.StatusProvisioning,
@@ -249,9 +244,9 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestImportFails_SetsStatusFailed() {
 	s.env.OnActivity("GetDatabaseByID", mock.Anything, databaseID).Return(&database, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, sourceShardID).Return(sourceNodes, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, targetShardID).Return(targetNodes, nil)
-	s.env.OnActivity("CreateDatabase", mock.Anything, "mydb").Return(nil)
+	s.env.OnActivity("CreateDatabase", mock.Anything, databaseID).Return(nil)
 	s.env.OnActivity("DumpMySQLDatabase", mock.Anything, activity.DumpMySQLDatabaseParams{
-		DatabaseName: "mydb",
+		DatabaseName: databaseID,
 		DumpPath:     dumpPath,
 	}).Return(nil)
 	s.env.OnActivity("ImportMySQLDatabase", mock.Anything, mock.Anything).Return(fmt.Errorf("import failed"))

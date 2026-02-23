@@ -122,8 +122,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 		now := time.Now()
 		shardID := req.ShardID
 		tenant = &model.Tenant{
-			ID:         platform.NewID(),
-			Name:       platform.NewName("t"),
+			ID:         platform.NewName("t"),
 			BrandID:    req.BrandID,
 			CustomerID: req.CustomerID,
 			RegionID:   req.RegionID,
@@ -191,10 +190,9 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 				runtimeConfig = json.RawMessage(`{}`)
 			}
 			webroot := &model.Webroot{
-				ID:             platform.NewID(),
+				ID:             platform.NewName("w"),
 				TenantID:       tenant.ID,
 				SubscriptionID: wr.SubscriptionID,
-				Name:           platform.NewName("w"),
 				Runtime:        wr.Runtime,
 				RuntimeVersion: wr.RuntimeVersion,
 				RuntimeConfig:  runtimeConfig,
@@ -213,7 +211,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 
 			// Nested daemon creation
 			for _, dr := range wr.Daemons {
-				daemonName := platform.NewName("d")
+				daemonID := platform.NewName("d")
 				numProcs := dr.NumProcs
 				if numProcs == 0 {
 					numProcs = 1
@@ -223,15 +221,14 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 				if dr.ProxyPath != "" {
 					pp := dr.ProxyPath
 					proxyPath = &pp
-					port := core.ComputeDaemonPort(tenant.Name, webroot.Name, daemonName)
+					port := core.ComputeDaemonPort(tenant.ID, webroot.ID, daemonID)
 					proxyPort = &port
 				}
 				now3 := time.Now()
 				daemon := &model.Daemon{
-					ID:           platform.NewID(),
+					ID:           daemonID,
 					TenantID:     tenant.ID,
 					WebrootID:    webroot.ID,
-					Name:         daemonName,
 					Command:      dr.Command,
 					ProxyPath:    proxyPath,
 					ProxyPort:    proxyPort,
@@ -245,7 +242,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 					UpdatedAt:    now3,
 				}
 				if err := tx.Daemon.Create(skipCtx, daemon); err != nil {
-					return fmt.Errorf("create daemon %s: %w", daemonName, err)
+					return fmt.Errorf("create daemon %s: %w", daemonID, err)
 				}
 			}
 
@@ -253,10 +250,9 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 			for _, cr := range wr.CronJobs {
 				now3 := time.Now()
 				cronJob := &model.CronJob{
-					ID:               platform.NewID(),
+					ID:               platform.NewName("cj"),
 					TenantID:         tenant.ID,
 					WebrootID:        webroot.ID,
-					Name:             platform.NewName("cj"),
 					Schedule:         cr.Schedule,
 					Command:          cr.Command,
 					WorkingDirectory: cr.WorkingDirectory,
@@ -277,19 +273,17 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 		for _, dr := range req.Databases {
 			now2 := time.Now()
 			dbShardID := dr.ShardID
-			dbName := platform.NewName("db")
 			database := &model.Database{
-				ID:             platform.NewID(),
+				ID:             platform.NewName("db"),
 				TenantID:       tenant.ID,
 				SubscriptionID: dr.SubscriptionID,
-				Name:           dbName,
 				ShardID:        &dbShardID,
 				Status:    model.StatusPending,
 				CreatedAt: now2,
 				UpdatedAt: now2,
 			}
 			if err := tx.Database.Create(skipCtx, database); err != nil {
-				return fmt.Errorf("create database %s: %w", dbName, err)
+				return fmt.Errorf("create database %s: %w", database.ID, err)
 			}
 			for _, ur := range dr.Users {
 				now3 := time.Now()
@@ -335,10 +329,9 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 				maxMemoryMB = 64
 			}
 			instance := &model.ValkeyInstance{
-				ID:             platform.NewID(),
+				ID:             platform.NewName("kv"),
 				TenantID:       tenant.ID,
 				SubscriptionID: vr.SubscriptionID,
-				Name:           platform.NewName("kv"),
 				ShardID:        &vShardID,
 				MaxMemoryMB: maxMemoryMB,
 				Password:    generatePassword(),
@@ -377,10 +370,9 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 			now2 := time.Now()
 			s3ShardID := br.ShardID
 			bucket := &model.S3Bucket{
-				ID:             platform.NewID(),
+				ID:             platform.NewName("s3"),
 				TenantID:       tenant.ID,
 				SubscriptionID: br.SubscriptionID,
-				Name:           platform.NewName("s3"),
 				ShardID:        &s3ShardID,
 				Status:    model.StatusPending,
 				CreatedAt: now2,

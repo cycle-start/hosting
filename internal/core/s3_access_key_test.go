@@ -51,13 +51,6 @@ func TestS3AccessKeyService_Create_Success(t *testing.T) {
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
 
-	// signalProvision tenant name lookup
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
-
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
@@ -232,13 +225,6 @@ func TestS3AccessKeyService_Delete_Success(t *testing.T) {
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
-
-	// signalProvision tenant name lookup
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")

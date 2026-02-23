@@ -14,7 +14,7 @@ import (
 // ListValkeyInstancesByTenantID retrieves all valkey instances for a tenant.
 func (a *CoreDB) ListValkeyInstancesByTenantID(ctx context.Context, tenantID string) ([]model.ValkeyInstance, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, status_message, suspend_reason, created_at, updated_at
+		`SELECT id, tenant_id, shard_id, port, max_memory_mb, password, status, status_message, suspend_reason, created_at, updated_at
 		 FROM valkey_instances WHERE tenant_id = $1`, tenantID,
 	)
 	if err != nil {
@@ -25,7 +25,7 @@ func (a *CoreDB) ListValkeyInstancesByTenantID(ctx context.Context, tenantID str
 	var instances []model.ValkeyInstance
 	for rows.Next() {
 		var v model.ValkeyInstance
-		if err := rows.Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB,
+		if err := rows.Scan(&v.ID, &v.TenantID, &v.ShardID, &v.Port, &v.MaxMemoryMB,
 			&v.Password, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan valkey instance row: %w", err)
 		}
@@ -37,7 +37,7 @@ func (a *CoreDB) ListValkeyInstancesByTenantID(ctx context.Context, tenantID str
 // ListS3BucketsByTenantID retrieves all S3 buckets for a tenant.
 func (a *CoreDB) ListS3BucketsByTenantID(ctx context.Context, tenantID string) ([]model.S3Bucket, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, name, shard_id, public, quota_bytes, status, status_message, suspend_reason, created_at, updated_at
+		`SELECT id, tenant_id, shard_id, public, quota_bytes, status, status_message, suspend_reason, created_at, updated_at
 		 FROM s3_buckets WHERE tenant_id = $1`, tenantID,
 	)
 	if err != nil {
@@ -48,7 +48,7 @@ func (a *CoreDB) ListS3BucketsByTenantID(ctx context.Context, tenantID string) (
 	var buckets []model.S3Bucket
 	for rows.Next() {
 		var b model.S3Bucket
-		if err := rows.Scan(&b.ID, &b.TenantID, &b.Name, &b.ShardID,
+		if err := rows.Scan(&b.ID, &b.TenantID, &b.ShardID,
 			&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.SuspendReason, &b.CreatedAt, &b.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan s3 bucket row: %w", err)
 		}
@@ -98,9 +98,9 @@ func (a *CoreDB) GetBrandByID(ctx context.Context, id string) (*model.Brand, err
 func (a *CoreDB) GetTenantByID(ctx context.Context, id string) (*model.Tenant, error) {
 	var t model.Tenant
 	err := a.db.QueryRow(ctx,
-		`SELECT id, name, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, ssh_enabled, disk_quota_bytes, status, status_message, suspend_reason, created_at, updated_at
+		`SELECT id, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, ssh_enabled, disk_quota_bytes, status, status_message, suspend_reason, created_at, updated_at
 		 FROM tenants WHERE id = $1`, id,
-	).Scan(&t.ID, &t.Name, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.SSHEnabled, &t.DiskQuotaBytes, &t.Status, &t.StatusMessage, &t.SuspendReason, &t.CreatedAt, &t.UpdatedAt)
+	).Scan(&t.ID, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.SSHEnabled, &t.DiskQuotaBytes, &t.Status, &t.StatusMessage, &t.SuspendReason, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get tenant by id: %w", err)
 	}
@@ -111,9 +111,9 @@ func (a *CoreDB) GetTenantByID(ctx context.Context, id string) (*model.Tenant, e
 func (a *CoreDB) GetWebrootByID(ctx context.Context, id string) (*model.Webroot, error) {
 	var w model.Webroot
 	err := a.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, status, status_message, suspend_reason, created_at, updated_at
+		`SELECT id, tenant_id, runtime, runtime_version, runtime_config, public_folder, status, status_message, suspend_reason, created_at, updated_at
 		 FROM webroots WHERE id = $1`, id,
-	).Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion, &w.RuntimeConfig, &w.PublicFolder, &w.Status, &w.StatusMessage, &w.SuspendReason, &w.CreatedAt, &w.UpdatedAt)
+	).Scan(&w.ID, &w.TenantID, &w.Runtime, &w.RuntimeVersion, &w.RuntimeConfig, &w.PublicFolder, &w.Status, &w.StatusMessage, &w.SuspendReason, &w.CreatedAt, &w.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get webroot by id: %w", err)
 	}
@@ -179,9 +179,9 @@ func (a *CoreDB) GetZoneRecordByID(ctx context.Context, id string) (*model.ZoneR
 func (a *CoreDB) GetDatabaseByID(ctx context.Context, id string) (*model.Database, error) {
 	var d model.Database
 	err := a.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, shard_id, node_id, status, status_message, suspend_reason, created_at, updated_at
+		`SELECT id, tenant_id, shard_id, node_id, status, status_message, suspend_reason, created_at, updated_at
 		 FROM databases WHERE id = $1`, id,
-	).Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID, &d.Status, &d.StatusMessage, &d.SuspendReason, &d.CreatedAt, &d.UpdatedAt)
+	).Scan(&d.ID, &d.TenantID, &d.ShardID, &d.NodeID, &d.Status, &d.StatusMessage, &d.SuspendReason, &d.CreatedAt, &d.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get database by id: %w", err)
 	}
@@ -324,7 +324,7 @@ func (a *CoreDB) CreateCertificate(ctx context.Context, params CreateCertificate
 // ListTenantsByShard retrieves all tenants assigned to a shard.
 func (a *CoreDB) ListTenantsByShard(ctx context.Context, shardID string) ([]model.Tenant, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, name, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, ssh_enabled, disk_quota_bytes, status, status_message, suspend_reason, created_at, updated_at
+		`SELECT id, brand_id, region_id, cluster_id, shard_id, uid, sftp_enabled, ssh_enabled, disk_quota_bytes, status, status_message, suspend_reason, created_at, updated_at
 		 FROM tenants WHERE shard_id = $1 ORDER BY id`, shardID,
 	)
 	if err != nil {
@@ -335,7 +335,7 @@ func (a *CoreDB) ListTenantsByShard(ctx context.Context, shardID string) ([]mode
 	var tenants []model.Tenant
 	for rows.Next() {
 		var t model.Tenant
-		if err := rows.Scan(&t.ID, &t.Name, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.SSHEnabled, &t.DiskQuotaBytes, &t.Status, &t.StatusMessage, &t.SuspendReason, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.BrandID, &t.RegionID, &t.ClusterID, &t.ShardID, &t.UID, &t.SFTPEnabled, &t.SSHEnabled, &t.DiskQuotaBytes, &t.Status, &t.StatusMessage, &t.SuspendReason, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan tenant row: %w", err)
 		}
 		tenants = append(tenants, t)
@@ -434,7 +434,7 @@ func (a *CoreDB) UpdateValkeyInstanceShardID(ctx context.Context, instanceID str
 // ListWebrootsByTenantID retrieves all webroots for a tenant.
 func (a *CoreDB) ListWebrootsByTenantID(ctx context.Context, tenantID string) ([]model.Webroot, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, service_hostname_enabled, status, status_message, suspend_reason, created_at, updated_at
+		`SELECT id, tenant_id, runtime, runtime_version, runtime_config, public_folder, env_file_name, service_hostname_enabled, status, status_message, suspend_reason, created_at, updated_at
 		 FROM webroots WHERE tenant_id = $1`, tenantID,
 	)
 	if err != nil {
@@ -445,7 +445,7 @@ func (a *CoreDB) ListWebrootsByTenantID(ctx context.Context, tenantID string) ([
 	var webroots []model.Webroot
 	for rows.Next() {
 		var w model.Webroot
-		if err := rows.Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion, &w.RuntimeConfig, &w.PublicFolder, &w.EnvFileName, &w.ServiceHostnameEnabled, &w.Status, &w.StatusMessage, &w.SuspendReason, &w.CreatedAt, &w.UpdatedAt); err != nil {
+		if err := rows.Scan(&w.ID, &w.TenantID, &w.Runtime, &w.RuntimeVersion, &w.RuntimeConfig, &w.PublicFolder, &w.EnvFileName, &w.ServiceHostnameEnabled, &w.Status, &w.StatusMessage, &w.SuspendReason, &w.CreatedAt, &w.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan webroot row: %w", err)
 		}
 		webroots = append(webroots, w)
@@ -456,7 +456,7 @@ func (a *CoreDB) ListWebrootsByTenantID(ctx context.Context, tenantID string) ([
 // ListDatabasesByTenantID retrieves all databases for a tenant.
 func (a *CoreDB) ListDatabasesByTenantID(ctx context.Context, tenantID string) ([]model.Database, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, name, shard_id, node_id, status, status_message, suspend_reason, created_at, updated_at
+		`SELECT id, tenant_id, shard_id, node_id, status, status_message, suspend_reason, created_at, updated_at
 		 FROM databases WHERE tenant_id = $1`, tenantID,
 	)
 	if err != nil {
@@ -467,7 +467,7 @@ func (a *CoreDB) ListDatabasesByTenantID(ctx context.Context, tenantID string) (
 	var databases []model.Database
 	for rows.Next() {
 		var d model.Database
-		if err := rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID, &d.Status, &d.StatusMessage, &d.SuspendReason, &d.CreatedAt, &d.UpdatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.ShardID, &d.NodeID, &d.Status, &d.StatusMessage, &d.SuspendReason, &d.CreatedAt, &d.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan database row: %w", err)
 		}
 		databases = append(databases, d)
@@ -479,9 +479,9 @@ func (a *CoreDB) ListDatabasesByTenantID(ctx context.Context, tenantID string) (
 func (a *CoreDB) GetValkeyInstanceByID(ctx context.Context, id string) (*model.ValkeyInstance, error) {
 	var v model.ValkeyInstance
 	err := a.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, status_message, suspend_reason, created_at, updated_at
+		`SELECT id, tenant_id, shard_id, port, max_memory_mb, password, status, status_message, suspend_reason, created_at, updated_at
 		 FROM valkey_instances WHERE id = $1`, id,
-	).Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB,
+	).Scan(&v.ID, &v.TenantID, &v.ShardID, &v.Port, &v.MaxMemoryMB,
 		&v.Password, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get valkey instance by id: %w", err)
@@ -551,8 +551,8 @@ func (a *CoreDB) CreateNode(ctx context.Context, n *model.Node) error {
 // ListDatabasesByShard retrieves all databases assigned to a shard (excluding deleted).
 func (a *CoreDB) ListDatabasesByShard(ctx context.Context, shardID string) ([]model.Database, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, name, shard_id, node_id, status, status_message, suspend_reason, created_at, updated_at
-		 FROM databases WHERE shard_id = $1 ORDER BY name`, shardID,
+		`SELECT id, tenant_id, shard_id, node_id, status, status_message, suspend_reason, created_at, updated_at
+		 FROM databases WHERE shard_id = $1 ORDER BY id`, shardID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list databases by shard: %w", err)
@@ -562,7 +562,7 @@ func (a *CoreDB) ListDatabasesByShard(ctx context.Context, shardID string) ([]mo
 	var databases []model.Database
 	for rows.Next() {
 		var d model.Database
-		if err := rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.ShardID, &d.NodeID, &d.Status, &d.StatusMessage, &d.SuspendReason, &d.CreatedAt, &d.UpdatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.ShardID, &d.NodeID, &d.Status, &d.StatusMessage, &d.SuspendReason, &d.CreatedAt, &d.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan database row: %w", err)
 		}
 		databases = append(databases, d)
@@ -573,8 +573,8 @@ func (a *CoreDB) ListDatabasesByShard(ctx context.Context, shardID string) ([]mo
 // ListValkeyInstancesByShard retrieves all valkey instances assigned to a shard (excluding deleted).
 func (a *CoreDB) ListValkeyInstancesByShard(ctx context.Context, shardID string) ([]model.ValkeyInstance, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, name, shard_id, port, max_memory_mb, password, status, status_message, suspend_reason, created_at, updated_at
-		 FROM valkey_instances WHERE shard_id = $1 ORDER BY name`, shardID,
+		`SELECT id, tenant_id, shard_id, port, max_memory_mb, password, status, status_message, suspend_reason, created_at, updated_at
+		 FROM valkey_instances WHERE shard_id = $1 ORDER BY id`, shardID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list valkey instances by shard: %w", err)
@@ -584,7 +584,7 @@ func (a *CoreDB) ListValkeyInstancesByShard(ctx context.Context, shardID string)
 	var instances []model.ValkeyInstance
 	for rows.Next() {
 		var v model.ValkeyInstance
-		if err := rows.Scan(&v.ID, &v.TenantID, &v.Name, &v.ShardID, &v.Port, &v.MaxMemoryMB, &v.Password, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt); err != nil {
+		if err := rows.Scan(&v.ID, &v.TenantID, &v.ShardID, &v.Port, &v.MaxMemoryMB, &v.Password, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan valkey instance row: %w", err)
 		}
 		instances = append(instances, v)
@@ -840,9 +840,9 @@ func (a *CoreDB) DeleteOldAuditLogs(ctx context.Context, retentionDays int) (int
 func (a *CoreDB) GetS3BucketByID(ctx context.Context, id string) (*model.S3Bucket, error) {
 	var b model.S3Bucket
 	err := a.db.QueryRow(ctx,
-		`SELECT id, tenant_id, name, shard_id, public, quota_bytes, status, status_message, suspend_reason, created_at, updated_at
+		`SELECT id, tenant_id, shard_id, public, quota_bytes, status, status_message, suspend_reason, created_at, updated_at
 		 FROM s3_buckets WHERE id = $1`, id,
-	).Scan(&b.ID, &b.TenantID, &b.Name, &b.ShardID,
+	).Scan(&b.ID, &b.TenantID, &b.ShardID,
 		&b.Public, &b.QuotaBytes, &b.Status, &b.StatusMessage, &b.SuspendReason, &b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get s3 bucket by id: %w", err)
@@ -929,8 +929,8 @@ func (a *CoreDB) GetOldBackups(ctx context.Context, retentionDays int) ([]model.
 // ListCronJobsByWebroot retrieves all cron jobs for a webroot (excluding deleted).
 func (a *CoreDB) ListCronJobsByWebroot(ctx context.Context, webrootID string) ([]model.CronJob, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, webroot_id, name, schedule, command, working_directory, enabled, timeout_seconds, max_memory_mb, status, status_message, created_at, updated_at
-		 FROM cron_jobs WHERE webroot_id = $1 ORDER BY name`, webrootID,
+		`SELECT id, tenant_id, webroot_id, schedule, command, working_directory, enabled, timeout_seconds, max_memory_mb, status, status_message, created_at, updated_at
+		 FROM cron_jobs WHERE webroot_id = $1 ORDER BY id`, webrootID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list cron jobs by webroot: %w", err)
@@ -940,7 +940,7 @@ func (a *CoreDB) ListCronJobsByWebroot(ctx context.Context, webrootID string) ([
 	var jobs []model.CronJob
 	for rows.Next() {
 		var j model.CronJob
-		if err := rows.Scan(&j.ID, &j.TenantID, &j.WebrootID, &j.Name, &j.Schedule, &j.Command, &j.WorkingDirectory, &j.Enabled, &j.TimeoutSeconds, &j.MaxMemoryMB, &j.Status, &j.StatusMessage, &j.CreatedAt, &j.UpdatedAt); err != nil {
+		if err := rows.Scan(&j.ID, &j.TenantID, &j.WebrootID, &j.Schedule, &j.Command, &j.WorkingDirectory, &j.Enabled, &j.TimeoutSeconds, &j.MaxMemoryMB, &j.Status, &j.StatusMessage, &j.CreatedAt, &j.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan cron job row: %w", err)
 		}
 		jobs = append(jobs, j)
@@ -982,10 +982,10 @@ func (a *CoreDB) UpdateShardConfig(ctx context.Context, params UpdateShardConfig
 // ListDaemonsByWebroot retrieves all daemons for a webroot (excluding deleted).
 func (a *CoreDB) ListDaemonsByWebroot(ctx context.Context, webrootID string) ([]model.Daemon, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, node_id, webroot_id, name, command, proxy_path, proxy_port,
+		`SELECT id, tenant_id, node_id, webroot_id, command, proxy_path, proxy_port,
 		        num_procs, stop_signal, stop_wait_secs, max_memory_mb,
 		        enabled, status, status_message, created_at, updated_at
-		 FROM daemons WHERE webroot_id = $1 ORDER BY name`, webrootID,
+		 FROM daemons WHERE webroot_id = $1 ORDER BY id`, webrootID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list daemons by webroot: %w", err)
@@ -995,7 +995,7 @@ func (a *CoreDB) ListDaemonsByWebroot(ctx context.Context, webrootID string) ([]
 	var daemons []model.Daemon
 	for rows.Next() {
 		var d model.Daemon
-		if err := rows.Scan(&d.ID, &d.TenantID, &d.NodeID, &d.WebrootID, &d.Name, &d.Command,
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.NodeID, &d.WebrootID, &d.Command,
 			&d.ProxyPath, &d.ProxyPort,
 			&d.NumProcs, &d.StopSignal, &d.StopWaitSecs, &d.MaxMemoryMB,
 			&d.Enabled, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt); err != nil {
@@ -1246,7 +1246,7 @@ func (a *CoreDB) ListS3AccessKeysByBucketID(ctx context.Context, bucketID string
 // ListDaemonsByWebrootID retrieves all daemons for a webroot.
 func (a *CoreDB) ListDaemonsByWebrootID(ctx context.Context, webrootID string) ([]model.Daemon, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, node_id, webroot_id, name, command, proxy_path, proxy_port, num_procs, stop_signal, stop_wait_secs, max_memory_mb, enabled, status, status_message, created_at, updated_at
+		`SELECT id, tenant_id, node_id, webroot_id, command, proxy_path, proxy_port, num_procs, stop_signal, stop_wait_secs, max_memory_mb, enabled, status, status_message, created_at, updated_at
 		 FROM daemons WHERE webroot_id = $1`, webrootID,
 	)
 	if err != nil {
@@ -1257,7 +1257,7 @@ func (a *CoreDB) ListDaemonsByWebrootID(ctx context.Context, webrootID string) (
 	var daemons []model.Daemon
 	for rows.Next() {
 		var d model.Daemon
-		if err := rows.Scan(&d.ID, &d.TenantID, &d.NodeID, &d.WebrootID, &d.Name, &d.Command, &d.ProxyPath, &d.ProxyPort, &d.NumProcs, &d.StopSignal, &d.StopWaitSecs, &d.MaxMemoryMB, &d.Enabled, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.NodeID, &d.WebrootID, &d.Command, &d.ProxyPath, &d.ProxyPort, &d.NumProcs, &d.StopSignal, &d.StopWaitSecs, &d.MaxMemoryMB, &d.Enabled, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan daemon row: %w", err)
 		}
 		daemons = append(daemons, d)
@@ -1268,7 +1268,7 @@ func (a *CoreDB) ListDaemonsByWebrootID(ctx context.Context, webrootID string) (
 // ListCronJobsByWebrootID retrieves all cron jobs for a webroot.
 func (a *CoreDB) ListCronJobsByWebrootID(ctx context.Context, webrootID string) ([]model.CronJob, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, webroot_id, name, schedule, command, working_directory, enabled, timeout_seconds, max_memory_mb, consecutive_failures, max_failures, status, status_message, created_at, updated_at
+		`SELECT id, tenant_id, webroot_id, schedule, command, working_directory, enabled, timeout_seconds, max_memory_mb, consecutive_failures, max_failures, status, status_message, created_at, updated_at
 		 FROM cron_jobs WHERE webroot_id = $1`, webrootID,
 	)
 	if err != nil {
@@ -1279,7 +1279,7 @@ func (a *CoreDB) ListCronJobsByWebrootID(ctx context.Context, webrootID string) 
 	var jobs []model.CronJob
 	for rows.Next() {
 		var c model.CronJob
-		if err := rows.Scan(&c.ID, &c.TenantID, &c.WebrootID, &c.Name, &c.Schedule, &c.Command, &c.WorkingDirectory, &c.Enabled, &c.TimeoutSeconds, &c.MaxMemoryMB, &c.ConsecutiveFailures, &c.MaxFailures, &c.Status, &c.StatusMessage, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.TenantID, &c.WebrootID, &c.Schedule, &c.Command, &c.WorkingDirectory, &c.Enabled, &c.TimeoutSeconds, &c.MaxMemoryMB, &c.ConsecutiveFailures, &c.MaxFailures, &c.Status, &c.StatusMessage, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan cron job row: %w", err)
 		}
 		jobs = append(jobs, c)
@@ -1523,7 +1523,7 @@ func (a *CoreDB) UpsertResourceUsage(ctx context.Context, params UpsertResourceU
 		err := a.db.QueryRow(ctx,
 			`SELECT w.id, w.tenant_id
 			 FROM webroots w JOIN tenants t ON t.id = w.tenant_id
-			 WHERE t.name = $1 AND w.name = $2`, parts[0], parts[1],
+			 WHERE t.id = $1 AND w.id = $2`, parts[0], parts[1],
 		).Scan(&resourceID, &tenantID)
 		if err != nil {
 			return nil // skip unknown webroots
@@ -1531,7 +1531,7 @@ func (a *CoreDB) UpsertResourceUsage(ctx context.Context, params UpsertResourceU
 
 	case "database":
 		err := a.db.QueryRow(ctx,
-			`SELECT id, tenant_id FROM databases WHERE name = $1`, params.Name,
+			`SELECT id, tenant_id FROM databases WHERE id = $1`, params.Name,
 		).Scan(&resourceID, &tenantID)
 		if err != nil {
 			return nil // skip unknown databases

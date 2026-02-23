@@ -153,14 +153,14 @@ export function DatabaseDetailPage() {
     <div className="space-y-6">
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
-        { label: tenant?.name ?? tenantId, href: `/tenants/${tenantId}` },
+        { label: tenant?.id ?? tenantId, href: `/tenants/${tenantId}` },
         { label: 'Databases', href: `/tenants/${tenantId}`, hash: 'databases' },
-        { label: database.name },
+        { label: database.id },
       ]} />
 
       <ResourceHeader
         icon={DatabaseIcon}
-        title={database.name}
+        title={database.id}
         subtitle={`Shard: ${database.shard_name || database.shard_id || '-'}`}
         status={database.status}
         actions={

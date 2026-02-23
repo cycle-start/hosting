@@ -58,7 +58,7 @@ func CreateDatabaseWorkflow(ctx workflow.Context, databaseID string) error {
 
 	// Create database on the PRIMARY only (replicas get data via replication).
 	primaryCtx := nodeActivityCtx(ctx, primaryID)
-	err = workflow.ExecuteActivity(primaryCtx, "CreateDatabase", database.Name).Get(ctx, nil)
+	err = workflow.ExecuteActivity(primaryCtx, "CreateDatabase", database.ID).Get(ctx, nil)
 	if err != nil {
 		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return err
@@ -147,7 +147,7 @@ func DeleteDatabaseWorkflow(ctx workflow.Context, databaseID string) error {
 
 	// Delete database on the PRIMARY only (change replicates to replicas).
 	primaryCtx := nodeActivityCtx(ctx, primaryID)
-	err = workflow.ExecuteActivity(primaryCtx, "DeleteDatabase", database.Name).Get(ctx, nil)
+	err = workflow.ExecuteActivity(primaryCtx, "DeleteDatabase", database.ID).Get(ctx, nil)
 	if err != nil {
 		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return err

@@ -153,7 +153,7 @@ func (s *EmailAccountService) Delete(ctx context.Context, id string) error {
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteEmailAccountWorkflow",
-		WorkflowID:   workflowID("email-account", address, id),
+		WorkflowID:   workflowID("email-account", id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("signal DeleteEmailAccountWorkflow: %w", err)
@@ -181,7 +181,7 @@ func (s *EmailAccountService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateEmailAccountWorkflow",
-		WorkflowID:   workflowID("email-account", address, id),
+		WorkflowID:   workflowID("email-account", id),
 		Arg:          id,
 	})
 }

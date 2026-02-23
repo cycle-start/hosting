@@ -83,9 +83,9 @@ func CreateDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 	createParams := activity.CreateDaemonParams{
 		ID:           daemonCtx.Daemon.ID,
 		NodeID:       daemonCtx.Daemon.NodeID,
-		TenantName:   daemonCtx.Tenant.Name,
-		WebrootName:  daemonCtx.Webroot.Name,
-		Name:         daemonCtx.Daemon.Name,
+		TenantName:   daemonCtx.Tenant.ID,
+		WebrootName:  daemonCtx.Webroot.ID,
+		Name:         daemonCtx.Daemon.ID,
 		Command:      daemonCtx.Daemon.Command,
 		ProxyPort:    daemonCtx.Daemon.ProxyPort,
 		HostIP:       computeDaemonHostIP(&daemonCtx, node),
@@ -177,9 +177,9 @@ func UpdateDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 	updateParams := activity.CreateDaemonParams{
 		ID:           daemonCtx.Daemon.ID,
 		NodeID:       daemonCtx.Daemon.NodeID,
-		TenantName:   daemonCtx.Tenant.Name,
-		WebrootName:  daemonCtx.Webroot.Name,
-		Name:         daemonCtx.Daemon.Name,
+		TenantName:   daemonCtx.Tenant.ID,
+		WebrootName:  daemonCtx.Webroot.ID,
+		Name:         daemonCtx.Daemon.ID,
 		Command:      daemonCtx.Daemon.Command,
 		ProxyPort:    daemonCtx.Daemon.ProxyPort,
 		HostIP:       computeDaemonHostIP(&daemonCtx, node),
@@ -268,9 +268,9 @@ func DeleteDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 
 	deleteParams := activity.DeleteDaemonParams{
 		ID:          daemonCtx.Daemon.ID,
-		TenantName:  daemonCtx.Tenant.Name,
-		WebrootName: daemonCtx.Webroot.Name,
-		Name:        daemonCtx.Daemon.Name,
+		TenantName:  daemonCtx.Tenant.ID,
+		WebrootName: daemonCtx.Webroot.ID,
+		Name:        daemonCtx.Daemon.ID,
 	}
 
 	// Delete config on the daemon's assigned node.
@@ -352,9 +352,9 @@ func EnableDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 
 	enableParams := activity.DaemonEnableParams{
 		ID:          daemonCtx.Daemon.ID,
-		TenantName:  daemonCtx.Tenant.Name,
-		WebrootName: daemonCtx.Webroot.Name,
-		Name:        daemonCtx.Daemon.Name,
+		TenantName:  daemonCtx.Tenant.ID,
+		WebrootName: daemonCtx.Webroot.ID,
+		Name:        daemonCtx.Daemon.ID,
 	}
 
 	// Enable on the daemon's assigned node only.
@@ -415,9 +415,9 @@ func DisableDaemonWorkflow(ctx workflow.Context, daemonID string) error {
 
 	disableParams := activity.DaemonEnableParams{
 		ID:          daemonCtx.Daemon.ID,
-		TenantName:  daemonCtx.Tenant.Name,
-		WebrootName: daemonCtx.Webroot.Name,
-		Name:        daemonCtx.Daemon.Name,
+		TenantName:  daemonCtx.Tenant.ID,
+		WebrootName: daemonCtx.Webroot.ID,
+		Name:        daemonCtx.Daemon.ID,
 	}
 
 	// Disable on the daemon's assigned node only.
@@ -508,8 +508,8 @@ func regenerateWebrootNginxOnNodes(ctx workflow.Context, webroot model.Webroot, 
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "UpdateWebroot", activity.UpdateWebrootParams{
 			ID:             webroot.ID,
-			TenantName:     tenant.Name,
-			Name:           webroot.Name,
+			TenantName:     tenant.ID,
+			Name:           webroot.ID,
 			Runtime:        webroot.Runtime,
 			RuntimeVersion: webroot.RuntimeVersion,
 			RuntimeConfig:  string(webroot.RuntimeConfig),

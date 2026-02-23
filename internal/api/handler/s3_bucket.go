@@ -98,10 +98,9 @@ func (h *S3Bucket) Create(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	shardID := req.ShardID
 	bucket := &model.S3Bucket{
-		ID:             platform.NewID(),
+		ID:             platform.NewName("s3"),
 		TenantID:       tenantID,
 		SubscriptionID: req.SubscriptionID,
-		Name:           platform.NewName("s3"),
 		ShardID:        &shardID,
 		Status:    model.StatusPending,
 		CreatedAt: now,
@@ -274,9 +273,8 @@ func (h *S3Bucket) CreateNested(w http.ResponseWriter, r *http.Request, tenantID
 		now := time.Now()
 		shardID := br.ShardID
 		bucket := &model.S3Bucket{
-			ID:        platform.NewID(),
+			ID:        platform.NewName("s3"),
 			TenantID:  tenantID,
-			Name:      platform.NewName("s3"),
 			ShardID:   &shardID,
 			Status:    model.StatusPending,
 			CreatedAt: now,

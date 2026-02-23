@@ -98,12 +98,10 @@ func (h *Database) Create(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	shardID := req.ShardID
-	dbName := platform.NewName("db")
 	database := &model.Database{
-		ID:             platform.NewID(),
+		ID:             platform.NewName("db"),
 		TenantID:       tenantID,
 		SubscriptionID: req.SubscriptionID,
-		Name:           dbName,
 		ShardID:        &shardID,
 		Status:    model.StatusPending,
 		CreatedAt: now,
@@ -117,8 +115,8 @@ func (h *Database) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Nested user creation
 	for _, ur := range req.Users {
-		if !strings.HasPrefix(ur.Username, dbName) {
-			response.WriteError(w, http.StatusBadRequest, fmt.Sprintf("username %q must start with database name %q", ur.Username, dbName))
+		if !strings.HasPrefix(ur.Username, database.ID) {
+			response.WriteError(w, http.StatusBadRequest, fmt.Sprintf("username %q must start with database name %q", ur.Username, database.ID))
 			return
 		}
 		now2 := time.Now()

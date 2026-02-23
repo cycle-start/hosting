@@ -170,8 +170,8 @@ export function TenantDetailPage() {
 
   // Backup source options
   const backupSources = bkType === 'web'
-    ? (webrootsData?.items ?? []).map(w => ({ id: w.id, name: w.name }))
-    : (databasesData?.items ?? []).map(d => ({ id: d.id, name: d.name }))
+    ? (webrootsData?.items ?? []).map(w => ({ id: w.id, label: w.id }))
+    : (databasesData?.items ?? []).map(d => ({ id: d.id, label: d.id }))
 
   const resetForm = () => {
     setWrForm(defaultWebroot)
@@ -280,8 +280,8 @@ export function TenantDetailPage() {
 
   const webrootColumns: ColumnDef<Webroot>[] = [
     {
-      accessorKey: 'name', header: 'Name',
-      cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+      accessorKey: 'id', header: 'ID',
+      cell: ({ row }) => <span className="font-medium">{row.original.id}</span>,
     },
     {
       accessorKey: 'subscription_id', header: 'Subscription',
@@ -331,8 +331,8 @@ export function TenantDetailPage() {
 
   const databaseColumns: ColumnDef<Database>[] = [
     {
-      accessorKey: 'name', header: 'Name',
-      cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+      accessorKey: 'id', header: 'ID',
+      cell: ({ row }) => <span className="font-medium">{row.original.id}</span>,
     },
     {
       accessorKey: 'subscription_id', header: 'Subscription',
@@ -385,8 +385,8 @@ export function TenantDetailPage() {
 
   const valkeyColumns: ColumnDef<ValkeyInstance>[] = [
     {
-      accessorKey: 'name', header: 'Name',
-      cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+      accessorKey: 'id', header: 'ID',
+      cell: ({ row }) => <span className="font-medium">{row.original.id}</span>,
     },
     {
       accessorKey: 'subscription_id', header: 'Subscription',
@@ -433,8 +433,8 @@ export function TenantDetailPage() {
 
   const s3Columns: ColumnDef<S3Bucket>[] = [
     {
-      accessorKey: 'name', header: 'Name',
-      cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+      accessorKey: 'id', header: 'ID',
+      cell: ({ row }) => <span className="font-medium">{row.original.id}</span>,
     },
     {
       accessorKey: 'subscription_id', header: 'Subscription',
@@ -662,12 +662,12 @@ export function TenantDetailPage() {
     <div className="space-y-6">
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
-        { label: tenant.name },
+        { label: tenant.id },
       ]} />
 
       <ResourceHeader
         icon={Users}
-        title={tenant.name}
+        title={tenant.id}
         subtitle={`UID: ${tenant.uid} | Brand: ${brand?.name || tenant.brand_id} | Region: ${tenant.region_name || tenant.region_id} | Cluster: ${tenant.cluster_name || tenant.cluster_id}`}
         status={tenant.status}
         actions={
@@ -711,9 +711,9 @@ export function TenantDetailPage() {
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: 'SSH', hostname: `ssh.${tenant.name}.${brand.base_hostname}` },
-                { label: 'SFTP', hostname: `sftp.${tenant.name}.${brand.base_hostname}` },
-                { label: 'MySQL', hostname: `mysql.${tenant.name}.${brand.base_hostname}` },
+                { label: 'SSH', hostname: `ssh.${tenant.id}.${brand.base_hostname}` },
+                { label: 'SFTP', hostname: `sftp.${tenant.id}.${brand.base_hostname}` },
+                { label: 'MySQL', hostname: `mysql.${tenant.id}.${brand.base_hostname}` },
               ].map(svc => (
                 <div key={svc.label} className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground w-12">{svc.label}</span>
@@ -779,7 +779,7 @@ export function TenantDetailPage() {
           {!webrootsLoading && (webrootsData?.items?.length ?? 0) === 0 ? (
             <EmptyState icon={FolderOpen} title="No webroots" description="Create a webroot to host a website." action={{ label: 'Create Webroot', onClick: () => { resetForm(); setCreateWebrootOpen(true) } }} />
           ) : (
-            <DataTable columns={webrootColumns} data={webrootsData?.items ?? []} loading={webrootsLoading} searchColumn="name" searchPlaceholder="Search webroots..."
+            <DataTable columns={webrootColumns} data={webrootsData?.items ?? []} loading={webrootsLoading} searchColumn="id" searchPlaceholder="Search webroots..."
               onRowClick={(w) => navigate({ to: '/tenants/$id/webroots/$webrootId', params: { id, webrootId: w.id } })} />
           )}
         </TabsContent>
@@ -793,7 +793,7 @@ export function TenantDetailPage() {
           {!databasesLoading && (databasesData?.items?.length ?? 0) === 0 ? (
             <EmptyState icon={DatabaseIcon} title="No databases" description="Create a MySQL database for this tenant." action={{ label: 'Create Database', onClick: () => { resetForm(); setCreateDbOpen(true) } }} />
           ) : (
-            <DataTable columns={databaseColumns} data={databasesData?.items ?? []} loading={databasesLoading} searchColumn="name" searchPlaceholder="Search databases..."
+            <DataTable columns={databaseColumns} data={databasesData?.items ?? []} loading={databasesLoading} searchColumn="id" searchPlaceholder="Search databases..."
               onRowClick={(d) => navigate({ to: '/tenants/$id/databases/$databaseId', params: { id, databaseId: d.id } })} />
           )}
         </TabsContent>
@@ -821,7 +821,7 @@ export function TenantDetailPage() {
           {!valkeyLoading && (valkeyData?.items?.length ?? 0) === 0 ? (
             <EmptyState icon={Boxes} title="No Valkey instances" description="Create a managed Valkey (Redis) instance." action={{ label: 'Create Instance', onClick: () => { resetForm(); setCreateValkeyOpen(true) } }} />
           ) : (
-            <DataTable columns={valkeyColumns} data={valkeyData?.items ?? []} loading={valkeyLoading} searchColumn="name" searchPlaceholder="Search instances..."
+            <DataTable columns={valkeyColumns} data={valkeyData?.items ?? []} loading={valkeyLoading} searchColumn="id" searchPlaceholder="Search instances..."
               onRowClick={(v) => navigate({ to: '/tenants/$id/valkey/$instanceId', params: { id, instanceId: v.id } })} />
           )}
         </TabsContent>
@@ -835,7 +835,7 @@ export function TenantDetailPage() {
           {!s3Loading && (s3Data?.items?.length ?? 0) === 0 ? (
             <EmptyState icon={HardDrive} title="No S3 buckets" description="Create an S3-compatible object storage bucket." action={{ label: 'Create Bucket', onClick: () => { resetForm(); setCreateS3Open(true) } }} />
           ) : (
-            <DataTable columns={s3Columns} data={s3Data?.items ?? []} loading={s3Loading} searchColumn="name" searchPlaceholder="Search buckets..."
+            <DataTable columns={s3Columns} data={s3Data?.items ?? []} loading={s3Loading} searchColumn="id" searchPlaceholder="Search buckets..."
               onRowClick={(b) => navigate({ to: `/tenants/${id}/s3-buckets/${b.id}` })} />
           )}
         </TabsContent>
@@ -886,30 +886,30 @@ export function TenantDetailPage() {
 
       {/* Delete Tenant */}
       <ConfirmDialog open={deleteOpen} onOpenChange={setDeleteOpen} title="Delete Tenant"
-        description={`Are you sure you want to delete "${tenant.name}"? All associated resources will be removed.`}
+        description={`Are you sure you want to delete "${tenant.id}"? All associated resources will be removed.`}
         confirmLabel="Delete" variant="destructive" onConfirm={handleDelete} loading={deleteMutation.isPending} />
 
       {/* Delete Webroot */}
       <ConfirmDialog open={!!deleteWebroot} onOpenChange={(o) => !o && setDeleteWebroot(null)} title="Delete Webroot"
-        description={`Delete webroot "${deleteWebroot?.name}"? This will remove all FQDNs and configurations.`}
+        description={`Delete webroot "${deleteWebroot?.id}"? This will remove all FQDNs and configurations.`}
         confirmLabel="Delete" variant="destructive" loading={deleteWebrootMut.isPending}
         onConfirm={async () => { try { await deleteWebrootMut.mutateAsync(deleteWebroot!.id); toast.success('Webroot deleted'); setDeleteWebroot(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
 
       {/* Delete Database */}
       <ConfirmDialog open={!!deleteDb} onOpenChange={(o) => !o && setDeleteDb(null)} title="Delete Database"
-        description={`Delete database "${deleteDb?.name}"? All data will be lost.`}
+        description={`Delete database "${deleteDb?.id}"? All data will be lost.`}
         confirmLabel="Delete" variant="destructive" loading={deleteDbMut.isPending}
         onConfirm={async () => { try { await deleteDbMut.mutateAsync(deleteDb!.id); toast.success('Database deleted'); setDeleteDb(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
 
       {/* Delete Valkey */}
       <ConfirmDialog open={!!deleteValkey} onOpenChange={(o) => !o && setDeleteValkey(null)} title="Delete Valkey Instance"
-        description={`Delete Valkey instance "${deleteValkey?.name}"? All data will be lost.`}
+        description={`Delete Valkey instance "${deleteValkey?.id}"? All data will be lost.`}
         confirmLabel="Delete" variant="destructive" loading={deleteValkeyMut.isPending}
         onConfirm={async () => { try { await deleteValkeyMut.mutateAsync(deleteValkey!.id); toast.success('Valkey instance deleted'); setDeleteValkey(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
 
       {/* Delete S3 Bucket */}
       <ConfirmDialog open={!!deleteS3} onOpenChange={(o) => !o && setDeleteS3(null)} title="Delete S3 Bucket"
-        description={`Delete S3 bucket "${deleteS3?.name}"? All objects and access keys will be removed.`}
+        description={`Delete S3 bucket "${deleteS3?.id}"? All objects and access keys will be removed.`}
         confirmLabel="Delete" variant="destructive" loading={deleteS3Mut.isPending}
         onConfirm={async () => { try { await deleteS3Mut.mutateAsync(deleteS3!.id); toast.success('S3 bucket deleted'); setDeleteS3(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
 
@@ -941,7 +941,7 @@ export function TenantDetailPage() {
       <Dialog open={terminalOpen} onOpenChange={setTerminalOpen}>
         <DialogContent className="max-w-6xl p-0" onEscapeKeyDown={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader className="px-6 pt-6 pb-2">
-            <DialogTitle>Terminal — {tenant.name}</DialogTitle>
+            <DialogTitle>Terminal — {tenant.id}</DialogTitle>
           </DialogHeader>
           <div className="px-4 pb-4">
             {terminalOpen && <WebTerminal tenantId={id} onClose={() => setTerminalOpen(false)} />}
@@ -1042,7 +1042,7 @@ export function TenantDetailPage() {
                 <Select value={bkSource} onValueChange={setBkSource}>
                   <SelectTrigger><SelectValue placeholder="Select source..." /></SelectTrigger>
                   <SelectContent>
-                    {backupSources.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    {backupSources.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               )}

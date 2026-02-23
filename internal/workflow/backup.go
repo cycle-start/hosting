@@ -73,10 +73,10 @@ func CreateBackupWorkflow(ctx workflow.Context, backupID string) error {
 			return err
 		}
 
-		backupPath := fmt.Sprintf("/var/backups/hosting/%s/%s.tar.gz", bctx.Tenant.Name, backupID)
+		backupPath := fmt.Sprintf("/var/backups/hosting/%s/%s.tar.gz", bctx.Tenant.ID, backupID)
 		err = workflow.ExecuteActivity(nodeCtx, "CreateWebBackup", activity.CreateWebBackupParams{
-			TenantName:  bctx.Tenant.Name,
-			WebrootName: webroot.Name,
+			TenantName:  bctx.Tenant.ID,
+			WebrootName: webroot.ID,
 			BackupPath:  backupPath,
 		}).Get(ctx, &result)
 		if err != nil {
@@ -85,7 +85,7 @@ func CreateBackupWorkflow(ctx workflow.Context, backupID string) error {
 		}
 
 	case model.BackupTypeDatabase:
-		backupPath := fmt.Sprintf("/var/backups/hosting/%s/%s.sql.gz", bctx.Tenant.Name, backupID)
+		backupPath := fmt.Sprintf("/var/backups/hosting/%s/%s.sql.gz", bctx.Tenant.ID, backupID)
 		err = workflow.ExecuteActivity(nodeCtx, "CreateMySQLBackup", activity.CreateMySQLBackupParams{
 			DatabaseName: bctx.Backup.SourceName,
 			BackupPath:   backupPath,
@@ -180,8 +180,8 @@ func RestoreBackupWorkflow(ctx workflow.Context, backupID string) error {
 		for _, node := range bctx.Nodes {
 			nodeCtx := nodeActivityCtx(ctx, node.ID)
 			err = workflow.ExecuteActivity(nodeCtx, "RestoreWebBackup", activity.RestoreWebBackupParams{
-				TenantName:  bctx.Tenant.Name,
-				WebrootName: webroot.Name,
+				TenantName:  bctx.Tenant.ID,
+				WebrootName: webroot.ID,
 				BackupPath:  bctx.Backup.StoragePath,
 			}).Get(ctx, nil)
 			if err != nil {

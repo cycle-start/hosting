@@ -46,8 +46,8 @@ func (s *SearchService) Search(ctx context.Context, query string, limit int) ([]
 			args: []any{pattern, limit},
 		},
 		{
-			sql: `SELECT 'tenant', id, name, '', status FROM tenants
-				WHERE id ILIKE $1 OR name ILIKE $1
+			sql: `SELECT 'tenant', id, id, '', status FROM tenants
+				WHERE id ILIKE $1
 				LIMIT $2`,
 			args: []any{pattern, limit},
 		},
@@ -58,8 +58,8 @@ func (s *SearchService) Search(ctx context.Context, query string, limit int) ([]
 			args: []any{pattern, limit},
 		},
 		{
-			sql: `SELECT 'webroot', id, name, tenant_id, status FROM webroots
-				WHERE name ILIKE $1
+			sql: `SELECT 'webroot', id, id, tenant_id, status FROM webroots
+				WHERE id ILIKE $1
 				LIMIT $2`,
 			args: []any{pattern, limit},
 		},
@@ -71,8 +71,8 @@ func (s *SearchService) Search(ctx context.Context, query string, limit int) ([]
 			args: []any{pattern, limit},
 		},
 		{
-			sql: `SELECT 'database', id, name, tenant_id, status FROM databases
-				WHERE name ILIKE $1
+			sql: `SELECT 'database', id, id, tenant_id, status FROM databases
+				WHERE id ILIKE $1
 				LIMIT $2`,
 			args: []any{pattern, limit},
 		},
@@ -84,14 +84,14 @@ func (s *SearchService) Search(ctx context.Context, query string, limit int) ([]
 			args: []any{pattern, limit},
 		},
 		{
-			sql: `SELECT 'valkey_instance', id, name, tenant_id, status FROM valkey_instances
-				WHERE name ILIKE $1
+			sql: `SELECT 'valkey_instance', id, id, tenant_id, status FROM valkey_instances
+				WHERE id ILIKE $1
 				LIMIT $2`,
 			args: []any{pattern, limit},
 		},
 		{
-			sql: `SELECT 's3_bucket', id, name, COALESCE(tenant_id, ''), status FROM s3_buckets
-				WHERE name ILIKE $1
+			sql: `SELECT 's3_bucket', id, id, COALESCE(tenant_id, ''), status FROM s3_buckets
+				WHERE id ILIKE $1
 				LIMIT $2`,
 			args: []any{pattern, limit},
 		},

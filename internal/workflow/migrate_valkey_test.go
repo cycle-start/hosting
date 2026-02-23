@@ -36,7 +36,6 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestSuccess() {
 
 	instance := model.ValkeyInstance{
 		ID:          instanceID,
-		Name:        "myvalkey",
 		ShardID:     &sourceShardID,
 		Port:        6379,
 		Password:    "valkeypass",
@@ -55,7 +54,7 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestSuccess() {
 		},
 	}
 
-	dumpPath := fmt.Sprintf("/var/backups/hosting/migrate/%s.rdb", instance.Name)
+	dumpPath := fmt.Sprintf("/var/backups/hosting/migrate/%s.rdb", instance.ID)
 
 	// Set provisioning.
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -71,7 +70,7 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestSuccess() {
 
 	// Create instance on target.
 	s.env.OnActivity("CreateValkeyInstance", mock.Anything, activity.CreateValkeyInstanceParams{
-		Name:        "myvalkey",
+		Name:        instanceID,
 		Port:        6379,
 		Password:    "valkeypass",
 		MaxMemoryMB: 256,
@@ -79,7 +78,7 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestSuccess() {
 
 	// Dump on source.
 	s.env.OnActivity("DumpValkeyData", mock.Anything, activity.DumpValkeyDataParams{
-		Name:     "myvalkey",
+		Name:     instanceID,
 		Port:     6379,
 		Password: "valkeypass",
 		DumpPath: dumpPath,
@@ -87,7 +86,7 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestSuccess() {
 
 	// Import on target.
 	s.env.OnActivity("ImportValkeyData", mock.Anything, activity.ImportValkeyDataParams{
-		Name:     "myvalkey",
+		Name:     instanceID,
 		Port:     6379,
 		DumpPath: dumpPath,
 	}).Return(nil)
@@ -95,7 +94,7 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestSuccess() {
 	// List and migrate users.
 	s.env.OnActivity("ListValkeyUsersByInstanceID", mock.Anything, instanceID).Return(users, nil)
 	s.env.OnActivity("CreateValkeyUser", mock.Anything, activity.CreateValkeyUserParams{
-		InstanceName: "myvalkey",
+		InstanceName: instanceID,
 		Port:         6379,
 		Username:     "appuser",
 		Password:     "userpass",
@@ -108,7 +107,7 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestSuccess() {
 
 	// Cleanup (best effort).
 	s.env.OnActivity("DeleteValkeyInstance", mock.Anything, activity.DeleteValkeyInstanceParams{
-		Name: "myvalkey",
+		Name: instanceID,
 		Port: 6379,
 	}).Return(nil)
 	s.env.OnActivity("CleanupMigrateFile", mock.Anything, dumpPath).Return(nil)
@@ -133,7 +132,6 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestSuccessNoUsers() {
 
 	instance := model.ValkeyInstance{
 		ID:          instanceID,
-		Name:        "myvalkey",
 		ShardID:     &sourceShardID,
 		Port:        6380,
 		Password:    "valkeypass2",
@@ -142,7 +140,7 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestSuccessNoUsers() {
 	sourceNodes := []model.Node{{ID: "source-node-2"}}
 	targetNodes := []model.Node{{ID: "target-node-2"}}
 
-	dumpPath := fmt.Sprintf("/var/backups/hosting/migrate/%s.rdb", instance.Name)
+	dumpPath := fmt.Sprintf("/var/backups/hosting/migrate/%s.rdb", instance.ID)
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_instances", ID: instanceID, Status: model.StatusProvisioning,
@@ -151,19 +149,19 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestSuccessNoUsers() {
 	s.env.OnActivity("ListNodesByShard", mock.Anything, sourceShardID).Return(sourceNodes, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, targetShardID).Return(targetNodes, nil)
 	s.env.OnActivity("CreateValkeyInstance", mock.Anything, activity.CreateValkeyInstanceParams{
-		Name:        "myvalkey",
+		Name:        instanceID,
 		Port:        6380,
 		Password:    "valkeypass2",
 		MaxMemoryMB: 128,
 	}).Return(nil)
 	s.env.OnActivity("DumpValkeyData", mock.Anything, activity.DumpValkeyDataParams{
-		Name:     "myvalkey",
+		Name:     instanceID,
 		Port:     6380,
 		Password: "valkeypass2",
 		DumpPath: dumpPath,
 	}).Return(nil)
 	s.env.OnActivity("ImportValkeyData", mock.Anything, activity.ImportValkeyDataParams{
-		Name:     "myvalkey",
+		Name:     instanceID,
 		Port:     6380,
 		DumpPath: dumpPath,
 	}).Return(nil)
@@ -174,7 +172,7 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestSuccessNoUsers() {
 
 	s.env.OnActivity("UpdateValkeyInstanceShardID", mock.Anything, instanceID, targetShardID).Return(nil)
 	s.env.OnActivity("DeleteValkeyInstance", mock.Anything, activity.DeleteValkeyInstanceParams{
-		Name: "myvalkey",
+		Name: instanceID,
 		Port: 6380,
 	}).Return(nil)
 	s.env.OnActivity("CleanupMigrateFile", mock.Anything, dumpPath).Return(nil)
@@ -212,7 +210,6 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestNoShard_SetsStatusFailed() 
 
 	instance := model.ValkeyInstance{
 		ID:          instanceID,
-		Name:        "myvalkey",
 		Port:        6379,
 		Password:    "valkeypass",
 		MaxMemoryMB: 256,
@@ -238,7 +235,6 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestDumpFails_SetsStatusFailed(
 
 	instance := model.ValkeyInstance{
 		ID:          instanceID,
-		Name:        "myvalkey",
 		ShardID:     &sourceShardID,
 		Port:        6379,
 		Password:    "valkeypass",
@@ -272,7 +268,6 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestImportFails_SetsStatusFaile
 
 	instance := model.ValkeyInstance{
 		ID:          instanceID,
-		Name:        "myvalkey",
 		ShardID:     &sourceShardID,
 		Port:        6379,
 		Password:    "valkeypass",
@@ -281,7 +276,7 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestImportFails_SetsStatusFaile
 	sourceNodes := []model.Node{{ID: "source-node-6"}}
 	targetNodes := []model.Node{{ID: "target-node-6"}}
 
-	dumpPath := fmt.Sprintf("/var/backups/hosting/migrate/%s.rdb", instance.Name)
+	dumpPath := fmt.Sprintf("/var/backups/hosting/migrate/%s.rdb", instance.ID)
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "valkey_instances", ID: instanceID, Status: model.StatusProvisioning,
@@ -291,7 +286,7 @@ func (s *MigrateValkeyInstanceWorkflowTestSuite) TestImportFails_SetsStatusFaile
 	s.env.OnActivity("ListNodesByShard", mock.Anything, targetShardID).Return(targetNodes, nil)
 	s.env.OnActivity("CreateValkeyInstance", mock.Anything, mock.Anything).Return(nil)
 	s.env.OnActivity("DumpValkeyData", mock.Anything, activity.DumpValkeyDataParams{
-		Name:     "myvalkey",
+		Name:     instanceID,
 		Port:     6379,
 		Password: "valkeypass",
 		DumpPath: dumpPath,

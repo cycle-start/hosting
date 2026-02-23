@@ -113,7 +113,7 @@ func (s *DatabaseUserService) Update(ctx context.Context, user *model.DatabaseUs
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateDatabaseUserWorkflow",
-		WorkflowID:   workflowID("database-user", user.Username, user.ID),
+		WorkflowID:   workflowID("database-user", user.ID),
 		Arg:          user.ID,
 	}); err != nil {
 		return fmt.Errorf("signal UpdateDatabaseUserWorkflow: %w", err)
@@ -138,7 +138,7 @@ func (s *DatabaseUserService) Delete(ctx context.Context, id string) error {
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteDatabaseUserWorkflow",
-		WorkflowID:   workflowID("database-user", username, id),
+		WorkflowID:   workflowID("database-user", id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("signal DeleteDatabaseUserWorkflow: %w", err)
@@ -166,7 +166,7 @@ func (s *DatabaseUserService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateDatabaseUserWorkflow",
-		WorkflowID:   workflowID("database-user", username, id),
+		WorkflowID:   workflowID("database-user", id),
 		Arg:          id,
 	})
 }

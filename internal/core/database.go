@@ -20,9 +20,9 @@ func NewDatabaseService(db DB, tc temporalclient.Client) *DatabaseService {
 
 func (s *DatabaseService) Create(ctx context.Context, database *model.Database) error {
 	_, err := s.db.Exec(ctx,
-		`INSERT INTO databases (id, tenant_id, subscription_id, name, shard_id, node_id, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		database.ID, database.TenantID, database.SubscriptionID, database.Name, database.ShardID, database.NodeID,
+		`INSERT INTO databases (id, tenant_id, subscription_id, shard_id, node_id, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		database.ID, database.TenantID, database.SubscriptionID, database.ShardID, database.NodeID,
 		database.Status, database.CreatedAt, database.UpdatedAt,
 	)
 	if err != nil {
@@ -43,12 +43,12 @@ func (s *DatabaseService) Create(ctx context.Context, database *model.Database) 
 func (s *DatabaseService) GetByID(ctx context.Context, id string) (*model.Database, error) {
 	var d model.Database
 	err := s.db.QueryRow(ctx,
-		`SELECT d.id, d.tenant_id, d.subscription_id, d.name, d.shard_id, d.node_id, d.status, d.status_message, d.suspend_reason, d.created_at, d.updated_at,
+		`SELECT d.id, d.tenant_id, d.subscription_id, d.shard_id, d.node_id, d.status, d.status_message, d.suspend_reason, d.created_at, d.updated_at,
 		        s.name
 		 FROM databases d
 		 LEFT JOIN shards s ON s.id = d.shard_id
 		 WHERE d.id = $1`, id,
-	).Scan(&d.ID, &d.TenantID, &d.SubscriptionID, &d.Name, &d.ShardID, &d.NodeID,
+	).Scan(&d.ID, &d.TenantID, &d.SubscriptionID, &d.ShardID, &d.NodeID,
 		&d.Status, &d.StatusMessage, &d.SuspendReason, &d.CreatedAt, &d.UpdatedAt,
 		&d.ShardName)
 	if err != nil {
@@ -58,12 +58,12 @@ func (s *DatabaseService) GetByID(ctx context.Context, id string) (*model.Databa
 }
 
 func (s *DatabaseService) ListByTenant(ctx context.Context, tenantID string, params request.ListParams) ([]model.Database, bool, error) {
-	query := `SELECT d.id, d.tenant_id, d.subscription_id, d.name, d.shard_id, d.node_id, d.status, d.status_message, d.suspend_reason, d.created_at, d.updated_at, s.name FROM databases d LEFT JOIN shards s ON s.id = d.shard_id WHERE d.tenant_id = $1`
+	query := `SELECT d.id, d.tenant_id, d.subscription_id, d.shard_id, d.node_id, d.status, d.status_message, d.suspend_reason, d.created_at, d.updated_at, s.name FROM databases d LEFT JOIN shards s ON s.id = d.shard_id WHERE d.tenant_id = $1`
 	args := []any{tenantID}
 	argIdx := 2
 
 	if params.Search != "" {
-		query += fmt.Sprintf(` AND d.name ILIKE $%d`, argIdx)
+		query += fmt.Sprintf(` AND d.id ILIKE $%d`, argIdx)
 		args = append(args, "%"+params.Search+"%")
 		argIdx++
 	}
@@ -81,7 +81,7 @@ func (s *DatabaseService) ListByTenant(ctx context.Context, tenantID string, par
 	sortCol := "d.created_at"
 	switch params.Sort {
 	case "name":
-		sortCol = "d.name"
+		sortCol = "d.id"
 	case "status":
 		sortCol = "d.status"
 	case "created_at":
@@ -104,7 +104,7 @@ func (s *DatabaseService) ListByTenant(ctx context.Context, tenantID string, par
 	var databases []model.Database
 	for rows.Next() {
 		var d model.Database
-		if err := rows.Scan(&d.ID, &d.TenantID, &d.SubscriptionID, &d.Name, &d.ShardID, &d.NodeID,
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.SubscriptionID, &d.ShardID, &d.NodeID,
 			&d.Status, &d.StatusMessage, &d.SuspendReason, &d.CreatedAt, &d.UpdatedAt,
 			&d.ShardName); err != nil {
 			return nil, false, fmt.Errorf("scan database: %w", err)
@@ -123,7 +123,7 @@ func (s *DatabaseService) ListByTenant(ctx context.Context, tenantID string, par
 }
 
 func (s *DatabaseService) ListByShard(ctx context.Context, shardID string, limit int, cursor string) ([]model.Database, bool, error) {
-	query := `SELECT d.id, d.tenant_id, d.subscription_id, d.name, d.shard_id, d.node_id, d.status, d.status_message, d.suspend_reason, d.created_at, d.updated_at, s.name FROM databases d LEFT JOIN shards s ON s.id = d.shard_id WHERE d.shard_id = $1`
+	query := `SELECT d.id, d.tenant_id, d.subscription_id, d.shard_id, d.node_id, d.status, d.status_message, d.suspend_reason, d.created_at, d.updated_at, s.name FROM databases d LEFT JOIN shards s ON s.id = d.shard_id WHERE d.shard_id = $1`
 	args := []any{shardID}
 	argIdx := 2
 
@@ -146,7 +146,7 @@ func (s *DatabaseService) ListByShard(ctx context.Context, shardID string, limit
 	var databases []model.Database
 	for rows.Next() {
 		var d model.Database
-		if err := rows.Scan(&d.ID, &d.TenantID, &d.SubscriptionID, &d.Name, &d.ShardID, &d.NodeID,
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.SubscriptionID, &d.ShardID, &d.NodeID,
 			&d.Status, &d.StatusMessage, &d.SuspendReason, &d.CreatedAt, &d.UpdatedAt,
 			&d.ShardName); err != nil {
 			return nil, false, fmt.Errorf("scan database: %w", err)
@@ -165,11 +165,10 @@ func (s *DatabaseService) ListByShard(ctx context.Context, shardID string, limit
 }
 
 func (s *DatabaseService) Delete(ctx context.Context, id string) error {
-	var name string
-	err := s.db.QueryRow(ctx,
-		"UPDATE databases SET status = $1, updated_at = now() WHERE id = $2 RETURNING name",
+	_, err := s.db.Exec(ctx,
+		"UPDATE databases SET status = $1, updated_at = now() WHERE id = $2",
 		model.StatusDeleting, id,
-	).Scan(&name)
+	)
 	if err != nil {
 		return fmt.Errorf("set database %s status to deleting: %w", id, err)
 	}
@@ -180,7 +179,7 @@ func (s *DatabaseService) Delete(ctx context.Context, id string) error {
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteDatabaseWorkflow",
-		WorkflowID:   workflowID("database", name, id),
+		WorkflowID:   workflowID("database", id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("signal DeleteDatabaseWorkflow: %w", err)
@@ -190,11 +189,10 @@ func (s *DatabaseService) Delete(ctx context.Context, id string) error {
 }
 
 func (s *DatabaseService) Migrate(ctx context.Context, id string, targetShardID string) error {
-	var name string
-	err := s.db.QueryRow(ctx,
-		"UPDATE databases SET status = $1, updated_at = now() WHERE id = $2 RETURNING name",
+	_, err := s.db.Exec(ctx,
+		"UPDATE databases SET status = $1, updated_at = now() WHERE id = $2",
 		model.StatusProvisioning, id,
-	).Scan(&name)
+	)
 	if err != nil {
 		return fmt.Errorf("set database %s status to provisioning: %w", id, err)
 	}
@@ -205,7 +203,7 @@ func (s *DatabaseService) Migrate(ctx context.Context, id string, targetShardID 
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "MigrateDatabaseWorkflow",
-		WorkflowID:   workflowID("migrate-database", name, id),
+		WorkflowID:   workflowID("migrate-database", id),
 		Arg: MigrateDatabaseParams{
 			DatabaseID:    id,
 			TargetShardID: targetShardID,
@@ -224,8 +222,8 @@ type MigrateDatabaseParams struct {
 }
 
 func (s *DatabaseService) Retry(ctx context.Context, id string) error {
-	var status, name string
-	err := s.db.QueryRow(ctx, "SELECT status, name FROM databases WHERE id = $1", id).Scan(&status, &name)
+	var status string
+	err := s.db.QueryRow(ctx, "SELECT status FROM databases WHERE id = $1", id).Scan(&status)
 	if err != nil {
 		return fmt.Errorf("get database status: %w", err)
 	}
@@ -242,7 +240,7 @@ func (s *DatabaseService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateDatabaseWorkflow",
-		WorkflowID:   workflowID("database", name, id),
+		WorkflowID:   workflowID("database", id),
 		Arg:          id,
 	})
 }

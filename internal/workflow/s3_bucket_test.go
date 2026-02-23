@@ -33,11 +33,10 @@ func (s *CreateS3BucketWorkflowTestSuite) TestSuccess() {
 	bucketID := "test-bucket-1"
 	tenantID := "test-tenant-1"
 	shardID := "test-shard-1"
-	tenant := model.Tenant{ID: tenantID, Name: "ttest1234567"}
+	tenant := model.Tenant{ID: tenantID}
 	bucket := model.S3Bucket{
 		ID:         bucketID,
 		TenantID:   tenantID,
-		Name:       "mybucket",
 		ShardID:    &shardID,
 		Public:     false,
 		QuotaBytes: 1073741824,
@@ -53,8 +52,8 @@ func (s *CreateS3BucketWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("CreateS3Bucket", mock.Anything, activity.CreateS3BucketParams{
-		TenantID:   "ttest1234567",
-		Name:       "ttest1234567-mybucket",
+		TenantID:   tenantID,
+		Name:       tenantID + "-" + bucketID,
 		QuotaBytes: 1073741824,
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -69,11 +68,10 @@ func (s *CreateS3BucketWorkflowTestSuite) TestSuccessPublicBucket() {
 	bucketID := "test-bucket-pub"
 	tenantID := "test-tenant-1"
 	shardID := "test-shard-1"
-	tenant := model.Tenant{ID: tenantID, Name: "ttest1234567"}
+	tenant := model.Tenant{ID: tenantID}
 	bucket := model.S3Bucket{
 		ID:         bucketID,
 		TenantID:   tenantID,
-		Name:       "publicbucket",
 		ShardID:    &shardID,
 		Public:     true,
 		QuotaBytes: 1073741824,
@@ -82,7 +80,7 @@ func (s *CreateS3BucketWorkflowTestSuite) TestSuccessPublicBucket() {
 		{ID: "node-1"},
 	}
 
-	internalName := "ttest1234567-publicbucket"
+	internalName := tenantID + "-" + bucketID
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "s3_buckets", ID: bucketID, Status: model.StatusProvisioning,
@@ -91,12 +89,12 @@ func (s *CreateS3BucketWorkflowTestSuite) TestSuccessPublicBucket() {
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("CreateS3Bucket", mock.Anything, activity.CreateS3BucketParams{
-		TenantID:   "ttest1234567",
+		TenantID:   tenantID,
 		Name:       internalName,
 		QuotaBytes: 1073741824,
 	}).Return(nil)
 	s.env.OnActivity("UpdateS3BucketPolicy", mock.Anything, activity.UpdateS3BucketPolicyParams{
-		TenantID: "ttest1234567",
+		TenantID: tenantID,
 		Name:     internalName,
 		Public:   true,
 	}).Return(nil)
@@ -125,11 +123,10 @@ func (s *CreateS3BucketWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	bucketID := "test-bucket-3"
 	tenantID := "test-tenant-3"
 	shardID := "test-shard-3"
-	tenant := model.Tenant{ID: tenantID, Name: "ttest1234567"}
+	tenant := model.Tenant{ID: tenantID}
 	bucket := model.S3Bucket{
 		ID:         bucketID,
 		TenantID:   tenantID,
-		Name:       "mybucket",
 		ShardID:    &shardID,
 		Public:     false,
 		QuotaBytes: 1073741824,
@@ -183,11 +180,10 @@ func (s *DeleteS3BucketWorkflowTestSuite) TestSuccess() {
 	bucketID := "test-bucket-1"
 	tenantID := "test-tenant-1"
 	shardID := "test-shard-1"
-	tenant := model.Tenant{ID: tenantID, Name: "ttest1234567"}
+	tenant := model.Tenant{ID: tenantID}
 	bucket := model.S3Bucket{
 		ID:         bucketID,
 		TenantID:   tenantID,
-		Name:       "mybucket",
 		ShardID:    &shardID,
 		Public:     false,
 		QuotaBytes: 1073741824,
@@ -196,7 +192,7 @@ func (s *DeleteS3BucketWorkflowTestSuite) TestSuccess() {
 		{ID: "node-1"},
 	}
 
-	internalName := "ttest1234567-mybucket"
+	internalName := tenantID + "-" + bucketID
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "s3_buckets", ID: bucketID, Status: model.StatusDeleting,
@@ -205,7 +201,7 @@ func (s *DeleteS3BucketWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("GetTenantByID", mock.Anything, tenantID).Return(&tenant, nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("DeleteS3Bucket", mock.Anything, activity.DeleteS3BucketParams{
-		TenantID: "ttest1234567",
+		TenantID: tenantID,
 		Name:     internalName,
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -233,11 +229,10 @@ func (s *DeleteS3BucketWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	bucketID := "test-bucket-3"
 	tenantID := "test-tenant-3"
 	shardID := "test-shard-3"
-	tenant := model.Tenant{ID: tenantID, Name: "ttest1234567"}
+	tenant := model.Tenant{ID: tenantID}
 	bucket := model.S3Bucket{
 		ID:         bucketID,
 		TenantID:   tenantID,
-		Name:       "mybucket",
 		ShardID:    &shardID,
 		Public:     false,
 		QuotaBytes: 1073741824,

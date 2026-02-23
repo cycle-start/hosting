@@ -88,11 +88,11 @@ func MigrateDatabaseWorkflow(ctx workflow.Context, params MigrateDatabaseParams)
 	sourceNode := sourceNodes[0]
 	targetNode := targetNodes[0]
 
-	dumpPath := fmt.Sprintf("/var/backups/hosting/migrate/%s.sql.gz", database.Name)
+	dumpPath := fmt.Sprintf("/var/backups/hosting/migrate/%s.sql.gz", database.ID)
 
 	// Create the database on the target node.
 	targetCtx := nodeActivityCtx(ctx, targetNode.ID)
-	err = workflow.ExecuteActivity(targetCtx, "CreateDatabase", database.Name).Get(ctx, nil)
+	err = workflow.ExecuteActivity(targetCtx, "CreateDatabase", database.ID).Get(ctx, nil)
 	if err != nil {
 		_ = setResourceFailed(ctx, "databases", databaseID, err)
 		return fmt.Errorf("create database on target node %s: %w", targetNode.ID, err)
@@ -101,7 +101,7 @@ func MigrateDatabaseWorkflow(ctx workflow.Context, params MigrateDatabaseParams)
 	// Dump the database on the source node.
 	sourceCtx := nodeActivityCtx(ctx, sourceNode.ID)
 	err = workflow.ExecuteActivity(sourceCtx, "DumpMySQLDatabase", activity.DumpMySQLDatabaseParams{
-		DatabaseName: database.Name,
+		DatabaseName: database.ID,
 		DumpPath:     dumpPath,
 	}).Get(ctx, nil)
 	if err != nil {
@@ -111,7 +111,7 @@ func MigrateDatabaseWorkflow(ctx workflow.Context, params MigrateDatabaseParams)
 
 	// Import the dump on the target node.
 	err = workflow.ExecuteActivity(targetCtx, "ImportMySQLDatabase", activity.ImportMySQLDatabaseParams{
-		DatabaseName: database.Name,
+		DatabaseName: database.ID,
 		DumpPath:     dumpPath,
 	}).Get(ctx, nil)
 	if err != nil {
@@ -129,7 +129,7 @@ func MigrateDatabaseWorkflow(ctx workflow.Context, params MigrateDatabaseParams)
 
 	for _, user := range users {
 		err = workflow.ExecuteActivity(targetCtx, "CreateDatabaseUser", activity.CreateDatabaseUserParams{
-			DatabaseName: database.Name,
+			DatabaseName: database.ID,
 			Username:     user.Username,
 			Password:     user.Password,
 			Privileges:   user.Privileges,
@@ -148,7 +148,7 @@ func MigrateDatabaseWorkflow(ctx workflow.Context, params MigrateDatabaseParams)
 	}
 
 	// Cleanup: drop database on source node (best effort).
-	_ = workflow.ExecuteActivity(sourceCtx, "DeleteDatabase", database.Name).Get(ctx, nil)
+	_ = workflow.ExecuteActivity(sourceCtx, "DeleteDatabase", database.ID).Get(ctx, nil)
 
 	// Cleanup: remove dump file on source node (best effort).
 	_ = workflow.ExecuteActivity(sourceCtx, "CleanupMigrateFile", dumpPath).Get(ctx, nil)

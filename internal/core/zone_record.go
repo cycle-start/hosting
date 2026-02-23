@@ -135,7 +135,7 @@ func (s *ZoneRecordService) Update(ctx context.Context, record *model.ZoneRecord
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateZoneRecordWorkflow",
-		WorkflowID:   workflowID("zone-record", record.Name+"/"+record.Type, record.ID),
+		WorkflowID:   workflowID("zone-record", record.ID),
 		Arg: model.ZoneRecordParams{
 			RecordID:  record.ID,
 			Name:      record.Name,
@@ -177,7 +177,7 @@ func (s *ZoneRecordService) Delete(ctx context.Context, id string) error {
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteZoneRecordWorkflow",
-		WorkflowID:   workflowID("zone-record", name+"/"+rtype, id),
+		WorkflowID:   workflowID("zone-record", id),
 		Arg: model.ZoneRecordParams{
 			RecordID:  id,
 			Name:      name,
@@ -225,7 +225,7 @@ func (s *ZoneRecordService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateZoneRecordWorkflow",
-		WorkflowID:   workflowID("zone-record", r.Name+"/"+r.Type, id),
+		WorkflowID:   workflowID("zone-record", id),
 		Arg: model.ZoneRecordParams{
 			RecordID:  id,
 			Name:      r.Name,

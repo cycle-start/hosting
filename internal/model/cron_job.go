@@ -6,7 +6,6 @@ type CronJob struct {
 	ID                  string    `json:"id"`
 	TenantID            string    `json:"tenant_id"`
 	WebrootID           string    `json:"webroot_id"`
-	Name                string    `json:"name"`
 	Schedule            string    `json:"schedule"`
 	Command             string    `json:"command"`
 	WorkingDirectory    string    `json:"working_directory"`

@@ -101,14 +101,14 @@ func (h *Backup) Create(w http.ResponseWriter, r *http.Request) {
 			response.WriteError(w, http.StatusNotFound, "webroot not found: "+err.Error())
 			return
 		}
-		sourceName = webroot.Name
+		sourceName = webroot.ID
 	case model.BackupTypeDatabase:
 		database, err := h.db.GetByID(r.Context(), req.SourceID)
 		if err != nil {
 			response.WriteError(w, http.StatusNotFound, "database not found: "+err.Error())
 			return
 		}
-		sourceName = database.Name
+		sourceName = database.ID
 	}
 
 	now := time.Now()

@@ -92,8 +92,8 @@ func (h *DatabaseUser) Create(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	if !strings.HasPrefix(req.Username, db.Name) {
-		response.WriteError(w, http.StatusBadRequest, fmt.Sprintf("username %q must start with database name %q", req.Username, db.Name))
+	if !strings.HasPrefix(req.Username, db.ID) {
+		response.WriteError(w, http.StatusBadRequest, fmt.Sprintf("username %q must start with database name %q", req.Username, db.ID))
 		return
 	}
 

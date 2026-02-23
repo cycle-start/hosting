@@ -110,7 +110,7 @@ func (s *EmailForwardService) Delete(ctx context.Context, id string) error {
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteEmailForwardWorkflow",
-		WorkflowID:   workflowID("email-forward", destination, id),
+		WorkflowID:   workflowID("email-forward", id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("signal DeleteEmailForwardWorkflow: %w", err)
@@ -138,7 +138,7 @@ func (s *EmailForwardService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateEmailForwardWorkflow",
-		WorkflowID:   workflowID("email-forward", destination, id),
+		WorkflowID:   workflowID("email-forward", id),
 		Arg:          id,
 	})
 }

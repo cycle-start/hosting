@@ -4,7 +4,6 @@ import "time"
 
 type Tenant struct {
 	ID          string  `json:"id" db:"id"`
-	Name        string  `json:"name" db:"name"`
 	BrandID     string  `json:"brand_id" db:"brand_id"`
 	CustomerID  string  `json:"customer_id" db:"customer_id"`
 	RegionID    string  `json:"region_id" db:"region_id"`

@@ -36,7 +36,6 @@ func TestWebrootService_Create_Success(t *testing.T) {
 	webroot := &model.Webroot{
 		ID:             "test-webroot-1",
 		TenantID:       "test-tenant-1",
-		Name:           "my-site",
 		Runtime:        "php",
 		RuntimeVersion: "8.2",
 		RuntimeConfig:  json.RawMessage(`{}`),
@@ -48,11 +47,6 @@ func TestWebrootService_Create_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -71,7 +65,7 @@ func TestWebrootService_Create_InsertError(t *testing.T) {
 	svc := NewWebrootService(db, tc)
 	ctx := context.Background()
 
-	webroot := &model.Webroot{ID: "test-webroot-1", Name: "my-site"}
+	webroot := &model.Webroot{ID: "test-webroot-1"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("unique violation"))
 
@@ -87,7 +81,7 @@ func TestWebrootService_Create_WorkflowError(t *testing.T) {
 	svc := NewWebrootService(db, tc)
 	ctx := context.Background()
 
-	webroot := &model.Webroot{ID: "test-webroot-1", Name: "my-site"}
+	webroot := &model.Webroot{ID: "test-webroot-1"}
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 	tc.On("ExecuteWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
@@ -116,18 +110,17 @@ func TestWebrootService_GetByID_Success(t *testing.T) {
 		*(dest[0].(*string)) = webrootID
 		*(dest[1].(*string)) = tenantID
 		*(dest[2].(*string)) = "" // subscription_id
-		*(dest[3].(*string)) = "my-site"
-		*(dest[4].(*string)) = "php"
-		*(dest[5].(*string)) = "8.2"
-		*(dest[6].(*json.RawMessage)) = cfg
-		*(dest[7].(*string)) = "/public"
-		*(dest[8].(*string)) = ".env.hosting"
-		*(dest[9].(*bool)) = true  // service_hostname_enabled
-		*(dest[10].(*string)) = model.StatusActive
-		*(dest[11].(**string)) = nil // status_message
-		*(dest[12].(*string)) = ""  // suspend_reason
+		*(dest[3].(*string)) = "php"
+		*(dest[4].(*string)) = "8.2"
+		*(dest[5].(*json.RawMessage)) = cfg
+		*(dest[6].(*string)) = "/public"
+		*(dest[7].(*string)) = ".env.hosting"
+		*(dest[8].(*bool)) = true  // service_hostname_enabled
+		*(dest[9].(*string)) = model.StatusActive
+		*(dest[10].(**string)) = nil // status_message
+		*(dest[11].(*string)) = ""  // suspend_reason
+		*(dest[12].(*time.Time)) = now
 		*(dest[13].(*time.Time)) = now
-		*(dest[14].(*time.Time)) = now
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -136,7 +129,6 @@ func TestWebrootService_GetByID_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, webrootID, result.ID)
-	assert.Equal(t, "my-site", result.Name)
 	assert.Equal(t, "php", result.Runtime)
 	assert.Equal(t, "8.2", result.RuntimeVersion)
 	assert.Equal(t, "/public", result.PublicFolder)
@@ -179,18 +171,17 @@ func TestWebrootService_ListByTenant_Success(t *testing.T) {
 			*(dest[0].(*string)) = id1
 			*(dest[1].(*string)) = tenantID
 			*(dest[2].(*string)) = "" // subscription_id
-			*(dest[3].(*string)) = "site-a"
-			*(dest[4].(*string)) = "php"
-			*(dest[5].(*string)) = "8.2"
-			*(dest[6].(*json.RawMessage)) = cfg
-			*(dest[7].(*string)) = "/public"
-			*(dest[8].(*string)) = ".env.hosting"
-			*(dest[9].(*bool)) = true  // service_hostname_enabled
-			*(dest[10].(*string)) = model.StatusActive
-			*(dest[11].(**string)) = nil // status_message
-			*(dest[12].(*string)) = ""  // suspend_reason
+			*(dest[3].(*string)) = "php"
+			*(dest[4].(*string)) = "8.2"
+			*(dest[5].(*json.RawMessage)) = cfg
+			*(dest[6].(*string)) = "/public"
+			*(dest[7].(*string)) = ".env.hosting"
+			*(dest[8].(*bool)) = true  // service_hostname_enabled
+			*(dest[9].(*string)) = model.StatusActive
+			*(dest[10].(**string)) = nil // status_message
+			*(dest[11].(*string)) = ""  // suspend_reason
+			*(dest[12].(*time.Time)) = now
 			*(dest[13].(*time.Time)) = now
-			*(dest[14].(*time.Time)) = now
 			return nil
 		},
 	)
@@ -200,7 +191,7 @@ func TestWebrootService_ListByTenant_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, hasMore)
 	require.Len(t, result, 1)
-	assert.Equal(t, "site-a", result[0].Name)
+	assert.Equal(t, id1, result[0].ID)
 	db.AssertExpectations(t)
 }
 
@@ -229,7 +220,6 @@ func TestWebrootService_Update_Success(t *testing.T) {
 
 	webroot := &model.Webroot{
 		ID:     "test-webroot-1",
-		Name:   "updated-site",
 		Status: model.StatusActive,
 	}
 
@@ -289,17 +279,11 @@ func TestWebrootService_Delete_Success(t *testing.T) {
 	webrootID := "test-webroot-1"
 
 	updateRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "my-site"
-		*(dest[1].(*string)) = "test-tenant-1"
+		*(dest[0].(*string)) = "test-tenant-1"
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -336,17 +320,11 @@ func TestWebrootService_Delete_WorkflowError(t *testing.T) {
 	ctx := context.Background()
 
 	updateRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "my-site"
-		*(dest[1].(*string)) = "test-tenant-1"
+		*(dest[0].(*string)) = "test-tenant-1"
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 

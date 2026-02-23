@@ -84,7 +84,7 @@ func AddSSHKeyWorkflow(ctx workflow.Context, keyID string) error {
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "SyncSSHKeys", activity.SyncSSHKeysParams{
-			TenantName: tenant.Name,
+			TenantName: tenant.ID,
 			PublicKeys: publicKeys,
 		}).Get(ctx, nil)
 		if err != nil {
@@ -168,7 +168,7 @@ func RemoveSSHKeyWorkflow(ctx workflow.Context, keyID string) error {
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "SyncSSHKeys", activity.SyncSSHKeysParams{
-			TenantName: tenant.Name,
+			TenantName: tenant.ID,
 			PublicKeys: publicKeys,
 		}).Get(ctx, nil)
 		if err != nil {

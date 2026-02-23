@@ -125,13 +125,9 @@ func (s *WebrootEnvVarService) BulkSet(ctx context.Context, webrootID string, va
 	}
 
 	// Trigger re-convergence via UpdateWebrootWorkflow.
-	webroot, err := s.getWebrootByID(ctx, webrootID)
-	if err != nil {
-		return fmt.Errorf("get webroot for workflow: %w", err)
-	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateWebrootWorkflow",
-		WorkflowID:   workflowID("webroot-env", webroot.Name, webrootID),
+		WorkflowID:   workflowID("webroot-env", webrootID),
 		Arg:          webrootID,
 	}); err != nil {
 		return fmt.Errorf("signal UpdateWebrootWorkflow: %w", err)
@@ -156,13 +152,9 @@ func (s *WebrootEnvVarService) DeleteByName(ctx context.Context, webrootID, name
 	if err != nil {
 		return fmt.Errorf("resolve tenant for env var: %w", err)
 	}
-	webroot, err := s.getWebrootByID(ctx, webrootID)
-	if err != nil {
-		return fmt.Errorf("get webroot for workflow: %w", err)
-	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateWebrootWorkflow",
-		WorkflowID:   workflowID("webroot-env", webroot.Name, webrootID),
+		WorkflowID:   workflowID("webroot-env", webrootID),
 		Arg:          webrootID,
 	}); err != nil {
 		return fmt.Errorf("signal UpdateWebrootWorkflow: %w", err)
@@ -171,14 +163,6 @@ func (s *WebrootEnvVarService) DeleteByName(ctx context.Context, webrootID, name
 	return nil
 }
 
-func (s *WebrootEnvVarService) getWebrootByID(ctx context.Context, id string) (*model.Webroot, error) {
-	var w model.Webroot
-	err := s.db.QueryRow(ctx, `SELECT id, name FROM webroots WHERE id = $1`, id).Scan(&w.ID, &w.Name)
-	if err != nil {
-		return nil, fmt.Errorf("get webroot %s: %w", id, err)
-	}
-	return &w, nil
-}
 
 // VaultEncrypt encrypts a plaintext value using the tenant's DEK and returns a vault token.
 func (s *WebrootEnvVarService) VaultEncrypt(ctx context.Context, webrootID, plaintext string) (string, error) {

@@ -52,7 +52,7 @@ func CreateValkeyUserWorkflow(ctx workflow.Context, userID string) error {
 	for _, node := range vctx.Nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "CreateValkeyUser", activity.CreateValkeyUserParams{
-			InstanceName: vctx.Instance.Name,
+			InstanceName: vctx.Instance.ID,
 			Port:         vctx.Instance.Port,
 			Username:     vctx.User.Username,
 			Password:     vctx.User.Password,
@@ -114,7 +114,7 @@ func UpdateValkeyUserWorkflow(ctx workflow.Context, userID string) error {
 	for _, node := range vctx.Nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "UpdateValkeyUser", activity.UpdateValkeyUserParams{
-			InstanceName: vctx.Instance.Name,
+			InstanceName: vctx.Instance.ID,
 			Port:         vctx.Instance.Port,
 			Username:     vctx.User.Username,
 			Password:     vctx.User.Password,
@@ -176,7 +176,7 @@ func DeleteValkeyUserWorkflow(ctx workflow.Context, userID string) error {
 	for _, node := range vctx.Nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "DeleteValkeyUser", activity.DeleteValkeyUserParams{
-			InstanceName: vctx.Instance.Name,
+			InstanceName: vctx.Instance.ID,
 			Port:         vctx.Instance.Port,
 			Username:     vctx.User.Username,
 		}).Get(ctx, nil)

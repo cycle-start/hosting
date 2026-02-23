@@ -44,7 +44,6 @@ func (s *CreateBackupWorkflowTestSuite) TestSuccess_WebBackup() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
@@ -52,8 +51,7 @@ func (s *CreateBackupWorkflowTestSuite) TestSuccess_WebBackup() {
 		{ID: "node-1"},
 	}
 	webroot := model.Webroot{
-		ID:   "test-webroot-1",
-		Name: "mysite",
+		ID: "test-webroot-1",
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -93,7 +91,6 @@ func (s *CreateBackupWorkflowTestSuite) TestSuccess_DatabaseBackup() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
@@ -148,7 +145,6 @@ func (s *CreateBackupWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		ShardID: nil, // no shard
 	}
@@ -193,7 +189,6 @@ func (s *CreateBackupWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
@@ -201,8 +196,7 @@ func (s *CreateBackupWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 		{ID: "node-1"},
 	}
 	webroot := model.Webroot{
-		ID:   "test-webroot-1",
-		Name: "mysite",
+		ID: "test-webroot-1",
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -259,7 +253,6 @@ func (s *RestoreBackupWorkflowTestSuite) TestSuccess_WebRestore() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
@@ -267,8 +260,7 @@ func (s *RestoreBackupWorkflowTestSuite) TestSuccess_WebRestore() {
 		{ID: "node-1"},
 	}
 	webroot := model.Webroot{
-		ID:   "test-webroot-1",
-		Name: "mysite",
+		ID: "test-webroot-1",
 	}
 
 	s.env.OnActivity("GetBackupContext", mock.Anything, backupID).Return(&activity.BackupContext{
@@ -310,7 +302,6 @@ func (s *RestoreBackupWorkflowTestSuite) TestSuccess_DatabaseRestore() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
@@ -365,7 +356,6 @@ func (s *RestoreBackupWorkflowTestSuite) TestRestoreFails_SetsStatusFailed() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
@@ -425,7 +415,6 @@ func (s *DeleteBackupWorkflowTestSuite) TestSuccess() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		ShardID: &shardID,
 	}
@@ -476,7 +465,6 @@ func (s *DeleteBackupWorkflowTestSuite) TestDeleteFileFails_SetsStatusFailed() {
 	}
 	tenant := model.Tenant{
 		ID:      tenantID,
-		Name:    "t_test123456",
 		BrandID: "test-brand",
 		ShardID: &shardID,
 	}

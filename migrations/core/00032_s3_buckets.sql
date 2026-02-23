@@ -3,7 +3,6 @@ CREATE TABLE s3_buckets (
     id          TEXT PRIMARY KEY,
     tenant_id       TEXT NOT NULL REFERENCES tenants(id),
     subscription_id TEXT NOT NULL REFERENCES subscriptions(id),
-    name        TEXT NOT NULL,
     shard_id    TEXT REFERENCES shards(id),
     public      BOOLEAN NOT NULL DEFAULT false,
     quota_bytes BIGINT NOT NULL DEFAULT 0,
@@ -11,8 +10,7 @@ CREATE TABLE s3_buckets (
     status_message TEXT,
     suspend_reason TEXT NOT NULL DEFAULT '',
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE(name)
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- +goose Down

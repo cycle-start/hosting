@@ -113,7 +113,7 @@ func (s *DatabaseAccessRuleService) Delete(ctx context.Context, id string) error
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "SyncDatabaseAccessWorkflow",
-		WorkflowID:   workflowID("db-access-rule-del", id, id),
+		WorkflowID:   workflowID("db-access-rule-del", id),
 		Arg:          databaseID,
 	}); err != nil {
 		return fmt.Errorf("signal SyncDatabaseAccessWorkflow: %w", err)
@@ -141,7 +141,7 @@ func (s *DatabaseAccessRuleService) Retry(ctx context.Context, id string) error 
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "SyncDatabaseAccessWorkflow",
-		WorkflowID:   workflowID("db-access-rule-retry", id, id),
+		WorkflowID:   workflowID("db-access-rule-retry", id),
 		Arg:          databaseID,
 	})
 }

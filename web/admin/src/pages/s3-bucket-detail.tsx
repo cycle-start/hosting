@@ -105,14 +105,14 @@ export function S3BucketDetailPage() {
     <div className="space-y-6">
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
-        { label: tenant?.name ?? tenantId, href: `/tenants/${tenantId}` },
+        { label: tenant?.id ?? tenantId, href: `/tenants/${tenantId}` },
         { label: 'S3 Buckets', href: `/tenants/${tenantId}`, hash: 's3' },
-        { label: bucket.name },
+        { label: bucket.id },
       ]} />
 
       <ResourceHeader
         icon={HardDrive}
-        title={bucket.name}
+        title={bucket.id}
         subtitle={`Shard: ${bucket.shard_name || bucket.shard_id || '-'} | Quota: ${formatQuota(bucket.quota_bytes)}`}
         status={bucket.status}
       />

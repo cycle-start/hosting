@@ -3,7 +3,6 @@ CREATE TABLE webroots (
     id                       TEXT PRIMARY KEY,
     tenant_id                TEXT NOT NULL REFERENCES tenants(id),
     subscription_id          TEXT NOT NULL REFERENCES subscriptions(id),
-    name                     TEXT NOT NULL,
     runtime                  TEXT NOT NULL,
     runtime_version          TEXT NOT NULL,
     runtime_config           JSONB NOT NULL DEFAULT '{}',
@@ -14,8 +13,7 @@ CREATE TABLE webroots (
     status_message           TEXT,
     suspend_reason           TEXT NOT NULL DEFAULT '',
     created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE(tenant_id, name)
+    updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE resource_usage (

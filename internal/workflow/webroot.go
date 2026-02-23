@@ -75,8 +75,8 @@ func CreateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 		nodeCtx := nodeActivityCtx(gCtx, node.ID)
 		return workflow.ExecuteActivity(nodeCtx, "CreateWebroot", activity.CreateWebrootParams{
 			ID:             wctx.Webroot.ID,
-			TenantName:     wctx.Tenant.Name,
-			Name:           wctx.Webroot.Name,
+			TenantName:     wctx.Tenant.ID,
+			Name:           wctx.Webroot.ID,
 			Runtime:        wctx.Webroot.Runtime,
 			RuntimeVersion: wctx.Webroot.RuntimeVersion,
 			RuntimeConfig:  string(wctx.Webroot.RuntimeConfig),
@@ -204,8 +204,8 @@ func UpdateWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 		nodeCtx := nodeActivityCtx(gCtx, node.ID)
 		return workflow.ExecuteActivity(nodeCtx, "UpdateWebroot", activity.UpdateWebrootParams{
 			ID:             wctx.Webroot.ID,
-			TenantName:     wctx.Tenant.Name,
-			Name:           wctx.Webroot.Name,
+			TenantName:     wctx.Tenant.ID,
+			Name:           wctx.Webroot.ID,
 			Runtime:        wctx.Webroot.Runtime,
 			RuntimeVersion: wctx.Webroot.RuntimeVersion,
 			RuntimeConfig:  string(wctx.Webroot.RuntimeConfig),
@@ -280,7 +280,7 @@ func DeleteWebrootWorkflow(ctx workflow.Context, webrootID string) error {
 	// Delete webroot on each node in the shard (parallel, continue-on-error).
 	errs := fanOutNodes(ctx, wctx.Nodes, func(gCtx workflow.Context, node model.Node) error {
 		nodeCtx := nodeActivityCtx(gCtx, node.ID)
-		if err := workflow.ExecuteActivity(nodeCtx, "DeleteWebroot", wctx.Tenant.Name, wctx.Webroot.Name).Get(gCtx, nil); err != nil {
+		if err := workflow.ExecuteActivity(nodeCtx, "DeleteWebroot", wctx.Tenant.ID, wctx.Webroot.ID).Get(gCtx, nil); err != nil {
 			return fmt.Errorf("node %s: %v", node.ID, err)
 		}
 		return nil
@@ -305,7 +305,7 @@ func webrootServiceHostname(wctx activity.WebrootContext) string {
 	if !wctx.Webroot.ServiceHostnameEnabled || wctx.BrandBaseHostname == "" {
 		return ""
 	}
-	return fmt.Sprintf("%s.%s.%s", wctx.Webroot.Name, wctx.Tenant.Name, wctx.BrandBaseHostname)
+	return fmt.Sprintf("%s.%s.%s", wctx.Webroot.ID, wctx.Tenant.ID, wctx.BrandBaseHostname)
 }
 
 // setupServiceHostname creates DNS A records and LB map entries for a service hostname.

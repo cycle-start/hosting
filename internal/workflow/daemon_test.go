@@ -40,7 +40,6 @@ func (s *CreateDaemonWorkflowTestSuite) TestSuccess_NoProxy() {
 			TenantID:     "tenant-1",
 			NodeID:       &nodeID,
 			WebrootID:    "wr-1",
-			Name:         "daemon_abc123",
 			Command:      "php artisan queue:work",
 			NumProcs:     2,
 			StopSignal:   "TERM",
@@ -50,7 +49,6 @@ func (s *CreateDaemonWorkflowTestSuite) TestSuccess_NoProxy() {
 		Webroot: model.Webroot{
 			ID:             "wr-1",
 			TenantID:       "tenant-1",
-			Name:           "main",
 			Runtime:        "php",
 			RuntimeVersion: "8.5",
 			RuntimeConfig:  json.RawMessage(`{}`),
@@ -58,7 +56,6 @@ func (s *CreateDaemonWorkflowTestSuite) TestSuccess_NoProxy() {
 		},
 		Tenant: model.Tenant{
 			ID:      "tenant-1",
-			Name:    "t_test123456",
 			BrandID: "test-brand",
 			ShardID: &shardID,
 		},
@@ -74,9 +71,9 @@ func (s *CreateDaemonWorkflowTestSuite) TestSuccess_NoProxy() {
 	s.env.OnActivity("CreateDaemonConfig", mock.Anything, activity.CreateDaemonParams{
 		ID:           daemonID,
 		NodeID:       &nodeID,
-		TenantName:   "t_test123456",
-		WebrootName:  "main",
-		Name:         "daemon_abc123",
+		TenantName:   "tenant-1",
+		WebrootName:  "wr-1",
+		Name:         daemonID,
 		Command:      "php artisan queue:work",
 		NumProcs:     2,
 		StopSignal:   "TERM",
@@ -107,7 +104,6 @@ func (s *CreateDaemonWorkflowTestSuite) TestSuccess_WithProxy() {
 			TenantID:     "tenant-1",
 			NodeID:       &nodeID,
 			WebrootID:    "wr-1",
-			Name:         "daemon_xyz789",
 			Command:      "php artisan reverb:start --port=$PORT",
 			ProxyPath:    &proxyPath,
 			ProxyPort:    &proxyPort,
@@ -119,7 +115,6 @@ func (s *CreateDaemonWorkflowTestSuite) TestSuccess_WithProxy() {
 		Webroot: model.Webroot{
 			ID:             "wr-1",
 			TenantID:       "tenant-1",
-			Name:           "main",
 			Runtime:        "php",
 			RuntimeVersion: "8.5",
 			RuntimeConfig:  json.RawMessage(`{}`),
@@ -127,7 +122,6 @@ func (s *CreateDaemonWorkflowTestSuite) TestSuccess_WithProxy() {
 		},
 		Tenant: model.Tenant{
 			ID:      "tenant-1",
-			Name:    "t_test123456",
 			BrandID: "test-brand",
 			ShardID: &shardID,
 		},
@@ -142,9 +136,9 @@ func (s *CreateDaemonWorkflowTestSuite) TestSuccess_WithProxy() {
 	s.env.OnActivity("CreateDaemonConfig", mock.Anything, activity.CreateDaemonParams{
 		ID:           daemonID,
 		NodeID:       &nodeID,
-		TenantName:   "t_test123456",
-		WebrootName:  "main",
-		Name:         "daemon_xyz789",
+		TenantName:   "tenant-1",
+		WebrootName:  "wr-1",
+		Name:         daemonID,
 		Command:      "php artisan reverb:start --port=$PORT",
 		ProxyPort:    &proxyPort,
 		NumProcs:     1,
@@ -191,7 +185,7 @@ func (s *CreateDaemonWorkflowTestSuite) TestNoShard() {
 	daemonCtx := activity.DaemonContext{
 		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID},
 		Webroot: model.Webroot{ID: "wr-1"},
-		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand"},
+		Tenant:  model.Tenant{ID: "tenant-1", BrandID: "test-brand"},
 		Nodes:   []model.Node{{ID: "node-1"}},
 	}
 
@@ -212,7 +206,7 @@ func (s *CreateDaemonWorkflowTestSuite) TestNoNode() {
 	daemonCtx := activity.DaemonContext{
 		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1"},
 		Webroot: model.Webroot{ID: "wr-1"},
-		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
+		Tenant:  model.Tenant{ID: "tenant-1", BrandID: "test-brand", ShardID: &shardID},
 		Nodes:   []model.Node{{ID: "node-1"}},
 	}
 
@@ -261,9 +255,9 @@ func (s *DeleteDaemonWorkflowTestSuite) TestSuccess_NoProxy() {
 	shardID := "shard-1"
 	nodeID := "node-1"
 	daemonCtx := activity.DaemonContext{
-		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1", Name: "daemon_abc123"},
-		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
-		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
+		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1"},
+		Webroot: model.Webroot{ID: "wr-1"},
+		Tenant:  model.Tenant{ID: "tenant-1", BrandID: "test-brand", ShardID: &shardID},
 		Nodes:   []model.Node{{ID: "node-1"}},
 	}
 
@@ -272,7 +266,7 @@ func (s *DeleteDaemonWorkflowTestSuite) TestSuccess_NoProxy() {
 	}).Return(nil)
 	s.env.OnActivity("GetDaemonContext", mock.Anything, daemonID).Return(&daemonCtx, nil)
 	s.env.OnActivity("DeleteDaemonConfig", mock.Anything, activity.DeleteDaemonParams{
-		ID: daemonID, TenantName: "t_test123456", WebrootName: "main", Name: "daemon_abc123",
+		ID: daemonID, TenantName: "tenant-1", WebrootName: "wr-1", Name: daemonID,
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "daemons", ID: daemonID, Status: model.StatusDeleted,
@@ -291,11 +285,11 @@ func (s *DeleteDaemonWorkflowTestSuite) TestSuccess_WithProxy() {
 	proxyPort := 15000
 	daemonCtx := activity.DaemonContext{
 		Daemon: model.Daemon{
-			ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1", Name: "daemon_ws123",
+			ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1",
 			ProxyPath: &proxyPath, ProxyPort: &proxyPort,
 		},
-		Webroot: model.Webroot{ID: "wr-1", Name: "main", Runtime: "php", RuntimeVersion: "8.5", RuntimeConfig: json.RawMessage(`{}`), PublicFolder: "public"},
-		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
+		Webroot: model.Webroot{ID: "wr-1", Runtime: "php", RuntimeVersion: "8.5", RuntimeConfig: json.RawMessage(`{}`), PublicFolder: "public"},
+		Tenant:  model.Tenant{ID: "tenant-1", BrandID: "test-brand", ShardID: &shardID},
 		Nodes:   []model.Node{{ID: "node-1"}},
 	}
 
@@ -304,7 +298,7 @@ func (s *DeleteDaemonWorkflowTestSuite) TestSuccess_WithProxy() {
 	}).Return(nil)
 	s.env.OnActivity("GetDaemonContext", mock.Anything, daemonID).Return(&daemonCtx, nil)
 	s.env.OnActivity("DeleteDaemonConfig", mock.Anything, activity.DeleteDaemonParams{
-		ID: daemonID, TenantName: "t_test123456", WebrootName: "main", Name: "daemon_ws123",
+		ID: daemonID, TenantName: "tenant-1", WebrootName: "wr-1", Name: daemonID,
 	}).Return(nil)
 
 	// With proxy_path: regenerate nginx on all nodes to remove proxy location.
@@ -340,9 +334,9 @@ func (s *DeleteDaemonWorkflowTestSuite) TestNoNode() {
 	daemonID := "daemon-4"
 	shardID := "shard-1"
 	daemonCtx := activity.DaemonContext{
-		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", WebrootID: "wr-1", Name: "daemon_abc123"},
-		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
-		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
+		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", WebrootID: "wr-1"},
+		Webroot: model.Webroot{ID: "wr-1"},
+		Tenant:  model.Tenant{ID: "tenant-1", BrandID: "test-brand", ShardID: &shardID},
 		Nodes:   []model.Node{{ID: "node-1"}},
 	}
 
@@ -379,9 +373,9 @@ func (s *EnableDaemonWorkflowTestSuite) TestSuccess() {
 	shardID := "shard-1"
 	nodeID := "node-1"
 	daemonCtx := activity.DaemonContext{
-		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1", Name: "daemon_abc"},
-		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
-		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
+		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1"},
+		Webroot: model.Webroot{ID: "wr-1"},
+		Tenant:  model.Tenant{ID: "tenant-1", BrandID: "test-brand", ShardID: &shardID},
 		Nodes:   []model.Node{{ID: "node-1"}, {ID: "node-2"}},
 	}
 
@@ -390,7 +384,7 @@ func (s *EnableDaemonWorkflowTestSuite) TestSuccess() {
 	}).Return(nil)
 	s.env.OnActivity("GetDaemonContext", mock.Anything, daemonID).Return(&daemonCtx, nil)
 	s.env.OnActivity("EnableDaemon", mock.Anything, activity.DaemonEnableParams{
-		ID: daemonID, TenantName: "t_test123456", WebrootName: "main", Name: "daemon_abc",
+		ID: daemonID, TenantName: "tenant-1", WebrootName: "wr-1", Name: daemonID,
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "daemons", ID: daemonID, Status: model.StatusActive,
@@ -406,9 +400,9 @@ func (s *EnableDaemonWorkflowTestSuite) TestNodeFails() {
 	shardID := "shard-1"
 	nodeID := "node-1"
 	daemonCtx := activity.DaemonContext{
-		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1", Name: "daemon_abc"},
-		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
-		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
+		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1"},
+		Webroot: model.Webroot{ID: "wr-1"},
+		Tenant:  model.Tenant{ID: "tenant-1", BrandID: "test-brand", ShardID: &shardID},
 		Nodes:   []model.Node{{ID: "node-1"}},
 	}
 
@@ -428,9 +422,9 @@ func (s *EnableDaemonWorkflowTestSuite) TestNoNode() {
 	daemonID := "daemon-3"
 	shardID := "shard-1"
 	daemonCtx := activity.DaemonContext{
-		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", WebrootID: "wr-1", Name: "daemon_abc"},
-		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
-		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
+		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", WebrootID: "wr-1"},
+		Webroot: model.Webroot{ID: "wr-1"},
+		Tenant:  model.Tenant{ID: "tenant-1", BrandID: "test-brand", ShardID: &shardID},
 		Nodes:   []model.Node{{ID: "node-1"}},
 	}
 
@@ -467,9 +461,9 @@ func (s *DisableDaemonWorkflowTestSuite) TestSuccess() {
 	shardID := "shard-1"
 	nodeID := "node-1"
 	daemonCtx := activity.DaemonContext{
-		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1", Name: "daemon_abc"},
-		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
-		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
+		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1"},
+		Webroot: model.Webroot{ID: "wr-1"},
+		Tenant:  model.Tenant{ID: "tenant-1", BrandID: "test-brand", ShardID: &shardID},
 		Nodes:   []model.Node{{ID: "node-1"}},
 	}
 
@@ -478,7 +472,7 @@ func (s *DisableDaemonWorkflowTestSuite) TestSuccess() {
 	}).Return(nil)
 	s.env.OnActivity("GetDaemonContext", mock.Anything, daemonID).Return(&daemonCtx, nil)
 	s.env.OnActivity("DisableDaemon", mock.Anything, activity.DaemonEnableParams{
-		ID: daemonID, TenantName: "t_test123456", WebrootName: "main", Name: "daemon_abc",
+		ID: daemonID, TenantName: "tenant-1", WebrootName: "wr-1", Name: daemonID,
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "daemons", ID: daemonID, Status: model.StatusActive,
@@ -494,9 +488,9 @@ func (s *DisableDaemonWorkflowTestSuite) TestNodeFails() {
 	shardID := "shard-1"
 	nodeID := "node-1"
 	daemonCtx := activity.DaemonContext{
-		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1", Name: "daemon_abc"},
-		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
-		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
+		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1"},
+		Webroot: model.Webroot{ID: "wr-1"},
+		Tenant:  model.Tenant{ID: "tenant-1", BrandID: "test-brand", ShardID: &shardID},
 		Nodes:   []model.Node{{ID: "node-1"}},
 	}
 
@@ -516,9 +510,9 @@ func (s *DisableDaemonWorkflowTestSuite) TestNoNode() {
 	daemonID := "daemon-3"
 	shardID := "shard-1"
 	daemonCtx := activity.DaemonContext{
-		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", WebrootID: "wr-1", Name: "daemon_abc"},
-		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
-		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
+		Daemon:  model.Daemon{ID: daemonID, TenantID: "tenant-1", WebrootID: "wr-1"},
+		Webroot: model.Webroot{ID: "wr-1"},
+		Tenant:  model.Tenant{ID: "tenant-1", BrandID: "test-brand", ShardID: &shardID},
 		Nodes:   []model.Node{{ID: "node-1"}},
 	}
 
@@ -556,12 +550,12 @@ func (s *UpdateDaemonWorkflowTestSuite) TestSuccess() {
 	nodeID := "node-1"
 	daemonCtx := activity.DaemonContext{
 		Daemon: model.Daemon{
-			ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1", Name: "daemon_abc",
+			ID: daemonID, TenantID: "tenant-1", NodeID: &nodeID, WebrootID: "wr-1",
 			Command: "node server.js", NumProcs: 1, StopSignal: "TERM",
 			StopWaitSecs: 30, MaxMemoryMB: 256,
 		},
-		Webroot: model.Webroot{ID: "wr-1", Name: "main", Runtime: "node", RuntimeVersion: "22", RuntimeConfig: json.RawMessage(`{}`), PublicFolder: ""},
-		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
+		Webroot: model.Webroot{ID: "wr-1", Runtime: "node", RuntimeVersion: "22", RuntimeConfig: json.RawMessage(`{}`), PublicFolder: ""},
+		Tenant:  model.Tenant{ID: "tenant-1", BrandID: "test-brand", ShardID: &shardID},
 		Nodes:   []model.Node{{ID: "node-1"}},
 	}
 
@@ -593,12 +587,12 @@ func (s *UpdateDaemonWorkflowTestSuite) TestNoNode() {
 	shardID := "shard-1"
 	daemonCtx := activity.DaemonContext{
 		Daemon: model.Daemon{
-			ID: daemonID, TenantID: "tenant-1", WebrootID: "wr-1", Name: "daemon_abc",
+			ID: daemonID, TenantID: "tenant-1", WebrootID: "wr-1",
 			Command: "node server.js", NumProcs: 1, StopSignal: "TERM",
 			StopWaitSecs: 30, MaxMemoryMB: 256,
 		},
-		Webroot: model.Webroot{ID: "wr-1", Name: "main"},
-		Tenant:  model.Tenant{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &shardID},
+		Webroot: model.Webroot{ID: "wr-1"},
+		Tenant:  model.Tenant{ID: "tenant-1", BrandID: "test-brand", ShardID: &shardID},
 		Nodes:   []model.Node{{ID: "node-1"}},
 	}
 

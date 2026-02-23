@@ -6,7 +6,6 @@ type ValkeyInstance struct {
 	ID             string  `json:"id" db:"id"`
 	TenantID       string  `json:"tenant_id" db:"tenant_id"`
 	SubscriptionID string  `json:"subscription_id" db:"subscription_id"`
-	Name           string  `json:"name" db:"name"`
 	ShardID        *string `json:"shard_id,omitempty" db:"shard_id"`
 	Port           int     `json:"port" db:"port"`
 	MaxMemoryMB    int     `json:"max_memory_mb" db:"max_memory_mb"`

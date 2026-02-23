@@ -97,7 +97,7 @@ func (s *EmailAutoReplyService) Delete(ctx context.Context, accountID string) er
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteEmailAutoReplyWorkflow",
-		WorkflowID:   workflowID("email-autoreply", subject, id),
+		WorkflowID:   workflowID("email-autoreply", id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("signal DeleteEmailAutoReplyWorkflow: %w", err)
@@ -125,7 +125,7 @@ func (s *EmailAutoReplyService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateEmailAutoReplyWorkflow",
-		WorkflowID:   workflowID("email-autoreply", subject, id),
+		WorkflowID:   workflowID("email-autoreply", id),
 		Arg:          id,
 	})
 }

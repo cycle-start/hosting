@@ -4,7 +4,6 @@ CREATE TABLE daemons (
     tenant_id       TEXT NOT NULL REFERENCES tenants(id),
     node_id         TEXT REFERENCES nodes(id),
     webroot_id      TEXT NOT NULL REFERENCES webroots(id),
-    name            TEXT NOT NULL UNIQUE,
     command         TEXT NOT NULL,
     proxy_path      TEXT,
     proxy_port      INT,

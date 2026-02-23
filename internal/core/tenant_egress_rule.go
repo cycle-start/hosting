@@ -105,7 +105,7 @@ func (s *TenantEgressRuleService) Delete(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "SyncEgressRulesWorkflow",
-		WorkflowID:   workflowID("egress-rule-del", id, id),
+		WorkflowID:   workflowID("egress-rule-del", id),
 		Arg:          tenantID,
 	}); err != nil {
 		return fmt.Errorf("signal SyncEgressRulesWorkflow: %w", err)
@@ -129,7 +129,7 @@ func (s *TenantEgressRuleService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "SyncEgressRulesWorkflow",
-		WorkflowID:   workflowID("egress-rule-retry", id, id),
+		WorkflowID:   workflowID("egress-rule-retry", id),
 		Arg:          tenantID,
 	})
 }

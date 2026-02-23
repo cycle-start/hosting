@@ -70,7 +70,7 @@ func (a *CoreDB) GetShardDesiredState(ctx context.Context, shardID string) (*Sha
 
 	// 3. Fetch all active webroots for those tenants.
 	wrRows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, name, runtime, runtime_version, runtime_config, public_folder, env_file_name, service_hostname_enabled, status, status_message, suspend_reason, created_at, updated_at
+		`SELECT id, tenant_id, runtime, runtime_version, runtime_config, public_folder, env_file_name, service_hostname_enabled, status, status_message, suspend_reason, created_at, updated_at
 		 FROM webroots WHERE tenant_id = ANY($1) AND status = $2`, tenantIDs, model.StatusActive)
 	if err != nil {
 		return nil, fmt.Errorf("batch list webroots: %w", err)
@@ -80,7 +80,7 @@ func (a *CoreDB) GetShardDesiredState(ctx context.Context, shardID string) (*Sha
 	var webrootIDs []string
 	for wrRows.Next() {
 		var w model.Webroot
-		if err := wrRows.Scan(&w.ID, &w.TenantID, &w.Name, &w.Runtime, &w.RuntimeVersion, &w.RuntimeConfig, &w.PublicFolder, &w.EnvFileName, &w.ServiceHostnameEnabled, &w.Status, &w.StatusMessage, &w.SuspendReason, &w.CreatedAt, &w.UpdatedAt); err != nil {
+		if err := wrRows.Scan(&w.ID, &w.TenantID, &w.Runtime, &w.RuntimeVersion, &w.RuntimeConfig, &w.PublicFolder, &w.EnvFileName, &w.ServiceHostnameEnabled, &w.Status, &w.StatusMessage, &w.SuspendReason, &w.CreatedAt, &w.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan webroot: %w", err)
 		}
 		result.Webroots[w.TenantID] = append(result.Webroots[w.TenantID], w)
@@ -123,7 +123,7 @@ func (a *CoreDB) GetShardDesiredState(ctx context.Context, shardID string) (*Sha
 
 	// 6. Fetch all daemons for those webroots.
 	daemonRows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, node_id, webroot_id, name, command, proxy_path, proxy_port,
+		`SELECT id, tenant_id, node_id, webroot_id, command, proxy_path, proxy_port,
 		        num_procs, stop_signal, stop_wait_secs, max_memory_mb,
 		        enabled, status, status_message, created_at, updated_at
 		 FROM daemons WHERE webroot_id = ANY($1)`, webrootIDs)
@@ -134,7 +134,7 @@ func (a *CoreDB) GetShardDesiredState(ctx context.Context, shardID string) (*Sha
 
 	for daemonRows.Next() {
 		var d model.Daemon
-		if err := daemonRows.Scan(&d.ID, &d.TenantID, &d.NodeID, &d.WebrootID, &d.Name, &d.Command,
+		if err := daemonRows.Scan(&d.ID, &d.TenantID, &d.NodeID, &d.WebrootID, &d.Command,
 			&d.ProxyPath, &d.ProxyPort,
 			&d.NumProcs, &d.StopSignal, &d.StopWaitSecs, &d.MaxMemoryMB,
 			&d.Enabled, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt); err != nil {
@@ -148,7 +148,7 @@ func (a *CoreDB) GetShardDesiredState(ctx context.Context, shardID string) (*Sha
 
 	// 7. Fetch all cron jobs for those webroots.
 	cronRows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, webroot_id, name, schedule, command, working_directory, enabled, timeout_seconds, max_memory_mb, status, status_message, created_at, updated_at
+		`SELECT id, tenant_id, webroot_id, schedule, command, working_directory, enabled, timeout_seconds, max_memory_mb, status, status_message, created_at, updated_at
 		 FROM cron_jobs WHERE webroot_id = ANY($1)`, webrootIDs)
 	if err != nil {
 		return nil, fmt.Errorf("batch list cron jobs: %w", err)
@@ -157,7 +157,7 @@ func (a *CoreDB) GetShardDesiredState(ctx context.Context, shardID string) (*Sha
 
 	for cronRows.Next() {
 		var j model.CronJob
-		if err := cronRows.Scan(&j.ID, &j.TenantID, &j.WebrootID, &j.Name, &j.Schedule, &j.Command, &j.WorkingDirectory, &j.Enabled, &j.TimeoutSeconds, &j.MaxMemoryMB, &j.Status, &j.StatusMessage, &j.CreatedAt, &j.UpdatedAt); err != nil {
+		if err := cronRows.Scan(&j.ID, &j.TenantID, &j.WebrootID, &j.Schedule, &j.Command, &j.WorkingDirectory, &j.Enabled, &j.TimeoutSeconds, &j.MaxMemoryMB, &j.Status, &j.StatusMessage, &j.CreatedAt, &j.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan cron job: %w", err)
 		}
 		result.CronJobs[j.WebrootID] = append(result.CronJobs[j.WebrootID], j)
@@ -192,10 +192,10 @@ func (a *CoreDB) GetShardDesiredState(ctx context.Context, shardID string) (*Sha
 // ListDaemonsByTenant retrieves all active daemons for a tenant (used in convergence).
 func (a *CoreDB) ListDaemonsByTenant(ctx context.Context, tenantID string) ([]model.Daemon, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, node_id, webroot_id, name, command, proxy_path, proxy_port,
+		`SELECT id, tenant_id, node_id, webroot_id, command, proxy_path, proxy_port,
 		        num_procs, stop_signal, stop_wait_secs, max_memory_mb,
 		        enabled, status, status_message, created_at, updated_at
-		 FROM daemons WHERE tenant_id = $1 AND status = $2 ORDER BY name`, tenantID, model.StatusActive,
+		 FROM daemons WHERE tenant_id = $1 AND status = $2 ORDER BY id`, tenantID, model.StatusActive,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list daemons by tenant: %w", err)
@@ -205,7 +205,7 @@ func (a *CoreDB) ListDaemonsByTenant(ctx context.Context, tenantID string) ([]mo
 	var daemons []model.Daemon
 	for rows.Next() {
 		var d model.Daemon
-		if err := rows.Scan(&d.ID, &d.TenantID, &d.NodeID, &d.WebrootID, &d.Name, &d.Command,
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.NodeID, &d.WebrootID, &d.Command,
 			&d.ProxyPath, &d.ProxyPort,
 			&d.NumProcs, &d.StopSignal, &d.StopWaitSecs, &d.MaxMemoryMB,
 			&d.Enabled, &d.Status, &d.StatusMessage, &d.CreatedAt, &d.UpdatedAt); err != nil {
@@ -219,8 +219,8 @@ func (a *CoreDB) ListDaemonsByTenant(ctx context.Context, tenantID string) ([]mo
 // ListCronJobsByTenant retrieves all active cron jobs for a tenant (used in convergence).
 func (a *CoreDB) ListCronJobsByTenant(ctx context.Context, tenantID string) ([]model.CronJob, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, webroot_id, name, schedule, command, working_directory, enabled, timeout_seconds, max_memory_mb, status, status_message, created_at, updated_at
-		 FROM cron_jobs WHERE tenant_id = $1 AND status = $2 ORDER BY name`, tenantID, model.StatusActive,
+		`SELECT id, tenant_id, webroot_id, schedule, command, working_directory, enabled, timeout_seconds, max_memory_mb, status, status_message, created_at, updated_at
+		 FROM cron_jobs WHERE tenant_id = $1 AND status = $2 ORDER BY id`, tenantID, model.StatusActive,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list cron jobs by tenant: %w", err)
@@ -230,7 +230,7 @@ func (a *CoreDB) ListCronJobsByTenant(ctx context.Context, tenantID string) ([]m
 	var jobs []model.CronJob
 	for rows.Next() {
 		var j model.CronJob
-		if err := rows.Scan(&j.ID, &j.TenantID, &j.WebrootID, &j.Name, &j.Schedule, &j.Command, &j.WorkingDirectory, &j.Enabled, &j.TimeoutSeconds, &j.MaxMemoryMB, &j.Status, &j.StatusMessage, &j.CreatedAt, &j.UpdatedAt); err != nil {
+		if err := rows.Scan(&j.ID, &j.TenantID, &j.WebrootID, &j.Schedule, &j.Command, &j.WorkingDirectory, &j.Enabled, &j.TimeoutSeconds, &j.MaxMemoryMB, &j.Status, &j.StatusMessage, &j.CreatedAt, &j.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan cron job row: %w", err)
 		}
 		jobs = append(jobs, j)

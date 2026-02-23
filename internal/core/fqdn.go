@@ -157,7 +157,7 @@ func (s *FQDNService) Delete(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UnbindFQDNWorkflow",
-		WorkflowID:   workflowID("fqdn", fqdnName, id),
+		WorkflowID:   workflowID("fqdn", id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("signal UnbindFQDNWorkflow: %w", err)
@@ -181,7 +181,7 @@ func (s *FQDNService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateFQDNWorkflow",
-		WorkflowID:   workflowID("fqdn", fqdnName, id),
+		WorkflowID:   workflowID("fqdn", id),
 		Arg:          id,
 	})
 }

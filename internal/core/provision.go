@@ -42,18 +42,9 @@ func WithSkipWorkflow(ctx context.Context) context.Context {
 }
 
 // workflowID builds a human-readable Temporal workflow ID from a resource type
-// prefix, a human-readable name, and the resource's unique ID.
-// Example: workflowID("database", "mydb", "917090fc-ab8e-4943-bc5d-4fb511551e5d")
-// returns "database-mydb-917090fc".
-func workflowID(prefix, name, id string) string {
-	short := id
-	if len(id) > 8 {
-		short = id[:8]
-	}
-	if name == "" {
-		return fmt.Sprintf("%s-%s", prefix, short)
-	}
-	return fmt.Sprintf("%s-%s-%s", prefix, name, short)
+// prefix and the resource's unique ID (short name).
+func workflowID(prefix, id string) string {
+	return fmt.Sprintf("%s-%s", prefix, id)
 }
 
 // signalProvision routes a workflow task through the per-tenant entity workflow.
@@ -75,13 +66,7 @@ func signalProvision(ctx context.Context, tc temporalclient.Client, db DB, tenan
 		return err
 	}
 
-	// Resolve tenant name for deterministic workflow ID.
-	var tenantName string
-	if err := db.QueryRow(ctx, "SELECT name FROM tenants WHERE id = $1", tenantID).Scan(&tenantName); err != nil {
-		return fmt.Errorf("resolve tenant name: %w", err)
-	}
-
-	wfID := fmt.Sprintf("tenant-%s", tenantName)
+	wfID := fmt.Sprintf("tenant-%s", tenantID)
 	_, err := tc.SignalWithStartWorkflow(ctx, wfID, model.ProvisionSignalName, task,
 		temporalclient.StartWorkflowOptions{
 			ID:        wfID,

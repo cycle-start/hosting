@@ -84,7 +84,7 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 	// Include service hostname as additional server_name if enabled.
 	if fctx.Webroot.ServiceHostnameEnabled && fctx.BrandBaseHostname != "" {
 		fqdnParams = append(fqdnParams, activity.FQDNParam{
-			FQDN:      fmt.Sprintf("%s.%s.%s", fctx.Webroot.Name, fctx.Tenant.Name, fctx.BrandBaseHostname),
+			FQDN:      fmt.Sprintf("%s.%s.%s", fctx.Webroot.ID, fctx.Tenant.ID, fctx.BrandBaseHostname),
 			WebrootID: fctx.Webroot.ID,
 		})
 	}
@@ -93,8 +93,8 @@ func BindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 		nodeCtx := nodeActivityCtx(gCtx, node.ID)
 		return workflow.ExecuteActivity(nodeCtx, "UpdateWebroot", activity.UpdateWebrootParams{
 			ID:             fctx.Webroot.ID,
-			TenantName:     fctx.Tenant.Name,
-			Name:           fctx.Webroot.Name,
+			TenantName:     fctx.Tenant.ID,
+			Name:           fctx.Webroot.ID,
 			Runtime:        fctx.Webroot.Runtime,
 			RuntimeVersion: fctx.Webroot.RuntimeVersion,
 			RuntimeConfig:  string(fctx.Webroot.RuntimeConfig),
@@ -228,7 +228,7 @@ func UnbindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 		// Include service hostname as additional server_name if enabled.
 		if fctx.Webroot.ServiceHostnameEnabled && fctx.BrandBaseHostname != "" {
 			fqdnParams = append(fqdnParams, activity.FQDNParam{
-				FQDN:      fmt.Sprintf("%s.%s.%s", fctx.Webroot.Name, fctx.Tenant.Name, fctx.BrandBaseHostname),
+				FQDN:      fmt.Sprintf("%s.%s.%s", fctx.Webroot.ID, fctx.Tenant.ID, fctx.BrandBaseHostname),
 				WebrootID: fctx.Webroot.ID,
 			})
 		}
@@ -237,8 +237,8 @@ func UnbindFQDNWorkflow(ctx workflow.Context, fqdnID string) error {
 			nodeCtx := nodeActivityCtx(gCtx, node.ID)
 			return workflow.ExecuteActivity(nodeCtx, "UpdateWebroot", activity.UpdateWebrootParams{
 				ID:             fctx.Webroot.ID,
-				TenantName:     fctx.Tenant.Name,
-				Name:           fctx.Webroot.Name,
+				TenantName:     fctx.Tenant.ID,
+				Name:           fctx.Webroot.ID,
 				Runtime:        fctx.Webroot.Runtime,
 				RuntimeVersion: fctx.Webroot.RuntimeVersion,
 				RuntimeConfig:  string(fctx.Webroot.RuntimeConfig),

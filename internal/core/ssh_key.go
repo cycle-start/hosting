@@ -111,7 +111,7 @@ func (s *SSHKeyService) Delete(ctx context.Context, id string) error {
 
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "RemoveSSHKeyWorkflow",
-		WorkflowID:   workflowID("ssh-key", name, id),
+		WorkflowID:   workflowID("ssh-key", id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("signal RemoveSSHKeyWorkflow: %w", err)
@@ -135,7 +135,7 @@ func (s *SSHKeyService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "AddSSHKeyWorkflow",
-		WorkflowID:   workflowID("ssh-key", name, id),
+		WorkflowID:   workflowID("ssh-key", id),
 		Arg:          id,
 	})
 }

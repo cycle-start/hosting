@@ -132,10 +132,9 @@ func (h *CronJob) Create(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	cronJob := &model.CronJob{
-		ID:               platform.NewID(),
+		ID:               platform.NewName("cj"),
 		TenantID:         webroot.TenantID,
 		WebrootID:        webrootID,
-		Name:             platform.NewName("cj"),
 		Schedule:         req.Schedule,
 		Command:          req.Command,
 		WorkingDirectory: req.WorkingDirectory,

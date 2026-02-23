@@ -102,10 +102,9 @@ func (h *ValkeyInstance) Create(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	shardID := req.ShardID
 	instance := &model.ValkeyInstance{
-		ID:             platform.NewID(),
+		ID:             platform.NewName("kv"),
 		TenantID:       tenantID,
 		SubscriptionID: req.SubscriptionID,
-		Name:           platform.NewName("kv"),
 		ShardID:        &shardID,
 		MaxMemoryMB: maxMemoryMB,
 		Password:    generatePassword(),

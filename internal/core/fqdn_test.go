@@ -46,12 +46,6 @@ func TestFQDNService_Create_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	// signalProvision tenant name lookup
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -253,12 +247,6 @@ func TestFQDNService_Delete_Success(t *testing.T) {
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 
-	// signalProvision tenant name lookup
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -301,12 +289,6 @@ func TestFQDNService_Delete_WorkflowError(t *testing.T) {
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
 
-	// signalProvision tenant name lookup
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 

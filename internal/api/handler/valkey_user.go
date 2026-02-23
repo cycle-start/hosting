@@ -92,8 +92,8 @@ func (h *ValkeyUser) Create(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	if !strings.HasPrefix(req.Username, instance.Name) {
-		response.WriteError(w, http.StatusBadRequest, fmt.Sprintf("username %q must start with instance name %q", req.Username, instance.Name))
+	if !strings.HasPrefix(req.Username, instance.ID) {
+		response.WriteError(w, http.StatusBadRequest, fmt.Sprintf("username %q must start with instance name %q", req.Username, instance.ID))
 		return
 	}
 

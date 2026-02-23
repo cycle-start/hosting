@@ -9,7 +9,6 @@ type Webroot struct {
 	ID             string          `json:"id" db:"id"`
 	TenantID       string          `json:"tenant_id" db:"tenant_id"`
 	SubscriptionID string          `json:"subscription_id" db:"subscription_id"`
-	Name           string          `json:"name" db:"name"`
 	Runtime        string          `json:"runtime" db:"runtime"`
 	RuntimeVersion string          `json:"runtime_version" db:"runtime_version"`
 	RuntimeConfig  json.RawMessage `json:"runtime_config" db:"runtime_config"`

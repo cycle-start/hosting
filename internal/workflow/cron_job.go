@@ -51,9 +51,9 @@ func CreateCronJobWorkflow(ctx workflow.Context, cronJobID string) error {
 
 	createParams := activity.CreateCronJobParams{
 		ID:               cronCtx.CronJob.ID,
-		TenantName:       cronCtx.Tenant.Name,
-		WebrootName:      cronCtx.Webroot.Name,
-		Name:             cronCtx.CronJob.Name,
+		TenantName:       cronCtx.Tenant.ID,
+		WebrootName:      cronCtx.Webroot.ID,
+		Name:             cronCtx.CronJob.ID,
 		Schedule:         cronCtx.CronJob.Schedule,
 		Command:          cronCtx.CronJob.Command,
 		WorkingDirectory: cronCtx.CronJob.WorkingDirectory,
@@ -76,7 +76,7 @@ func CreateCronJobWorkflow(ctx workflow.Context, cronJobID string) error {
 	if cronCtx.CronJob.Enabled {
 		timerParams := activity.CronJobTimerParams{
 			ID:         cronCtx.CronJob.ID,
-			TenantName: cronCtx.Tenant.Name,
+			TenantName: cronCtx.Tenant.ID,
 		}
 		for _, node := range cronCtx.Nodes {
 			nodeCtx := nodeActivityCtx(ctx, node.ID)
@@ -146,9 +146,9 @@ func UpdateCronJobWorkflow(ctx workflow.Context, cronJobID string) error {
 
 	updateParams := activity.CreateCronJobParams{
 		ID:               cronCtx.CronJob.ID,
-		TenantName:       cronCtx.Tenant.Name,
-		WebrootName:      cronCtx.Webroot.Name,
-		Name:             cronCtx.CronJob.Name,
+		TenantName:       cronCtx.Tenant.ID,
+		WebrootName:      cronCtx.Webroot.ID,
+		Name:             cronCtx.CronJob.ID,
 		Schedule:         cronCtx.CronJob.Schedule,
 		Command:          cronCtx.CronJob.Command,
 		WorkingDirectory: cronCtx.CronJob.WorkingDirectory,
@@ -168,7 +168,7 @@ func UpdateCronJobWorkflow(ctx workflow.Context, cronJobID string) error {
 	// Manage timer state on all nodes — flock ensures single execution.
 	timerParams := activity.CronJobTimerParams{
 		ID:         cronCtx.CronJob.ID,
-		TenantName: cronCtx.Tenant.Name,
+		TenantName: cronCtx.Tenant.ID,
 	}
 	for _, node := range cronCtx.Nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
@@ -243,7 +243,7 @@ func DeleteCronJobWorkflow(ctx workflow.Context, cronJobID string) error {
 
 	deleteParams := activity.DeleteCronJobParams{
 		ID:       cronCtx.CronJob.ID,
-		TenantName: cronCtx.Tenant.Name,
+		TenantName: cronCtx.Tenant.ID,
 	}
 
 	var errs []string
@@ -320,7 +320,7 @@ func EnableCronJobWorkflow(ctx workflow.Context, cronJobID string) error {
 
 	timerParams := activity.CronJobTimerParams{
 		ID:         cronCtx.CronJob.ID,
-		TenantName: cronCtx.Tenant.Name,
+		TenantName: cronCtx.Tenant.ID,
 	}
 	var errs []string
 	for _, node := range cronCtx.Nodes {
@@ -382,7 +382,7 @@ func DisableCronJobWorkflow(ctx workflow.Context, cronJobID string) error {
 
 	timerParams := activity.CronJobTimerParams{
 		ID:       cronCtx.CronJob.ID,
-		TenantName: cronCtx.Tenant.Name,
+		TenantName: cronCtx.Tenant.ID,
 	}
 
 	var errs []string

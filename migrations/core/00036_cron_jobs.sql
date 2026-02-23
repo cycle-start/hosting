@@ -3,7 +3,6 @@ CREATE TABLE cron_jobs (
     id                    TEXT PRIMARY KEY,
     tenant_id             TEXT NOT NULL REFERENCES tenants(id),
     webroot_id            TEXT NOT NULL REFERENCES webroots(id),
-    name                  TEXT NOT NULL,
     schedule              TEXT NOT NULL,
     command               TEXT NOT NULL,
     working_directory     TEXT NOT NULL DEFAULT '',
@@ -15,8 +14,7 @@ CREATE TABLE cron_jobs (
     status                TEXT NOT NULL DEFAULT 'pending',
     status_message        TEXT,
     created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE(name)
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_cron_jobs_tenant_id ON cron_jobs(tenant_id);

@@ -13,7 +13,7 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { CopyButton } from '@/components/shared/copy-button'
-import { formatDate, truncateID } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { useTenants, useDeleteTenant, useSuspendTenant, useUnsuspendTenant } from '@/lib/hooks'
 import type { Tenant } from '@/lib/types'
 
@@ -48,16 +48,11 @@ export function TenantsPage() {
 
   const columns: ColumnDef<Tenant>[] = [
     {
-      accessorKey: 'name',
-      header: 'Name',
-      cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
-    },
-    {
       accessorKey: 'id',
       header: 'ID',
       cell: ({ row }) => (
         <div className="flex items-center gap-1">
-          <code className="text-xs">{truncateID(row.original.id)}</code>
+          <span className="font-medium">{row.original.id}</span>
           <CopyButton value={row.original.id} />
         </div>
       ),
@@ -154,7 +149,7 @@ export function TenantsPage() {
           columns={columns}
           data={tenants}
           loading={isLoading}
-          searchColumn="name"
+          searchColumn="id"
           searchPlaceholder="Search tenants..."
           onRowClick={(t) => navigate({ to: '/tenants/$id', params: { id: t.id } })}
         />
@@ -164,7 +159,7 @@ export function TenantsPage() {
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         title="Delete Tenant"
-        description={`Are you sure you want to delete tenant "${deleteTarget?.name}"? All associated resources will be removed.`}
+        description={`Are you sure you want to delete tenant "${deleteTarget?.id}"? All associated resources will be removed.`}
         confirmLabel="Delete"
         variant="destructive"
         onConfirm={handleDelete}

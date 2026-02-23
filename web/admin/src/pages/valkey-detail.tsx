@@ -145,14 +145,14 @@ export function ValkeyDetailPage() {
     <div className="space-y-6">
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
-        { label: tenant?.name ?? tenantId, href: `/tenants/${tenantId}` },
+        { label: tenant?.id ?? tenantId, href: `/tenants/${tenantId}` },
         { label: 'Valkey', href: `/tenants/${tenantId}`, hash: 'valkey' },
-        { label: instance.name },
+        { label: instance.id },
       ]} />
 
       <ResourceHeader
         icon={Boxes}
-        title={instance.name}
+        title={instance.id}
         subtitle={`Port: ${instance.port} | Max Memory: ${instance.max_memory_mb} MB`}
         status={instance.status}
       />

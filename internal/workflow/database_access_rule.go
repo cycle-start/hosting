@@ -73,7 +73,7 @@ func SyncDatabaseAccessWorkflow(ctx workflow.Context, databaseID string) error {
 	// Rebuild MySQL users with updated host patterns on the primary node.
 	primaryCtx := nodeActivityCtx(ctx, primaryID)
 	err = workflow.ExecuteActivity(primaryCtx, "SyncDatabaseUserHosts", activity.SyncDatabaseUserHostsParams{
-		DatabaseName: database.Name,
+		DatabaseName: database.ID,
 		Users:        users,
 		AccessRules:  rules,
 	}).Get(ctx, nil)

@@ -70,7 +70,6 @@ export interface Brand {
 
 export interface Tenant {
   id: string
-  name: string
   brand_id: string
   customer_id: string
   region_id: string
@@ -101,7 +100,6 @@ export interface Webroot {
   id: string
   tenant_id: string
   subscription_id: string
-  name: string
   runtime: string
   runtime_version: string
   runtime_config: Record<string, unknown> | null
@@ -183,7 +181,6 @@ export interface Database {
   id: string
   tenant_id: string
   subscription_id: string
-  name: string
   shard_id?: string | null
   node_id?: string | null
   status: string
@@ -209,7 +206,6 @@ export interface ValkeyInstance {
   id: string
   tenant_id: string
   subscription_id: string
-  name: string
   shard_id?: string | null
   port: number
   max_memory_mb: number
@@ -286,7 +282,6 @@ export interface CronJob {
   id: string
   tenant_id: string
   webroot_id: string
-  name: string
   schedule: string
   command: string
   working_directory: string
@@ -305,7 +300,6 @@ export interface Daemon {
   id: string
   tenant_id: string
   webroot_id: string
-  name: string
   command: string
   proxy_path?: string | null
   proxy_port?: number | null
@@ -336,7 +330,6 @@ export interface S3Bucket {
   id: string
   tenant_id: string
   subscription_id: string
-  name: string
   shard_id?: string | null
   public: boolean
   quota_bytes: number

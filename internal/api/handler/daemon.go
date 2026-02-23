@@ -117,21 +117,20 @@ func (h *Daemon) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	daemonName := platform.NewName("d")
+	daemonID := platform.NewName("d")
 
 	// Compute proxy port if proxy_path is set
 	var proxyPort *int
 	if req.ProxyPath != nil && *req.ProxyPath != "" {
-		port := core.ComputeDaemonPort(tenant.Name, webroot.Name, daemonName)
+		port := core.ComputeDaemonPort(tenant.ID, webroot.ID, daemonID)
 		proxyPort = &port
 	}
 
 	now := time.Now()
 	daemon := &model.Daemon{
-		ID:           platform.NewID(),
+		ID:           daemonID,
 		TenantID:     webroot.TenantID,
 		WebrootID:    webrootID,
-		Name:         daemonName,
 		Command:      req.Command,
 		ProxyPath:    req.ProxyPath,
 		ProxyPort:    proxyPort,
@@ -221,7 +220,7 @@ func (h *Daemon) Update(w http.ResponseWriter, r *http.Request) {
 				response.WriteError(w, http.StatusInternalServerError, "failed to resolve webroot")
 				return
 			}
-			port := core.ComputeDaemonPort(tenant.Name, webroot.Name, daemon.Name)
+			port := core.ComputeDaemonPort(tenant.ID, webroot.ID, daemon.ID)
 			daemon.ProxyPort = &port
 		}
 	}

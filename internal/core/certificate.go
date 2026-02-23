@@ -120,7 +120,7 @@ func (s *CertificateService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UploadCustomCertWorkflow",
-		WorkflowID:   workflowID("certificate", fqdnName, id),
+		WorkflowID:   workflowID("certificate", id),
 		Arg:          id,
 	})
 }

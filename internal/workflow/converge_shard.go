@@ -152,17 +152,17 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 			continue
 		}
 		for _, webroot := range state.Webroots[tenant.ID] {
-			confName := fmt.Sprintf("%s_%s.conf", tenant.Name, webroot.Name)
+			confName := fmt.Sprintf("%s_%s.conf", tenant.ID, webroot.ID)
 			expectedConfigs[confName] = true
 			// FPM pool configs are per-tenant (not per-webroot).
-			expectedPools[tenant.Name+".conf"] = true
+			expectedPools[tenant.ID+".conf"] = true
 
 			fqdns := state.FQDNs[webroot.ID]
 			// Add service hostname as an additional server_name if enabled.
 			if webroot.ServiceHostnameEnabled {
 				if baseHostname, ok := state.BrandBaseHostnames[tenant.ID]; ok && baseHostname != "" {
 					fqdns = append(fqdns, activity.FQDNParam{
-						FQDN:      fmt.Sprintf("%s.%s.%s", webroot.Name, tenant.Name, baseHostname),
+						FQDN:      fmt.Sprintf("%s.%s.%s", webroot.ID, tenant.ID, baseHostname),
 						WebrootID: webroot.ID,
 					})
 				}
@@ -176,7 +176,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 			// Daemon configs: daemon-{tenantName}-{daemonName}.conf
 			for _, daemon := range state.Daemons[webroot.ID] {
 				if daemon.Status == model.StatusActive {
-					expectedDaemonConfigs[fmt.Sprintf("daemon-%s-%s.conf", tenant.Name, daemon.Name)] = true
+					expectedDaemonConfigs[fmt.Sprintf("daemon-%s-%s.conf", tenant.ID, daemon.ID)] = true
 				}
 			}
 		}
@@ -242,7 +242,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 			nodeCtx := nodeActivityCtx(gCtx, node.ID)
 			if err := workflow.ExecuteActivity(nodeCtx, "CreateTenant", activity.CreateTenantParams{
 				ID:             t.ID,
-				Name:           t.Name,
+				Name:           t.ID,
 				UID:            t.UID,
 				SFTPEnabled:    t.SFTPEnabled,
 				SSHEnabled:     t.SSHEnabled,
@@ -253,7 +253,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 
 			// Sync SSH/SFTP config on the node.
 			if err := workflow.ExecuteActivity(nodeCtx, "SyncSSHConfig", activity.SyncSSHConfigParams{
-				TenantName:  t.Name,
+				TenantName:  t.ID,
 				SSHEnabled:  t.SSHEnabled,
 				SFTPEnabled: t.SFTPEnabled,
 			}).Get(gCtx, nil); err != nil {
@@ -277,7 +277,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 			nodeCtx := nodeActivityCtx(gCtx, node.ID)
 			if err := workflow.ExecuteActivity(nodeCtx, "ConfigureTenantAddresses",
 				activity.ConfigureTenantAddressesParams{
-					TenantName:   t.Name,
+					TenantName:   t.ID,
 					TenantUID:    t.UID,
 					ClusterID:    clusterID,
 					NodeShardIdx: *node.ShardIndex,
@@ -353,8 +353,8 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 			nodeCtx := nodeActivityCtx(gCtx, node.ID)
 			if err := workflow.ExecuteActivity(nodeCtx, "CreateWebroot", activity.CreateWebrootParams{
 				ID:             e.webroot.ID,
-				TenantName:     e.tenant.Name,
-				Name:           e.webroot.Name,
+				TenantName:     e.tenant.ID,
+				Name:           e.webroot.ID,
 				Runtime:        e.webroot.Runtime,
 				RuntimeVersion: e.webroot.RuntimeVersion,
 				RuntimeConfig:  string(e.webroot.RuntimeConfig),
@@ -381,9 +381,9 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 
 			createParams := activity.CreateCronJobParams{
 				ID:               job.ID,
-				TenantName:       entry.tenant.Name,
-				WebrootName:      entry.webroot.Name,
-				Name:             job.Name,
+				TenantName:       entry.tenant.ID,
+				WebrootName:      entry.webroot.ID,
+				Name:             job.ID,
 				Schedule:         job.Schedule,
 				Command:          job.Command,
 				WorkingDirectory: job.WorkingDirectory,
@@ -407,7 +407,7 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 			if j.Enabled {
 				timerParams := activity.CronJobTimerParams{
 					ID:         j.ID,
-					TenantName: entry.tenant.Name,
+					TenantName: entry.tenant.ID,
 				}
 				timerErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
 					nodeCtx := nodeActivityCtx(gCtx, node.ID)
@@ -440,9 +440,9 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 			createParams := activity.CreateDaemonParams{
 				ID:           daemon.ID,
 				NodeID:       daemon.NodeID,
-				TenantName:   entry.tenant.Name,
-				WebrootName:  entry.webroot.Name,
-				Name:         daemon.Name,
+				TenantName:   entry.tenant.ID,
+				WebrootName:  entry.webroot.ID,
+				Name:         daemon.ID,
 				Command:      daemon.Command,
 				ProxyPort:    daemon.ProxyPort,
 				HostIP:       hostIP,
@@ -468,9 +468,9 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 			if !d.Enabled {
 				disableParams := activity.DaemonEnableParams{
 					ID:          d.ID,
-					TenantName:  entry.tenant.Name,
-					WebrootName: entry.webroot.Name,
-					Name:        d.Name,
+					TenantName:  entry.tenant.ID,
+					WebrootName: entry.webroot.ID,
+					Name:        d.ID,
 				}
 				disableErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
 					nodeCtx := nodeActivityCtx(gCtx, node.ID)
@@ -539,7 +539,7 @@ func convergeDatabaseShard(ctx workflow.Context, shardID string, nodes []model.N
 			continue
 		}
 
-		err = workflow.ExecuteActivity(primaryCtx, "CreateDatabase", database.Name).Get(ctx, nil)
+		err = workflow.ExecuteActivity(primaryCtx, "CreateDatabase", database.ID).Get(ctx, nil)
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("create database %s on primary: %v", database.ID, err))
 		}
@@ -556,7 +556,7 @@ func convergeDatabaseShard(ctx workflow.Context, shardID string, nodes []model.N
 				continue
 			}
 			err = workflow.ExecuteActivity(primaryCtx, "CreateDatabaseUser", activity.CreateDatabaseUserParams{
-				DatabaseName: database.Name,
+				DatabaseName: database.ID,
 				Username:     user.Username,
 				Password:     user.Password,
 				Privileges:   user.Privileges,
@@ -618,7 +618,7 @@ func convergeValkeyShard(ctx workflow.Context, shardID string, nodes []model.Nod
 		for _, node := range nodes {
 			nodeCtx := nodeActivityCtx(ctx, node.ID)
 			err = workflow.ExecuteActivity(nodeCtx, "CreateValkeyInstance", activity.CreateValkeyInstanceParams{
-				Name:        instance.Name,
+				Name:        instance.ID,
 				Port:        instance.Port,
 				Password:    instance.Password,
 				MaxMemoryMB: instance.MaxMemoryMB,
@@ -645,7 +645,7 @@ func convergeValkeyShard(ctx workflow.Context, shardID string, nodes []model.Nod
 			for _, node := range nodes {
 				nodeCtx := nodeActivityCtx(ctx, node.ID)
 				err = workflow.ExecuteActivity(nodeCtx, "CreateValkeyUser", activity.CreateValkeyUserParams{
-					InstanceName: instance.Name,
+					InstanceName: instance.ID,
 					Port:         instance.Port,
 					Username:     user.Username,
 					Password:     user.Password,

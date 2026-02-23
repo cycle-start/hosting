@@ -166,7 +166,7 @@ func (s *ZoneService) Delete(ctx context.Context, id string) error {
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteZoneWorkflow",
-		WorkflowID:   workflowID("zone", name, id),
+		WorkflowID:   workflowID("zone", id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("signal DeleteZoneWorkflow: %w", err)
@@ -194,7 +194,7 @@ func (s *ZoneService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateZoneWorkflow",
-		WorkflowID:   workflowID("zone", name, id),
+		WorkflowID:   workflowID("zone", id),
 		Arg:          id,
 	})
 }

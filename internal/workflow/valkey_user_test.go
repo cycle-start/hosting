@@ -44,7 +44,6 @@ func (s *CreateValkeyUserWorkflowTestSuite) TestSuccess() {
 	}
 	instance := model.ValkeyInstance{
 		ID:      instanceID,
-		Name:    "myvalkey",
 		ShardID: &shardID,
 		Port:    6379,
 	}
@@ -61,7 +60,7 @@ func (s *CreateValkeyUserWorkflowTestSuite) TestSuccess() {
 		Nodes:    nodes,
 	}, nil)
 	s.env.OnActivity("CreateValkeyUser", mock.Anything, activity.CreateValkeyUserParams{
-		InstanceName: "myvalkey",
+		InstanceName: instanceID,
 		Port:         6379,
 		Username:     "appuser",
 		Password:     "secret123",
@@ -117,7 +116,6 @@ func (s *CreateValkeyUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	}
 	instance := model.ValkeyInstance{
 		ID:      instanceID,
-		Name:    "myvalkey",
 		ShardID: &shardID,
 		Port:    6379,
 	}
@@ -154,7 +152,6 @@ func (s *CreateValkeyUserWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 	}
 	instance := model.ValkeyInstance{
 		ID:   instanceID,
-		Name: "myvalkey",
 		Port: 6379,
 	}
 
@@ -214,7 +211,6 @@ func (s *UpdateValkeyUserWorkflowTestSuite) TestSuccess() {
 	}
 	instance := model.ValkeyInstance{
 		ID:      instanceID,
-		Name:    "myvalkey",
 		Port:    6379,
 		ShardID: &shardID,
 	}
@@ -229,7 +225,7 @@ func (s *UpdateValkeyUserWorkflowTestSuite) TestSuccess() {
 		Nodes:    nodes,
 	}, nil)
 	s.env.OnActivity("UpdateValkeyUser", mock.Anything, activity.UpdateValkeyUserParams{
-		InstanceName: "myvalkey",
+		InstanceName: instanceID,
 		Port:         6379,
 		Username:     "appuser",
 		Password:     "newsecret456",
@@ -259,7 +255,6 @@ func (s *UpdateValkeyUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	}
 	instance := model.ValkeyInstance{
 		ID:      instanceID,
-		Name:    "myvalkey",
 		Port:    6379,
 		ShardID: &shardID,
 	}
@@ -323,7 +318,6 @@ func (s *DeleteValkeyUserWorkflowTestSuite) TestSuccess() {
 	}
 	instance := model.ValkeyInstance{
 		ID:      instanceID,
-		Name:    "myvalkey",
 		Port:    6379,
 		ShardID: &shardID,
 	}
@@ -338,7 +332,7 @@ func (s *DeleteValkeyUserWorkflowTestSuite) TestSuccess() {
 		Nodes:    nodes,
 	}, nil)
 	s.env.OnActivity("DeleteValkeyUser", mock.Anything, activity.DeleteValkeyUserParams{
-		InstanceName: "myvalkey",
+		InstanceName: instanceID,
 		Port:         6379,
 		Username:     "appuser",
 	}).Return(nil)
@@ -363,7 +357,6 @@ func (s *DeleteValkeyUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 	}
 	instance := model.ValkeyInstance{
 		ID:      instanceID,
-		Name:    "myvalkey",
 		Port:    6379,
 		ShardID: &shardID,
 	}
@@ -378,7 +371,7 @@ func (s *DeleteValkeyUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 		Nodes:    nodes,
 	}, nil)
 	s.env.OnActivity("DeleteValkeyUser", mock.Anything, activity.DeleteValkeyUserParams{
-		InstanceName: "myvalkey",
+		InstanceName: instanceID,
 		Port:         6379,
 		Username:     "appuser",
 	}).Return(fmt.Errorf("node agent down"))

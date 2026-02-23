@@ -303,8 +303,8 @@ export function WebrootDetailPage() {
       ),
     },
     {
-      accessorKey: 'name', header: 'Name',
-      cell: ({ row }) => <span className="font-mono text-sm">{row.original.name}</span>,
+      accessorKey: 'id', header: 'ID',
+      cell: ({ row }) => <span className="font-mono text-sm">{row.original.id}</span>,
     },
     {
       accessorKey: 'command', header: 'Command',
@@ -369,8 +369,8 @@ export function WebrootDetailPage() {
       ),
     },
     {
-      accessorKey: 'name', header: 'Name',
-      cell: ({ row }) => <span className="font-mono text-sm">{row.original.name}</span>,
+      accessorKey: 'id', header: 'ID',
+      cell: ({ row }) => <span className="font-mono text-sm">{row.original.id}</span>,
     },
     {
       accessorKey: 'schedule', header: 'Schedule',
@@ -510,7 +510,7 @@ export function WebrootDetailPage() {
   const cronJobsList = cronJobsData?.items ?? []
   const cronTableWithExpand = (
     <div>
-      <DataTable columns={cronColumns} data={cronJobsList} loading={cronJobsLoading} searchColumn="name" searchPlaceholder="Search cron jobs..." />
+      <DataTable columns={cronColumns} data={cronJobsList} loading={cronJobsLoading} searchColumn="id" searchPlaceholder="Search cron jobs..." />
       {expandedCronId && cronJobsList.some(c => c.id === expandedCronId) && (
         <div className="p-4 bg-muted/30 rounded-md">
           <h4 className="text-sm font-medium mb-2">Cron Logs</h4>
@@ -524,14 +524,14 @@ export function WebrootDetailPage() {
     <div className="space-y-6">
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
-        { label: tenant?.name ?? tenantId, href: `/tenants/${tenantId}` },
+        { label: tenant?.id ?? tenantId, href: `/tenants/${tenantId}` },
         { label: 'Webroots', href: `/tenants/${tenantId}`, hash: 'webroots' },
-        { label: webroot.name },
+        { label: webroot.id },
       ]} />
 
       <ResourceHeader
         icon={Globe}
-        title={webroot.name}
+        title={webroot.id}
         subtitle={`${webroot.runtime} ${webroot.runtime_version} | Public: ${webroot.public_folder} | Env: ${webroot.env_file_name || '.env.hosting'} | Service hostname: ${webroot.service_hostname_enabled ? 'on' : 'off'}`}
         status={webroot.status}
         actions={
@@ -581,11 +581,11 @@ export function WebrootDetailPage() {
             <EmptyState icon={Terminal} title="No Daemons" description="Add a long-running process (WebSocket server, queue worker, etc.)." action={{ label: 'Add Daemon', onClick: openCreateDaemon }} />
           ) : (
             <div>
-              <DataTable columns={daemonColumns} data={daemonsData?.items ?? []} loading={daemonsLoading} searchColumn="name" searchPlaceholder="Search daemons..." />
+              <DataTable columns={daemonColumns} data={daemonsData?.items ?? []} loading={daemonsLoading} searchColumn="id" searchPlaceholder="Search daemons..." />
               {expandedDaemonId && (daemonsData?.items ?? []).some(d => d.id === expandedDaemonId) && (
                 <div className="p-4 bg-muted/30 rounded-md">
                   <h4 className="text-sm font-medium mb-2">Daemon Logs</h4>
-                  <TenantLogViewer tenantId={tenantId} daemonName={(daemonsData?.items ?? []).find(d => d.id === expandedDaemonId)?.name} />
+                  <TenantLogViewer tenantId={tenantId} daemonName={(daemonsData?.items ?? []).find(d => d.id === expandedDaemonId)?.id} />
                 </div>
               )}
             </div>
@@ -801,13 +801,13 @@ export function WebrootDetailPage() {
 
       {/* Delete Daemon */}
       <ConfirmDialog open={!!deleteDaemon} onOpenChange={(o) => !o && setDeleteDaemon(null)} title="Delete Daemon"
-        description={`Delete daemon "${deleteDaemon?.name}"? The process will be stopped and removed from all nodes.`}
+        description={`Delete daemon "${deleteDaemon?.id}"? The process will be stopped and removed from all nodes.`}
         confirmLabel="Delete" variant="destructive" loading={deleteDaemonMut.isPending}
         onConfirm={async () => { try { await deleteDaemonMut.mutateAsync(deleteDaemon!.id); toast.success('Daemon deleted'); setDeleteDaemon(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
 
       {/* Delete Cron Job */}
       <ConfirmDialog open={!!deleteCron} onOpenChange={(o) => !o && setDeleteCron(null)} title="Delete Cron Job"
-        description={`Delete cron job "${deleteCron?.name}"? The timer will be stopped and removed from all nodes.`}
+        description={`Delete cron job "${deleteCron?.id}"? The timer will be stopped and removed from all nodes.`}
         confirmLabel="Delete" variant="destructive" loading={deleteCronMut.isPending}
         onConfirm={async () => { try { await deleteCronMut.mutateAsync(deleteCron!.id); toast.success('Cron job deleted'); setDeleteCron(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
 

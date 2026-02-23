@@ -19,9 +19,9 @@ func NewCronJobService(db DB, tc temporalclient.Client) *CronJobService {
 
 func (s *CronJobService) Create(ctx context.Context, cronJob *model.CronJob) error {
 	_, err := s.db.Exec(ctx,
-		`INSERT INTO cron_jobs (id, tenant_id, webroot_id, name, schedule, command, working_directory, enabled, timeout_seconds, max_memory_mb, max_failures, status, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-		cronJob.ID, cronJob.TenantID, cronJob.WebrootID, cronJob.Name, cronJob.Schedule,
+		`INSERT INTO cron_jobs (id, tenant_id, webroot_id, schedule, command, working_directory, enabled, timeout_seconds, max_memory_mb, max_failures, status, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+		cronJob.ID, cronJob.TenantID, cronJob.WebrootID, cronJob.Schedule,
 		cronJob.Command, cronJob.WorkingDirectory, cronJob.Enabled, cronJob.TimeoutSeconds,
 		cronJob.MaxMemoryMB, cronJob.MaxFailures, cronJob.Status, cronJob.CreatedAt, cronJob.UpdatedAt,
 	)
@@ -40,11 +40,11 @@ func (s *CronJobService) Create(ctx context.Context, cronJob *model.CronJob) err
 	return nil
 }
 
-const cronJobColumns = `id, tenant_id, webroot_id, name, schedule, command, working_directory, enabled, timeout_seconds, max_memory_mb, consecutive_failures, max_failures, status, status_message, created_at, updated_at`
+const cronJobColumns = `id, tenant_id, webroot_id, schedule, command, working_directory, enabled, timeout_seconds, max_memory_mb, consecutive_failures, max_failures, status, status_message, created_at, updated_at`
 
 func scanCronJob(row interface{ Scan(dest ...any) error }) (model.CronJob, error) {
 	var c model.CronJob
-	err := row.Scan(&c.ID, &c.TenantID, &c.WebrootID, &c.Name, &c.Schedule, &c.Command,
+	err := row.Scan(&c.ID, &c.TenantID, &c.WebrootID, &c.Schedule, &c.Command,
 		&c.WorkingDirectory, &c.Enabled, &c.TimeoutSeconds, &c.MaxMemoryMB,
 		&c.ConsecutiveFailures, &c.MaxFailures,
 		&c.Status, &c.StatusMessage, &c.CreatedAt, &c.UpdatedAt)
@@ -115,7 +115,7 @@ func (s *CronJobService) Update(ctx context.Context, cronJob *model.CronJob) err
 
 	if err := signalProvision(ctx, s.tc, s.db, cronJob.TenantID, model.ProvisionTask{
 		WorkflowName: "UpdateCronJobWorkflow",
-		WorkflowID:   workflowID("cron-job", cronJob.Name, cronJob.ID),
+		WorkflowID:   workflowID("cron-job", cronJob.ID),
 		Arg:          cronJob.ID,
 	}); err != nil {
 		return fmt.Errorf("signal UpdateCronJobWorkflow: %w", err)
@@ -125,18 +125,18 @@ func (s *CronJobService) Update(ctx context.Context, cronJob *model.CronJob) err
 }
 
 func (s *CronJobService) Delete(ctx context.Context, id string) error {
-	var name, tenantID string
+	var tenantID string
 	err := s.db.QueryRow(ctx,
-		"UPDATE cron_jobs SET status = $1, updated_at = now() WHERE id = $2 RETURNING name, tenant_id",
+		"UPDATE cron_jobs SET status = $1, updated_at = now() WHERE id = $2 RETURNING tenant_id",
 		model.StatusDeleting, id,
-	).Scan(&name, &tenantID)
+	).Scan(&tenantID)
 	if err != nil {
 		return fmt.Errorf("set cron job %s status to deleting: %w", id, err)
 	}
 
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteCronJobWorkflow",
-		WorkflowID:   workflowID("cron-job", name, id),
+		WorkflowID:   workflowID("cron-job", id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("signal DeleteCronJobWorkflow: %w", err)
@@ -146,8 +146,8 @@ func (s *CronJobService) Delete(ctx context.Context, id string) error {
 }
 
 func (s *CronJobService) Enable(ctx context.Context, id string) error {
-	var status, name, tenantID string
-	err := s.db.QueryRow(ctx, "SELECT status, name, tenant_id FROM cron_jobs WHERE id = $1", id).Scan(&status, &name, &tenantID)
+	var status, tenantID string
+	err := s.db.QueryRow(ctx, "SELECT status, tenant_id FROM cron_jobs WHERE id = $1", id).Scan(&status, &tenantID)
 	if err != nil {
 		return fmt.Errorf("get cron job status: %w", err)
 	}
@@ -165,14 +165,14 @@ func (s *CronJobService) Enable(ctx context.Context, id string) error {
 
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "EnableCronJobWorkflow",
-		WorkflowID:   workflowID("cron-job", name, id),
+		WorkflowID:   workflowID("cron-job", id),
 		Arg:          id,
 	})
 }
 
 func (s *CronJobService) Disable(ctx context.Context, id string) error {
-	var status, name, tenantID string
-	err := s.db.QueryRow(ctx, "SELECT status, name, tenant_id FROM cron_jobs WHERE id = $1", id).Scan(&status, &name, &tenantID)
+	var status, tenantID string
+	err := s.db.QueryRow(ctx, "SELECT status, tenant_id FROM cron_jobs WHERE id = $1", id).Scan(&status, &tenantID)
 	if err != nil {
 		return fmt.Errorf("get cron job status: %w", err)
 	}
@@ -190,14 +190,14 @@ func (s *CronJobService) Disable(ctx context.Context, id string) error {
 
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DisableCronJobWorkflow",
-		WorkflowID:   workflowID("cron-job", name, id),
+		WorkflowID:   workflowID("cron-job", id),
 		Arg:          id,
 	})
 }
 
 func (s *CronJobService) Retry(ctx context.Context, id string) error {
-	var status, name, tenantID string
-	err := s.db.QueryRow(ctx, "SELECT status, name, tenant_id FROM cron_jobs WHERE id = $1", id).Scan(&status, &name, &tenantID)
+	var status, tenantID string
+	err := s.db.QueryRow(ctx, "SELECT status, tenant_id FROM cron_jobs WHERE id = $1", id).Scan(&status, &tenantID)
 	if err != nil {
 		return fmt.Errorf("get cron job status: %w", err)
 	}
@@ -210,7 +210,7 @@ func (s *CronJobService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateCronJobWorkflow",
-		WorkflowID:   workflowID("cron-job", name, id),
+		WorkflowID:   workflowID("cron-job", id),
 		Arg:          id,
 	})
 }
@@ -231,14 +231,13 @@ func (s *CronJobService) ReportCronOutcome(ctx context.Context, id string, succe
 	// Increment consecutive_failures and check threshold.
 	var failures, maxFailures int
 	var enabled bool
-	var name string
 	err := s.db.QueryRow(ctx,
 		`UPDATE cron_jobs
 		 SET consecutive_failures = consecutive_failures + 1, updated_at = now()
 		 WHERE id = $1
-		 RETURNING consecutive_failures, max_failures, enabled, name`,
+		 RETURNING consecutive_failures, max_failures, enabled`,
 		id,
-	).Scan(&failures, &maxFailures, &enabled, &name)
+	).Scan(&failures, &maxFailures, &enabled)
 	if err != nil {
 		return fmt.Errorf("increment cron job failures: %w", err)
 	}
@@ -259,7 +258,7 @@ func (s *CronJobService) ReportCronOutcome(ctx context.Context, id string, succe
 		_ = s.db.QueryRow(ctx, "SELECT tenant_id FROM cron_jobs WHERE id = $1", id).Scan(&tenantID)
 		_ = signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 			WorkflowName: "DisableCronJobWorkflow",
-			WorkflowID:   workflowID("cron-job", name, id),
+			WorkflowID:   workflowID("cron-job", id),
 			Arg:          id,
 		})
 	}

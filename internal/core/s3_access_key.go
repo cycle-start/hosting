@@ -141,7 +141,7 @@ func (s *S3AccessKeyService) Delete(ctx context.Context, id string) error {
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteS3AccessKeyWorkflow",
-		WorkflowID:   workflowID("s3-access-key", accessKeyID, id),
+		WorkflowID:   workflowID("s3-access-key", id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("signal DeleteS3AccessKeyWorkflow: %w", err)
@@ -169,7 +169,7 @@ func (s *S3AccessKeyService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateS3AccessKeyWorkflow",
-		WorkflowID:   workflowID("s3-access-key", accessKeyID, id),
+		WorkflowID:   workflowID("s3-access-key", id),
 		Arg:          id,
 	})
 }

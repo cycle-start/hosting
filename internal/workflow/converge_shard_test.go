@@ -51,10 +51,10 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 		{ID: "node-2"},
 	}
 	tenants := []model.Tenant{
-		{ID: "tenant-1", Name: "t_test123456", BrandID: "test-brand", ShardID: &tenantShardID, UID: 1000, SFTPEnabled: true, Status: model.StatusActive},
+		{ID: "tenant-1", BrandID: "test-brand", ShardID: &tenantShardID, UID: 1000, SFTPEnabled: true, Status: model.StatusActive},
 	}
 	webroots := []model.Webroot{
-		{ID: "wr-1", TenantID: "tenant-1", Name: "main", Runtime: "php", RuntimeVersion: "8.5", RuntimeConfig: json.RawMessage(`{}`), PublicFolder: "public", Status: model.StatusActive},
+		{ID: "wr-1", TenantID: "tenant-1", Runtime: "php", RuntimeVersion: "8.5", RuntimeConfig: json.RawMessage(`{}`), PublicFolder: "public", Status: model.StatusActive},
 	}
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusConverging)).Return(nil)
@@ -77,20 +77,20 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 
 	// CleanOrphanedConfigs on each node before creating webroots.
 	s.env.OnActivity("CleanOrphanedConfigs", mock.Anything, activity.CleanOrphanedConfigsInput{
-		ExpectedConfigs: map[string]bool{"t_test123456_main.conf": true},
+		ExpectedConfigs: map[string]bool{"tenant-1_wr-1.conf": true},
 	}).Return(activity.CleanOrphanedConfigsResult{}, nil)
 
 	// CreateTenant for each node.
 	s.env.OnActivity("CreateTenant", mock.Anything, activity.CreateTenantParams{
-		ID: "tenant-1", Name: "t_test123456", UID: 1000, SFTPEnabled: true,
+		ID: "tenant-1", Name: "tenant-1", UID: 1000, SFTPEnabled: true,
 	}).Return(nil)
 	s.env.OnActivity("SyncSSHConfig", mock.Anything, activity.SyncSSHConfigParams{
-		TenantName: "t_test123456", SFTPEnabled: true,
+		TenantName: "tenant-1", SFTPEnabled: true,
 	}).Return(nil)
 
 	// CreateWebroot for each node.
 	s.env.OnActivity("CreateWebroot", mock.Anything, activity.CreateWebrootParams{
-		ID: "wr-1", TenantName: "t_test123456", Name: "main",
+		ID: "wr-1", TenantName: "tenant-1", Name: "wr-1",
 		Runtime: "php", RuntimeVersion: "8.5", RuntimeConfig: "{}",
 		PublicFolder: "public",
 		FQDNs:        []activity.FQDNParam{{FQDN: "example.com", WebrootID: "wr-1", SSLEnabled: true}},
@@ -115,7 +115,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestDatabaseShard() {
 		{ID: "node-1"},
 	}
 	databases := []model.Database{
-		{ID: "db-1", Name: "mydb", ShardID: &shardID, Status: model.StatusActive},
+		{ID: "db-1", ShardID: &shardID, Status: model.StatusActive},
 	}
 	users := []model.DatabaseUser{
 		{ID: "dbu-1", DatabaseID: "db-1", Username: "admin", Password: "pass", Privileges: []string{"ALL"}, Status: model.StatusActive},
@@ -127,10 +127,10 @@ func (s *ConvergeShardWorkflowTestSuite) TestDatabaseShard() {
 	// SetReadOnly(false) on the primary node.
 	s.env.OnActivity("SetReadOnly", mock.Anything, false).Return(nil)
 	s.env.OnActivity("ListDatabasesByShard", mock.Anything, shardID).Return(databases, nil)
-	s.env.OnActivity("CreateDatabase", mock.Anything, "mydb").Return(nil)
+	s.env.OnActivity("CreateDatabase", mock.Anything, "db-1").Return(nil)
 	s.env.OnActivity("ListDatabaseUsersByDatabaseID", mock.Anything, "db-1").Return(users, nil)
 	s.env.OnActivity("CreateDatabaseUser", mock.Anything, activity.CreateDatabaseUserParams{
-		DatabaseName: "mydb",
+		DatabaseName: "db-1",
 		Username:     "admin",
 		Password:     "pass",
 		Privileges:   []string{"ALL"},
@@ -152,7 +152,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestValkeyShard() {
 		{ID: "node-1"},
 	}
 	instances := []model.ValkeyInstance{
-		{ID: "vk-1", Name: "cache", ShardID: &shardID, Port: 6379, Password: "vkpass", MaxMemoryMB: 128, Status: model.StatusActive},
+		{ID: "vk-1", ShardID: &shardID, Port: 6379, Password: "vkpass", MaxMemoryMB: 128, Status: model.StatusActive},
 	}
 	users := []model.ValkeyUser{
 		{ID: "vku-1", ValkeyInstanceID: "vk-1", Username: "app", Password: "apppass", Privileges: []string{"allcommands"}, KeyPattern: "*", Status: model.StatusActive},
@@ -163,14 +163,14 @@ func (s *ConvergeShardWorkflowTestSuite) TestValkeyShard() {
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("ListValkeyInstancesByShard", mock.Anything, shardID).Return(instances, nil)
 	s.env.OnActivity("CreateValkeyInstance", mock.Anything, activity.CreateValkeyInstanceParams{
-		Name:        "cache",
+		Name:        "vk-1",
 		Port:        6379,
 		Password:    "vkpass",
 		MaxMemoryMB: 128,
 	}).Return(nil)
 	s.env.OnActivity("ListValkeyUsersByInstanceID", mock.Anything, "vk-1").Return(users, nil)
 	s.env.OnActivity("CreateValkeyUser", mock.Anything, activity.CreateValkeyUserParams{
-		InstanceName: "cache",
+		InstanceName: "vk-1",
 		Port:         6379,
 		Username:     "app",
 		Password:     "apppass",
@@ -212,8 +212,8 @@ func (s *ConvergeShardWorkflowTestSuite) TestSkipsInactiveResources() {
 	}
 	// A provisioning tenant should be skipped.
 	tenants := []model.Tenant{
-		{ID: "tenant-active", Name: "t_test123456", BrandID: "test-brand", UID: 1000, Status: model.StatusActive},
-		{ID: "tenant-prov", Name: "t_test123456", BrandID: "test-brand", UID: 1001, Status: model.StatusProvisioning},
+		{ID: "tenant-active", BrandID: "test-brand", UID: 1000, Status: model.StatusActive},
+		{ID: "tenant-prov", BrandID: "test-brand", UID: 1001, Status: model.StatusProvisioning},
 	}
 
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
@@ -238,10 +238,10 @@ func (s *ConvergeShardWorkflowTestSuite) TestSkipsInactiveResources() {
 
 	// Only the active tenant gets CreateTenant.
 	s.env.OnActivity("CreateTenant", mock.Anything, activity.CreateTenantParams{
-		ID: "tenant-active", Name: "t_test123456", UID: 1000,
+		ID: "tenant-active", Name: "tenant-active", UID: 1000,
 	}).Return(nil)
 	s.env.OnActivity("SyncSSHConfig", mock.Anything, activity.SyncSSHConfigParams{
-		TenantName: "t_test123456",
+		TenantName: "tenant-active",
 	}).Return(nil)
 
 	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
@@ -273,7 +273,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestPartialFailureContinues() {
 		{ID: "node-bad"},
 	}
 	databases := []model.Database{
-		{ID: "db-1", Name: "mydb", ShardID: &shardID, Status: model.StatusActive},
+		{ID: "db-1", ShardID: &shardID, Status: model.StatusActive},
 	}
 
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
@@ -286,7 +286,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestPartialFailureContinues() {
 	s.env.OnActivity("ListDatabasesByShard", mock.Anything, shardID).Return(databases, nil)
 
 	// CreateDatabase on primary only - succeeds.
-	s.env.OnActivity("CreateDatabase", mock.Anything, "mydb").Return(nil)
+	s.env.OnActivity("CreateDatabase", mock.Anything, "db-1").Return(nil)
 
 	// User listing still runs (workflow doesn't stop).
 	s.env.OnActivity("ListDatabaseUsersByDatabaseID", mock.Anything, "db-1").Return([]model.DatabaseUser{}, nil)

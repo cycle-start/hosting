@@ -95,11 +95,6 @@ func TestTenantService_Create_Success(t *testing.T) {
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
 	// Tenant name lookup for signalProvision
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
 
 	// Temporal workflow
 	wfRun := &temporalmocks.WorkflowRun{}
@@ -185,11 +180,6 @@ func TestTenantService_Create_WorkflowError(t *testing.T) {
 	db.On("QueryRow", ctx, "SELECT nextval('tenant_uid_seq')", []any(nil)).Return(row)
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
 
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal unavailable"))
 
@@ -219,24 +209,23 @@ func TestTenantService_GetByID_Success(t *testing.T) {
 	shardName := "Test Shard"
 	row := &mockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = tenantID
-		*(dest[1].(*string)) = "t_abc1234567" // name
-		*(dest[2].(*string)) = "test-brand"   // brand_id
-		*(dest[3].(*string)) = "cust-1"       // customer_id
-		*(dest[4].(*string)) = regionID       // region_id
-		*(dest[5].(*string)) = clusterID      // cluster_id
-		*(dest[6].(**string)) = &shardID      // shard_id
-		*(dest[7].(*int)) = 5001              // uid
-		*(dest[8].(*bool)) = true             // sftp_enabled
-		*(dest[9].(*bool)) = false            // ssh_enabled
-		*(dest[10].(*int64)) = int64(1073741824) // disk_quota_bytes
-		*(dest[11].(*string)) = model.StatusActive // status
-		*(dest[12].(**string)) = nil           // status_message
-		*(dest[13].(*string)) = ""             // suspend_reason
-		*(dest[14].(*time.Time)) = now         // created_at
-		*(dest[15].(*time.Time)) = now         // updated_at
-		*(dest[16].(*string)) = regionName     // region_name
-		*(dest[17].(*string)) = clusterName    // cluster_name
-		*(dest[18].(**string)) = &shardName    // shard_name
+		*(dest[1].(*string)) = "test-brand"   // brand_id
+		*(dest[2].(*string)) = "cust-1"       // customer_id
+		*(dest[3].(*string)) = regionID       // region_id
+		*(dest[4].(*string)) = clusterID      // cluster_id
+		*(dest[5].(**string)) = &shardID      // shard_id
+		*(dest[6].(*int)) = 5001              // uid
+		*(dest[7].(*bool)) = true             // sftp_enabled
+		*(dest[8].(*bool)) = false            // ssh_enabled
+		*(dest[9].(*int64)) = int64(1073741824) // disk_quota_bytes
+		*(dest[10].(*string)) = model.StatusActive // status
+		*(dest[11].(**string)) = nil           // status_message
+		*(dest[12].(*string)) = ""             // suspend_reason
+		*(dest[13].(*time.Time)) = now         // created_at
+		*(dest[14].(*time.Time)) = now         // updated_at
+		*(dest[15].(*string)) = regionName     // region_name
+		*(dest[16].(*string)) = clusterName    // cluster_name
+		*(dest[17].(**string)) = &shardName    // shard_name
 		return nil
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(row)
@@ -245,7 +234,6 @@ func TestTenantService_GetByID_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, tenantID, result.ID)
-	assert.Equal(t, "t_abc1234567", result.Name)
 	assert.Equal(t, "cust-1", result.CustomerID)
 	assert.Equal(t, regionID, result.RegionID)
 	assert.Equal(t, clusterID, result.ClusterID)
@@ -303,46 +291,44 @@ func TestTenantService_List_Success(t *testing.T) {
 	rows := newMockRows(
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
-			*(dest[1].(*string)) = "t_tenant00001" // name
-			*(dest[2].(*string)) = "test-brand"    // brand_id
-			*(dest[3].(*string)) = "cust-1"        // customer_id
-			*(dest[4].(*string)) = regionID        // region_id
-			*(dest[5].(*string)) = clusterID       // cluster_id
-			*(dest[6].(**string)) = &shardID       // shard_id
-			*(dest[7].(*int)) = 5001               // uid
-			*(dest[8].(*bool)) = false             // sftp_enabled
-			*(dest[9].(*bool)) = false             // ssh_enabled
-			*(dest[10].(*int64)) = int64(0)        // disk_quota_bytes
-			*(dest[11].(*string)) = model.StatusActive // status
-			*(dest[12].(**string)) = nil           // status_message
-			*(dest[13].(*string)) = ""             // suspend_reason
-			*(dest[14].(*time.Time)) = now         // created_at
-			*(dest[15].(*time.Time)) = now         // updated_at
-			*(dest[16].(*string)) = regionName     // region_name
-			*(dest[17].(*string)) = clusterName    // cluster_name
-			*(dest[18].(**string)) = &shardName    // shard_name
+			*(dest[1].(*string)) = "test-brand"    // brand_id
+			*(dest[2].(*string)) = "cust-1"        // customer_id
+			*(dest[3].(*string)) = regionID        // region_id
+			*(dest[4].(*string)) = clusterID       // cluster_id
+			*(dest[5].(**string)) = &shardID       // shard_id
+			*(dest[6].(*int)) = 5001               // uid
+			*(dest[7].(*bool)) = false             // sftp_enabled
+			*(dest[8].(*bool)) = false             // ssh_enabled
+			*(dest[9].(*int64)) = int64(0)         // disk_quota_bytes
+			*(dest[10].(*string)) = model.StatusActive // status
+			*(dest[11].(**string)) = nil           // status_message
+			*(dest[12].(*string)) = ""             // suspend_reason
+			*(dest[13].(*time.Time)) = now         // created_at
+			*(dest[14].(*time.Time)) = now         // updated_at
+			*(dest[15].(*string)) = regionName     // region_name
+			*(dest[16].(*string)) = clusterName    // cluster_name
+			*(dest[17].(**string)) = &shardName    // shard_name
 			return nil
 		},
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id2
-			*(dest[1].(*string)) = "t_tenant00002" // name
-			*(dest[2].(*string)) = "test-brand"    // brand_id
-			*(dest[3].(*string)) = "cust-1"        // customer_id
-			*(dest[4].(*string)) = regionID        // region_id
-			*(dest[5].(*string)) = clusterID       // cluster_id
-			*(dest[6].(**string)) = &shardID       // shard_id
-			*(dest[7].(*int)) = 5002               // uid
-			*(dest[8].(*bool)) = true              // sftp_enabled
-			*(dest[9].(*bool)) = false             // ssh_enabled
-			*(dest[10].(*int64)) = int64(0)        // disk_quota_bytes
-			*(dest[11].(*string)) = model.StatusPending // status
-			*(dest[12].(**string)) = nil           // status_message
-			*(dest[13].(*string)) = ""             // suspend_reason
-			*(dest[14].(*time.Time)) = now         // created_at
-			*(dest[15].(*time.Time)) = now         // updated_at
-			*(dest[16].(*string)) = regionName     // region_name
-			*(dest[17].(*string)) = clusterName    // cluster_name
-			*(dest[18].(**string)) = &shardName    // shard_name
+			*(dest[1].(*string)) = "test-brand"    // brand_id
+			*(dest[2].(*string)) = "cust-1"        // customer_id
+			*(dest[3].(*string)) = regionID        // region_id
+			*(dest[4].(*string)) = clusterID       // cluster_id
+			*(dest[5].(**string)) = &shardID       // shard_id
+			*(dest[6].(*int)) = 5002               // uid
+			*(dest[7].(*bool)) = true              // sftp_enabled
+			*(dest[8].(*bool)) = false             // ssh_enabled
+			*(dest[9].(*int64)) = int64(0)         // disk_quota_bytes
+			*(dest[10].(*string)) = model.StatusPending // status
+			*(dest[11].(**string)) = nil           // status_message
+			*(dest[12].(*string)) = ""             // suspend_reason
+			*(dest[13].(*time.Time)) = now         // created_at
+			*(dest[14].(*time.Time)) = now         // updated_at
+			*(dest[15].(*string)) = regionName     // region_name
+			*(dest[16].(*string)) = clusterName    // cluster_name
+			*(dest[17].(**string)) = &shardName    // shard_name
 			return nil
 		},
 	)
@@ -426,11 +412,6 @@ func TestTenantService_Update_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -469,11 +450,6 @@ func TestTenantService_Update_WorkflowError(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
 
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
@@ -496,11 +472,6 @@ func TestTenantService_Delete_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -540,11 +511,6 @@ func TestTenantService_Delete_WorkflowError(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
 
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
@@ -567,11 +533,6 @@ func TestTenantService_Suspend_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -610,11 +571,6 @@ func TestTenantService_Suspend_WorkflowError(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
 
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
@@ -645,46 +601,44 @@ func TestTenantService_ListByShard_Success(t *testing.T) {
 	rows := newMockRows(
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id1
-			*(dest[1].(*string)) = "t_tenant00001" // name
-			*(dest[2].(*string)) = "test-brand"    // brand_id
-			*(dest[3].(*string)) = "cust-1"        // customer_id
-			*(dest[4].(*string)) = regionID        // region_id
-			*(dest[5].(*string)) = clusterID       // cluster_id
-			*(dest[6].(**string)) = &shardID       // shard_id
-			*(dest[7].(*int)) = 5001               // uid
-			*(dest[8].(*bool)) = false             // sftp_enabled
-			*(dest[9].(*bool)) = false             // ssh_enabled
-			*(dest[10].(*int64)) = int64(0)        // disk_quota_bytes
-			*(dest[11].(*string)) = model.StatusActive // status
-			*(dest[12].(**string)) = nil           // status_message
-			*(dest[13].(*string)) = ""             // suspend_reason
-			*(dest[14].(*time.Time)) = now         // created_at
-			*(dest[15].(*time.Time)) = now         // updated_at
-			*(dest[16].(*string)) = regionName     // region_name
-			*(dest[17].(*string)) = clusterName    // cluster_name
-			*(dest[18].(**string)) = &shardName    // shard_name
+			*(dest[1].(*string)) = "test-brand"    // brand_id
+			*(dest[2].(*string)) = "cust-1"        // customer_id
+			*(dest[3].(*string)) = regionID        // region_id
+			*(dest[4].(*string)) = clusterID       // cluster_id
+			*(dest[5].(**string)) = &shardID       // shard_id
+			*(dest[6].(*int)) = 5001               // uid
+			*(dest[7].(*bool)) = false             // sftp_enabled
+			*(dest[8].(*bool)) = false             // ssh_enabled
+			*(dest[9].(*int64)) = int64(0)         // disk_quota_bytes
+			*(dest[10].(*string)) = model.StatusActive // status
+			*(dest[11].(**string)) = nil           // status_message
+			*(dest[12].(*string)) = ""             // suspend_reason
+			*(dest[13].(*time.Time)) = now         // created_at
+			*(dest[14].(*time.Time)) = now         // updated_at
+			*(dest[15].(*string)) = regionName     // region_name
+			*(dest[16].(*string)) = clusterName    // cluster_name
+			*(dest[17].(**string)) = &shardName    // shard_name
 			return nil
 		},
 		func(dest ...any) error {
 			*(dest[0].(*string)) = id2
-			*(dest[1].(*string)) = "t_tenant00002" // name
-			*(dest[2].(*string)) = "test-brand"    // brand_id
-			*(dest[3].(*string)) = "cust-1"        // customer_id
-			*(dest[4].(*string)) = regionID        // region_id
-			*(dest[5].(*string)) = clusterID       // cluster_id
-			*(dest[6].(**string)) = &shardID       // shard_id
-			*(dest[7].(*int)) = 5002               // uid
-			*(dest[8].(*bool)) = true              // sftp_enabled
-			*(dest[9].(*bool)) = false             // ssh_enabled
-			*(dest[10].(*int64)) = int64(0)        // disk_quota_bytes
-			*(dest[11].(*string)) = model.StatusPending // status
-			*(dest[12].(**string)) = nil           // status_message
-			*(dest[13].(*string)) = ""             // suspend_reason
-			*(dest[14].(*time.Time)) = now         // created_at
-			*(dest[15].(*time.Time)) = now         // updated_at
-			*(dest[16].(*string)) = regionName     // region_name
-			*(dest[17].(*string)) = clusterName    // cluster_name
-			*(dest[18].(**string)) = &shardName    // shard_name
+			*(dest[1].(*string)) = "test-brand"    // brand_id
+			*(dest[2].(*string)) = "cust-1"        // customer_id
+			*(dest[3].(*string)) = regionID        // region_id
+			*(dest[4].(*string)) = clusterID       // cluster_id
+			*(dest[5].(**string)) = &shardID       // shard_id
+			*(dest[6].(*int)) = 5002               // uid
+			*(dest[7].(*bool)) = true              // sftp_enabled
+			*(dest[8].(*bool)) = false             // ssh_enabled
+			*(dest[9].(*int64)) = int64(0)         // disk_quota_bytes
+			*(dest[10].(*string)) = model.StatusPending // status
+			*(dest[11].(**string)) = nil           // status_message
+			*(dest[12].(*string)) = ""             // suspend_reason
+			*(dest[13].(*time.Time)) = now         // created_at
+			*(dest[14].(*time.Time)) = now         // updated_at
+			*(dest[15].(*string)) = regionName     // region_name
+			*(dest[16].(*string)) = clusterName    // cluster_name
+			*(dest[17].(**string)) = &shardName    // shard_name
 			return nil
 		},
 	)
@@ -763,11 +717,6 @@ func TestTenantService_Unsuspend_Success(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
@@ -806,11 +755,6 @@ func TestTenantService_Unsuspend_WorkflowError(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
 
-	tenantNameRow := &mockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow)
 
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 

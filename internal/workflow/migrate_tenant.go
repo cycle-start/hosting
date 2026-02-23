@@ -94,7 +94,7 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "CreateTenant", activity.CreateTenantParams{
 			ID:             tenant.ID,
-			Name:           tenant.Name,
+			Name:           tenant.ID,
 			UID:            tenant.UID,
 			SFTPEnabled:    tenant.SFTPEnabled,
 			SSHEnabled:     tenant.SSHEnabled,
@@ -140,8 +140,8 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 			nodeCtx := nodeActivityCtx(ctx, node.ID)
 			err = workflow.ExecuteActivity(nodeCtx, "CreateWebroot", activity.CreateWebrootParams{
 				ID:             webroot.ID,
-				TenantName:     tenant.Name,
-				Name:           webroot.Name,
+				TenantName:     tenant.ID,
+				Name:           webroot.ID,
 				Runtime:        webroot.Runtime,
 				RuntimeVersion: webroot.RuntimeVersion,
 				RuntimeConfig:  string(webroot.RuntimeConfig),
@@ -150,7 +150,7 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 			}).Get(ctx, nil)
 			if err != nil {
 				_ = setResourceFailed(ctx, "tenants", tenantID, err)
-				return fmt.Errorf("create webroot %s on node %s: %w", webroot.Name, node.ID, err)
+				return fmt.Errorf("create webroot %s on node %s: %w", webroot.ID, node.ID, err)
 			}
 		}
 	}
@@ -194,10 +194,10 @@ func MigrateTenantWorkflow(ctx workflow.Context, params core.MigrateTenantParams
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		// Delete webroots from source nodes.
 		for _, webroot := range webroots {
-			_ = workflow.ExecuteActivity(nodeCtx, "DeleteWebroot", tenant.Name, webroot.Name).Get(ctx, nil)
+			_ = workflow.ExecuteActivity(nodeCtx, "DeleteWebroot", tenant.ID, webroot.ID).Get(ctx, nil)
 		}
 		// Delete tenant from source nodes.
-		_ = workflow.ExecuteActivity(nodeCtx, "DeleteTenant", tenant.Name).Get(ctx, nil)
+		_ = workflow.ExecuteActivity(nodeCtx, "DeleteTenant", tenant.ID).Get(ctx, nil)
 	}
 
 	// Set tenant status to active.

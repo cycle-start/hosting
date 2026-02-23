@@ -113,7 +113,7 @@ func (s *ValkeyUserService) Update(ctx context.Context, user *model.ValkeyUser) 
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "UpdateValkeyUserWorkflow",
-		WorkflowID:   workflowID("valkey-user", user.Username, user.ID),
+		WorkflowID:   workflowID("valkey-user", user.ID),
 		Arg:          user.ID,
 	}); err != nil {
 		return fmt.Errorf("signal UpdateValkeyUserWorkflow: %w", err)
@@ -138,7 +138,7 @@ func (s *ValkeyUserService) Delete(ctx context.Context, id string) error {
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "DeleteValkeyUserWorkflow",
-		WorkflowID:   workflowID("valkey-user", username, id),
+		WorkflowID:   workflowID("valkey-user", id),
 		Arg:          id,
 	}); err != nil {
 		return fmt.Errorf("signal DeleteValkeyUserWorkflow: %w", err)
@@ -166,7 +166,7 @@ func (s *ValkeyUserService) Retry(ctx context.Context, id string) error {
 	}
 	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateValkeyUserWorkflow",
-		WorkflowID:   workflowID("valkey-user", username, id),
+		WorkflowID:   workflowID("valkey-user", id),
 		Arg:          id,
 	})
 }

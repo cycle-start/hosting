@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/edvin/hosting/internal/core"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	temporalmocks "go.temporal.io/sdk/mocks"
@@ -110,69 +111,59 @@ func TestValkeyInstanceMigrate_Success(t *testing.T) {
 	// GetByID call for the valkey instance
 	now := time.Now()
 	getRow := &handlerMockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = validID
-		*(dest[1].(*string)) = tenantID // TenantID
-		*(dest[2].(*string)) = ""       // subscription_id
-		*(dest[3].(*string)) = "my-valkey"
-		*(dest[4].(**string)) = nil
-		*(dest[5].(*int)) = 0
-		*(dest[6].(*int)) = 64
-		*(dest[7].(*string)) = ""
-		*(dest[8].(*string)) = "active"
-		*(dest[9].(**string)) = nil
-		*(dest[10].(*string)) = ""
-		*(dest[11].(*time.Time)) = now
-		*(dest[12].(*time.Time)) = now
-		*(dest[13].(**string)) = nil
+		*(dest[0].(*string)) = validID     // ID
+		*(dest[1].(*string)) = tenantID    // TenantID
+		*(dest[2].(*string)) = ""          // SubscriptionID
+		*(dest[3].(**string)) = nil        // ShardID
+		*(dest[4].(*int)) = 0              // Port
+		*(dest[5].(*int)) = 64             // MaxMemoryMB
+		*(dest[6].(*string)) = ""          // Password
+		*(dest[7].(*string)) = "active"    // Status
+		*(dest[8].(**string)) = nil        // StatusMessage
+		*(dest[9].(*string)) = ""          // SuspendReason
+		*(dest[10].(*time.Time)) = now     // CreatedAt
+		*(dest[11].(*time.Time)) = now     // UpdatedAt
+		*(dest[12].(**string)) = nil       // ShardName
 		return nil
 	}}
 	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(getRow).Once()
 
 	// Brand check: tenant GetByID
-	// Scan order: ID, Name, BrandID, CustomerID, RegionID, ClusterID, ShardID, UID,
+	// Scan order: ID, BrandID, CustomerID, RegionID, ClusterID, ShardID, UID,
 	//   SFTPEnabled, SSHEnabled, DiskQuotaBytes, Status, StatusMessage, SuspendReason,
 	//   CreatedAt, UpdatedAt, RegionName, ClusterName, ShardName
 	tenantRow := &handlerMockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = tenantID         // ID
-		*(dest[1].(*string)) = "t_testtenant01" // Name
-		*(dest[2].(*string)) = "test-brand"     // BrandID
-		*(dest[3].(*string)) = ""               // CustomerID
-		*(dest[4].(*string)) = "dev"            // RegionID
-		*(dest[5].(*string)) = "dev"            // ClusterID
-		*(dest[6].(**string)) = nil             // ShardID
-		*(dest[7].(*int)) = 1000                // UID
-		*(dest[8].(*bool)) = false              // SFTPEnabled
-		*(dest[9].(*bool)) = false              // SSHEnabled
-		*(dest[10].(*int64)) = int64(0)         // DiskQuotaBytes
-		*(dest[11].(*string)) = "active"        // Status
-		*(dest[12].(**string)) = nil            // StatusMessage
-		*(dest[13].(*string)) = ""              // SuspendReason
-		*(dest[14].(*time.Time)) = now          // CreatedAt
-		*(dest[15].(*time.Time)) = now          // UpdatedAt
-		*(dest[16].(*string)) = "dev"           // RegionName
-		*(dest[17].(*string)) = "dev"           // ClusterName
-		*(dest[18].(**string)) = nil            // ShardName
+		*(dest[0].(*string)) = tenantID     // ID
+		*(dest[1].(*string)) = "test-brand" // BrandID
+		*(dest[2].(*string)) = ""           // CustomerID
+		*(dest[3].(*string)) = "dev"        // RegionID
+		*(dest[4].(*string)) = "dev"        // ClusterID
+		*(dest[5].(**string)) = nil         // ShardID
+		*(dest[6].(*int)) = 1000            // UID
+		*(dest[7].(*bool)) = false          // SFTPEnabled
+		*(dest[8].(*bool)) = false          // SSHEnabled
+		*(dest[9].(*int64)) = int64(0)      // DiskQuotaBytes
+		*(dest[10].(*string)) = "active"    // Status
+		*(dest[11].(**string)) = nil        // StatusMessage
+		*(dest[12].(*string)) = ""          // SuspendReason
+		*(dest[13].(*time.Time)) = now      // CreatedAt
+		*(dest[14].(*time.Time)) = now      // UpdatedAt
+		*(dest[15].(*string)) = "dev"       // RegionName
+		*(dest[16].(*string)) = "dev"       // ClusterName
+		*(dest[17].(**string)) = nil        // ShardName
 		return nil
 	}}
 	tenantDB.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(tenantRow).Once()
 
-	updateRow := &handlerMockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "my-valkey"
-		return nil
-	}}
-	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(updateRow).Once()
+	// Migrate: Exec to update status to provisioning.
+	db.On("Exec", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.NewCommandTag("UPDATE 1"), nil).Once()
 
+	// Migrate: resolveTenantIDFromValkeyInstance QueryRow.
 	resolveRow := &handlerMockRow{scanFunc: func(dest ...any) error {
 		*(dest[0].(*string)) = tenantID
 		return nil
 	}}
 	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
-
-	tenantNameRow := &handlerMockRow{scanFunc: func(dest ...any) error {
-		*(dest[0].(*string)) = "t_testtenant01"
-		return nil
-	}}
-	db.On("QueryRow", mock.Anything, mock.AnythingOfType("string"), mock.Anything).Return(tenantNameRow).Once()
 
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
