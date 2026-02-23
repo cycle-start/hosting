@@ -10,12 +10,6 @@ users:
       - ${ssh_public_key}
 
 runcmd:
-  # Start k3s with traefik and servicelb disabled.
-  - systemctl enable --now k3s
-  # Wait for k3s to be ready (kubeconfig file + node responding).
-  - until [ -f /etc/rancher/k3s/k3s.yaml ] && k3s kubectl get node 2>/dev/null; do sleep 2; done
-  # Make kubeconfig accessible for the ubuntu user.
-  - mkdir -p /home/ubuntu/.kube
-  - cp /etc/rancher/k3s/k3s.yaml /home/ubuntu/.kube/config
-  - chmod 644 /etc/rancher/k3s/k3s.yaml
-  - chown -R ubuntu:ubuntu /home/ubuntu/.kube
+  # k3s is installed and started by Ansible (k3s role), not cloud-init.
+  # If k3s is already installed (e.g. baked into the image), start it.
+  - test -f /usr/local/bin/k3s && systemctl enable --now k3s || true

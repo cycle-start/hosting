@@ -29,6 +29,20 @@ func ClusterApply(configPath string, timeout time.Duration) error {
 	}
 	client := NewClient(cfg.APIURL, apiKey)
 
+	// Wait for API to be reachable before proceeding.
+	fmt.Printf("Waiting for API at %s...\n", cfg.APIURL)
+	deadline := time.Now().Add(timeout)
+	for {
+		_, err := client.Get("/regions")
+		if err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("API not reachable after %s: %w", timeout, err)
+		}
+		time.Sleep(3 * time.Second)
+	}
+
 	// 1. Find or create region
 	regionID, err := findOrCreateRegion(client, cfg.Region)
 	if err != nil {

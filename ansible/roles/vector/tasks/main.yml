@@ -126,6 +126,7 @@
   copy:
     content: |
       [Service]
+      TimeoutStopSec=10
       ExecStartPre=
       ExecStartPre=/usr/bin/vector validate --skip-healthchecks --config-dir /etc/vector/config.d
       ExecStart=
@@ -138,6 +139,7 @@
   copy:
     content: |
       [Service]
+      TimeoutStopSec=10
       ExecStartPre=
       ExecStartPre=/usr/bin/vector validate --skip-healthchecks --config-toml /etc/vector/vector.toml
       ExecStart=

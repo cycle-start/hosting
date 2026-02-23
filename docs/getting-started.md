@@ -139,40 +139,19 @@ This builds the node-agent binary and deploys it to all VMs via Ansible (uses th
 
 **Full rebuild** (control plane + node agent + database reset):
 
-When both control plane and node-agent code have changed, the bootstrap sequence has a dependency chain: `seed` requires running node-agents, and `deploy-node-agent` requires registered nodes (dynamic Ansible inventory queries the API). Split `bootstrap` into parts with node-agent deployment in between:
-
 ```bash
-just vm-deploy                  # 1. Rebuild control plane images → k3s
-just reset-db                   # 2. Wipe both databases
-just migrate                    # 3. Run migrations
-just create-dev-key             # 4. Create dev API key
-just create-agent-key           # 5. Create agent API key
-just cluster-apply              # 6. Register cluster topology (nodes now in API)
-just deploy-node-agent          # 7. Deploy updated node-agent to all VMs (dynamic inventory works)
-just seed                       # 8. Seed test data (requires node-agents running)
+just rebuild
 ```
 
-Steps 2–6 can be chained: `just reset-db && just migrate && just create-dev-key && just create-agent-key && just cluster-apply`.
-
-**Alternative**: If you don't need the dynamic inventory (e.g. VMs were just recreated), use the static Ansible inventory to deploy node-agent before the API is up:
-
-```bash
-just vm-deploy                  # 1. Rebuild control plane images → k3s
-just ansible-bootstrap          # 2. Deploy node-agent + all configs (static inventory, no API needed)
-just reset-db && just bootstrap # 3. Wipe DB and run full bootstrap
-```
+This single command handles the full dependency chain: deploy control plane images to k3s, wipe DB, run migrations, create API keys, wait for core-api to be healthy, register cluster topology, deploy updated node-agent to all VMs (via dynamic Ansible inventory), and seed test data.
 
 **Destroying and recreating VMs** (nuclear option):
 
 ```bash
-just vm-down                    # Destroy all VMs
-just packer-base                # Rebuild base golden image (if needed)
-cd terraform && terraform apply # Recreate VMs
-just vm-kubeconfig              # Fetch kubeconfig
-just vm-deploy                  # Deploy control plane to k3s
-just ansible-bootstrap          # Deploy all software to VMs (static inventory)
-just bootstrap                  # Migrate, create keys, register cluster, seed
+just rebuild-all
 ```
+
+This destroys all VMs, recreates them via Terraform, installs all software via Ansible (including k3s on the controlplane), fetches kubeconfig, deploys control plane images, and runs the full bootstrap. Takes ~10 minutes.
 
 ## Project layout
 

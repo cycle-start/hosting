@@ -7,6 +7,17 @@
   shell: curl -sfL https://get.k3s.io | INSTALL_K3S_SKIP_START=true sh -s - --disable=servicelb
   when: not k3s_binary.stat.exists
 
+- name: Start k3s
+  systemd:
+    name: k3s
+    state: started
+    enabled: true
+
+- name: Wait for k3s kubeconfig
+  wait_for:
+    path: /etc/rancher/k3s/k3s.yaml
+    timeout: 60
+
 - name: Check if Helm is installed
   stat:
     path: /usr/local/bin/helm

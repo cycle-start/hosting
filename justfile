@@ -124,8 +124,27 @@ create-agent-key:
 cluster-apply:
     go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml
 
+# Wait for core-api to be healthy (used between migrate and cluster-apply)
+wait-api:
+    @echo "Waiting for core-api..."
+    @until curl -sf http://{{cp}}:8090/healthz > /dev/null 2>&1; do sleep 2; done
+    @echo "core-api is ready."
+
 # Full bootstrap after DB reset: migrate, create dev key, create agent key, register cluster, seed tenants
-bootstrap: migrate create-dev-key create-agent-key cluster-apply seed
+bootstrap: migrate create-dev-key create-agent-key wait-api cluster-apply seed
+
+# Full rebuild: deploy control plane + node agents + wipe DB + bootstrap
+# Use when both control plane and node-agent code have changed.
+rebuild: vm-deploy reset-db migrate create-dev-key create-agent-key wait-api cluster-apply deploy-node-agent seed
+
+# Nuclear rebuild: destroy VMs, recreate, deploy everything from scratch
+rebuild-all:
+    just vm-down
+    cd terraform && terraform apply -auto-approve
+    just ansible-bootstrap
+    just vm-kubeconfig
+    just vm-deploy
+    just bootstrap
 
 # Generate Temporal mTLS certificates
 gen-certs:
@@ -387,6 +406,10 @@ vm-down:
 vm-ssh name:
     ssh {{ssh_opts}} ubuntu@$(cd terraform && terraform output -json 2>/dev/null | python3 -c "import sys,json; o=json.load(sys.stdin); d={}; [d.update(v['value']) for k,v in o.items() if k.endswith('_ips')]; print(d['{{name}}'])")
 
+# Run a command on a VM (e.g. just vm-exec controlplane-0 "sudo systemctl start k3s")
+vm-exec name *cmd:
+    ssh {{ssh_opts}} ubuntu@$(cd terraform && terraform output -json 2>/dev/null | python3 -c "import sys,json; o=json.load(sys.stdin); d={}; [d.update(v['value']) for k,v in o.items() if k.endswith('_ips')]; print(d['{{name}}'])") {{cmd}}
+
 # --- k3s Control Plane ---
 
 # Rebuild and deploy a single image to k3s (e.g. just vm-deploy-one admin-ui)
@@ -435,6 +458,8 @@ vm-deploy:
       --set secrets.llmApiKey="$LLM_API_KEY" \
       --set secrets.agentApiKey="$AGENT_API_KEY" \
       {{ if path_exists("ssh_ca") == "true" { "--set-file secrets.sshCaPrivateKey=ssh_ca" } else { "" } }}
+    # Restart app pods to pick up new images (tag is always `latest`)
+    kubectl --context hosting rollout restart deployment/hosting-core-api deployment/hosting-worker deployment/hosting-admin-ui deployment/hosting-mcp-server
 
 # Fetch kubeconfig from controlplane VM and merge into ~/.kube/config
 vm-kubeconfig:
