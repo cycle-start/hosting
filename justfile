@@ -97,9 +97,14 @@ reset-powerdns:
 
 # Reset Temporal DB (drop and recreate databases, restart Temporal)
 reset-temporal:
+    # Scale down Temporal to release DB connections
+    kubectl --context hosting scale deployment/temporal --replicas=0
+    @sleep 5
+    kubectl --context hosting exec statefulset/postgres-core -- psql -U hosting postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IN ('temporal','temporal_visibility') AND pid <> pg_backend_pid();" || true
     kubectl --context hosting exec statefulset/postgres-core -- psql -U hosting postgres -c "DROP DATABASE IF EXISTS temporal;"
     kubectl --context hosting exec statefulset/postgres-core -- psql -U hosting postgres -c "DROP DATABASE IF EXISTS temporal_visibility;"
-    kubectl --context hosting rollout restart deployment/temporal
+    # Scale back up — Temporal auto-setup recreates databases on start
+    kubectl --context hosting scale deployment/temporal --replicas=1
     @echo "Waiting for Temporal to recreate databases..."
     @sleep 15
 
