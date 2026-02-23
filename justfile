@@ -119,6 +119,11 @@ migrate-status:
     @echo "=== PowerDNS DB ==="
     goose -dir migrations/powerdns postgres "postgres://hosting:hosting@{{cp}}:5433/hosting_powerdns?sslmode=disable" status
 
+# Create controlpanel database and user (one-time setup)
+create-controlpanel-db:
+    psql "postgres://hosting:hosting@{{cp}}:5432/hosting_core?sslmode=disable" -c "CREATE USER controlpanel WITH PASSWORD 'controlpanel';" || true
+    psql "postgres://hosting:hosting@{{cp}}:5432/hosting_core?sslmode=disable" -c "CREATE DATABASE controlpanel OWNER controlpanel;" || true
+
 # --- Auth ---
 
 # Create an API key (requires core-db running)
@@ -155,18 +160,6 @@ wait-db:
     @echo "Waiting for Postgres..."
     @until nc -z {{cp}} 5432 2>/dev/null; do sleep 2; done
     @echo "Postgres is ready."
-
-# Nuclear rebuild: destroy VMs, recreate, deploy everything from scratch
-rebuild-all:
-    just vm-down
-    cd terraform && terraform apply -auto-approve
-    @echo "Waiting for VMs to boot..."
-    @sleep 30
-    just ansible-bootstrap
-    just vm-kubeconfig
-    just vm-deploy
-    just wait-db
-    just bootstrap
 
 # Generate Temporal mTLS certificates
 gen-certs:
@@ -261,7 +254,7 @@ ansible-bootstrap: build-node-agent build-dbadmin-proxy
 # --- VM Infrastructure ---
 
 # Create VMs with Terraform and register them with the platform
-# (Requires golden images — run `just packer-all` first)
+# (Requires golden images — run `just packer-base` first)
 vm-up:
     @if sudo virsh net-info hosting 2>/dev/null | grep -q 'Active:.*no'; then \
         echo "Starting libvirt network 'hosting'..."; \
@@ -272,27 +265,11 @@ vm-up:
     just _wait-api
     go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml
 
-# Rebuild everything: base image, recreate VMs, Ansible provision, deploy control plane
+# Nuclear rebuild: base image, destroy/recreate VMs, provision, deploy, bootstrap
 vm-rebuild:
     just packer-base
     just vm-down
-    cd terraform && terraform apply -auto-approve
-    @if sudo virsh net-info hosting 2>/dev/null | grep -q 'Active:.*no'; then \
-        echo "Starting libvirt network 'hosting'..."; \
-        sudo virsh net-start hosting; \
-    fi
-    just _wait-ssh
-    just ansible-bootstrap
-    just _rerun-cloudinit
-    just _wait-k3s
-    just vm-kubeconfig
-    just vm-deploy
-    just _wait-postgres
-    just migrate
-    just create-dev-key
-    just create-agent-key
-    just _wait-api
-    go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml
+    just dev-k3s
 
 # Wait for k3s API to be reachable on the control plane VM
 [private]
@@ -509,16 +486,21 @@ vm-pods:
 vm-log name:
     kubectl --context hosting logs -f deployment/{{name}}
 
-# Full dev setup: build images, create VMs, deploy control plane, seed cluster
-dev-k3s: build-node-agent
-    just packer-role controlplane
+# Full dev setup: create VMs, provision, deploy control plane, bootstrap
+# Assumes base image exists (run `just packer-base` first, or use `just vm-rebuild`)
+dev-k3s:
     cd terraform && terraform apply -auto-approve
-    @echo "Waiting for k3s to be ready..."
-    @sleep 30
+    @if sudo virsh net-info hosting 2>/dev/null | grep -q 'Active:.*no'; then \
+        echo "Starting libvirt network 'hosting'..."; \
+        sudo virsh net-start hosting; \
+    fi
+    just _wait-ssh
+    just ansible-bootstrap
+    just _rerun-cloudinit
+    just _wait-k3s
     just vm-kubeconfig
     just vm-deploy
-    @sleep 10
-    go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml
+    just bootstrap
 
 # --- SSL ---
 

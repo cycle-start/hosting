@@ -13,21 +13,29 @@
 
 ## Quick Start
 
-### 1. Build golden images and create VMs
+### 1. Build golden image and create VMs
 
 ```bash
-just packer-all
+just packer-base
 just dev-k3s
 ```
 
-`packer-all` builds QEMU/KVM golden images for all VM roles (controlplane, web, db, dns, valkey, storage, dbadmin, lb, s3). Each image is a minimal Ubuntu with role-specific software and the node-agent binary pre-installed.
+Or as a single command (also rebuilds the base image and destroys existing VMs first):
 
-`dev-k3s` runs the full bootstrap:
-1. Creates all VMs via Terraform/libvirt (controlplane + node agents)
-2. Fetches the k3s kubeconfig
-3. Builds Docker images and imports them into k3s
-4. Deploys infrastructure (PostgreSQL, Temporal, Loki, Grafana, Prometheus) and the platform (core-api, worker, admin-ui, MCP server) to k3s
-5. Registers the cluster and nodes with the platform via `hostctl cluster apply`
+```bash
+just vm-rebuild
+```
+
+`packer-base` builds a single QEMU/KVM base golden image (minimal Ubuntu). Ansible handles installing role-specific software during provisioning.
+
+`dev-k3s` creates VMs and sets up the full environment (assumes base image already exists):
+1. Creates VMs via Terraform/libvirt
+2. Waits for SSH on all VMs
+3. Provisions all VMs via Ansible (static inventory, since the API isn't up yet)
+4. Re-runs cloud-init (so runcmd succeeds after Ansible installs software)
+5. Waits for k3s, then fetches the kubeconfig
+6. Builds Docker images and deploys infrastructure + platform to k3s
+7. Runs `bootstrap` (migrate, create API keys, register cluster, seed test data)
 
 ### 2. Enable Windows access (WSL2 only)
 
@@ -56,19 +64,23 @@ route add 10.10.10.0 mask 255.255.255.0 <WSL2_IP>
 
 After this, all services are accessible from the Windows browser. See [Local Networking](local-networking.md) for details.
 
-### 3. Bootstrap: migrate, create API keys, register cluster, seed data
+### 3. Bootstrap (already done by `dev-k3s`)
+
+`dev-k3s` runs `bootstrap` automatically at the end. If you need to re-run it (e.g. after a DB reset):
 
 ```bash
 just bootstrap
 ```
 
-This single command runs five steps:
+This runs the full sequence: wait for Postgres, migrate, create API keys, wait for core-api, register cluster, and seed data:
 
-1. **`migrate`** — runs goose migrations for both core and PowerDNS databases.
-2. **`create-dev-key`** — creates a well-known dev API key (`hst_dev_e2e_test_key_00000000`) used by seed configs, `hostctl`, and e2e tests.
-3. **`create-agent-key`** — creates the agent API key (`hst_agent_key_000000000000000`) used by the LLM incident agent.
-4. **`cluster-apply`** — registers the cluster topology (regions, clusters, shards, nodes) via `hostctl cluster apply`.
-5. **`seed`** — creates test data: a brand ("Acme Hosting"), DNS zone, tenant with webroots, databases, Valkey, S3, email, and a Laravel fixture app.
+1. **`wait-db`** — waits for PostgreSQL to accept connections.
+2. **`migrate`** — runs goose migrations for both core and PowerDNS databases.
+3. **`create-dev-key`** — creates a well-known dev API key (`hst_dev_e2e_test_key_00000000`) used by seed configs, `hostctl`, and e2e tests.
+4. **`create-agent-key`** — creates the agent API key (`hst_agent_key_000000000000000`) used by the LLM incident agent.
+5. **`wait-api`** — waits for core-api to be healthy.
+6. **`cluster-apply`** — registers the cluster topology (regions, clusters, shards, nodes) via `hostctl cluster apply`.
+7. **`seed`** — creates test data: a brand ("Acme Hosting"), DNS zone, tenant with webroots, databases, Valkey, S3, email, and a Laravel fixture app.
 
 You can also run each step individually: `just migrate`, `just create-dev-key`, `just cluster-apply`, `just seed`.
 
@@ -148,10 +160,10 @@ This single command handles the full dependency chain: deploy control plane imag
 **Destroying and recreating VMs** (nuclear option):
 
 ```bash
-just rebuild-all
+just vm-rebuild
 ```
 
-This destroys all VMs, recreates them via Terraform, installs all software via Ansible (including k3s on the controlplane), fetches kubeconfig, deploys control plane images, and runs the full bootstrap. Takes ~10 minutes.
+This rebuilds the base golden image, destroys all VMs, then runs `dev-k3s` (create VMs, Ansible provision, deploy control plane, full bootstrap).
 
 ## Project layout
 
@@ -161,6 +173,8 @@ cmd/
   worker/            Temporal worker (workflows + activities)
   node-agent/        Temporal worker running on each VM node
   admin-ui/          Admin UI reverse proxy + SPA server
+  mcp-server/        MCP server for LLM tool integration
+  dbadmin-proxy/     Reverse proxy for database admin UIs
   hostctl/           CLI for cluster bootstrap and test data seeding
 
 internal/
@@ -179,7 +193,7 @@ packer/              Packer configs for golden images
 seeds/               Test data seed YAML files
 migrations/
   core/              Core database migrations
-  service/           Service database migrations
+  powerdns/          PowerDNS database migrations
 deploy/
   k3s/               Kubernetes manifests for infrastructure services
   helm/hosting/      Helm chart for platform services
@@ -208,7 +222,7 @@ just test                      # Run unit tests
 just test-e2e                  # Run e2e tests
 just lint                      # Run linter
 just vm-deploy                 # Rebuild and redeploy to k3s
-just bootstrap                 # Create dev key + register cluster + seed data
+just bootstrap                 # Migrate, create keys, register cluster, seed data
 just cluster-apply             # Register cluster topology only
 just seed                      # Seed test data only
 just vm-pods                   # Show k3s pod status
