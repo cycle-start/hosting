@@ -3,6 +3,7 @@ package hostctl
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -31,9 +32,14 @@ func ClusterApply(configPath string, timeout time.Duration) error {
 
 	// Wait for API to be reachable before proceeding.
 	fmt.Printf("Waiting for API at %s...\n", cfg.APIURL)
+	probeClient := &Client{
+		BaseURL:    cfg.APIURL,
+		APIKey:     apiKey,
+		HTTPClient: &http.Client{Timeout: 5 * time.Second},
+	}
 	deadline := time.Now().Add(timeout)
 	for {
-		_, err := client.Get("/regions")
+		_, err := probeClient.Get("/regions")
 		if err == nil {
 			break
 		}
