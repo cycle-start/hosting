@@ -13,6 +13,7 @@ import type {
   LogQueryResponse,
   Incident, IncidentEvent, IncidentListParams,
   CapabilityGap, CapabilityGapListParams,
+  RegionRuntime,
 } from './types'
 
 function buildQuery(params?: Record<string, unknown>): string {
@@ -128,6 +129,14 @@ export function useDeleteRegion() {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/regions/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['regions'] }),
+  })
+}
+
+export function useRegionRuntimes(regionId: string) {
+  return useQuery({
+    queryKey: ['region-runtimes', regionId],
+    queryFn: () => api.get<PaginatedResponse<RegionRuntime>>(`/regions/${regionId}/runtimes`),
+    enabled: !!regionId,
   })
 }
 

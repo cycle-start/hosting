@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Plus, Trash2, Pencil, Globe, Play, Pause, RotateCcw, Terminal, Clock, Key, Lock, ScrollText, ChevronDown, ChevronRight } from 'lucide-react'
@@ -29,10 +29,9 @@ import {
   useCreateDaemon, useUpdateDaemon, useDeleteDaemon, useEnableDaemon, useDisableDaemon, useRetryDaemon,
   useCreateCronJob, useUpdateCronJob, useDeleteCronJob, useEnableCronJob, useDisableCronJob, useRetryCronJob,
   useEnvVars, useSetEnvVars, useDeleteEnvVar,
+  useRegionRuntimes,
 } from '@/lib/hooks'
 import type { FQDN, Daemon, CronJob, WebrootEnvVar } from '@/lib/types'
-
-const runtimes = ['php', 'node', 'python', 'ruby', 'static']
 const stopSignals = ['TERM', 'INT', 'QUIT', 'KILL', 'HUP']
 
 const webrootTabs = ['fqdns', 'daemons', 'cron-jobs', 'env-vars', 'access-logs', 'platform-logs']
@@ -44,6 +43,7 @@ function getWebrootTabFromHash() {
 export function WebrootDetailPage() {
   const { id: tenantId, webrootId } = useParams({ from: '/auth/tenants/$id/webroots/$webrootId' as never })
   const { data: tenant } = useTenant(tenantId)
+  const { data: regionRuntimesData } = useRegionRuntimes(tenant?.region_id ?? '')
   const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState(getWebrootTabFromHash)
@@ -58,6 +58,25 @@ export function WebrootDetailPage() {
   const [editPublicFolder, setEditPublicFolder] = useState('')
   const [editEnvFileName, setEditEnvFileName] = useState('')
   const [editServiceHostname, setEditServiceHostname] = useState(true)
+
+  // Group flat region runtimes into { runtime → versions[] }
+  const runtimeGroups = useMemo(() => {
+    const items = regionRuntimesData?.items ?? []
+    const order: string[] = []
+    const map: Record<string, string[]> = {}
+    for (const r of items) {
+      if (!r.available) continue
+      if (!map[r.runtime]) {
+        order.push(r.runtime)
+        map[r.runtime] = []
+      }
+      map[r.runtime].push(r.version)
+    }
+    return order.map(rt => ({ runtime: rt, versions: map[rt] }))
+  }, [regionRuntimesData])
+
+  const runtimeNames = runtimeGroups.map(g => g.runtime)
+  const editVersions = runtimeGroups.find(g => g.runtime === editRuntime)?.versions ?? []
 
   // Create FQDN form
   const [fqdnValue, setFqdnValue] = useState('')
@@ -673,16 +692,29 @@ export function WebrootDetailPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Runtime</Label>
-                <Select value={editRuntime} onValueChange={setEditRuntime}>
+                <Select value={editRuntime} onValueChange={(v) => {
+                  setEditRuntime(v)
+                  const group = runtimeGroups.find(g => g.runtime === v)
+                  if (group && group.versions.length > 0) {
+                    setEditVersion(group.versions[0])
+                  } else {
+                    setEditVersion('')
+                  }
+                }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {runtimes.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                    {runtimeNames.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>Version</Label>
-                <Input value={editVersion} onChange={(e) => setEditVersion(e.target.value)} />
+                <Select value={editVersion} onValueChange={setEditVersion}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {editVersions.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="space-y-2">
