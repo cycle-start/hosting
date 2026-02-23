@@ -95,8 +95,16 @@ reset-core:
 reset-powerdns:
     kubectl --context hosting exec statefulset/postgres-powerdns -- psql -U hosting hosting_powerdns -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 
-# Reset all databases
-reset-db: reset-core reset-powerdns
+# Reset Temporal DB (drop and recreate databases, restart Temporal)
+reset-temporal:
+    kubectl --context hosting exec statefulset/postgres-core -- psql -U hosting postgres -c "DROP DATABASE IF EXISTS temporal;"
+    kubectl --context hosting exec statefulset/postgres-core -- psql -U hosting postgres -c "DROP DATABASE IF EXISTS temporal_visibility;"
+    kubectl --context hosting rollout restart deployment/temporal
+    @echo "Waiting for Temporal to recreate databases..."
+    @sleep 15
+
+# Reset all databases (core + PowerDNS + Temporal)
+reset-db: reset-core reset-powerdns reset-temporal
 
 # Migration status
 migrate-status:
