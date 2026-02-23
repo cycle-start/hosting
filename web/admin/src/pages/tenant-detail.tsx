@@ -284,6 +284,10 @@ export function TenantDetailPage() {
       cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
     },
     {
+      accessorKey: 'subscription_id', header: 'Subscription',
+      cell: ({ row }) => <code className="text-xs">{row.original.subscription_id}</code>,
+    },
+    {
       accessorKey: 'runtime', header: 'Runtime',
       cell: ({ row }) => `${row.original.runtime} ${row.original.runtime_version}`,
     },
@@ -329,6 +333,10 @@ export function TenantDetailPage() {
     {
       accessorKey: 'name', header: 'Name',
       cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+    },
+    {
+      accessorKey: 'subscription_id', header: 'Subscription',
+      cell: ({ row }) => <code className="text-xs">{row.original.subscription_id}</code>,
     },
     {
       accessorKey: 'shard_name', header: 'Shard',
@@ -380,6 +388,10 @@ export function TenantDetailPage() {
       accessorKey: 'name', header: 'Name',
       cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
     },
+    {
+      accessorKey: 'subscription_id', header: 'Subscription',
+      cell: ({ row }) => <code className="text-xs">{row.original.subscription_id}</code>,
+    },
     { accessorKey: 'port', header: 'Port' },
     { accessorKey: 'max_memory_mb', header: 'Max Memory (MB)' },
     {
@@ -423,6 +435,10 @@ export function TenantDetailPage() {
     {
       accessorKey: 'name', header: 'Name',
       cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+    },
+    {
+      accessorKey: 'subscription_id', header: 'Subscription',
+      cell: ({ row }) => <code className="text-xs">{row.original.subscription_id}</code>,
     },
     {
       accessorKey: 'public', header: 'Access',
@@ -473,6 +489,10 @@ export function TenantDetailPage() {
     {
       accessorKey: 'name', header: 'Name',
       cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+    },
+    {
+      accessorKey: 'subscription_id', header: 'Subscription',
+      cell: ({ row }) => <code className="text-xs">{row.original.subscription_id}</code>,
     },
     {
       accessorKey: 'region_name', header: 'Region',
@@ -625,6 +645,10 @@ export function TenantDetailPage() {
       cell: ({ row }) => <span className="font-medium">{row.original.address}</span>,
     },
     {
+      accessorKey: 'subscription_id', header: 'Subscription',
+      cell: ({ row }) => <code className="text-xs">{row.original.subscription_id}</code>,
+    },
+    {
       accessorKey: 'status', header: 'Status',
       cell: ({ row }) => <StatusBadge status={row.original.status} />,
     },
@@ -644,7 +668,7 @@ export function TenantDetailPage() {
       <ResourceHeader
         icon={Users}
         title={tenant.name}
-        subtitle={`UID: ${tenant.uid} | Customer: ${tenant.customer_id} | Brand: ${brand?.name || tenant.brand_id} | Region: ${tenant.region_name || tenant.region_id} | Cluster: ${tenant.cluster_name || tenant.cluster_id}`}
+        subtitle={`UID: ${tenant.uid} | Brand: ${brand?.name || tenant.brand_id} | Region: ${tenant.region_name || tenant.region_id} | Cluster: ${tenant.cluster_name || tenant.cluster_id}`}
         status={tenant.status}
         actions={
           <div className="flex gap-2">
@@ -670,9 +694,11 @@ export function TenantDetailPage() {
         }
       />
 
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
         <span>ID: <code>{tenant.id}</code></span>
         <CopyButton value={tenant.id} />
+        <span className="ml-4">Customer: <code>{tenant.customer_id}</code></span>
+        <CopyButton value={tenant.customer_id} />
         <span className="ml-4">Created: {formatDate(tenant.created_at)}</span>
         <span className="ml-4">SFTP: {tenant.sftp_enabled ? 'Enabled' : 'Disabled'}</span>
       </div>
