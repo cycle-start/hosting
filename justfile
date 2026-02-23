@@ -402,13 +402,17 @@ vm-down:
         sudo virsh net-undefine hosting 2>/dev/null || true; \
     fi
 
-# SSH into a VM (e.g. just vm-ssh web-1-node-0)
+# Resolve VM name to IP (includes controlplane)
+_vm-ip name:
+    @cd terraform && terraform output -json 2>/dev/null | python3 -c "import sys,json; o=json.load(sys.stdin); d={'controlplane-0': o.get('controlplane_ip',{}).get('value','')}; [d.update(v['value']) for k,v in o.items() if k.endswith('_ips')]; print(d['{{name}}'])"
+
+# SSH into a VM (e.g. just vm-ssh controlplane-0, just vm-ssh web-1-node-0)
 vm-ssh name:
-    ssh {{ssh_opts}} ubuntu@$(cd terraform && terraform output -json 2>/dev/null | python3 -c "import sys,json; o=json.load(sys.stdin); d={}; [d.update(v['value']) for k,v in o.items() if k.endswith('_ips')]; print(d['{{name}}'])")
+    ssh {{ssh_opts}} ubuntu@$(just _vm-ip {{name}})
 
 # Run a command on a VM (e.g. just vm-exec controlplane-0 "sudo systemctl start k3s")
 vm-exec name *cmd:
-    ssh {{ssh_opts}} ubuntu@$(cd terraform && terraform output -json 2>/dev/null | python3 -c "import sys,json; o=json.load(sys.stdin); d={}; [d.update(v['value']) for k,v in o.items() if k.endswith('_ips')]; print(d['{{name}}'])") {{cmd}}
+    ssh {{ssh_opts}} ubuntu@$(just _vm-ip {{name}}) {{cmd}}
 
 # --- k3s Control Plane ---
 
