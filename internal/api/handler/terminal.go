@@ -57,12 +57,11 @@ func (h *Terminal) Connect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Look up tenant.
-	var tenantName string
 	var sshEnabled bool
 	var shardID *string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT name, ssh_enabled, shard_id FROM tenants WHERE id = $1`, tenantID,
-	).Scan(&tenantName, &sshEnabled, &shardID)
+		`SELECT ssh_enabled, shard_id FROM tenants WHERE id = $1`, tenantID,
+	).Scan(&sshEnabled, &shardID)
 	if err != nil {
 		response.WriteError(w, http.StatusNotFound, "tenant not found")
 		return
@@ -85,7 +84,7 @@ func (h *Terminal) Connect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Sign ephemeral certificate.
-	certSigner, err := h.ca.Sign(tenantName, 60*time.Second)
+	certSigner, err := h.ca.Sign(tenantID, 60*time.Second)
 	if err != nil {
 		log.Error().Err(err).Str("tenant", tenantID).Msg("failed to sign SSH certificate")
 		response.WriteError(w, http.StatusInternalServerError, "failed to create SSH credentials")
@@ -111,13 +110,13 @@ func (h *Terminal) Connect(w http.ResponseWriter, r *http.Request) {
 	defer tcpConn.Close()
 
 	sshConn, chans, reqs, err := ssh.NewClientConn(tcpConn, addr, &ssh.ClientConfig{
-		User:            tenantName,
+		User:            tenantID,
 		Auth:            []ssh.AuthMethod{ssh.PublicKeys(certSigner)},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         10 * time.Second,
 	})
 	if err != nil {
-		log.Error().Err(err).Str("node_ip", nodeIP).Str("tenant", tenantName).Msg("SSH handshake failed")
+		log.Error().Err(err).Str("node_ip", nodeIP).Str("tenant", tenantID).Msg("SSH handshake failed")
 		ws.Close(websocket.StatusInternalError, fmt.Sprintf("SSH connection failed: %s", err))
 		return
 	}

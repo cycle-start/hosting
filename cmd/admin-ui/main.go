@@ -1,7 +1,9 @@
 package main
 
 import (
+	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -23,8 +25,12 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	// Proxy API requests to core-api
+	// Proxy API requests to core-api (with WebSocket support).
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
+		if isWebSocket(r) {
+			proxyWebSocket(w, r, target)
+			return
+		}
 		proxy.ServeHTTP(w, r)
 	})
 
@@ -80,4 +86,53 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func isWebSocket(r *http.Request) bool {
+	return strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
+}
+
+// proxyWebSocket hijacks the client connection and tunnels raw TCP to the upstream.
+func proxyWebSocket(w http.ResponseWriter, r *http.Request, target *url.URL) {
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "websocket hijack not supported", http.StatusInternalServerError)
+		return
+	}
+
+	upstream, err := net.Dial("tcp", target.Host)
+	if err != nil {
+		http.Error(w, "upstream unreachable", http.StatusBadGateway)
+		return
+	}
+	defer upstream.Close()
+
+	// Rewrite the request URL to the upstream and forward it verbatim.
+	r.URL.Scheme = target.Scheme
+	r.URL.Host = target.Host
+	r.Host = target.Host
+	if err := r.Write(upstream); err != nil {
+		http.Error(w, "failed to write to upstream", http.StatusBadGateway)
+		return
+	}
+
+	client, buf, err := hijacker.Hijack()
+	if err != nil {
+		log.Printf("websocket hijack failed: %v", err)
+		return
+	}
+	defer client.Close()
+
+	// Flush any buffered data from the hijacked connection.
+	if buf.Reader.Buffered() > 0 {
+		buffered := make([]byte, buf.Reader.Buffered())
+		buf.Read(buffered)
+		upstream.Write(buffered)
+	}
+
+	// Bidirectional copy.
+	done := make(chan struct{}, 2)
+	go func() { io.Copy(client, upstream); done <- struct{}{} }()
+	go func() { io.Copy(upstream, client); done <- struct{}{} }()
+	<-done
 }
