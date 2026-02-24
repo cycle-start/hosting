@@ -275,7 +275,20 @@ func (m *SSHManager) setupChrootBindMounts(ctx context.Context, name, chrootDir 
 
 	// Set up direnv so env vars auto-load when cd-ing into a webroot directory.
 	// The direnv binary is accessible via the /usr bind mount.
-	direnvHook := "eval \"$(direnv hook bash)\"\n"
+	// We wrap the hook to filter out the verbose "direnv: export ..." line
+	// while keeping the "direnv: loading ..." line. The standard direnv.toml
+	// hide_env_diff option requires direnv >= 2.34.0 which isn't available on
+	// Ubuntu 24.04 (ships 2.32.1). Process substitution (>(...)) is also
+	// unavailable because the chroot lacks /dev/fd, so we capture stderr to
+	// a temp file, filter it, and clean up.
+	direnvHook := `_direnv_hook() {
+  local _direnv_err=$(mktemp 2>/dev/null || echo /tmp/.direnv_$$)
+  eval "$(direnv export bash 2>"$_direnv_err")"
+  grep -v '^direnv: export ' "$_direnv_err" >&2 2>/dev/null
+  rm -f "$_direnv_err"
+}
+PROMPT_COMMAND="_direnv_hook;${PROMPT_COMMAND-}"
+`
 	_ = os.WriteFile(filepath.Join(etcDir, "bash.bashrc"), []byte(direnvHook), 0644)
 	_ = os.WriteFile(filepath.Join(etcDir, "profile"), []byte(direnvHook), 0644)
 
@@ -286,7 +299,7 @@ func (m *SSHManager) setupChrootBindMounts(ctx context.Context, name, chrootDir 
 	if err := os.MkdirAll(direnvConfDir, 0755); err != nil {
 		return fmt.Errorf("mkdir home/.config/direnv: %w", err)
 	}
-	direnvToml := "[global]\nhide_env_diff = true\n\n[whitelist]\nprefix = [\"/webroots\"]\n"
+	direnvToml := "[whitelist]\nprefix = [\"/webroots\"]\n"
 	_ = os.WriteFile(filepath.Join(direnvConfDir, "direnv.toml"), []byte(direnvToml), 0644)
 	// Chown the .config tree to the tenant so direnv can read it.
 	_ = chownRecursive(filepath.Join(chrootDir, "home", ".config"), uid, gid)
