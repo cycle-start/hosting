@@ -1,3 +1,11 @@
+- name: Storage nodes
+  hosts: storage
+  roles:
+    - { role: ssh_hardening, tags: [ssh] }
+    - { role: vector, tags: [vector] }
+    - { role: ceph_server, tags: [ceph-server] }
+    - { role: node_agent, tags: [node-agent] }
+
 - name: Web nodes
   hosts: web
   roles:
@@ -41,14 +49,6 @@
     - { role: ssh_hardening, tags: [ssh] }
     - { role: vector, tags: [vector] }
     - { role: stalwart, tags: [stalwart] }
-    - { role: node_agent, tags: [node-agent] }
-
-- name: Storage nodes
-  hosts: storage
-  roles:
-    - { role: ssh_hardening, tags: [ssh] }
-    - { role: vector, tags: [vector] }
-    - { role: ceph_server, tags: [ceph-server] }
     - { role: node_agent, tags: [node-agent] }
 
 - name: Load balancer nodes
