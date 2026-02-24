@@ -149,7 +149,7 @@ wait-api:
     @echo "core-api is ready."
 
 # Full bootstrap after DB reset: migrate, create dev key, create agent key, register cluster, seed tenants
-bootstrap: wait-db migrate create-dev-key create-agent-key wait-api cluster-apply seed
+bootstrap: wait-db migrate docs create-dev-key create-agent-key wait-api cluster-apply seed
 
 # Full rebuild: deploy control plane + node agents + wipe DB + bootstrap
 # Use when both control plane and node-agent code have changed.
@@ -423,6 +423,8 @@ vm-deploy-one name:
 
 # Build all Docker images and deploy to k3s VM
 vm-deploy:
+    # Generate OpenAPI docs (needed by Go embed)
+    just docs
     # Build Docker images
     docker build -t hosting-core-api:latest -f docker/core-api.Dockerfile .
     docker build -t hosting-worker:latest -f docker/worker.Dockerfile .
@@ -452,6 +454,9 @@ vm-deploy:
       --from-file=notification-policies.yaml=docker/grafana/provisioning/alerting/notification-policies.yaml \
       --from-file=alert-rules.yaml=docker/grafana/provisioning/alerting/alert-rules.yaml
     # Install/upgrade Helm chart (secrets from .env, SSH CA key from file)
+    helm repo add bitnami https://charts.bitnami.com/bitnami 2>/dev/null || true
+    helm repo add temporal https://go.temporal.io/helm-charts 2>/dev/null || true
+    @if [ ! -f deploy/helm/hosting/charts/postgresql-*.tgz ]; then helm dependency build deploy/helm/hosting; fi
     helm --kube-context hosting upgrade --install hosting \
       deploy/helm/hosting -f deploy/helm/hosting/values-dev.yaml \
       --set secrets.coreDatabaseUrl="$CORE_DATABASE_URL" \
