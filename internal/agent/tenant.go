@@ -151,23 +151,28 @@ func (m *TenantManager) createUser(ctx context.Context, name string, uid int32) 
 	}
 
 	outStr := string(output)
-	if !strings.Contains(outStr, "UID") || !strings.Contains(outStr, "not unique") {
+
+	// Determine which stale user to remove:
+	// - "already exists": same username left over from a previous DB state
+	// - "UID not unique": different username occupying the same UID
+	var staleUser string
+	if strings.Contains(outStr, "already exists") {
+		staleUser = name
+	} else if strings.Contains(outStr, "UID") && strings.Contains(outStr, "not unique") {
+		getentCmd := exec.CommandContext(ctx, "getent", "passwd", strconv.FormatInt(int64(uid), 10))
+		getentOut, err := getentCmd.Output()
+		if err != nil {
+			return status.Errorf(codes.Internal, "getent passwd %d failed: %v", uid, err)
+		}
+		// getent output: "username:x:uid:gid:comment:home:shell"
+		parts := strings.SplitN(string(getentOut), ":", 2)
+		if len(parts) == 0 || parts[0] == "" {
+			return status.Errorf(codes.Internal, "could not parse stale user from getent output: %s", string(getentOut))
+		}
+		staleUser = parts[0]
+	} else {
 		return status.Errorf(codes.Internal, "useradd failed for %s: %s: %v", name, outStr, err)
 	}
-
-	// UID already taken by a stale user — look up its name and remove it.
-	m.logger.Warn().Int32("uid", uid).Str("tenant", name).Msg("UID already taken by stale user, cleaning up")
-	getentCmd := exec.CommandContext(ctx, "getent", "passwd", strconv.FormatInt(int64(uid), 10))
-	getentOut, err := getentCmd.Output()
-	if err != nil {
-		return status.Errorf(codes.Internal, "getent passwd %d failed: %v", uid, err)
-	}
-	// getent output: "username:x:uid:gid:comment:home:shell"
-	parts := strings.SplitN(string(getentOut), ":", 2)
-	if len(parts) == 0 || parts[0] == "" {
-		return status.Errorf(codes.Internal, "could not parse stale user from getent output: %s", string(getentOut))
-	}
-	staleUser := parts[0]
 
 	m.logger.Info().Str("stale_user", staleUser).Int32("uid", uid).Msg("removing stale user to reclaim UID")
 

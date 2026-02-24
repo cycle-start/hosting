@@ -148,8 +148,8 @@ wait-api:
     @until curl -sf http://{{cp}}:8090/healthz > /dev/null 2>&1; do sleep 2; done
     @echo "core-api is ready."
 
-# Full bootstrap after DB reset: migrate, create dev key, create agent key, register cluster, seed tenants
-bootstrap: wait-db migrate docs create-dev-key create-agent-key wait-api cluster-apply seed
+# Full bootstrap: wipe DBs, migrate, create keys, register cluster, seed tenants
+bootstrap: wait-db reset-db migrate docs create-dev-key create-agent-key wait-api cluster-apply seed
 
 # Full rebuild: deploy control plane + node agents + wipe DB + bootstrap
 # Use when both control plane and node-agent code have changed.
@@ -548,7 +548,7 @@ _ssl-deploy:
     # Deploy to LB VM HAProxy (skip if not reachable)
     cat /tmp/hosting-cert.pem /tmp/hosting-key.pem > /tmp/hosting.pem
     scp {{ssh_opts}} -o ConnectTimeout=3 /tmp/hosting.pem ubuntu@{{lb}}:/tmp/hosting.pem && \
-      ssh {{ssh_opts}} -o ConnectTimeout=3 ubuntu@{{lb}} "sudo cp /tmp/hosting.pem /etc/haproxy/certs/hosting.pem && sudo systemctl reload haproxy" || true
+      ssh {{ssh_opts}} -o ConnectTimeout=3 ubuntu@{{lb}} "sudo cp /tmp/hosting.pem /etc/haproxy/certs/hosting.pem && sudo systemctl restart haproxy" || true
     # Deploy to DB Admin VM nginx (skip if not reachable)
     scp {{ssh_opts}} -o ConnectTimeout=3 /tmp/hosting-cert.pem ubuntu@10.10.10.60:/tmp/dbadmin.pem && \
       scp {{ssh_opts}} -o ConnectTimeout=3 /tmp/hosting-key.pem ubuntu@10.10.10.60:/tmp/dbadmin-key.pem && \

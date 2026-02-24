@@ -38,6 +38,19 @@
     state: directory
     mode: "0755"
 
+- name: Generate placeholder SSL cert if missing
+  command:
+    cmd: >
+      openssl req -x509 -newkey rsa:2048
+      -keyout /tmp/placeholder-key.pem -out /tmp/placeholder-cert.pem
+      -days 365 -nodes -subj '/CN=placeholder'
+    creates: /etc/haproxy/certs/hosting.pem
+
+- name: Combine placeholder cert and key
+  shell: cat /tmp/placeholder-cert.pem /tmp/placeholder-key.pem > /etc/haproxy/certs/hosting.pem
+  args:
+    creates: /etc/haproxy/certs/hosting.pem
+
 - name: Set HAProxy directory ownership
   file:
     path: /var/lib/haproxy

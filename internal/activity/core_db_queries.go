@@ -2,6 +2,7 @@ package activity
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -780,9 +781,13 @@ func (a *CoreDB) GetSSHKeysByTenant(ctx context.Context, tenantID string) ([]mod
 }
 
 // GetPlatformConfig retrieves a platform configuration value by key.
+// Returns an empty string (not an error) if the key does not exist.
 func (a *CoreDB) GetPlatformConfig(ctx context.Context, key string) (string, error) {
 	var value string
 	err := a.db.QueryRow(ctx, `SELECT value FROM platform_config WHERE key = $1`, key).Scan(&value)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
 	if err != nil {
 		return "", fmt.Errorf("get platform config %q: %w", key, err)
 	}
