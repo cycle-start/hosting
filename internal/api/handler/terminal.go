@@ -92,7 +92,9 @@ func (h *Terminal) Connect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Upgrade to WebSocket.
-	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{})
+	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		InsecureSkipVerify: true, // Origin differs from Host when proxied through admin-ui.
+	})
 	if err != nil {
 		log.Error().Err(err).Msg("websocket upgrade failed")
 		return
