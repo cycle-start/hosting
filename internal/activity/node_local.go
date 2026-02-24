@@ -1025,6 +1025,7 @@ func writeWebrootEnv(tenantName, webrootName, envFileName, runtimeName, runtimeV
 	var envrc strings.Builder
 	if isPHP {
 		envrc.WriteString("PATH_add .bin\n")
+		envrc.WriteString(fmt.Sprintf("export PHP_VERSION=%s\n", runtimeVersion))
 	}
 	if len(envVars) > 0 {
 		envrc.WriteString(fmt.Sprintf("dotenv_if_exists %s\n", envFileName))

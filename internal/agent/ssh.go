@@ -287,7 +287,15 @@ func (m *SSHManager) setupChrootBindMounts(ctx context.Context, name, chrootDir 
   grep -v '^direnv: export ' "$_direnv_err" >&2 2>/dev/null
   rm -f "$_direnv_err"
 }
-PROMPT_COMMAND="_direnv_hook;${PROMPT_COMMAND-}"
+_hosting_ps1() {
+  local dir="\w"
+  local info=""
+  if [ -n "$PHP_VERSION" ]; then
+    info=" \[\e[36m\](php $PHP_VERSION)\[\e[0m\]"
+  fi
+  PS1="\[\e[32m\]\u\[\e[0m\]:${dir}${info} \$ "
+}
+PROMPT_COMMAND="_direnv_hook;_hosting_ps1;${PROMPT_COMMAND-}"
 `
 	_ = os.WriteFile(filepath.Join(etcDir, "bash.bashrc"), []byte(direnvHook), 0644)
 	_ = os.WriteFile(filepath.Join(etcDir, "profile"), []byte(direnvHook), 0644)
