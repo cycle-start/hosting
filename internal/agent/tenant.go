@@ -212,22 +212,23 @@ func (m *TenantManager) createUser(ctx context.Context, name string, uid int32) 
 	return nil
 }
 
-// stopUserServices stops all managed services running as a given user so that
-// processes don't respawn after being killed. This includes PHP-FPM pools,
-// supervisord daemons, and systemd cron timers.
+// stopUserServices removes config files that would cause services to respawn
+// workers for this user, then restarts the relevant service managers.
+// After this, a pkill -9 -u will permanently clear all processes.
 func (m *TenantManager) stopUserServices(ctx context.Context, username string) {
-	// 1. Remove PHP-FPM pool configs and reload so FPM stops spawning workers.
+	// 1. Remove PHP-FPM pool configs and restart all FPM versions.
+	//    We always restart (not reload) because the config may already be gone
+	//    from a previous attempt but the master still has the pool in memory.
 	pools, _ := filepath.Glob("/etc/php/*/fpm/pool.d/" + username + ".conf")
 	for _, pool := range pools {
 		m.logger.Debug().Str("pool", pool).Msg("removing PHP-FPM pool config")
 		os.Remove(pool)
 	}
-	if len(pools) > 0 {
-		versions, _ := filepath.Glob("/etc/php/*/fpm")
-		for _, dir := range versions {
-			version := filepath.Base(filepath.Dir(dir))
-			_ = exec.CommandContext(ctx, "systemctl", "reload", "php"+version+"-fpm").Run()
-		}
+	fpmVersions, _ := filepath.Glob("/etc/php/*/fpm")
+	for _, dir := range fpmVersions {
+		version := filepath.Base(filepath.Dir(dir))
+		m.logger.Debug().Str("version", version).Msg("restarting PHP-FPM to clear stale workers")
+		_ = exec.CommandContext(ctx, "systemctl", "restart", "php"+version+"-fpm").Run()
 	}
 
 	// 2. Stop supervisord daemons for this user.
@@ -252,10 +253,12 @@ func (m *TenantManager) stopUserServices(ctx context.Context, username string) {
 		_ = exec.CommandContext(ctx, "systemctl", "disable", unit).Run()
 	}
 
-	// Give services a moment to terminate.
-	if len(pools) > 0 || len(confs) > 0 || len(timers) > 0 {
-		time.Sleep(500 * time.Millisecond)
-	}
+	// 4. Kill ALL processes owned by this user's UID. This catches any runtime
+	//    (PHP-FPM, Node, Python, Ruby, daemons) regardless of how it was started
+	//    or which previous tenant name the process was spawned under.
+	_ = exec.CommandContext(ctx, "pkill", "-9", "-u", username).Run()
+
+	time.Sleep(1 * time.Second)
 }
 
 // setQuota sets the CephFS directory quota for a tenant using extended attributes.
