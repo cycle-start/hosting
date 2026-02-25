@@ -1,0 +1,95 @@
+{{- if .Values.controlpanelApi.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hosting.fullname" . }}-controlpanel-api
+  labels:
+    {{- include "hosting.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controlpanel-api
+spec:
+  replicas: {{ .Values.controlpanelApi.replicas }}
+  {{- if .Values.controlpanelApi.hostNetwork }}
+  strategy:
+    type: Recreate
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "hosting.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: controlpanel-api
+  template:
+    metadata:
+      labels:
+        {{- include "hosting.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: controlpanel-api
+    spec:
+      {{- if .Values.controlpanelApi.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
+      {{- if .Values.controlpanelApi.migrate }}
+      initContainers:
+        - name: migrate
+          image: "{{ .Values.image.controlpanelApi.repository }}:{{ .Values.image.controlpanelApi.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/goose"]
+          args: ["-dir", "/migrations", "postgres", "$(DATABASE_URL)", "up"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hosting.secretName" . }}
+                  key: CONTROLPANEL_DATABASE_URL
+      {{- end }}
+      containers:
+        - name: controlpanel-api
+          image: "{{ .Values.image.controlpanelApi.repository }}:{{ .Values.image.controlpanelApi.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.controlpanelApi.port }}
+              protocol: TCP
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hosting.secretName" . }}
+                  key: CONTROLPANEL_DATABASE_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hosting.secretName" . }}
+                  key: CONTROLPANEL_JWT_SECRET
+            - name: HTTP_LISTEN_ADDR
+              value: ":{{ .Values.controlpanelApi.port }}"
+            - name: HOSTING_API_URL
+              {{- if .Values.controlpanelApi.hostNetwork }}
+              value: "http://127.0.0.1:{{ .Values.coreApi.port }}"
+              {{- else }}
+              value: "http://{{ include "hosting.fullname" . }}-core-api:{{ .Values.coreApi.port }}"
+              {{- end }}
+            - name: HOSTING_API_KEY
+              value: {{ .Values.controlpanelApi.hostingApiKey | default "hst_dev" | quote }}
+            - name: CORS_ORIGINS
+              value: {{ .Values.controlpanelApi.corsOrigins | default "http://localhost:5173" | quote }}
+            - name: DEV_MODE
+              value: {{ .Values.controlpanelApi.devMode | default "false" | quote }}
+            {{- with .Values.controlpanelApi.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          {{- with .Values.controlpanelApi.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

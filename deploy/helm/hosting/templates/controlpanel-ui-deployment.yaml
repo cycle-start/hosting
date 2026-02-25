@@ -1,0 +1,67 @@
+{{- if .Values.controlpanelUi.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hosting.fullname" . }}-controlpanel-ui
+  labels:
+    {{- include "hosting.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controlpanel-ui
+spec:
+  replicas: {{ .Values.controlpanelUi.replicas }}
+  {{- if .Values.controlpanelUi.hostNetwork }}
+  strategy:
+    type: Recreate
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "hosting.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: controlpanel-ui
+  template:
+    metadata:
+      labels:
+        {{- include "hosting.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: controlpanel-ui
+    spec:
+      {{- if .Values.controlpanelUi.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
+      containers:
+        - name: controlpanel-ui
+          image: "{{ .Values.image.controlpanelUi.repository }}:{{ .Values.image.controlpanelUi.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.controlpanelUi.port }}
+              protocol: TCP
+          env:
+            - name: CONTROLPANEL_API_URL
+              {{- if .Values.controlpanelUi.hostNetwork }}
+              value: "http://127.0.0.1:{{ .Values.controlpanelApi.port }}"
+              {{- else }}
+              value: "http://{{ include "hosting.fullname" . }}-controlpanel-api:{{ .Values.controlpanelApi.port }}"
+              {{- end }}
+            - name: STATIC_DIR
+              value: /app/dist
+            - name: LISTEN_ADDR
+              value: ":{{ .Values.controlpanelUi.port }}"
+            {{- with .Values.controlpanelUi.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          {{- with .Values.controlpanelUi.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

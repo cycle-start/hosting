@@ -12,6 +12,12 @@ image:
   mcpServer:
     repository: hosting-mcp-server
     tag: latest
+  controlpanelApi:
+    repository: controlpanel-api
+    tag: latest
+  controlpanelUi:
+    repository: controlpanel-ui
+    tag: latest
 
 coreApi:
   replicas: 1
@@ -32,6 +38,20 @@ mcpServer:
   replicas: 1
   hostNetwork: true
   apiUrl: "http://127.0.0.1:8090"
+
+controlpanelApi:
+  enabled: true
+  replicas: 1
+  hostNetwork: true
+  migrate: true
+  hostingApiKey: "hst_dev"
+  corsOrigins: "http://home.hosting.test,http://localhost:5173"
+  devMode: "true"
+
+controlpanelUi:
+  enabled: true
+  replicas: 1
+  hostNetwork: true
 
 config:
   registryUrl: "localhost:5000"

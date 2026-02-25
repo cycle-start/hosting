@@ -4,6 +4,10 @@ Components:
   - core-api: REST API server
   - worker: Temporal workflow worker
   - admin-ui: Admin dashboard
+{{- if .Values.controlpanelApi.enabled }}
+  - controlpanel-api: Customer control panel API
+  - controlpanel-ui: Customer control panel UI
+{{- end }}
 
 {{- if .Values.ingress.enabled }}
 

@@ -1,0 +1,19 @@
+{{- if .Values.controlpanelUi.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hosting.fullname" . }}-controlpanel-ui
+  labels:
+    {{- include "hosting.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controlpanel-ui
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.controlpanelUi.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "hosting.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: controlpanel-ui
+{{- end }}

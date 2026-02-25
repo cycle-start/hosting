@@ -11,6 +11,12 @@ image:
   mcpServer:
     repository: hosting-mcp-server
     tag: latest
+  controlpanelApi:
+    repository: controlpanel-api
+    tag: latest
+  controlpanelUi:
+    repository: controlpanel-ui
+    tag: latest
   pullPolicy: IfNotPresent
 
 coreApi:
@@ -41,6 +47,26 @@ mcpServer:
   port: 8091
   hostNetwork: false
   apiUrl: "http://localhost:8090"
+  resources: {}
+  extraEnv: []
+
+controlpanelApi:
+  enabled: false
+  replicas: 1
+  port: 8080
+  hostNetwork: false
+  migrate: true
+  hostingApiKey: "hst_dev"
+  corsOrigins: "http://localhost:5173"
+  devMode: "false"
+  resources: {}
+  extraEnv: []
+
+controlpanelUi:
+  enabled: false
+  replicas: 1
+  port: 3002
+  hostNetwork: false
   resources: {}
   extraEnv: []
 
@@ -78,6 +104,8 @@ secrets:
   llmApiKey: ""
   agentApiKey: "" # Dev: hst_agent_key_000000000000000 (created by `just create-agent-key`)
   sshCaPrivateKey: "" # PEM-encoded SSH CA private key (for web terminal)
+  controlpanelDatabaseUrl: ""
+  controlpanelJwtSecret: ""
 
 # Temporal connection
 temporal:

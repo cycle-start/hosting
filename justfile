@@ -165,8 +165,14 @@ wait-api:
     @until curl -sf http://{{cp}}:8090/healthz > /dev/null 2>&1; do sleep 2; done
     @echo "core-api is ready."
 
+# Bootstrap the control panel database (create DB, run migrations, seed data)
+bootstrap-controlpanel:
+    just create-controlpanel-db
+    goose -dir ../controlpanel-api/migrations postgres "postgres://controlpanel:controlpanel@{{cp}}:5432/controlpanel?sslmode=disable" up
+    DATABASE_URL="postgres://controlpanel:controlpanel@{{cp}}:5432/controlpanel?sslmode=disable" HOSTING_API_URL="http://{{cp}}:8090" HOSTING_API_KEY="$HOSTING_API_KEY" go run ../controlpanel-api/seeds/dev.go
+
 # Full bootstrap: wipe DBs, migrate, create keys, register cluster, seed tenants
-bootstrap: wait-db reset-db migrate docs create-dev-key create-agent-key wait-api cluster-apply seed
+bootstrap: wait-db reset-db migrate docs create-dev-key create-agent-key wait-api cluster-apply seed bootstrap-controlpanel
 
 # Full rebuild: deploy control plane + node agents + wipe DB + bootstrap
 # Use when both control plane and node-agent code have changed.
@@ -442,13 +448,21 @@ vm-deploy-one name:
 vm-deploy:
     # Generate OpenAPI docs (needed by Go embed)
     just docs
+    # Copy sibling repos into build context (cleaned up at end)
+    rm -rf controlpanel-build controlpanel-api-build
+    cp -r ../controlpanel controlpanel-build
+    cp -r ../controlpanel-api controlpanel-api-build
     # Build Docker images
     docker build -t hosting-core-api:latest -f docker/core-api.Dockerfile .
     docker build -t hosting-worker:latest -f docker/worker.Dockerfile .
     docker build -t hosting-admin-ui:latest -f docker/admin-ui.Dockerfile .
     docker build -t hosting-mcp-server:latest -f docker/mcp-server.Dockerfile .
+    docker build -t controlpanel-api:latest -f docker/controlpanel-api.Dockerfile .
+    docker build -t controlpanel-ui:latest -f docker/controlpanel-ui.Dockerfile .
+    # Clean up temp copies
+    rm -rf controlpanel-build controlpanel-api-build
     # Import into k3s containerd
-    docker save hosting-core-api:latest hosting-worker:latest hosting-admin-ui:latest hosting-mcp-server:latest | \
+    docker save hosting-core-api:latest hosting-worker:latest hosting-admin-ui:latest hosting-mcp-server:latest controlpanel-api:latest controlpanel-ui:latest | \
       ssh {{ssh_opts}} ubuntu@{{cp}} "sudo k3s ctr images import -"
     # Apply infra manifests (includes Traefik config and Ingress)
     kubectl --context hosting apply -f deploy/k3s/
@@ -482,9 +496,11 @@ vm-deploy:
       --set secrets.secretEncryptionKey="$SECRET_ENCRYPTION_KEY" \
       --set secrets.llmApiKey="$LLM_API_KEY" \
       --set secrets.agentApiKey="$AGENT_API_KEY" \
+      --set secrets.controlpanelDatabaseUrl="$CONTROLPANEL_DATABASE_URL" \
+      --set secrets.controlpanelJwtSecret="$CONTROLPANEL_JWT_SECRET" \
       {{ if path_exists("ssh_ca") == "true" { "--set-file secrets.sshCaPrivateKey=ssh_ca" } else { "" } }}
     # Restart app pods to pick up new images (tag is always `latest`)
-    kubectl --context hosting rollout restart deployment/hosting-core-api deployment/hosting-worker deployment/hosting-admin-ui deployment/hosting-mcp-server
+    kubectl --context hosting rollout restart deployment/hosting-core-api deployment/hosting-worker deployment/hosting-admin-ui deployment/hosting-mcp-server deployment/hosting-controlpanel-api deployment/hosting-controlpanel-ui
 
 # Fetch kubeconfig from controlplane VM and merge into ~/.kube/config
 vm-kubeconfig:
