@@ -176,12 +176,15 @@ func (m *TenantManager) createUser(ctx context.Context, name string, uid int32) 
 
 	m.logger.Info().Str("stale_user", staleUser).Int32("uid", uid).Msg("removing stale user to reclaim UID")
 
-	// Kill any running processes for the stale user before removing.
-	killCmd := exec.CommandContext(ctx, "pkill", "-9", "-u", staleUser)
-	_ = killCmd.Run() // Ignore error — no processes is fine.
+	// Stop managed services before killing processes so they don't respawn.
+	m.stopUserServices(ctx, staleUser)
 
-	// Wait for killed processes to be reaped before userdel.
+	// Kill any remaining processes and remove the user.
 	for i := 0; i < 10; i++ {
+		killCmd := exec.CommandContext(ctx, "pkill", "-9", "-u", staleUser)
+		_ = killCmd.Run() // Ignore error — no processes is fine.
+		time.Sleep(500 * time.Millisecond)
+
 		delCmd := exec.CommandContext(ctx, "userdel", staleUser)
 		delOutput, err := delCmd.CombinedOutput()
 		if err == nil {
@@ -194,7 +197,6 @@ func (m *TenantManager) createUser(ctx context.Context, name string, uid int32) 
 			return status.Errorf(codes.Internal, "userdel stale user %s failed after retries: %s: %v", staleUser, string(delOutput), err)
 		}
 		m.logger.Debug().Str("stale_user", staleUser).Int("attempt", i+1).Msg("waiting for processes to exit before userdel")
-		time.Sleep(500 * time.Millisecond)
 	}
 
 	// Retry useradd.
@@ -208,6 +210,52 @@ func (m *TenantManager) createUser(ctx context.Context, name string, uid int32) 
 		return status.Errorf(codes.Internal, "useradd retry failed for %s: %s: %v", name, string(retryOutput), err)
 	}
 	return nil
+}
+
+// stopUserServices stops all managed services running as a given user so that
+// processes don't respawn after being killed. This includes PHP-FPM pools,
+// supervisord daemons, and systemd cron timers.
+func (m *TenantManager) stopUserServices(ctx context.Context, username string) {
+	// 1. Remove PHP-FPM pool configs and reload so FPM stops spawning workers.
+	pools, _ := filepath.Glob("/etc/php/*/fpm/pool.d/" + username + ".conf")
+	for _, pool := range pools {
+		m.logger.Debug().Str("pool", pool).Msg("removing PHP-FPM pool config")
+		os.Remove(pool)
+	}
+	if len(pools) > 0 {
+		versions, _ := filepath.Glob("/etc/php/*/fpm")
+		for _, dir := range versions {
+			version := filepath.Base(filepath.Dir(dir))
+			_ = exec.CommandContext(ctx, "systemctl", "reload", "php"+version+"-fpm").Run()
+		}
+	}
+
+	// 2. Stop supervisord daemons for this user.
+	confs, _ := filepath.Glob("/etc/supervisor/conf.d/daemon-" + username + "-*.conf")
+	for _, conf := range confs {
+		program := strings.TrimSuffix(filepath.Base(conf), ".conf")
+		m.logger.Debug().Str("program", program).Msg("stopping supervisord daemon")
+		_ = exec.CommandContext(ctx, "supervisorctl", "stop", program+":*").Run()
+		os.Remove(conf)
+	}
+	if len(confs) > 0 {
+		_ = exec.CommandContext(ctx, "supervisorctl", "reread").Run()
+		_ = exec.CommandContext(ctx, "supervisorctl", "update").Run()
+	}
+
+	// 3. Stop and disable systemd cron timers for this user.
+	timers, _ := filepath.Glob("/etc/systemd/system/cron-" + username + "-*.timer")
+	for _, timer := range timers {
+		unit := filepath.Base(timer)
+		m.logger.Debug().Str("timer", unit).Msg("stopping cron timer")
+		_ = exec.CommandContext(ctx, "systemctl", "stop", unit).Run()
+		_ = exec.CommandContext(ctx, "systemctl", "disable", unit).Run()
+	}
+
+	// Give services a moment to terminate.
+	if len(pools) > 0 || len(confs) > 0 || len(timers) > 0 {
+		time.Sleep(500 * time.Millisecond)
+	}
 }
 
 // setQuota sets the CephFS directory quota for a tenant using extended attributes.
@@ -280,23 +328,8 @@ func (m *TenantManager) Delete(ctx context.Context, name string) error {
 
 	m.logger.Info().Str("tenant", name).Msg("deleting tenant user")
 
-	// Remove PHP-FPM pool configs and reload so FPM stops spawning workers
-	// as this user. Also handles any other per-tenant FPM pool config.
-	pools, _ := filepath.Glob("/etc/php/*/fpm/pool.d/" + name + ".conf")
-	for _, pool := range pools {
-		m.logger.Debug().Str("pool", pool).Msg("removing PHP-FPM pool config")
-		os.Remove(pool)
-	}
-	if len(pools) > 0 {
-		// Reload all PHP-FPM versions to drop the pool.
-		versions, _ := filepath.Glob("/etc/php/*/fpm")
-		for _, dir := range versions {
-			version := filepath.Base(filepath.Dir(dir))
-			_ = exec.CommandContext(ctx, "systemctl", "reload", "php"+version+"-fpm").Run()
-		}
-		// Give FPM a moment to terminate pool workers.
-		time.Sleep(500 * time.Millisecond)
-	}
+	// Stop managed services before killing processes so they don't respawn.
+	m.stopUserServices(ctx, name)
 
 	// Kill all processes owned by the user and remove. Retry because
 	// other runtimes (daemons, workers) may take a moment to exit.
