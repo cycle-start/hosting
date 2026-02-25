@@ -72,4 +72,4 @@
   systemd:
     name: haproxy
     enabled: true
-    state: started
+    state: restarted
