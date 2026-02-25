@@ -51,6 +51,15 @@
   args:
     creates: /etc/haproxy/certs/hosting.pem
 
+- name: Deploy HAProxy config
+  template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    owner: root
+    group: root
+    mode: "0644"
+    validate: haproxy -c -f %s
+
 - name: Set HAProxy directory ownership
   file:
     path: /var/lib/haproxy
