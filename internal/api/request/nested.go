@@ -17,15 +17,16 @@ type CreateZoneNested struct {
 }
 
 type CreateWebrootNested struct {
-	SubscriptionID string             `json:"subscription_id" validate:"required"`
-	Runtime        string             `json:"runtime" validate:"required,oneof=php node python ruby static"`
-	RuntimeVersion string             `json:"runtime_version" validate:"required"`
-	RuntimeConfig  json.RawMessage    `json:"runtime_config"`
-	PublicFolder   string             `json:"public_folder"`
-	EnvFileName    string             `json:"env_file_name"`
-	FQDNs          []CreateFQDNNested `json:"fqdns" validate:"omitempty,dive"`
-	Daemons        []CreateDaemonNested  `json:"daemons" validate:"omitempty,dive"`
-	CronJobs       []CreateCronJobNested `json:"cron_jobs" validate:"omitempty,dive"`
+	SubscriptionID         string             `json:"subscription_id" validate:"required"`
+	Runtime                string             `json:"runtime" validate:"required,oneof=php node python ruby static"`
+	RuntimeVersion         string             `json:"runtime_version" validate:"required"`
+	RuntimeConfig          json.RawMessage    `json:"runtime_config"`
+	PublicFolder           string             `json:"public_folder"`
+	EnvFileName            string             `json:"env_file_name"`
+	ServiceHostnameEnabled *bool              `json:"service_hostname_enabled"`
+	FQDNs                  []CreateFQDNNested `json:"fqdns" validate:"omitempty,dive"`
+	Daemons                []CreateDaemonNested  `json:"daemons" validate:"omitempty,dive"`
+	CronJobs               []CreateCronJobNested `json:"cron_jobs" validate:"omitempty,dive"`
 }
 
 type CreateFQDNNested struct {

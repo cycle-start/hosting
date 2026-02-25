@@ -189,18 +189,23 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 			if runtimeConfig == nil {
 				runtimeConfig = json.RawMessage(`{}`)
 			}
+			serviceHostnameEnabled := false
+			if wr.ServiceHostnameEnabled != nil {
+				serviceHostnameEnabled = *wr.ServiceHostnameEnabled
+			}
 			webroot := &model.Webroot{
-				ID:             platform.NewName("w"),
-				TenantID:       tenant.ID,
-				SubscriptionID: wr.SubscriptionID,
-				Runtime:        wr.Runtime,
-				RuntimeVersion: wr.RuntimeVersion,
-				RuntimeConfig:  runtimeConfig,
-				PublicFolder:   wr.PublicFolder,
-				EnvFileName:    wr.EnvFileName,
-				Status:         model.StatusPending,
-				CreatedAt:      now2,
-				UpdatedAt:      now2,
+				ID:                     platform.NewName("w"),
+				TenantID:               tenant.ID,
+				SubscriptionID:         wr.SubscriptionID,
+				Runtime:                wr.Runtime,
+				RuntimeVersion:         wr.RuntimeVersion,
+				RuntimeConfig:          runtimeConfig,
+				PublicFolder:           wr.PublicFolder,
+				EnvFileName:            wr.EnvFileName,
+				ServiceHostnameEnabled: serviceHostnameEnabled,
+				Status:                 model.StatusPending,
+				CreatedAt:              now2,
+				UpdatedAt:              now2,
 			}
 			if err := tx.Webroot.Create(skipCtx, webroot); err != nil {
 				return fmt.Errorf("create webroot: %w", err)
