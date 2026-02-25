@@ -61,6 +61,11 @@ cluster:
         role: lb
         node_count: ${length([for n in nodes : n if n.shard_name == node.shard_name])}
 %{ endif ~}
+%{ if node.role == "gateway" && endswith(node.name, "node-0") ~}
+      - name: ${node.shard_name}
+        role: gateway
+        node_count: ${length([for n in nodes : n if n.shard_name == node.shard_name])}
+%{ endif ~}
 %{ endfor ~}
     infrastructure:
       haproxy: false
