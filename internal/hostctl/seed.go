@@ -154,6 +154,10 @@ func Seed(configPath string, timeout time.Duration) error {
 			return fmt.Errorf("find web node IPs: %w", err)
 		}
 		fmt.Printf("Web nodes: %v\n", webNodeIPs)
+
+		if err := waitForCephFS(webNodeIPs); err != nil {
+			return fmt.Errorf("wait for CephFS: %w", err)
+		}
 	}
 
 	// 3. Create tenants with all nested resources in one request

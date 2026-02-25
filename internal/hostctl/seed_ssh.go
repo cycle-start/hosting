@@ -82,6 +82,39 @@ func scpFile(ip, localPath, remotePath string) error {
 	return nil
 }
 
+// waitForCephFS waits until CephFS is responsive on all given web nodes.
+// It SSHs into each node and runs `timeout 5 stat -f /var/www/storage` to
+// verify the filesystem responds (mountpoint alone isn't sufficient for hung mounts).
+// Retries up to 30 times with 5s sleep (2.5 min total).
+func waitForCephFS(webNodeIPs []string) error {
+	const (
+		maxRetries = 30
+		retryDelay = 5 * time.Second
+	)
+
+	for _, ip := range webNodeIPs {
+		fmt.Printf("Waiting for CephFS on %s...\n", ip)
+		var lastErr error
+		ready := false
+		for attempt := 0; attempt < maxRetries; attempt++ {
+			_, err := sshExec(ip, "timeout 5 stat -f /var/www/storage")
+			if err == nil {
+				ready = true
+				break
+			}
+			lastErr = err
+			if attempt < maxRetries-1 {
+				time.Sleep(retryDelay)
+			}
+		}
+		if !ready {
+			return fmt.Errorf("CephFS not ready on %s after %d retries: %w", ip, maxRetries, lastErr)
+		}
+		fmt.Printf("CephFS ready on %s\n", ip)
+	}
+	return nil
+}
+
 // findNodeIPsByRole returns all node IPs for the given role in a cluster,
 // sorted by shard_index.
 func findNodeIPsByRole(client *Client, clusterID, role string) ([]string, error) {
