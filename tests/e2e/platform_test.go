@@ -37,7 +37,7 @@ func TestPlatformE2E(t *testing.T) {
 	})
 
 	t.Run("cluster_bootstrap", func(t *testing.T) {
-		if err := hostctl.ClusterApply(clusterConfigPath(), provisionTimeout); err != nil {
+		if err := hostctl.ClusterApply([]string{clusterConfigPath()}, provisionTimeout); err != nil {
 			t.Fatalf("cluster apply failed: %v", err)
 		}
 	})
