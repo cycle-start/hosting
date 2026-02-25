@@ -4,7 +4,7 @@ api_url: http://10.10.10.2:8090/api/v1
 region:
   name: dev
 
-region_runtimes:
+cluster_runtimes:
   - runtime: php
     version: "8.5"
   - runtime: php

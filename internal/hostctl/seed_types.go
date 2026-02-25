@@ -12,11 +12,6 @@ type SeedConfig struct {
 	OIDCClients  []OIDCClientDef `yaml:"oidc_clients"`
 }
 
-type RegionRuntimeDef struct {
-	Runtime string `yaml:"runtime"`
-	Version string `yaml:"version"`
-}
-
 type OIDCClientDef struct {
 	ID           string   `yaml:"id"`
 	Secret       string   `yaml:"secret"`

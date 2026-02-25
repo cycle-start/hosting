@@ -13,7 +13,7 @@ import type {
   LogQueryResponse,
   Incident, IncidentEvent, IncidentListParams,
   CapabilityGap, CapabilityGapListParams,
-  RegionRuntime,
+  ClusterRuntime,
 } from './types'
 
 function buildQuery(params?: Record<string, unknown>): string {
@@ -132,11 +132,11 @@ export function useDeleteRegion() {
   })
 }
 
-export function useRegionRuntimes(regionId: string) {
+export function useClusterRuntimes(clusterId: string) {
   return useQuery({
-    queryKey: ['region-runtimes', regionId],
-    queryFn: () => api.get<PaginatedResponse<RegionRuntime>>(`/regions/${regionId}/runtimes`),
-    enabled: !!regionId,
+    queryKey: ['cluster-runtimes', clusterId],
+    queryFn: () => api.get<PaginatedResponse<ClusterRuntime>>(`/clusters/${clusterId}/runtimes`),
+    enabled: !!clusterId,
   })
 }
 

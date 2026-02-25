@@ -128,7 +128,7 @@ export function CreateTenantPage() {
         items={webroots}
         onChange={setWebroots}
         defaultItem={() => ({ subscription_id: '', runtime: 'php', runtime_version: '8.5', public_folder: 'public', env_file_name: '.env.hosting' })}
-        renderItem={(item, _, onChange) => <WebrootFields value={item} onChange={onChange} regionId={regionId} />}
+        renderItem={(item, _, onChange) => <WebrootFields value={item} onChange={onChange} clusterId={clusterId} />}
       />
 
       <ArraySection<DatabaseFormData>

@@ -5,17 +5,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArraySection } from './array-section'
 import { FQDNFields } from './fqdn-fields'
 import { SubscriptionSelect } from './subscription-select'
-import { useRegionRuntimes } from '@/lib/hooks'
+import { useClusterRuntimes } from '@/lib/hooks'
 import type { WebrootFormData, FQDNFormData } from '@/lib/types'
 
-interface Props { value: WebrootFormData; onChange: (v: WebrootFormData) => void; tenantId?: string; regionId?: string }
+interface Props { value: WebrootFormData; onChange: (v: WebrootFormData) => void; tenantId?: string; clusterId?: string }
 
-export function WebrootFields({ value, onChange, tenantId, regionId }: Props) {
-  const { data: regionRuntimesData } = useRegionRuntimes(regionId ?? '')
+export function WebrootFields({ value, onChange, tenantId, clusterId }: Props) {
+  const { data: clusterRuntimesData } = useClusterRuntimes(clusterId ?? '')
 
-  // Group flat region runtimes into { runtime → versions[] }
+  // Group flat cluster runtimes into { runtime → versions[] }
   const runtimeGroups = useMemo(() => {
-    const items = regionRuntimesData?.items ?? []
+    const items = clusterRuntimesData?.items ?? []
     const order: string[] = []
     const map: Record<string, string[]> = {}
     for (const r of items) {
@@ -27,7 +27,7 @@ export function WebrootFields({ value, onChange, tenantId, regionId }: Props) {
       map[r.runtime].push(r.version)
     }
     return order.map(rt => ({ runtime: rt, versions: map[rt] }))
-  }, [regionRuntimesData])
+  }, [clusterRuntimesData])
 
   const runtimeNames = runtimeGroups.map(g => g.runtime)
   const versions = runtimeGroups.find(g => g.runtime === value.runtime)?.versions ?? []
@@ -45,9 +45,9 @@ export function WebrootFields({ value, onChange, tenantId, regionId }: Props) {
               const group = runtimeGroups.find(g => g.runtime === v)
               onChange({ ...value, runtime: v, runtime_version: group?.versions[0] ?? '' })
             }}
-            disabled={!regionId || !hasRuntimes}
+            disabled={!clusterId || !hasRuntimes}
           >
-            <SelectTrigger><SelectValue placeholder={!regionId ? 'Select a region first' : 'Select runtime'} /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder={!clusterId ? 'Select a cluster first' : 'Select runtime'} /></SelectTrigger>
             <SelectContent>
               {runtimeNames.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
             </SelectContent>
@@ -58,9 +58,9 @@ export function WebrootFields({ value, onChange, tenantId, regionId }: Props) {
           <Select
             value={value.runtime_version}
             onValueChange={(v) => onChange({ ...value, runtime_version: v })}
-            disabled={!regionId || !hasRuntimes || versions.length === 0}
+            disabled={!clusterId || !hasRuntimes || versions.length === 0}
           >
-            <SelectTrigger><SelectValue placeholder={!regionId ? 'Select a region first' : 'Select version'} /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder={!clusterId ? 'Select a cluster first' : 'Select version'} /></SelectTrigger>
             <SelectContent>
               {versions.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
             </SelectContent>

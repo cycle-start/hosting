@@ -29,7 +29,7 @@ import {
   useCreateDaemon, useUpdateDaemon, useDeleteDaemon, useEnableDaemon, useDisableDaemon, useRetryDaemon,
   useCreateCronJob, useUpdateCronJob, useDeleteCronJob, useEnableCronJob, useDisableCronJob, useRetryCronJob,
   useEnvVars, useSetEnvVars, useDeleteEnvVar,
-  useRegionRuntimes,
+  useClusterRuntimes,
 } from '@/lib/hooks'
 import type { FQDN, Daemon, CronJob, WebrootEnvVar } from '@/lib/types'
 const stopSignals = ['TERM', 'INT', 'QUIT', 'KILL', 'HUP']
@@ -43,7 +43,7 @@ function getWebrootTabFromHash() {
 export function WebrootDetailPage() {
   const { id: tenantId, webrootId } = useParams({ from: '/auth/tenants/$id/webroots/$webrootId' as never })
   const { data: tenant } = useTenant(tenantId)
-  const { data: regionRuntimesData } = useRegionRuntimes(tenant?.region_id ?? '')
+  const { data: clusterRuntimesData } = useClusterRuntimes(tenant?.cluster_id ?? '')
   const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState(getWebrootTabFromHash)
@@ -59,9 +59,9 @@ export function WebrootDetailPage() {
   const [editEnvFileName, setEditEnvFileName] = useState('')
   const [editServiceHostname, setEditServiceHostname] = useState(true)
 
-  // Group flat region runtimes into { runtime → versions[] }
+  // Group flat cluster runtimes into { runtime → versions[] }
   const runtimeGroups = useMemo(() => {
-    const items = regionRuntimesData?.items ?? []
+    const items = clusterRuntimesData?.items ?? []
     const order: string[] = []
     const map: Record<string, string[]> = {}
     for (const r of items) {
@@ -73,7 +73,7 @@ export function WebrootDetailPage() {
       map[r.runtime].push(r.version)
     }
     return order.map(rt => ({ runtime: rt, versions: map[rt] }))
-  }, [regionRuntimesData])
+  }, [clusterRuntimesData])
 
   const runtimeNames = runtimeGroups.map(g => g.runtime)
   const editVersions = runtimeGroups.find(g => g.runtime === editRuntime)?.versions ?? []

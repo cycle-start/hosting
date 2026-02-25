@@ -197,18 +197,15 @@ func (s *Server) setupRoutes() {
 				r.Use(mw.RequireScope("regions", "read"))
 				r.Get("/regions", region.List)
 				r.Get("/regions/{id}", region.Get)
-				r.Get("/regions/{id}/runtimes", region.ListRuntimes)
 			})
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequireScope("regions", "write"))
 				r.Post("/regions", region.Create)
 				r.Put("/regions/{id}", region.Update)
-				r.Post("/regions/{id}/runtimes", region.AddRuntime)
 			})
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequireScope("regions", "delete"))
 				r.Delete("/regions/{id}", region.Delete)
-				r.Delete("/regions/{id}/runtimes", region.RemoveRuntime)
 			})
 
 			// Clusters
@@ -216,15 +213,18 @@ func (s *Server) setupRoutes() {
 				r.Use(mw.RequireScope("clusters", "read"))
 				r.Get("/regions/{regionID}/clusters", cluster.ListByRegion)
 				r.Get("/clusters/{id}", cluster.Get)
+				r.Get("/clusters/{id}/runtimes", cluster.ListRuntimes)
 			})
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequireScope("clusters", "write"))
 				r.Post("/regions/{regionID}/clusters", cluster.Create)
 				r.Put("/clusters/{id}", cluster.Update)
+				r.Post("/clusters/{id}/runtimes", cluster.AddRuntime)
 			})
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequireScope("clusters", "delete"))
 				r.Delete("/clusters/{id}", cluster.Delete)
+				r.Delete("/clusters/{id}/runtimes", cluster.RemoveRuntime)
 			})
 
 			// Cluster LB addresses

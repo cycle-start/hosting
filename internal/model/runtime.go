@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-type RegionRuntime struct {
-	RegionID  string `json:"region_id" db:"region_id"`
+type ClusterRuntime struct {
+	ClusterID string `json:"cluster_id" db:"cluster_id"`
 	Runtime   string `json:"runtime" db:"runtime"`
 	Version   string `json:"version" db:"version"`
 	Available bool   `json:"available" db:"available"`

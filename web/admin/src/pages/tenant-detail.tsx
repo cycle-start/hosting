@@ -953,7 +953,7 @@ export function TenantDetailPage() {
       <Dialog open={createWebrootOpen} onOpenChange={setCreateWebrootOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Create Webroot</DialogTitle></DialogHeader>
-          <WebrootFields value={wrForm} onChange={setWrForm} tenantId={id} regionId={tenant.region_id} />
+          <WebrootFields value={wrForm} onChange={setWrForm} tenantId={id} clusterId={tenant.cluster_id} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateWebrootOpen(false)}>Cancel</Button>
             <Button onClick={handleCreateWebroot} disabled={createWebrootMut.isPending || !wrForm.runtime || !wrForm.subscription_id}>

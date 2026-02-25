@@ -242,3 +242,132 @@ func TestClusterService_Delete_DBError(t *testing.T) {
 	assert.Contains(t, err.Error(), "delete cluster")
 	db.AssertExpectations(t)
 }
+
+// ---------- ListRuntimes ----------
+
+func TestClusterService_ListRuntimes_Success(t *testing.T) {
+	db := &mockDB{}
+	svc := NewClusterService(db)
+	ctx := context.Background()
+
+	clusterID := "test-cluster-1"
+
+	rows := newMockRows(
+		func(dest ...any) error {
+			*(dest[0].(*string)) = clusterID
+			*(dest[1].(*string)) = model.RuntimePHP
+			*(dest[2].(*string)) = "8.2"
+			*(dest[3].(*bool)) = true
+			return nil
+		},
+		func(dest ...any) error {
+			*(dest[0].(*string)) = clusterID
+			*(dest[1].(*string)) = model.RuntimeNode
+			*(dest[2].(*string)) = "20"
+			*(dest[3].(*bool)) = true
+			return nil
+		},
+	)
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
+
+	result, hasMore, err := svc.ListRuntimes(ctx, clusterID, 50, "")
+	require.NoError(t, err)
+	assert.False(t, hasMore)
+	require.Len(t, result, 2)
+	assert.Equal(t, model.RuntimePHP, result[0].Runtime)
+	assert.Equal(t, "8.2", result[0].Version)
+	assert.Equal(t, model.RuntimeNode, result[1].Runtime)
+	assert.Equal(t, "20", result[1].Version)
+	db.AssertExpectations(t)
+}
+
+func TestClusterService_ListRuntimes_Empty(t *testing.T) {
+	db := &mockDB{}
+	svc := NewClusterService(db)
+	ctx := context.Background()
+
+	rows := newEmptyMockRows()
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(rows, nil)
+
+	result, hasMore, err := svc.ListRuntimes(ctx, "test-cluster-1", 50, "")
+	require.NoError(t, err)
+	assert.False(t, hasMore)
+	assert.Empty(t, result)
+	db.AssertExpectations(t)
+}
+
+func TestClusterService_ListRuntimes_QueryError(t *testing.T) {
+	db := &mockDB{}
+	svc := NewClusterService(db)
+	ctx := context.Background()
+
+	db.On("Query", ctx, mock.AnythingOfType("string"), mock.Anything).Return(nil, errors.New("db error"))
+
+	result, _, err := svc.ListRuntimes(ctx, "test-cluster-1", 50, "")
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "list cluster runtimes")
+	db.AssertExpectations(t)
+}
+
+// ---------- AddRuntime ----------
+
+func TestClusterService_AddRuntime_Success(t *testing.T) {
+	db := &mockDB{}
+	svc := NewClusterService(db)
+	ctx := context.Background()
+
+	rt := &model.ClusterRuntime{
+		ClusterID: "test-cluster-1",
+		Runtime:   model.RuntimePHP,
+		Version:   "8.3",
+		Available: true,
+	}
+
+	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+
+	err := svc.AddRuntime(ctx, rt)
+	require.NoError(t, err)
+	db.AssertExpectations(t)
+}
+
+func TestClusterService_AddRuntime_DBError(t *testing.T) {
+	db := &mockDB{}
+	svc := NewClusterService(db)
+	ctx := context.Background()
+
+	rt := &model.ClusterRuntime{ClusterID: "test-cluster-1", Runtime: "php", Version: "8.3"}
+	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
+
+	err := svc.AddRuntime(ctx, rt)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "add cluster runtime")
+	db.AssertExpectations(t)
+}
+
+// ---------- RemoveRuntime ----------
+
+func TestClusterService_RemoveRuntime_Success(t *testing.T) {
+	db := &mockDB{}
+	svc := NewClusterService(db)
+	ctx := context.Background()
+
+	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, nil)
+
+	err := svc.RemoveRuntime(ctx, "test-cluster-1", "php", "8.2")
+	require.NoError(t, err)
+	db.AssertExpectations(t)
+}
+
+func TestClusterService_RemoveRuntime_DBError(t *testing.T) {
+	db := &mockDB{}
+	svc := NewClusterService(db)
+	ctx := context.Background()
+
+	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
+
+	err := svc.RemoveRuntime(ctx, "test-cluster-1", "php", "8.2")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "remove cluster runtime")
+	db.AssertExpectations(t)
+}

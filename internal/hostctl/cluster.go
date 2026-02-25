@@ -56,18 +56,6 @@ func ClusterApply(configPath string, timeout time.Duration) error {
 	}
 	fmt.Printf("Region %q: %s\n", cfg.Region.Name, regionID)
 
-	// 1b. Seed region runtimes
-	for _, rr := range cfg.RegionRuntimes {
-		fmt.Printf("Adding region runtime %s %s...\n", rr.Runtime, rr.Version)
-		_, err := client.Post(fmt.Sprintf("/regions/%s/runtimes", regionID), map[string]any{
-			"runtime": rr.Runtime,
-			"version": rr.Version,
-		})
-		if err != nil {
-			return fmt.Errorf("add region runtime %s %s: %w", rr.Runtime, rr.Version, err)
-		}
-	}
-
 	// 2. Find or create cluster
 	clusterID, created, err := findOrCreateCluster(client, regionID, cfg.Cluster)
 	if err != nil {
@@ -125,6 +113,18 @@ func ClusterApply(configPath string, timeout time.Duration) error {
 		return fmt.Errorf("set cluster active: %w", err)
 	}
 	fmt.Printf("Cluster %q: active\n", cfg.Cluster.Name)
+
+	// 5. Seed cluster runtimes
+	for _, rr := range cfg.ClusterRuntimes {
+		fmt.Printf("Adding cluster runtime %s %s...\n", rr.Runtime, rr.Version)
+		_, err := client.Post(fmt.Sprintf("/clusters/%s/runtimes", clusterID), map[string]any{
+			"runtime": rr.Runtime,
+			"version": rr.Version,
+		})
+		if err != nil {
+			return fmt.Errorf("add cluster runtime %s %s: %w", rr.Runtime, rr.Version, err)
+		}
+	}
 
 	return nil
 }

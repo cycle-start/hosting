@@ -1,10 +1,10 @@
 -- +goose Up
-CREATE TABLE region_runtimes (
-    region_id TEXT NOT NULL REFERENCES regions(id),
-    runtime   TEXT NOT NULL,
-    version   TEXT NOT NULL,
-    available BOOLEAN NOT NULL DEFAULT true,
-    PRIMARY KEY (region_id, runtime, version)
+CREATE TABLE cluster_runtimes (
+    cluster_id TEXT NOT NULL REFERENCES clusters(id),
+    runtime    TEXT NOT NULL,
+    version    TEXT NOT NULL,
+    available  BOOLEAN NOT NULL DEFAULT true,
+    PRIMARY KEY (cluster_id, runtime, version)
 );
 
 CREATE TABLE tenant_runtime_configs (
@@ -19,4 +19,4 @@ CREATE TABLE tenant_runtime_configs (
 
 -- +goose Down
 DROP TABLE tenant_runtime_configs;
-DROP TABLE region_runtimes;
+DROP TABLE cluster_runtimes;

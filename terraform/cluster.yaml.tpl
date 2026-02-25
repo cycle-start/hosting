@@ -5,7 +5,7 @@ api_key: hst_dev_e2e_test_key_00000000
 region:
   name: dev
 
-region_runtimes:
+cluster_runtimes:
   - runtime: php
     version: "8.5"
   - runtime: php

@@ -12,12 +12,12 @@ type UpdateRegion struct {
 	Config json.RawMessage `json:"config"`
 }
 
-type AddRegionRuntime struct {
+type AddClusterRuntime struct {
 	Runtime string `json:"runtime" validate:"required"`
 	Version string `json:"version" validate:"required"`
 }
 
-type RemoveRegionRuntime struct {
+type RemoveClusterRuntime struct {
 	Runtime string `json:"runtime" validate:"required"`
 	Version string `json:"version" validate:"required"`
 }

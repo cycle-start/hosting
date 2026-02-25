@@ -96,8 +96,8 @@ export interface Subscription {
   updated_at: string
 }
 
-export interface RegionRuntime {
-  region_id: string
+export interface ClusterRuntime {
+  cluster_id: string
   runtime: string
   version: string
   available: boolean

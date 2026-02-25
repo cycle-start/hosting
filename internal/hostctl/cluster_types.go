@@ -5,11 +5,16 @@ type ClusterConfig struct {
 	APIKey          string              `yaml:"api_key"`
 	Region          RegionDef           `yaml:"region"`
 	Cluster         ClusterDef          `yaml:"cluster"`
-	RegionRuntimes  []RegionRuntimeDef  `yaml:"region_runtimes"`
+	ClusterRuntimes []ClusterRuntimeDef `yaml:"cluster_runtimes"`
 }
 
 type RegionDef struct {
 	Name string `yaml:"name"`
+}
+
+type ClusterRuntimeDef struct {
+	Runtime string `yaml:"runtime"`
+	Version string `yaml:"version"`
 }
 
 type ClusterDef struct {

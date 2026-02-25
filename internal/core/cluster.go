@@ -102,3 +102,67 @@ func (s *ClusterService) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+func (s *ClusterService) ListRuntimes(ctx context.Context, clusterID string, limit int, cursor string) ([]model.ClusterRuntime, bool, error) {
+	query := `SELECT cluster_id, runtime, version, available FROM cluster_runtimes WHERE cluster_id = $1`
+	args := []any{clusterID}
+	argIdx := 2
+
+	if cursor != "" {
+		query += fmt.Sprintf(` AND runtime || '/' || version > $%d`, argIdx)
+		args = append(args, cursor)
+		argIdx++
+	}
+
+	query += ` ORDER BY runtime, version`
+	query += fmt.Sprintf(` LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := s.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, false, fmt.Errorf("list cluster runtimes for %s: %w", clusterID, err)
+	}
+	defer rows.Close()
+
+	var runtimes []model.ClusterRuntime
+	for rows.Next() {
+		var rt model.ClusterRuntime
+		if err := rows.Scan(&rt.ClusterID, &rt.Runtime, &rt.Version, &rt.Available); err != nil {
+			return nil, false, fmt.Errorf("scan cluster runtime: %w", err)
+		}
+		runtimes = append(runtimes, rt)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, fmt.Errorf("iterate cluster runtimes: %w", err)
+	}
+
+	hasMore := len(runtimes) > limit
+	if hasMore {
+		runtimes = runtimes[:limit]
+	}
+	return runtimes, hasMore, nil
+}
+
+func (s *ClusterService) AddRuntime(ctx context.Context, rt *model.ClusterRuntime) error {
+	_, err := s.db.Exec(ctx,
+		`INSERT INTO cluster_runtimes (cluster_id, runtime, version, available)
+		 VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (cluster_id, runtime, version) DO UPDATE SET available = EXCLUDED.available`,
+		rt.ClusterID, rt.Runtime, rt.Version, rt.Available,
+	)
+	if err != nil {
+		return fmt.Errorf("add cluster runtime: %w", err)
+	}
+	return nil
+}
+
+func (s *ClusterService) RemoveRuntime(ctx context.Context, clusterID string, runtime, version string) error {
+	_, err := s.db.Exec(ctx,
+		"DELETE FROM cluster_runtimes WHERE cluster_id = $1 AND runtime = $2 AND version = $3",
+		clusterID, runtime, version,
+	)
+	if err != nil {
+		return fmt.Errorf("remove cluster runtime: %w", err)
+	}
+	return nil
+}
+

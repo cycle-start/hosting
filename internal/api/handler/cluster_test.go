@@ -232,6 +232,181 @@ func TestClusterDelete_EmptyID(t *testing.T) {
 	assert.Contains(t, body["error"], "missing required ID")
 }
 
+// --- ListRuntimes ---
+
+func TestClusterListRuntimes_EmptyID(t *testing.T) {
+	h := newClusterHandler()
+	rec := httptest.NewRecorder()
+	r := newRequest(http.MethodGet, "/clusters//runtimes", nil)
+	r = withChiURLParam(r, "id", "")
+
+	h.ListRuntimes(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+// --- AddRuntime ---
+
+func TestClusterAddRuntime_EmptyID(t *testing.T) {
+	h := newClusterHandler()
+	rec := httptest.NewRecorder()
+	r := newRequest(http.MethodPost, "/clusters//runtimes", map[string]any{
+		"runtime": "php",
+		"version": "8.3",
+	})
+	r = withChiURLParam(r, "id", "")
+
+	h.AddRuntime(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	body := decodeErrorResponse(rec)
+	assert.Contains(t, body["error"], "missing required ID")
+}
+
+func TestClusterAddRuntime_InvalidJSON(t *testing.T) {
+	h := newClusterHandler()
+	rec := httptest.NewRecorder()
+	r := newRequestRaw(http.MethodPost, "/clusters/"+validID+"/runtimes", "{bad json")
+	r = withChiURLParam(r, "id", validID)
+
+	h.AddRuntime(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	body := decodeErrorResponse(rec)
+	assert.Contains(t, body["error"], "invalid JSON")
+}
+
+func TestClusterAddRuntime_EmptyBody(t *testing.T) {
+	h := newClusterHandler()
+	rec := httptest.NewRecorder()
+	r := newRequestRaw(http.MethodPost, "/clusters/"+validID+"/runtimes", "")
+	r = withChiURLParam(r, "id", validID)
+
+	h.AddRuntime(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestClusterAddRuntime_MissingRuntime(t *testing.T) {
+	h := newClusterHandler()
+	rec := httptest.NewRecorder()
+	r := newRequest(http.MethodPost, "/clusters/"+validID+"/runtimes", map[string]any{
+		"version": "8.3",
+	})
+	r = withChiURLParam(r, "id", validID)
+
+	h.AddRuntime(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	body := decodeErrorResponse(rec)
+	assert.Contains(t, body["error"], "validation error")
+}
+
+func TestClusterAddRuntime_MissingVersion(t *testing.T) {
+	h := newClusterHandler()
+	rec := httptest.NewRecorder()
+	r := newRequest(http.MethodPost, "/clusters/"+validID+"/runtimes", map[string]any{
+		"runtime": "php",
+	})
+	r = withChiURLParam(r, "id", validID)
+
+	h.AddRuntime(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	body := decodeErrorResponse(rec)
+	assert.Contains(t, body["error"], "validation error")
+}
+
+func TestClusterAddRuntime_ValidBody(t *testing.T) {
+	h := newClusterHandler()
+	rec := httptest.NewRecorder()
+	cid := "test-cluster-1"
+	r := newRequest(http.MethodPost, "/clusters/"+cid+"/runtimes", map[string]any{
+		"runtime": "php",
+		"version": "8.3",
+	})
+	r = withChiURLParam(r, "id", cid)
+
+	func() {
+		defer func() { recover() }()
+		h.AddRuntime(rec, r)
+	}()
+
+	assert.NotEqual(t, http.StatusBadRequest, rec.Code)
+}
+
+// --- RemoveRuntime ---
+
+func TestClusterRemoveRuntime_EmptyID(t *testing.T) {
+	h := newClusterHandler()
+	rec := httptest.NewRecorder()
+	r := newRequest(http.MethodDelete, "/clusters//runtimes", map[string]any{
+		"runtime": "php",
+		"version": "8.3",
+	})
+	r = withChiURLParam(r, "id", "")
+
+	h.RemoveRuntime(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	body := decodeErrorResponse(rec)
+	assert.Contains(t, body["error"], "missing required ID")
+}
+
+func TestClusterRemoveRuntime_InvalidJSON(t *testing.T) {
+	h := newClusterHandler()
+	rec := httptest.NewRecorder()
+	r := newRequestRaw(http.MethodDelete, "/clusters/"+validID+"/runtimes", "{bad json")
+	r = withChiURLParam(r, "id", validID)
+
+	h.RemoveRuntime(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	body := decodeErrorResponse(rec)
+	assert.Contains(t, body["error"], "invalid JSON")
+}
+
+func TestClusterRemoveRuntime_EmptyBody(t *testing.T) {
+	h := newClusterHandler()
+	rec := httptest.NewRecorder()
+	r := newRequestRaw(http.MethodDelete, "/clusters/"+validID+"/runtimes", "")
+	r = withChiURLParam(r, "id", validID)
+
+	h.RemoveRuntime(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestClusterRemoveRuntime_MissingRuntime(t *testing.T) {
+	h := newClusterHandler()
+	rec := httptest.NewRecorder()
+	r := newRequest(http.MethodDelete, "/clusters/"+validID+"/runtimes", map[string]any{
+		"version": "8.3",
+	})
+	r = withChiURLParam(r, "id", validID)
+
+	h.RemoveRuntime(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	body := decodeErrorResponse(rec)
+	assert.Contains(t, body["error"], "validation error")
+}
+
+func TestClusterRemoveRuntime_MissingVersion(t *testing.T) {
+	h := newClusterHandler()
+	rec := httptest.NewRecorder()
+	r := newRequest(http.MethodDelete, "/clusters/"+validID+"/runtimes", map[string]any{
+		"runtime": "php",
+	})
+	r = withChiURLParam(r, "id", validID)
+
+	h.RemoveRuntime(rec, r)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	body := decodeErrorResponse(rec)
+	assert.Contains(t, body["error"], "validation error")
+}
+
 // --- Error response format ---
 
 func TestClusterCreate_ErrorResponseFormat(t *testing.T) {
