@@ -257,3 +257,27 @@ variable "lb_shard_name" {
   type        = string
   default     = "lb-1"
 }
+
+# --- Gateway nodes ---
+
+variable "gateway_nodes" {
+  description = "List of gateway node definitions"
+  type = list(object({
+    name   = string
+    ip     = string
+    memory = optional(number, 2048)
+    vcpus  = optional(number, 2)
+  }))
+  default = [
+    {
+      name = "gateway-1-node-0"
+      ip   = "10.10.10.90"
+    }
+  ]
+}
+
+variable "gateway_shard_name" {
+  description = "Name of the gateway shard"
+  type        = string
+  default     = "gateway-1"
+}

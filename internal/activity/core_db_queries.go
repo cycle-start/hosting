@@ -1598,3 +1598,68 @@ func (a *CoreDB) ListResourceUsageByTenantID(ctx context.Context, tenantID strin
 	}
 	return usages, rows.Err()
 }
+
+// GetWireGuardPeerByID retrieves a single WireGuard peer by ID.
+func (a *CoreDB) GetWireGuardPeerByID(ctx context.Context, id string) (*model.WireGuardPeer, error) {
+	var p model.WireGuardPeer
+	err := a.db.QueryRow(ctx,
+		`SELECT id, tenant_id, subscription_id, name, public_key, preshared_key, assigned_ip, peer_index, endpoint, status, status_message, created_at, updated_at
+		 FROM wireguard_peers WHERE id = $1`, id,
+	).Scan(&p.ID, &p.TenantID, &p.SubscriptionID, &p.Name, &p.PublicKey,
+		&p.PresharedKey, &p.AssignedIP, &p.PeerIndex, &p.Endpoint,
+		&p.Status, &p.StatusMessage, &p.CreatedAt, &p.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("get wireguard peer %s: %w", id, err)
+	}
+	return &p, nil
+}
+
+// ListWireGuardPeersByTenant retrieves all WireGuard peers for a tenant.
+func (a *CoreDB) ListWireGuardPeersByTenant(ctx context.Context, tenantID string) ([]model.WireGuardPeer, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, tenant_id, subscription_id, name, public_key, preshared_key, assigned_ip, peer_index, endpoint, status, status_message, created_at, updated_at
+		 FROM wireguard_peers WHERE tenant_id = $1`, tenantID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list wireguard peers by tenant: %w", err)
+	}
+	defer rows.Close()
+
+	var peers []model.WireGuardPeer
+	for rows.Next() {
+		var p model.WireGuardPeer
+		if err := rows.Scan(&p.ID, &p.TenantID, &p.SubscriptionID, &p.Name, &p.PublicKey,
+			&p.PresharedKey, &p.AssignedIP, &p.PeerIndex, &p.Endpoint,
+			&p.Status, &p.StatusMessage, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan wireguard peer: %w", err)
+		}
+		peers = append(peers, p)
+	}
+	return peers, rows.Err()
+}
+
+// ListWireGuardPeersByCluster retrieves all WireGuard peers for tenants in a given cluster.
+func (a *CoreDB) ListWireGuardPeersByCluster(ctx context.Context, clusterID string) ([]model.WireGuardPeer, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT wp.id, wp.tenant_id, wp.subscription_id, wp.name, wp.public_key, wp.preshared_key, wp.assigned_ip, wp.peer_index, wp.endpoint, wp.status, wp.status_message, wp.created_at, wp.updated_at
+		 FROM wireguard_peers wp
+		 JOIN tenants t ON t.id = wp.tenant_id
+		 WHERE t.cluster_id = $1`, clusterID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list wireguard peers by cluster: %w", err)
+	}
+	defer rows.Close()
+
+	var peers []model.WireGuardPeer
+	for rows.Next() {
+		var p model.WireGuardPeer
+		if err := rows.Scan(&p.ID, &p.TenantID, &p.SubscriptionID, &p.Name, &p.PublicKey,
+			&p.PresharedKey, &p.AssignedIP, &p.PeerIndex, &p.Endpoint,
+			&p.Status, &p.StatusMessage, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan wireguard peer: %w", err)
+		}
+		peers = append(peers, p)
+	}
+	return peers, rows.Err()
+}

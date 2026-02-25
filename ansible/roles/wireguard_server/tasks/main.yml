@@ -1,0 +1,35 @@
+- name: Install WireGuard packages
+  apt:
+    name:
+      - wireguard
+      - wireguard-tools
+    state: present
+    update_cache: true
+
+- name: Enable IPv6 forwarding
+  sysctl:
+    name: net.ipv6.conf.all.forwarding
+    value: "1"
+    sysctl_set: true
+    state: present
+    reload: true
+
+- name: Create /etc/wireguard directory
+  file:
+    path: /etc/wireguard
+    state: directory
+    mode: "0700"
+
+- name: Generate WireGuard server keypair
+  shell: |
+    umask 077
+    wg genkey > /etc/wireguard/server.key
+    wg pubkey < /etc/wireguard/server.key > /etc/wireguard/server.pub
+  args:
+    creates: /etc/wireguard/server.key
+
+- name: Enable and start node-agent
+  systemd:
+    name: node-agent
+    enabled: true
+    state: started

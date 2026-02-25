@@ -579,6 +579,32 @@ export interface ResourceUsage {
   collected_at: string
 }
 
+export interface WireGuardPeer {
+  id: string
+  tenant_id: string
+  subscription_id: string
+  name: string
+  public_key: string
+  assigned_ip: string
+  peer_index: number
+  endpoint: string
+  status: string
+  status_message: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface WireGuardPeerCreateResult {
+  peer: WireGuardPeer
+  private_key: string
+  client_config: string
+}
+
+export interface WireGuardPeerFormData {
+  name: string
+  subscription_id: string
+}
+
 export interface SSHKeyFormData { name: string; public_key: string }
 
 export interface CreateTenantRequest {

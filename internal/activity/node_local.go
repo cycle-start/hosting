@@ -67,6 +67,7 @@ type NodeLocal struct {
 	cron     *agent.CronManager
 	daemon    *agent.DaemonManager
 	tenantULA *agent.TenantULAManager
+	wireguard *agent.WireGuardManager
 	runtimes  map[string]runtime.Manager
 }
 
@@ -83,6 +84,7 @@ func NewNodeLocal(
 	cron *agent.CronManager,
 	daemon *agent.DaemonManager,
 	tenantULA *agent.TenantULAManager,
+	wireguard *agent.WireGuardManager,
 	runtimes map[string]runtime.Manager,
 ) *NodeLocal {
 	return &NodeLocal{
@@ -97,6 +99,7 @@ func NewNodeLocal(
 		cron:      cron,
 		daemon:    daemon,
 		tenantULA: tenantULA,
+		wireguard: wireguard,
 		runtimes:  runtimes,
 	}
 }
@@ -1296,5 +1299,47 @@ func (a *NodeLocal) getDatabaseResourceUsage(ctx context.Context) ([]ResourceUsa
 	}
 
 	return entries, nil
+}
+
+// --------------------------------------------------------------------------
+// WireGuard activities
+// --------------------------------------------------------------------------
+
+// ConfigureWireGuardPeer adds a WireGuard peer to the gateway node.
+func (a *NodeLocal) ConfigureWireGuardPeer(ctx context.Context, params ConfigureWireGuardPeerParams) error {
+	if a.wireguard == nil {
+		return nil // Not a gateway node.
+	}
+	return a.wireguard.AddPeer(ctx, agent.AddPeerParams{
+		PublicKey:    params.PublicKey,
+		PresharedKey: params.PresharedKey,
+		AssignedIP:   params.AssignedIP,
+		AllowedIPs:   params.AllowedIPs,
+	})
+}
+
+// RemoveWireGuardPeer removes a WireGuard peer from the gateway node.
+func (a *NodeLocal) RemoveWireGuardPeer(ctx context.Context, params RemoveWireGuardPeerParams) error {
+	if a.wireguard == nil {
+		return nil
+	}
+	return a.wireguard.RemovePeer(ctx, params.PublicKey, params.AssignedIP)
+}
+
+// SyncWireGuardPeers performs full convergence of all WireGuard peers on a gateway node.
+func (a *NodeLocal) SyncWireGuardPeers(ctx context.Context, params SyncWireGuardPeersParams) error {
+	if a.wireguard == nil {
+		return nil
+	}
+	var agentPeers []agent.AddPeerParams
+	for _, p := range params.Peers {
+		agentPeers = append(agentPeers, agent.AddPeerParams{
+			PublicKey:    p.PublicKey,
+			PresharedKey: p.PresharedKey,
+			AssignedIP:   p.AssignedIP,
+			AllowedIPs:   p.AllowedIPs,
+		})
+	}
+	return a.wireguard.SyncPeers(ctx, agentPeers)
 }
 

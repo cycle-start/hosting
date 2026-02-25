@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Pause, Play, Trash2, Plus, RotateCcw, Loader2, FolderOpen, Database as DatabaseIcon, Globe, Boxes, HardDrive, Key, Archive, AlertCircle, ScrollText, Mail, Users, TerminalSquare } from 'lucide-react'
+import { Pause, Play, Trash2, Plus, RotateCcw, Loader2, FolderOpen, Database as DatabaseIcon, Globe, Boxes, HardDrive, Key, Archive, AlertCircle, ScrollText, Mail, Users, TerminalSquare, Shield, Download, Copy, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -32,8 +33,9 @@ import {
   useCreateZone, useDeleteZone,
   useRetryTenantFailed, useRetryWebroot, useRetryDatabase,
   useRetryValkeyInstance, useRetryS3Bucket, useRetrySSHKey, useRetryZone, useRetryBackup,
+  useWireGuardPeers, useCreateWireGuardPeer, useDeleteWireGuardPeer, useSubscriptions,
 } from '@/lib/hooks'
-import type { Webroot, Database, ValkeyInstance, S3Bucket, SSHKey, Backup, Zone, EmailAccount, WebrootFormData, DatabaseFormData, ValkeyInstanceFormData, S3BucketFormData, SSHKeyFormData, ZoneFormData } from '@/lib/types'
+import type { Webroot, Database, ValkeyInstance, S3Bucket, SSHKey, Backup, Zone, EmailAccount, WebrootFormData, DatabaseFormData, ValkeyInstanceFormData, S3BucketFormData, SSHKeyFormData, ZoneFormData, WireGuardPeer, WireGuardPeerFormData, WireGuardPeerCreateResult } from '@/lib/types'
 import { WebrootFields } from '@/components/forms/webroot-fields'
 import { DatabaseFields } from '@/components/forms/database-fields'
 import { ValkeyInstanceFields } from '@/components/forms/valkey-instance-fields'
@@ -46,7 +48,7 @@ import { WebTerminal } from '@/components/shared/web-terminal'
 import { Separator } from '@/components/ui/separator'
 
 const defaultTab = 'webroots'
-const validTabs = ['webroots', 'databases', 'zones', 'valkey', 's3', 'sftp', 'email', 'backups', 'access-logs', 'platform-logs']
+const validTabs = ['webroots', 'databases', 'zones', 'valkey', 's3', 'sftp', 'email', 'wireguard', 'backups', 'access-logs', 'platform-logs']
 
 function getTabFromHash() {
   const hash = window.location.hash.slice(1)
@@ -68,6 +70,8 @@ export function TenantDetailPage() {
   const [createSftpOpen, setCreateSftpOpen] = useState(false)
   const [createBackupOpen, setCreateBackupOpen] = useState(false)
   const [createZoneOpen, setCreateZoneOpen] = useState(false)
+  const [createWgOpen, setCreateWgOpen] = useState(false)
+  const [wgConfigResult, setWgConfigResult] = useState<WireGuardPeerCreateResult | null>(null)
 
   // Delete targets
   const [deleteWebroot, setDeleteWebroot] = useState<Webroot | null>(null)
@@ -78,6 +82,7 @@ export function TenantDetailPage() {
   const [deleteBackupTarget, setDeleteBackupTarget] = useState<Backup | null>(null)
   const [restoreBackupTarget, setRestoreBackupTarget] = useState<Backup | null>(null)
   const [deleteZoneTarget, setDeleteZoneTarget] = useState<Zone | null>(null)
+  const [deleteWgPeer, setDeleteWgPeer] = useState<WireGuardPeer | null>(null)
 
   // Form state
   const defaultWebroot: WebrootFormData = { subscription_id: '', runtime: 'php', runtime_version: '8.5', public_folder: 'public', env_file_name: '.env.hosting' }
@@ -86,6 +91,7 @@ export function TenantDetailPage() {
   const defaultS3: S3BucketFormData = { subscription_id: '', shard_id: '' }
   const defaultSftp: SSHKeyFormData = { name: '', public_key: '' }
   const defaultZone: ZoneFormData = { subscription_id: '', name: '' }
+  const defaultWg: WireGuardPeerFormData = { name: '', subscription_id: '' }
 
   const [wrForm, setWrForm] = useState<WebrootFormData>(defaultWebroot)
   const [dbForm, setDbForm] = useState<DatabaseFormData>(defaultDatabase)
@@ -93,6 +99,7 @@ export function TenantDetailPage() {
   const [s3Form, setS3Form] = useState<S3BucketFormData>(defaultS3)
   const [sftpForm, setSftpForm] = useState<SSHKeyFormData>(defaultSftp)
   const [znForm, setZnForm] = useState<ZoneFormData>(defaultZone)
+  const [wgForm, setWgForm] = useState<WireGuardPeerFormData>(defaultWg)
   const [bkType, setBkType] = useState('web')
   const [bkSource, setBkSource] = useState('')
 

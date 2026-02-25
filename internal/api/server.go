@@ -36,6 +36,10 @@ type Server struct {
 
 func NewServer(logger zerolog.Logger, coreDB *pgxpool.Pool, temporalClient temporalclient.Client, cfg *config.Config) *Server {
 	services := core.NewServices(coreDB, temporalClient, cfg.OIDCIssuerURL, cfg.SecretEncryptionKey)
+	// Override WireGuard endpoint from config.
+	if cfg.WireGuardEndpoint != "" {
+		services.WireGuardPeer = core.NewWireGuardPeerService(coreDB, temporalClient, cfg.WireGuardEndpoint)
+	}
 	auditLogger := mw.NewAuditLogger(coreDB, logger)
 
 	s := &Server{
@@ -142,6 +146,7 @@ func (s *Server) setupRoutes() {
 		internalNode := handler.NewInternalNode(s.services.DesiredState, s.services.NodeHealth, s.services.CronJob)
 		incident := handler.NewIncident(s.services.Incident)
 		capabilityGap := handler.NewCapabilityGap(s.services.CapabilityGap)
+		wireguardPeer := handler.NewWireGuardPeer(s.services.WireGuardPeer, s.services.Tenant)
 
 		// Workflow await (admin-only, blocks until workflow completes)
 		workflow := handler.NewWorkflow(s.temporalClient)
@@ -689,6 +694,22 @@ func (s *Server) setupRoutes() {
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireScope("backups", "delete"))
 			r.Delete("/backups/{id}", backup.Delete)
+		})
+
+		// WireGuard peers
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("wireguard", "read"))
+			r.Get("/tenants/{tenantID}/wireguard-peers", wireguardPeer.ListByTenant)
+			r.Get("/wireguard-peers/{id}", wireguardPeer.Get)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("wireguard", "write"))
+			r.Post("/tenants/{tenantID}/wireguard-peers", wireguardPeer.Create)
+			r.Post("/wireguard-peers/{id}/retry", wireguardPeer.Retry)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireScope("wireguard", "delete"))
+			r.Delete("/wireguard-peers/{id}", wireguardPeer.Delete)
 		})
 
 		// Incidents

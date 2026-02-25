@@ -401,3 +401,30 @@ type SyncDatabaseUserHostsParams struct {
 	AccessRules     []model.DatabaseAccessRule
 	InternalNetworkCIDR string
 }
+
+// ConfigureWireGuardPeerParams holds parameters for adding a WireGuard peer on a gateway node.
+type ConfigureWireGuardPeerParams struct {
+	PublicKey    string
+	PresharedKey string
+	AssignedIP   string
+	AllowedIPs   []string
+}
+
+// RemoveWireGuardPeerParams holds parameters for removing a WireGuard peer from a gateway node.
+type RemoveWireGuardPeerParams struct {
+	PublicKey  string
+	AssignedIP string
+}
+
+// WireGuardPeerConfig describes a single peer for convergence sync.
+type WireGuardPeerConfig struct {
+	PublicKey    string
+	PresharedKey string
+	AssignedIP   string
+	AllowedIPs   []string
+}
+
+// SyncWireGuardPeersParams holds parameters for syncing all WireGuard peers on a gateway node.
+type SyncWireGuardPeersParams struct {
+	Peers []WireGuardPeerConfig
+}

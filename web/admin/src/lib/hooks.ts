@@ -10,6 +10,7 @@ import type {
   PlatformConfig, ListParams, AuditListParams, TenantResourceSummary,
   CreateTenantRequest, WebrootEnvVar,
   FQDNFormData, DatabaseUserFormData, ValkeyUserFormData,
+  WireGuardPeer, WireGuardPeerCreateResult, WireGuardPeerFormData,
   LogQueryResponse,
   Incident, IncidentEvent, IncidentListParams,
   CapabilityGap, CapabilityGapListParams,
@@ -860,6 +861,32 @@ export function useDeleteS3AccessKey() {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/s3-access-keys/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['s3-access-keys'] }),
+  })
+}
+
+// WireGuard Peers
+export function useWireGuardPeers(tenantId: string, params?: ListParams) {
+  return useQuery({
+    queryKey: ['wireguard-peers', tenantId, params],
+    queryFn: () => api.get<PaginatedResponse<WireGuardPeer>>(listPath(`/tenants/${tenantId}/wireguard-peers`, params)),
+    enabled: !!tenantId,
+  })
+}
+
+export function useCreateWireGuardPeer() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { tenant_id: string; name: string; subscription_id: string }) =>
+      api.post<WireGuardPeerCreateResult>(`/tenants/${data.tenant_id}/wireguard-peers`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['wireguard-peers'] }),
+  })
+}
+
+export function useDeleteWireGuardPeer() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/wireguard-peers/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['wireguard-peers'] }),
   })
 }
 

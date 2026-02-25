@@ -62,6 +62,8 @@ type Config struct {
 	LLMMaxTurns       int    // LLM_MAX_TURNS — max conversation turns per investigation (default: 10)
 
 	SSHCAPrivateKey string // SSH_CA_PRIVATE_KEY — PEM-encoded SSH CA private key (for web terminal)
+
+	WireGuardEndpoint string // WIREGUARD_ENDPOINT — public endpoint for WireGuard VPN (e.g. "vpn.hosting.test:51820")
 }
 
 func Load() (*Config, error) {
@@ -109,6 +111,8 @@ func Load() (*Config, error) {
 		LLMMaxTurns:        getEnvInt("LLM_MAX_TURNS", 10),
 
 		SSHCAPrivateKey: getEnv("SSH_CA_PRIVATE_KEY", ""),
+
+		WireGuardEndpoint: getEnv("WIREGUARD_ENDPOINT", ""),
 	}
 
 	return cfg, nil

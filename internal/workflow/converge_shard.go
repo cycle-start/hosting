@@ -71,6 +71,8 @@ func ConvergeShardWorkflow(ctx workflow.Context, params ConvergeShardParams) err
 		errs = convergeValkeyShard(ctx, params.ShardID, nodes)
 	case model.ShardRoleLB:
 		errs = convergeLBShard(ctx, shard, nodes)
+	case model.ShardRoleGateway:
+		errs = convergeGatewayShard(ctx, shard, nodes)
 	default:
 		// Storage, DBAdmin, DNS, email — no convergence needed.
 		setShardStatus(ctx, params.ShardID, model.StatusActive, nil)
@@ -877,6 +879,121 @@ func convergeValkeyShard(ctx workflow.Context, shardID string, nodes []model.Nod
 				}
 			}
 		}
+	}
+
+	return errs
+}
+
+func convergeGatewayShard(ctx workflow.Context, shard model.Shard, nodes []model.Node) []string {
+	var errs []string
+	clusterID := shard.ClusterID
+
+	// List all WireGuard peers for tenants in this cluster.
+	var peers []model.WireGuardPeer
+	err := workflow.ExecuteActivity(ctx, "ListWireGuardPeersByCluster", clusterID).Get(ctx, &peers)
+	if err != nil {
+		return []string{fmt.Sprintf("list wireguard peers: %v", err)}
+	}
+
+	if len(peers) == 0 {
+		return nil
+	}
+
+	// Collect all DB and Valkey shard nodes for ULA computation.
+	type nodeInfo struct {
+		ShardIndex int
+		ShardRole  string
+	}
+	var serviceNodes []nodeInfo
+	for _, role := range []string{model.ShardRoleDatabase, model.ShardRoleValkey} {
+		var shards []model.Shard
+		if sErr := workflow.ExecuteActivity(ctx, "ListShardsByClusterAndRole",
+			clusterID, role).Get(ctx, &shards); sErr != nil {
+			errs = append(errs, fmt.Sprintf("list %s shards for gateway: %v", role, sErr))
+			continue
+		}
+		for _, s := range shards {
+			var sNodes []model.Node
+			if nErr := workflow.ExecuteActivity(ctx, "ListNodesByShard", s.ID).Get(ctx, &sNodes); nErr != nil {
+				errs = append(errs, fmt.Sprintf("list nodes for shard %s: %v", s.ID, nErr))
+				continue
+			}
+			for _, n := range sNodes {
+				if n.ShardIndex != nil {
+					serviceNodes = append(serviceNodes, nodeInfo{ShardIndex: *n.ShardIndex, ShardRole: role})
+				}
+			}
+		}
+	}
+
+	// Build per-peer sync params: compute allowed ULAs for each peer's tenant.
+	clusterHash := core.ComputeClusterHash(clusterID)
+	tenantUIDs := make(map[string]int)
+	for _, peer := range peers {
+		if _, ok := tenantUIDs[peer.TenantID]; !ok {
+			var tenant model.Tenant
+			if tErr := workflow.ExecuteActivity(ctx, "GetTenantByID", peer.TenantID).Get(ctx, &tenant); tErr != nil {
+				errs = append(errs, fmt.Sprintf("get tenant %s: %v", peer.TenantID, tErr))
+				continue
+			}
+			tenantUIDs[peer.TenantID] = tenant.UID
+		}
+	}
+
+	var syncPeers []activity.WireGuardPeerConfig
+	for _, peer := range peers {
+		if peer.Status != model.StatusActive {
+			continue
+		}
+		uid, ok := tenantUIDs[peer.TenantID]
+		if !ok {
+			continue
+		}
+		var allowedIPs []string
+		for _, sn := range serviceNodes {
+			ula := fmt.Sprintf("fd00:%x:%x::%x/128", clusterHash, sn.ShardIndex, uid)
+			allowedIPs = append(allowedIPs, ula)
+		}
+		syncPeers = append(syncPeers, activity.WireGuardPeerConfig{
+			PublicKey:    peer.PublicKey,
+			PresharedKey: peer.PresharedKey,
+			AssignedIP:   peer.AssignedIP,
+			AllowedIPs:   allowedIPs,
+		})
+	}
+
+	// Fan out SyncWireGuardPeers to each gateway node.
+	syncErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
+		nodeCtx := nodeActivityCtx(gCtx, node.ID)
+		return workflow.ExecuteActivity(nodeCtx, "SyncWireGuardPeers", activity.SyncWireGuardPeersParams{
+			Peers: syncPeers,
+		}).Get(gCtx, nil)
+	})
+	errs = append(errs, syncErrs...)
+
+	// Set up transit routes to all DB and Valkey shard nodes.
+	var crossShardPeers []activity.ULARoutePeerParam
+	for _, sn := range serviceNodes {
+		crossShardPeers = append(crossShardPeers, activity.ULARoutePeerParam{
+			PrefixIndex:  sn.ShardIndex,
+			TransitIndex: core.TransitIndex(sn.ShardRole, sn.ShardIndex),
+		})
+	}
+
+	if len(crossShardPeers) > 0 {
+		routeErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
+			if node.ShardIndex == nil {
+				return nil
+			}
+			nodeCtx := nodeActivityCtx(gCtx, node.ID)
+			return workflow.ExecuteActivity(nodeCtx, "ConfigureULARoutesV2",
+				activity.ConfigureULARoutesV2Params{
+					ClusterID:        clusterID,
+					ThisTransitIndex: core.TransitIndex(model.ShardRoleGateway, *node.ShardIndex),
+					Peers:            crossShardPeers,
+				}).Get(gCtx, nil)
+		})
+		errs = append(errs, routeErrs...)
 	}
 
 	return errs

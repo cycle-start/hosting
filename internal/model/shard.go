@@ -27,6 +27,7 @@ const (
 	ShardRoleStorage     = "storage"
 	ShardRoleDBAdmin = "dbadmin"
 	ShardRoleLB      = "lb"
+	ShardRoleGateway = "gateway"
 )
 
 type StorageShardConfig struct {
@@ -37,4 +38,11 @@ type StorageShardConfig struct {
 // DatabaseShardConfig holds replication configuration for a database shard.
 type DatabaseShardConfig struct {
 	PrimaryNodeID string `json:"primary_node_id"`
+}
+
+// GatewayShardConfig holds configuration for a WireGuard gateway shard.
+type GatewayShardConfig struct {
+	ListenPort   int    `json:"listen_port"`
+	PublicKey    string `json:"public_key"`
+	ExternalHost string `json:"external_host"`
 }

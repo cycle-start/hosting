@@ -85,6 +85,7 @@ func main() {
 		srv.CronManager(),
 		srv.DaemonManager(),
 		srv.TenantULAManager(),
+		agent.NewWireGuardManager(logger),
 		srv.Runtimes(),
 	)
 	w.RegisterActivity(nodeActs)

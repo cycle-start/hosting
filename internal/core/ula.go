@@ -28,7 +28,11 @@ const (
 	TransitOffsetWeb      = 0   // 0-255
 	TransitOffsetDatabase = 256 // 256-511
 	TransitOffsetValkey   = 512 // 512-767
+	TransitOffsetGateway  = 768 // 768-1023
 )
+
+// GatewayShardIndex is the reserved shard index for the WireGuard gateway.
+const GatewayShardIndex = 0xFFFF
 
 // TransitIndex computes the transit address index for a node given its shard
 // role and shard-local index. This prevents collisions when web, DB, and Valkey
@@ -39,9 +43,18 @@ func TransitIndex(shardRole string, shardIndex int) int {
 		return TransitOffsetDatabase + shardIndex
 	case "valkey":
 		return TransitOffsetValkey + shardIndex
+	case "gateway":
+		return TransitOffsetGateway + shardIndex
 	default:
 		return TransitOffsetWeb + shardIndex
 	}
+}
+
+// ComputeWireGuardClientIP computes the WireGuard client IPv6 address for a peer.
+// Format: fd00:{cluster_hash}:ffff::{peer_index}
+func ComputeWireGuardClientIP(clusterID string, peerIndex int) string {
+	clusterHash := ComputeClusterHash(clusterID)
+	return fmt.Sprintf("fd00:%x:ffff::%x", clusterHash, peerIndex)
 }
 
 // FormatDaemonProxyURL formats a proxy_pass URL for nginx, handling both

@@ -32,6 +32,10 @@ resource "random_uuid" "lb_node_id" {
   count = length(var.lb_nodes)
 }
 
+resource "random_uuid" "gateway_node_id" {
+  count = length(var.gateway_nodes)
+}
+
 resource "random_uuid" "ceph_fsid" {}
 
 # Pre-generated CephFS client key material — injected into both storage and web
@@ -861,6 +865,102 @@ resource "libvirt_domain" "lb_node" {
   }
 }
 
+resource "libvirt_volume" "gateway_node" {
+  count    = length(var.gateway_nodes)
+  name     = "${var.gateway_nodes[count.index].name}.qcow2"
+  pool     = libvirt_pool.hosting.name
+  capacity = 21474836480 # 20 GB
+  target   = { format = { type = "qcow2" } }
+  backing_store = {
+    path   = libvirt_volume.image_base.path
+    format = { type = "qcow2" }
+  }
+}
+
+resource "libvirt_cloudinit_disk" "gateway_node" {
+  count = length(var.gateway_nodes)
+  name  = "${var.gateway_nodes[count.index].name}-cloudinit.iso"
+  meta_data = yamlencode({
+    instance-id    = "i-${var.gateway_nodes[count.index].name}"
+    local-hostname = var.gateway_nodes[count.index].name
+  })
+  user_data = templatefile("${path.module}/cloud-init/gateway-node.yaml.tpl", {
+    hostname         = var.gateway_nodes[count.index].name
+    node_id          = random_uuid.gateway_node_id[count.index].result
+    shard_name       = var.gateway_shard_name
+    temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
+    ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
+    region_id        = var.region_id
+    cluster_id       = var.cluster_id
+  })
+  network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
+    ip_address = var.gateway_nodes[count.index].ip
+    gateway    = var.gateway_ip
+  })
+}
+
+resource "libvirt_volume" "gateway_node_seed" {
+  count = length(var.gateway_nodes)
+  name  = "${var.gateway_nodes[count.index].name}-seed.iso"
+  pool  = libvirt_pool.hosting.name
+  create = {
+    content = { url = libvirt_cloudinit_disk.gateway_node[count.index].path }
+  }
+  lifecycle {
+    replace_triggered_by = [libvirt_cloudinit_disk.gateway_node[count.index]]
+    ignore_changes       = [create]
+  }
+}
+
+resource "libvirt_domain" "gateway_node" {
+  count       = length(var.gateway_nodes)
+  name        = var.gateway_nodes[count.index].name
+  memory      = var.gateway_nodes[count.index].memory
+  memory_unit = "MiB"
+  vcpu        = var.gateway_nodes[count.index].vcpus
+  type        = "kvm"
+  running     = true
+  autostart   = true
+
+  os = { type = "hvm" }
+
+  devices = {
+    disks = [
+      {
+        source = {
+          volume = {
+            pool   = libvirt_pool.hosting.name
+            volume = libvirt_volume.gateway_node[count.index].name
+          }
+        }
+        driver = { type = "qcow2" }
+        target = { dev = "vda", bus = "virtio" }
+      },
+      {
+        source = {
+          volume = {
+            pool   = libvirt_pool.hosting.name
+            volume = libvirt_volume.gateway_node_seed[count.index].name
+          }
+        }
+        driver = { type = "raw" }
+        target = { dev = "vdb", bus = "virtio" }
+      },
+    ]
+
+    interfaces = [{
+      type   = "network"
+      source = { network = { network = libvirt_network.hosting.name } }
+      model  = { type = "virtio" }
+    }]
+
+    consoles = [{
+      type   = "pty"
+      target = { type = "serial", port = "0" }
+    }]
+  }
+}
+
 # --- Control Plane VM (k3s, not a hosting shard) ---
 
 resource "libvirt_volume" "controlplane_node" {
@@ -1013,6 +1113,13 @@ locals {
       ip         = n.ip
       shard_name = var.lb_shard_name
       role       = "lb"
+    }],
+    [for i, n in var.gateway_nodes : {
+      id         = random_uuid.gateway_node_id[i].result
+      name       = n.name
+      ip         = n.ip
+      shard_name = var.gateway_shard_name
+      role       = "gateway"
     }],
   )
 
