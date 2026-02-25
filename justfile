@@ -138,9 +138,9 @@ create-dev-key:
 create-agent-key:
     CORE_DATABASE_URL="postgres://hosting:hosting@{{cp}}:5432/hosting_core?sslmode=disable" go run ./cmd/core-api create-api-key --name agent --raw-key hst_agent_key_000000000000000
 
-# Register cluster topology (regions, clusters, shards, nodes) with the platform
+# Register cluster topology (regions, clusters, shards, nodes) and runtimes with the platform
 cluster-apply:
-    go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml
+    go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml -f seeds/runtimes.yaml
 
 # Wait for core-api to be healthy (used between migrate and cluster-apply)
 wait-api:
@@ -263,7 +263,7 @@ vm-up:
     cd terraform && terraform apply -auto-approve
     @sudo virsh list --all --name | xargs -I{} sudo virsh start {} 2>/dev/null; true
     just _wait-api
-    go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml
+    go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml -f seeds/runtimes.yaml
 
 # Nuclear rebuild: base image, destroy/recreate VMs, provision, deploy, bootstrap
 vm-rebuild:

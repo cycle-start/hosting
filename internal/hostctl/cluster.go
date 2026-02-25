@@ -10,15 +10,32 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func ClusterApply(configPath string, timeout time.Duration) error {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return fmt.Errorf("read config: %w", err)
-	}
-
+func ClusterApply(configPaths []string, timeout time.Duration) error {
 	var cfg ClusterConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return fmt.Errorf("parse config: %w", err)
+	for _, p := range configPaths {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return fmt.Errorf("read config %s: %w", p, err)
+		}
+		var partial ClusterConfig
+		if err := yaml.Unmarshal(data, &partial); err != nil {
+			return fmt.Errorf("parse config %s: %w", p, err)
+		}
+		if partial.APIURL != "" {
+			cfg.APIURL = partial.APIURL
+		}
+		if partial.APIKey != "" {
+			cfg.APIKey = partial.APIKey
+		}
+		if partial.Region.Name != "" {
+			cfg.Region = partial.Region
+		}
+		if partial.Cluster.Name != "" {
+			cfg.Cluster = partial.Cluster
+		}
+		if len(partial.ClusterRuntimes) > 0 {
+			cfg.ClusterRuntimes = partial.ClusterRuntimes
+		}
 	}
 
 	apiKey := cfg.APIKey

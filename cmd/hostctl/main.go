@@ -22,21 +22,22 @@ func main() {
 	switch os.Args[1] {
 	case "cluster":
 		if len(os.Args) < 3 || os.Args[2] != "apply" {
-			fmt.Fprintln(os.Stderr, "Usage: hostctl cluster apply -f <cluster-definition.yaml>")
+			fmt.Fprintln(os.Stderr, "Usage: hostctl cluster apply -f <file> [-f <file>...]")
 			os.Exit(1)
 		}
 		fs := flag.NewFlagSet("cluster apply", flag.ExitOnError)
-		file := fs.String("f", "", "Path to cluster definition YAML file (required)")
+		var files multiFlag
+		fs.Var(&files, "f", "Path to cluster definition YAML file (can be repeated)")
 		timeout := fs.Duration("timeout", 10*time.Minute, "Timeout for async operations")
 		fs.Parse(os.Args[3:])
 
-		if *file == "" {
-			fmt.Fprintln(os.Stderr, "Error: -f flag is required")
+		if len(files) == 0 {
+			fmt.Fprintln(os.Stderr, "Error: at least one -f flag is required")
 			fs.Usage()
 			os.Exit(1)
 		}
 
-		if err := hostctl.ClusterApply(*file, *timeout); err != nil {
+		if err := hostctl.ClusterApply([]string(files), *timeout); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
@@ -107,9 +108,18 @@ func loadEnvFile(path string) {
 	}
 }
 
+// multiFlag allows a flag to be specified multiple times (e.g. -f a.yaml -f b.yaml).
+type multiFlag []string
+
+func (f *multiFlag) String() string { return strings.Join(*f, ", ") }
+func (f *multiFlag) Set(value string) error {
+	*f = append(*f, value)
+	return nil
+}
+
 func printUsage() {
 	fmt.Fprintln(os.Stderr, `Usage:
-  hostctl cluster apply -f <cluster-definition.yaml>
+  hostctl cluster apply -f <file> [-f <file>...]
   hostctl seed -f <seed-definition.yaml>
   hostctl converge-shard [-api URL] <shard-id>
 
