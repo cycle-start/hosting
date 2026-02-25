@@ -155,7 +155,7 @@ export function EmailAccountDetailPage() {
       <Breadcrumb segments={[
         { label: 'Tenants', href: '/tenants' },
         { label: tenant?.id ?? tenantId, href: `/tenants/${tenantId}` },
-        { label: 'Email' },
+        { label: 'Email', href: `/tenants/${tenantId}`, hash: 'email' },
         { label: account.address },
       ]} />
 
