@@ -115,8 +115,9 @@ Runs on each VM node, connecting to Temporal via `node-{uuid}` task queue:
 - **NginxManager:** Per-webroot server blocks from templates, SSL cert installation, config test + reload, orphaned config cleanup
 - **SSHManager:** SSH/SFTP configuration, authorized_keys sync across all shard nodes
 - **DatabaseManager:** MySQL CREATE/DROP DATABASE/USER, GRANT, dump/import for migrations
-- **ValkeyManager:** Instance lifecycle (config + systemd units), ACL user management, RDB dump/import
+- **ValkeyManager:** Instance lifecycle (config + systemd units, dual-stack bind), ACL user management, RDB dump/import
 - **S3Manager:** Ceph RGW bucket/user management via `radosgw-admin`, tenant-scoped naming (`{tenantID}--{bucketName}`)
+- **TenantULAManager:** Per-tenant ULA IPv6 addresses on web/DB/Valkey nodes, nftables UID binding (web), service ingress filtering (DB/Valkey), cross-shard routing
 - **Runtime managers:** PHP-FPM (socket activation, configurable PM/php.ini via runtime_config), Node.js, Python (gunicorn), Ruby (puma), Static
 
 ### DNS (PowerDNS)
@@ -327,6 +328,17 @@ Names are `{prefix}{10-char-random}`, globally unique, auto-generated on creatio
 - Cron job lifecycle (create → systemd timer verification → update → disable/enable → delete)
 - Shard convergence trigger with idempotency test
 - Suspend/resume with HTTP 503 verification and restore
+
+### Per-Tenant ULA on Service Nodes
+
+- Per-tenant ULA IPv6 addresses (`fd00:{hash}:{shard_index}::{uid}`) on DB and Valkey nodes (extends existing web-node ULA)
+- `tenant0` dummy interface provisioned via cloud-init on DB and Valkey VMs (same as web nodes)
+- MySQL dual-stack binding (`bind-address = *`) and Valkey dual-stack (`bind 0.0.0.0 ::`)
+- Service ingress nftables table (`ip6 tenant_service_ingress`) restricts ULA-destined traffic to web-node ULAs and localhost
+- Role-based transit address offsets (web 0-255, DB 256-511, Valkey 512-767) prevent collisions in cross-shard routing
+- `ConfigureRoutesV2` supports cross-shard peers — web nodes route to DB/Valkey and vice versa
+- Creation workflows (`CreateDatabaseWorkflow`, `CreateValkeyInstanceWorkflow`) configure ULA on shard nodes (non-fatal)
+- Convergence workflows set up ULA addresses and cross-shard routes for DB and Valkey shards
 
 ---
 

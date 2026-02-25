@@ -10,6 +10,23 @@ users:
       - ${ssh_public_key}
 
 write_files:
+  - path: /etc/modules-load.d/dummy.conf
+    content: |
+      dummy
+
+  - path: /etc/systemd/network/50-tenant0.netdev
+    content: |
+      [NetDev]
+      Name=tenant0
+      Kind=dummy
+
+  - path: /etc/systemd/network/50-tenant0.network
+    content: |
+      [Match]
+      Name=tenant0
+      [Network]
+      Description=Tenant ULA addresses
+
   - path: /etc/default/node-agent
     content: |
       TEMPORAL_ADDRESS=${temporal_address}
@@ -25,4 +42,6 @@ write_files:
       METRICS_ADDR=:9100
 
 runcmd:
+  - modprobe dummy
+  - systemctl restart systemd-networkd
   - systemctl daemon-reload

@@ -21,6 +21,29 @@ func ComputeTenantULA(clusterID string, nodeShardIndex int, tenantUID int) strin
 	return fmt.Sprintf("fd00:%x:%x::%x", clusterHash, nodeShardIndex, tenantUID)
 }
 
+// Transit address offset constants. Each role gets a 256-slot range in the
+// transit address space fd00:{hash}:0::{transit_index} so that web, DB, and
+// Valkey nodes within the same cluster never collide.
+const (
+	TransitOffsetWeb      = 0   // 0-255
+	TransitOffsetDatabase = 256 // 256-511
+	TransitOffsetValkey   = 512 // 512-767
+)
+
+// TransitIndex computes the transit address index for a node given its shard
+// role and shard-local index. This prevents collisions when web, DB, and Valkey
+// nodes share the same cluster hash in the transit address space.
+func TransitIndex(shardRole string, shardIndex int) int {
+	switch shardRole {
+	case "database":
+		return TransitOffsetDatabase + shardIndex
+	case "valkey":
+		return TransitOffsetValkey + shardIndex
+	default:
+		return TransitOffsetWeb + shardIndex
+	}
+}
+
 // FormatDaemonProxyURL formats a proxy_pass URL for nginx, handling both
 // IPv4 and IPv6 addresses. IPv6 addresses must be wrapped in square brackets
 // per RFC 2732.

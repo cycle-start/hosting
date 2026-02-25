@@ -381,6 +381,19 @@ type SyncEgressRulesParams struct {
 	Rules     []model.TenantEgressRule
 }
 
+// ConfigureULARoutesV2Params holds parameters for generalized cross-shard ULA routing.
+type ConfigureULARoutesV2Params struct {
+	ClusterID        string
+	ThisTransitIndex int
+	Peers            []ULARoutePeerParam
+}
+
+// ULARoutePeerParam describes a single peer for cross-shard ULA routing.
+type ULARoutePeerParam struct {
+	PrefixIndex  int
+	TransitIndex int
+}
+
 // SyncDatabaseUserHostsParams holds parameters for rebuilding MySQL user host patterns.
 type SyncDatabaseUserHostsParams struct {
 	DatabaseName    string

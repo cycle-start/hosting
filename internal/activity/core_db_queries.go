@@ -975,6 +975,28 @@ func (a *CoreDB) ListShardsByRole(ctx context.Context, role string) ([]model.Sha
 	return shards, rows.Err()
 }
 
+// ListShardsByClusterAndRole retrieves all shards for a cluster with the given role.
+func (a *CoreDB) ListShardsByClusterAndRole(ctx context.Context, clusterID, role string) ([]model.Shard, error) {
+	rows, err := a.db.Query(ctx,
+		`SELECT id, cluster_id, name, role, lb_backend, config, status, status_message, created_at, updated_at
+		 FROM shards WHERE cluster_id = $1 AND role = $2`, clusterID, role,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list shards by cluster and role: %w", err)
+	}
+	defer rows.Close()
+
+	var shards []model.Shard
+	for rows.Next() {
+		var s model.Shard
+		if err := rows.Scan(&s.ID, &s.ClusterID, &s.Name, &s.Role, &s.LBBackend, &s.Config, &s.Status, &s.StatusMessage, &s.CreatedAt, &s.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan shard row: %w", err)
+		}
+		shards = append(shards, s)
+	}
+	return shards, rows.Err()
+}
+
 // UpdateShardConfig updates the config JSON for a shard.
 func (a *CoreDB) UpdateShardConfig(ctx context.Context, params UpdateShardConfigParams) error {
 	_, err := a.db.Exec(ctx,

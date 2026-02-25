@@ -289,24 +289,65 @@ func convergeWebShard(ctx workflow.Context, shardID string, nodes []model.Node) 
 		errs = append(errs, ulaErrs...)
 	}
 
-	// Configure cross-node ULA routes on each node (parallel).
+	// Configure cross-node/cross-shard ULA routes on each node (parallel).
+	// Collect peers: other web nodes in this shard + all DB and Valkey shard nodes.
+	type shardNodeInfo struct {
+		ShardIndex int
+		ShardRole  string
+	}
+	var crossShardPeers []shardNodeInfo
+	for _, role := range []string{model.ShardRoleDatabase, model.ShardRoleValkey} {
+		var shards []model.Shard
+		if err := workflow.ExecuteActivity(ctx, "ListShardsByClusterAndRole",
+			clusterID, role).Get(ctx, &shards); err != nil {
+			errs = append(errs, fmt.Sprintf("list %s shards for ULA routes: %v", role, err))
+			continue
+		}
+		for _, s := range shards {
+			var peerNodes []model.Node
+			if err := workflow.ExecuteActivity(ctx, "ListNodesByShard", s.ID).Get(ctx, &peerNodes); err != nil {
+				errs = append(errs, fmt.Sprintf("list nodes for shard %s: %v", s.ID, err))
+				continue
+			}
+			for _, pn := range peerNodes {
+				if pn.ShardIndex != nil {
+					crossShardPeers = append(crossShardPeers, shardNodeInfo{
+						ShardIndex: *pn.ShardIndex,
+						ShardRole:  role,
+					})
+				}
+			}
+		}
+	}
+
 	routeErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
 		if node.ShardIndex == nil {
 			return nil
 		}
-		var otherIndices []int
+		var peers []activity.ULARoutePeerParam
+		// Other web nodes in this shard.
 		for _, other := range nodes {
 			if other.ID != node.ID && other.ShardIndex != nil {
-				otherIndices = append(otherIndices, *other.ShardIndex)
+				peers = append(peers, activity.ULARoutePeerParam{
+					PrefixIndex:  *other.ShardIndex,
+					TransitIndex: core.TransitIndex(model.ShardRoleWeb, *other.ShardIndex),
+				})
 			}
 		}
-		if len(otherIndices) > 0 {
+		// Cross-shard DB and Valkey peers.
+		for _, p := range crossShardPeers {
+			peers = append(peers, activity.ULARoutePeerParam{
+				PrefixIndex:  p.ShardIndex,
+				TransitIndex: core.TransitIndex(p.ShardRole, p.ShardIndex),
+			})
+		}
+		if len(peers) > 0 {
 			nodeCtx := nodeActivityCtx(gCtx, node.ID)
-			if err := workflow.ExecuteActivity(nodeCtx, "ConfigureULARoutes",
-				activity.ConfigureULARoutesParams{
+			if err := workflow.ExecuteActivity(nodeCtx, "ConfigureULARoutesV2",
+				activity.ConfigureULARoutesV2Params{
 					ClusterID:        clusterID,
-					ThisNodeIndex:    *node.ShardIndex,
-					OtherNodeIndices: otherIndices,
+					ThisTransitIndex: core.TransitIndex(model.ShardRoleWeb, *node.ShardIndex),
+					Peers:            peers,
 				}).Get(gCtx, nil); err != nil {
 				return fmt.Errorf("configure ULA routes on %s: %v", node.ID, err)
 			}
@@ -567,6 +608,94 @@ func convergeDatabaseShard(ctx workflow.Context, shardID string, nodes []model.N
 		}
 	}
 
+	// Configure tenant ULA addresses on all DB shard nodes for each tenant with a database.
+	clusterID := nodes[0].ClusterID
+	seenTenants := make(map[string]bool)
+	for _, database := range databases {
+		if database.Status != model.StatusActive || seenTenants[database.TenantID] {
+			continue
+		}
+		seenTenants[database.TenantID] = true
+
+		var tenant model.Tenant
+		if tErr := workflow.ExecuteActivity(ctx, "GetTenantByID", database.TenantID).Get(ctx, &tenant); tErr != nil {
+			errs = append(errs, fmt.Sprintf("get tenant %s for ULA: %v", database.TenantID, tErr))
+			continue
+		}
+
+		t := tenant // capture
+		ulaErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
+			if node.ShardIndex == nil {
+				return nil
+			}
+			nodeCtx := nodeActivityCtx(gCtx, node.ID)
+			return workflow.ExecuteActivity(nodeCtx, "ConfigureServiceTenantAddr",
+				activity.ConfigureTenantAddressesParams{
+					TenantName:   t.ID,
+					TenantUID:    t.UID,
+					ClusterID:    t.ClusterID,
+					NodeShardIdx: *node.ShardIndex,
+				}).Get(gCtx, nil)
+		})
+		errs = append(errs, ulaErrs...)
+	}
+
+	// Configure cross-shard ULA routes on DB nodes (web + other DB peers).
+	var crossShardPeers []activity.ULARoutePeerParam
+	for _, role := range []string{model.ShardRoleWeb, model.ShardRoleValkey} {
+		var shards []model.Shard
+		if sErr := workflow.ExecuteActivity(ctx, "ListShardsByClusterAndRole",
+			clusterID, role).Get(ctx, &shards); sErr != nil {
+			errs = append(errs, fmt.Sprintf("list %s shards for DB ULA routes: %v", role, sErr))
+			continue
+		}
+		for _, s := range shards {
+			var peerNodes []model.Node
+			if nErr := workflow.ExecuteActivity(ctx, "ListNodesByShard", s.ID).Get(ctx, &peerNodes); nErr != nil {
+				errs = append(errs, fmt.Sprintf("list nodes for shard %s: %v", s.ID, nErr))
+				continue
+			}
+			for _, pn := range peerNodes {
+				if pn.ShardIndex != nil {
+					crossShardPeers = append(crossShardPeers, activity.ULARoutePeerParam{
+						PrefixIndex:  *pn.ShardIndex,
+						TransitIndex: core.TransitIndex(role, *pn.ShardIndex),
+					})
+				}
+			}
+		}
+	}
+
+	routeErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
+		if node.ShardIndex == nil {
+			return nil
+		}
+		// Peers: other DB nodes in this shard + cross-shard web/valkey.
+		var peers []activity.ULARoutePeerParam
+		for _, other := range nodes {
+			if other.ID != node.ID && other.ShardIndex != nil {
+				peers = append(peers, activity.ULARoutePeerParam{
+					PrefixIndex:  *other.ShardIndex,
+					TransitIndex: core.TransitIndex(model.ShardRoleDatabase, *other.ShardIndex),
+				})
+			}
+		}
+		peers = append(peers, crossShardPeers...)
+		if len(peers) > 0 {
+			nodeCtx := nodeActivityCtx(gCtx, node.ID)
+			if err := workflow.ExecuteActivity(nodeCtx, "ConfigureULARoutesV2",
+				activity.ConfigureULARoutesV2Params{
+					ClusterID:        clusterID,
+					ThisTransitIndex: core.TransitIndex(model.ShardRoleDatabase, *node.ShardIndex),
+					Peers:            peers,
+				}).Get(gCtx, nil); err != nil {
+				return fmt.Errorf("configure ULA routes on DB node %s: %v", node.ID, err)
+			}
+		}
+		return nil
+	})
+	errs = append(errs, routeErrs...)
+
 	// Configure replication on each replica.
 	for _, replica := range replicas {
 		replicaCtx := nodeActivityCtx(ctx, replica.ID)
@@ -609,6 +738,97 @@ func convergeValkeyShard(ctx workflow.Context, shardID string, nodes []model.Nod
 	}
 
 	var errs []string
+
+	// Configure tenant ULA addresses on all Valkey shard nodes for each tenant with an instance.
+	clusterID := ""
+	if len(nodes) > 0 {
+		clusterID = nodes[0].ClusterID
+	}
+	seenTenants := make(map[string]bool)
+	for _, instance := range instances {
+		if instance.Status != model.StatusActive || seenTenants[instance.TenantID] {
+			continue
+		}
+		seenTenants[instance.TenantID] = true
+
+		var tenant model.Tenant
+		if tErr := workflow.ExecuteActivity(ctx, "GetTenantByID", instance.TenantID).Get(ctx, &tenant); tErr != nil {
+			errs = append(errs, fmt.Sprintf("get tenant %s for ULA: %v", instance.TenantID, tErr))
+			continue
+		}
+
+		t := tenant // capture
+		ulaErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
+			if node.ShardIndex == nil {
+				return nil
+			}
+			nodeCtx := nodeActivityCtx(gCtx, node.ID)
+			return workflow.ExecuteActivity(nodeCtx, "ConfigureServiceTenantAddr",
+				activity.ConfigureTenantAddressesParams{
+					TenantName:   t.ID,
+					TenantUID:    t.UID,
+					ClusterID:    t.ClusterID,
+					NodeShardIdx: *node.ShardIndex,
+				}).Get(gCtx, nil)
+		})
+		errs = append(errs, ulaErrs...)
+	}
+
+	// Configure cross-shard ULA routes on Valkey nodes (web + DB peers).
+	var crossShardPeers []activity.ULARoutePeerParam
+	for _, role := range []string{model.ShardRoleWeb, model.ShardRoleDatabase} {
+		var shards []model.Shard
+		if sErr := workflow.ExecuteActivity(ctx, "ListShardsByClusterAndRole",
+			clusterID, role).Get(ctx, &shards); sErr != nil {
+			errs = append(errs, fmt.Sprintf("list %s shards for Valkey ULA routes: %v", role, sErr))
+			continue
+		}
+		for _, s := range shards {
+			var peerNodes []model.Node
+			if nErr := workflow.ExecuteActivity(ctx, "ListNodesByShard", s.ID).Get(ctx, &peerNodes); nErr != nil {
+				errs = append(errs, fmt.Sprintf("list nodes for shard %s: %v", s.ID, nErr))
+				continue
+			}
+			for _, pn := range peerNodes {
+				if pn.ShardIndex != nil {
+					crossShardPeers = append(crossShardPeers, activity.ULARoutePeerParam{
+						PrefixIndex:  *pn.ShardIndex,
+						TransitIndex: core.TransitIndex(role, *pn.ShardIndex),
+					})
+				}
+			}
+		}
+	}
+
+	routeErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
+		if node.ShardIndex == nil {
+			return nil
+		}
+		var peers []activity.ULARoutePeerParam
+		for _, other := range nodes {
+			if other.ID != node.ID && other.ShardIndex != nil {
+				peers = append(peers, activity.ULARoutePeerParam{
+					PrefixIndex:  *other.ShardIndex,
+					TransitIndex: core.TransitIndex(model.ShardRoleValkey, *other.ShardIndex),
+				})
+			}
+		}
+		peers = append(peers, crossShardPeers...)
+		if len(peers) > 0 {
+			nodeCtx := nodeActivityCtx(gCtx, node.ID)
+			if err := workflow.ExecuteActivity(nodeCtx, "ConfigureULARoutesV2",
+				activity.ConfigureULARoutesV2Params{
+					ClusterID:        clusterID,
+					ThisTransitIndex: core.TransitIndex(model.ShardRoleValkey, *node.ShardIndex),
+					Peers:            peers,
+				}).Get(gCtx, nil); err != nil {
+				return fmt.Errorf("configure ULA routes on Valkey node %s: %v", node.ID, err)
+			}
+		}
+		return nil
+	})
+	errs = append(errs, routeErrs...)
+
 	for _, instance := range instances {
 		if instance.Status != model.StatusActive {
 			continue

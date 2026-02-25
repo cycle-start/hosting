@@ -145,6 +145,78 @@ When rules are added, MySQL users get the internal host pattern **plus** each ru
 |---------|---------|-------------|
 | `INTERNAL_NETWORK_CIDR` | `10.0.0.0/8` | CIDR for internal network access. Converted to MySQL host pattern for default database access. |
 
+## Per-Tenant ULA Isolation on Service Nodes
+
+Every tenant gets a unique ULA IPv6 address per node across all node types — web, DB, and Valkey. The address format is `fd00:{cluster_hash}:{shard_index}::{tenant_uid}`.
+
+### Web Nodes
+
+Web nodes use nftables UID-based binding (`ip6 tenant_binding` table) so each tenant's processes can only use their own ULA as source address. This is enforced via the `skuid` match.
+
+### DB and Valkey Nodes
+
+Service nodes (DB/Valkey) don't have per-tenant Linux users, so they use a different model:
+
+- **`tenant0` dummy interface**: Same as web nodes — all tenant ULA addresses are assigned to this interface
+- **`ip6 tenant_service_ingress` table**: An nftables set `ula_addrs` tracks all tenant ULAs on the node. The input chain allows traffic to these addresses only from `fd00::/16` (other hosting nodes) and `::1` (localhost), dropping all other ULA-destined traffic
+- Non-ULA traffic (node's regular IPv4/IPv6) is unaffected (policy accept)
+
+### nftables Structure (Service Nodes)
+
+```
+table ip6 tenant_service_ingress {
+    set ula_addrs {
+        type ipv6_addr
+        elements = { fd00:abcd:1::1388, fd00:abcd:1::1389, ... }
+    }
+    chain input {
+        type filter hook input priority 0; policy accept;
+        ip6 daddr @ula_addrs ip6 saddr fd00::/16 accept
+        ip6 daddr @ula_addrs ip6 saddr ::1 accept
+        ip6 daddr @ula_addrs drop
+    }
+}
+```
+
+### Cross-Shard Routing
+
+Nodes in different shards need to reach each other's ULA addresses (e.g., a web node connecting to `[fd00:hash:db_idx::uid]:3306`). This is achieved via transit addresses in the `fd00:{hash}:0::/48` prefix.
+
+Each node role gets a separate range of transit indices to avoid collisions:
+
+| Role | Transit offset | Range |
+|------|---------------|-------|
+| Web | 0 | 0–255 |
+| Database | 256 | 256–511 |
+| Valkey | 512 | 512–767 |
+
+Each node adds its transit address (`fd00:{hash}:0::{transit_index}/64`) to its primary interface, then adds routes to peer nodes' ULA prefixes (`fd00:{hash}:{peer_shard_index}::/48`) via their transit addresses.
+
+### Provisioning
+
+- **Cloud-init**: DB and Valkey node templates include the `tenant0` dummy interface (module, netdev, network files) and `modprobe dummy && systemctl restart systemd-networkd` in runcmd
+- **Creation workflows**: `CreateDatabaseWorkflow` and `CreateValkeyInstanceWorkflow` configure tenant ULA on shard nodes after resource creation (non-fatal on failure — convergence catches up)
+- **Convergence**: `convergeDatabaseShard` and `convergeValkeyShard` set up ULA addresses for all tenants with resources on the shard, plus cross-shard transit routes
+
+### Dual-Stack Binding
+
+- MySQL: `bind-address = *` (MySQL 8.0.13+ dual-stack syntax)
+- Valkey: `bind 0.0.0.0 ::` (listens on both IPv4 and IPv6)
+
+### Verification
+
+```bash
+# On DB node: check tenant ULA addresses
+ip -6 addr show dev tenant0
+
+# On DB node: check nftables ingress rules
+nft list table ip6 tenant_service_ingress
+
+# From web node: reach a tenant's DB ULA
+ping6 fd00:{hash}:{db_idx}::{uid}
+mysql -h fd00:{hash}:{db_idx}::{uid} -P 3306 -u <user> -p
+```
+
 ## Authorization
 
 - Egress rules use `network:read/write/delete` scopes

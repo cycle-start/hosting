@@ -200,6 +200,153 @@ func isAddrAlreadyExists(output string) bool {
 	return strings.Contains(output, "File exists") || strings.Contains(output, "already assigned")
 }
 
+// EnsureServiceIngressTable creates the ip6 tenant_service_ingress nftables
+// table on service nodes (DB/Valkey). It restricts inbound ULA traffic so only
+// web-node ULAs and localhost can reach the tenant ULAs on this node.
+// Non-ULA traffic (node's regular IPv4/IPv6) is unaffected (policy accept).
+func (m *TenantULAManager) EnsureServiceIngressTable(ctx context.Context) error {
+	steps := []struct {
+		args []string
+		desc string
+	}{
+		{[]string{"add", "table", "ip6", "tenant_service_ingress"}, "create table"},
+		{[]string{"add", "set", "ip6", "tenant_service_ingress", "ula_addrs", "{ type ipv6_addr ; }"}, "create set"},
+		{[]string{"add", "chain", "ip6", "tenant_service_ingress", "input", "{ type filter hook input priority 0 ; policy accept ; }"}, "create chain"},
+	}
+	for _, s := range steps {
+		if out, err := exec.CommandContext(ctx, "nft", s.args...).CombinedOutput(); err != nil {
+			return fmt.Errorf("nft %s: %s: %w", s.desc, string(out), err)
+		}
+	}
+
+	// Flush and re-add rules. Allow ULA-destined traffic only from fd00::/16 (web
+	// nodes) and ::1 (local CLI). Drop all other traffic destined to our ULA addrs.
+	nftScript := `flush chain ip6 tenant_service_ingress input
+table ip6 tenant_service_ingress {
+    chain input {
+        ip6 daddr @ula_addrs ip6 saddr fd00::/16 accept
+        ip6 daddr @ula_addrs ip6 saddr ::1 accept
+        ip6 daddr @ula_addrs drop
+    }
+}
+`
+	cmd := exec.CommandContext(ctx, "nft", "-f", "-")
+	cmd.Stdin = strings.NewReader(nftScript)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("nft service ingress flush+rules: %s: %w", string(out), err)
+	}
+
+	m.logger.Info().Msg("nftables tenant_service_ingress table ensured")
+	return nil
+}
+
+// ConfigureServiceAddr adds a tenant's ULA address to tenant0 on a service node
+// (DB/Valkey) and registers it in the service ingress nftables set. Unlike
+// Configure, this does not add UID-based binding rules since service nodes
+// don't have per-tenant Linux users.
+func (m *TenantULAManager) ConfigureServiceAddr(ctx context.Context, info *TenantULAInfo) error {
+	if err := m.EnsureServiceIngressTable(ctx); err != nil {
+		return err
+	}
+
+	ula := core.ComputeTenantULA(info.ClusterID, info.NodeShardIdx, info.TenantUID)
+
+	m.logger.Info().
+		Str("tenant", info.TenantName).
+		Str("ula", ula).
+		Int("uid", info.TenantUID).
+		Msg("configuring service tenant ULA")
+
+	// Add IPv6 address to tenant0 interface — idempotent.
+	out, err := exec.CommandContext(ctx, "ip", "-6", "addr", "add", ula+"/128", "dev", "tenant0").CombinedOutput()
+	if err != nil && !isAddrAlreadyExists(string(out)) {
+		return fmt.Errorf("ip addr add %s: %s: %w", ula, string(out), err)
+	}
+
+	// Add to nftables ula_addrs set.
+	out, err = exec.CommandContext(ctx, "nft", "add", "element", "ip6", "tenant_service_ingress", "ula_addrs",
+		fmt.Sprintf("{ %s }", ula)).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("nft add element %s: %s: %w", ula, string(out), err)
+	}
+
+	return nil
+}
+
+// RemoveServiceAddr removes a tenant's ULA address from tenant0 on a service
+// node and removes it from the service ingress nftables set.
+func (m *TenantULAManager) RemoveServiceAddr(ctx context.Context, info *TenantULAInfo) error {
+	ula := core.ComputeTenantULA(info.ClusterID, info.NodeShardIdx, info.TenantUID)
+
+	m.logger.Info().
+		Str("tenant", info.TenantName).
+		Str("ula", ula).
+		Int("uid", info.TenantUID).
+		Msg("removing service tenant ULA")
+
+	// Remove IPv6 address from tenant0 — ignore errors if not present.
+	out, err := exec.CommandContext(ctx, "ip", "-6", "addr", "del", ula+"/128", "dev", "tenant0").CombinedOutput()
+	if err != nil {
+		outStr := string(out)
+		if !strings.Contains(outStr, "Cannot assign") && !strings.Contains(outStr, "not found") {
+			return fmt.Errorf("ip addr del %s: %s: %w", ula, outStr, err)
+		}
+	}
+
+	// Remove from nftables set — ignore errors if not present.
+	_, _ = exec.CommandContext(ctx, "nft", "delete", "element", "ip6", "tenant_service_ingress", "ula_addrs",
+		fmt.Sprintf("{ %s }", ula)).CombinedOutput()
+
+	return nil
+}
+
+// ULARoutePeer describes a single peer for cross-shard ULA routing.
+type ULARoutePeer struct {
+	PrefixIndex  int // The peer's shard index (used in fd00:{hash}:{prefix_index}::/48)
+	TransitIndex int // The peer's transit index (used in fd00:{hash}:0::{transit_index})
+}
+
+// ULARoutesInfoV2 holds the information needed for generalized cross-shard routing.
+type ULARoutesInfoV2 struct {
+	ClusterID       string
+	ThisTransitIndex int
+	Peers           []ULARoutePeer
+}
+
+// ConfigureRoutesV2 sets up IPv6 transit addresses and routes supporting
+// cross-shard peers (e.g. web nodes routing to DB/Valkey nodes and vice versa).
+// Each node gets a transit address fd00:{hash}:0::{transit_index}/64 on the
+// primary interface, and routes to each peer's ULA prefix via its transit address.
+func (m *TenantULAManager) ConfigureRoutesV2(ctx context.Context, info *ULARoutesInfoV2) error {
+	iface, err := m.detectPrimaryInterface(ctx)
+	if err != nil {
+		return err
+	}
+
+	clusterHash := core.ComputeClusterHash(info.ClusterID)
+
+	// Add transit address on primary interface — idempotent.
+	transitAddr := fmt.Sprintf("fd00:%x:0::%x/64", clusterHash, info.ThisTransitIndex)
+	out, err := exec.CommandContext(ctx, "ip", "-6", "addr", "add", transitAddr, "dev", iface).CombinedOutput()
+	if err != nil && !isAddrAlreadyExists(string(out)) {
+		return fmt.Errorf("ip addr add transit %s dev %s: %s: %w", transitAddr, iface, string(out), err)
+	}
+	m.logger.Info().Str("addr", transitAddr).Str("dev", iface).Msg("transit address configured")
+
+	// Add routes to each peer's ULA prefix via their transit address.
+	for _, peer := range info.Peers {
+		prefix := fmt.Sprintf("fd00:%x:%x::/48", clusterHash, peer.PrefixIndex)
+		nextHop := fmt.Sprintf("fd00:%x:0::%x", clusterHash, peer.TransitIndex)
+		out, err := exec.CommandContext(ctx, "ip", "-6", "route", "replace", prefix, "via", nextHop).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("ip route replace %s via %s: %s: %w", prefix, nextHop, string(out), err)
+		}
+		m.logger.Info().Str("prefix", prefix).Str("via", nextHop).Msg("ULA route configured")
+	}
+
+	return nil
+}
+
 // SyncEgressRules applies all egress rules for a tenant via nftables.
 // Whitelist model: when rules exist, each CIDR gets an accept verdict, then a
 // final reject catches everything else. When no rules exist, the chain and jump

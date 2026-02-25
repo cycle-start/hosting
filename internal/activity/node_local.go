@@ -923,6 +923,48 @@ func (a *NodeLocal) ConfigureULARoutes(ctx context.Context, params ConfigureULAR
 	})
 }
 
+// ConfigureServiceTenantAddr adds a tenant's ULA address on a service node
+// (DB/Valkey). Only adds the IPv6 to tenant0 + nftables ingress set, no
+// UID-based binding rules.
+func (a *NodeLocal) ConfigureServiceTenantAddr(ctx context.Context, params ConfigureTenantAddressesParams) error {
+	a.logger.Info().Str("tenant", params.TenantName).Int("uid", params.TenantUID).Msg("ConfigureServiceTenantAddr")
+	return a.tenantULA.ConfigureServiceAddr(ctx, &agent.TenantULAInfo{
+		TenantName:   params.TenantName,
+		TenantUID:    params.TenantUID,
+		ClusterID:    params.ClusterID,
+		NodeShardIdx: params.NodeShardIdx,
+	})
+}
+
+// RemoveServiceTenantAddr removes a tenant's ULA address from a service node.
+func (a *NodeLocal) RemoveServiceTenantAddr(ctx context.Context, params ConfigureTenantAddressesParams) error {
+	a.logger.Info().Str("tenant", params.TenantName).Int("uid", params.TenantUID).Msg("RemoveServiceTenantAddr")
+	return a.tenantULA.RemoveServiceAddr(ctx, &agent.TenantULAInfo{
+		TenantName:   params.TenantName,
+		TenantUID:    params.TenantUID,
+		ClusterID:    params.ClusterID,
+		NodeShardIdx: params.NodeShardIdx,
+	})
+}
+
+// ConfigureULARoutesV2 sets up generalized cross-shard IPv6 transit addresses
+// and routes, supporting routing between web, DB, and Valkey nodes.
+func (a *NodeLocal) ConfigureULARoutesV2(ctx context.Context, params ConfigureULARoutesV2Params) error {
+	a.logger.Info().Int("transit_index", params.ThisTransitIndex).Int("peer_count", len(params.Peers)).Msg("ConfigureULARoutesV2")
+	peers := make([]agent.ULARoutePeer, len(params.Peers))
+	for i, p := range params.Peers {
+		peers[i] = agent.ULARoutePeer{
+			PrefixIndex:  p.PrefixIndex,
+			TransitIndex: p.TransitIndex,
+		}
+	}
+	return a.tenantULA.ConfigureRoutesV2(ctx, &agent.ULARoutesInfoV2{
+		ClusterID:        params.ClusterID,
+		ThisTransitIndex: params.ThisTransitIndex,
+		Peers:            peers,
+	})
+}
+
 // --------------------------------------------------------------------------
 // Egress rules activities
 // --------------------------------------------------------------------------

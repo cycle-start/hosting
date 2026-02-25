@@ -71,6 +71,27 @@ func CreateValkeyInstanceWorkflow(ctx workflow.Context, instanceID string) error
 		}
 	}
 
+	// Configure tenant ULA on all Valkey shard nodes (non-fatal).
+	var tenant model.Tenant
+	if tErr := workflow.ExecuteActivity(ctx, "GetTenantByID", instance.TenantID).Get(ctx, &tenant); tErr == nil {
+		ulaErrs := fanOutNodes(ctx, nodes, func(gCtx workflow.Context, node model.Node) error {
+			if node.ShardIndex == nil {
+				return nil
+			}
+			nodeCtx := nodeActivityCtx(gCtx, node.ID)
+			return workflow.ExecuteActivity(nodeCtx, "ConfigureServiceTenantAddr",
+				activity.ConfigureTenantAddressesParams{
+					TenantName:   tenant.ID,
+					TenantUID:    tenant.UID,
+					ClusterID:    tenant.ClusterID,
+					NodeShardIdx: *node.ShardIndex,
+				}).Get(gCtx, nil)
+		})
+		if len(ulaErrs) > 0 {
+			workflow.GetLogger(ctx).Warn("non-fatal: ULA setup on Valkey nodes failed", "errors", joinErrors(ulaErrs))
+		}
+	}
+
 	// Set status to active.
 	err = workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
 		Table:  "valkey_instances",

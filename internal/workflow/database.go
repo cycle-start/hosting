@@ -64,6 +64,30 @@ func CreateDatabaseWorkflow(ctx workflow.Context, databaseID string) error {
 		return err
 	}
 
+	// Configure tenant ULA on all DB shard nodes (non-fatal).
+	var tenant model.Tenant
+	if tErr := workflow.ExecuteActivity(ctx, "GetTenantByID", database.TenantID).Get(ctx, &tenant); tErr == nil {
+		var dbNodes []model.Node
+		if nErr := workflow.ExecuteActivity(ctx, "ListNodesByShard", *database.ShardID).Get(ctx, &dbNodes); nErr == nil {
+			ulaErrs := fanOutNodes(ctx, dbNodes, func(gCtx workflow.Context, node model.Node) error {
+				if node.ShardIndex == nil {
+					return nil
+				}
+				nodeCtx := nodeActivityCtx(gCtx, node.ID)
+				return workflow.ExecuteActivity(nodeCtx, "ConfigureServiceTenantAddr",
+					activity.ConfigureTenantAddressesParams{
+						TenantName:   tenant.ID,
+						TenantUID:    tenant.UID,
+						ClusterID:    tenant.ClusterID,
+						NodeShardIdx: *node.ShardIndex,
+					}).Get(gCtx, nil)
+			})
+			if len(ulaErrs) > 0 {
+				workflow.GetLogger(ctx).Warn("non-fatal: ULA setup on DB nodes failed", "errors", joinErrors(ulaErrs))
+			}
+		}
+	}
+
 	// Set status to active.
 	err = workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
 		Table:  "databases",

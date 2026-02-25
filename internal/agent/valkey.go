@@ -85,7 +85,7 @@ func (m *ValkeyManager) CreateInstance(ctx context.Context, name string, port in
 
 	dataPath := filepath.Join(m.dataDir, name)
 	config := fmt.Sprintf(`port %d
-bind 0.0.0.0
+bind 0.0.0.0 ::
 protected-mode yes
 requirepass %s
 maxmemory %dmb
