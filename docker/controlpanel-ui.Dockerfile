@@ -1,12 +1,15 @@
-# Stage 1: Build the React SPA
+# Build context: hosting repo (default), ../controlpanel (named "controlpanel")
+# Build with: docker build --build-context controlpanel=../controlpanel ...
+
+# Stage 1: Build the React SPA from the controlpanel repo
 FROM node:22-alpine AS frontend
 WORKDIR /app
-COPY controlpanel-build/package.json controlpanel-build/package-lock.json ./
+COPY --from=controlpanel package.json package-lock.json ./
 RUN npm ci
-COPY controlpanel-build/ .
+COPY --from=controlpanel . .
 RUN npm run build
 
-# Stage 2: Build the Go binary
+# Stage 2: Build the Go SPA server from the hosting repo
 FROM golang:1.25-alpine AS backend
 WORKDIR /app
 COPY go.mod go.sum ./

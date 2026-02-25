@@ -448,18 +448,13 @@ vm-deploy-one name:
 vm-deploy:
     # Generate OpenAPI docs (needed by Go embed)
     just docs
-    # Build hosting images (before copying sibling repos to keep build context clean)
+    # Build Docker images
     docker build -t hosting-core-api:latest -f docker/core-api.Dockerfile .
     docker build -t hosting-worker:latest -f docker/worker.Dockerfile .
     docker build -t hosting-admin-ui:latest -f docker/admin-ui.Dockerfile .
     docker build -t hosting-mcp-server:latest -f docker/mcp-server.Dockerfile .
-    # Copy sibling repos, build controlpanel images, clean up
-    rm -rf controlpanel-build controlpanel-api-build
-    cp -r ../controlpanel controlpanel-build
-    cp -r ../controlpanel-api controlpanel-api-build
-    docker build -t controlpanel-api:latest -f docker/controlpanel-api.Dockerfile .
-    docker build -t controlpanel-ui:latest -f docker/controlpanel-ui.Dockerfile .
-    rm -rf controlpanel-build controlpanel-api-build
+    docker build -t controlpanel-api:latest -f docker/controlpanel-api.Dockerfile ../controlpanel-api
+    docker build -t controlpanel-ui:latest -f docker/controlpanel-ui.Dockerfile --build-context controlpanel=../controlpanel .
     # Import into k3s containerd
     docker save hosting-core-api:latest hosting-worker:latest hosting-admin-ui:latest hosting-mcp-server:latest controlpanel-api:latest controlpanel-ui:latest | \
       ssh {{ssh_opts}} ubuntu@{{cp}} "sudo k3s ctr images import -"
