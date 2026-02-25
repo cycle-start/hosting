@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE wireguard_peers (
     id              TEXT PRIMARY KEY,
     tenant_id       TEXT NOT NULL REFERENCES tenants(id),
