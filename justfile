@@ -108,8 +108,25 @@ reset-temporal:
     @echo "Waiting for Temporal to recreate databases..."
     @sleep 15
 
-# Reset all databases (core + PowerDNS + Temporal)
-reset-db: reset-core reset-powerdns reset-temporal
+# Reset MySQL on primary DB node (drop all tenant databases and users)
+reset-mysql:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Resetting MySQL on primary DB node (10.10.10.20)..."
+    # Drop all non-system databases
+    ssh {{ssh_opts}} ubuntu@10.10.10.20 "mysql -u root -e \"SELECT CONCAT('DROP DATABASE \\\`', schema_name, '\\\`;') FROM information_schema.schemata WHERE schema_name NOT IN ('mysql','information_schema','performance_schema','sys');\"" \
+      | tail -n +2 \
+      | ssh {{ssh_opts}} ubuntu@10.10.10.20 "mysql -u root"
+    # Drop all non-system users
+    ssh {{ssh_opts}} ubuntu@10.10.10.20 "mysql -u root -e \"SELECT CONCAT('DROP USER \\\\'', user, '\\\\'@\\\\'', host, '\\\\';') FROM mysql.user WHERE user NOT IN ('root','mysql.sys','mysql.session','mysql.infoschema','debian-sys-maint','repl') AND user != '';\"" \
+      | tail -n +2 \
+      | ssh {{ssh_opts}} ubuntu@10.10.10.20 "mysql -u root"
+    # Clear binary logs so replica re-syncs cleanly
+    ssh {{ssh_opts}} ubuntu@10.10.10.20 "mysql -u root -e 'RESET MASTER;'"
+    echo "MySQL reset complete."
+
+# Reset all databases (core + PowerDNS + Temporal + MySQL)
+reset-db: reset-core reset-powerdns reset-temporal reset-mysql
 
 # Migration status
 migrate-status:
@@ -193,7 +210,7 @@ db-powerdns:
 
 # Connect to MySQL on the DB shard VM
 db-mysql:
-    mysql -h 10.10.10.20 -P 3306 -u root -prootpassword
+    ssh {{ssh_opts}} ubuntu@10.10.10.20 "mysql -u root"
 
 # Check Ceph cluster health
 ceph-status:

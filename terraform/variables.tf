@@ -74,7 +74,7 @@ variable "web_nodes" {
   type = list(object({
     name   = string
     ip     = string
-    memory = optional(number, 1024)
+    memory = optional(number, 8192)
     vcpus  = optional(number, 2)
   }))
   default = [
@@ -132,7 +132,7 @@ variable "dns_nodes" {
   type = list(object({
     name   = string
     ip     = string
-    memory = optional(number, 1024)
+    memory = optional(number, 4096)
     vcpus  = optional(number, 1)
   }))
   default = [
@@ -153,7 +153,7 @@ variable "valkey_nodes" {
   type = list(object({
     name   = string
     ip     = string
-    memory = optional(number, 1024)
+    memory = optional(number, 4096)
     vcpus  = optional(number, 1)
   }))
   default = [
@@ -174,7 +174,7 @@ variable "email_nodes" {
   type = list(object({
     name   = string
     ip     = string
-    memory = optional(number, 1024)
+    memory = optional(number, 4096)
     vcpus  = optional(number, 2)
   }))
   default = [
@@ -202,7 +202,7 @@ variable "storage_nodes" {
   type = list(object({
     name   = string
     ip     = string
-    memory = optional(number, 2048)
+    memory = optional(number, 16384)
     vcpus  = optional(number, 2)
   }))
   default = [
@@ -244,7 +244,7 @@ variable "lb_nodes" {
   type = list(object({
     name   = string
     ip     = string
-    memory = optional(number, 1024)
+    memory = optional(number, 2048)
     vcpus  = optional(number, 2)
   }))
   default = [
