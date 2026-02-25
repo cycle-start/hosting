@@ -563,6 +563,7 @@ export function WebrootDetailPage() {
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <span>ID: <code>{webroot.id}</code></span>
         <CopyButton value={webroot.id} />
+        <span className="ml-4">Subscription: <code>{webroot.subscription_id}</code></span>
         <span className="ml-4">Created: {formatDate(webroot.created_at)}</span>
       </div>
 

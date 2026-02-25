@@ -60,6 +60,18 @@ func Seed(configPath string, timeout time.Duration) error {
 	}
 	fmt.Printf("Cluster %q: %s\n", cfg.Cluster, clusterID)
 
+	// Seed region runtimes
+	for _, rr := range cfg.RegionRuntimes {
+		fmt.Printf("Adding region runtime %s %s...\n", rr.Runtime, rr.Version)
+		_, err := client.Post(fmt.Sprintf("/regions/%s/runtimes", regionID), map[string]any{
+			"runtime": rr.Runtime,
+			"version": rr.Version,
+		})
+		if err != nil {
+			return fmt.Errorf("add region runtime %s %s: %w", rr.Runtime, rr.Version, err)
+		}
+	}
+
 	// In-memory maps for tracking created resources
 	tenantMap := map[string]string{} // tenant name -> ID
 	shardMap := map[string]string{}  // shard name -> ID
@@ -272,7 +284,10 @@ func Seed(configPath string, timeout time.Duration) error {
 				if w.EnvFileName != "" {
 					wr["env_file_name"] = w.EnvFileName
 				}
-	
+				if w.ServiceHostnameEnabled != nil {
+					wr["service_hostname_enabled"] = *w.ServiceHostnameEnabled
+				}
+
 				// FQDNs with nested email accounts
 				if len(w.FQDNs) > 0 {
 					var fqdns []map[string]any

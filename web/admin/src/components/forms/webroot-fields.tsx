@@ -1,30 +1,70 @@
+import { useMemo } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArraySection } from './array-section'
 import { FQDNFields } from './fqdn-fields'
+import { SubscriptionSelect } from './subscription-select'
+import { useRegionRuntimes } from '@/lib/hooks'
 import type { WebrootFormData, FQDNFormData } from '@/lib/types'
 
-const runtimes = ['php', 'node', 'python', 'ruby', 'static']
+interface Props { value: WebrootFormData; onChange: (v: WebrootFormData) => void; tenantId?: string; regionId?: string }
 
-interface Props { value: WebrootFormData; onChange: (v: WebrootFormData) => void }
+export function WebrootFields({ value, onChange, tenantId, regionId }: Props) {
+  const { data: regionRuntimesData } = useRegionRuntimes(regionId ?? '')
 
-export function WebrootFields({ value, onChange }: Props) {
+  // Group flat region runtimes into { runtime → versions[] }
+  const runtimeGroups = useMemo(() => {
+    const items = regionRuntimesData?.items ?? []
+    const order: string[] = []
+    const map: Record<string, string[]> = {}
+    for (const r of items) {
+      if (!r.available) continue
+      if (!map[r.runtime]) {
+        order.push(r.runtime)
+        map[r.runtime] = []
+      }
+      map[r.runtime].push(r.version)
+    }
+    return order.map(rt => ({ runtime: rt, versions: map[rt] }))
+  }, [regionRuntimesData])
+
+  const runtimeNames = runtimeGroups.map(g => g.runtime)
+  const versions = runtimeGroups.find(g => g.runtime === value.runtime)?.versions ?? []
+  const hasRuntimes = runtimeGroups.length > 0
+
   return (
     <div className="space-y-3">
+      {tenantId && <SubscriptionSelect tenantId={tenantId} value={value.subscription_id} onChange={(subscription_id) => onChange({ ...value, subscription_id })} />}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Runtime</Label>
-          <Select value={value.runtime} onValueChange={(v) => onChange({ ...value, runtime: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+          <Select
+            value={value.runtime}
+            onValueChange={(v) => {
+              const group = runtimeGroups.find(g => g.runtime === v)
+              onChange({ ...value, runtime: v, runtime_version: group?.versions[0] ?? '' })
+            }}
+            disabled={!regionId || !hasRuntimes}
+          >
+            <SelectTrigger><SelectValue placeholder={!regionId ? 'Select a region first' : 'Select runtime'} /></SelectTrigger>
             <SelectContent>
-              {runtimes.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+              {runtimeNames.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-2">
           <Label>Version</Label>
-          <Input placeholder="8.5" value={value.runtime_version} onChange={(e) => onChange({ ...value, runtime_version: e.target.value })} />
+          <Select
+            value={value.runtime_version}
+            onValueChange={(v) => onChange({ ...value, runtime_version: v })}
+            disabled={!regionId || !hasRuntimes || versions.length === 0}
+          >
+            <SelectTrigger><SelectValue placeholder={!regionId ? 'Select a region first' : 'Select version'} /></SelectTrigger>
+            <SelectContent>
+              {versions.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">

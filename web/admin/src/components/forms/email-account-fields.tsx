@@ -5,15 +5,17 @@ import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Plus, X } from 'lucide-react'
+import { SubscriptionSelect } from './subscription-select'
 import type { EmailAccountFormData } from '@/lib/types'
 
-interface Props { value: EmailAccountFormData; onChange: (v: EmailAccountFormData) => void }
+interface Props { value: EmailAccountFormData; onChange: (v: EmailAccountFormData) => void; tenantId?: string }
 
-export function EmailAccountFields({ value, onChange }: Props) {
+export function EmailAccountFields({ value, onChange, tenantId }: Props) {
   const [showAutoReply, setShowAutoReply] = useState(!!value.autoreply)
 
   return (
     <div className="space-y-3">
+      {tenantId && <SubscriptionSelect tenantId={tenantId} value={value.subscription_id} onChange={(subscription_id) => onChange({ ...value, subscription_id })} />}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Email Address</Label>

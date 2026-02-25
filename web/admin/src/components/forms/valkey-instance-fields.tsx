@@ -1,15 +1,17 @@
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ShardSelect } from './shard-select'
+import { SubscriptionSelect } from './subscription-select'
 import { ArraySection } from './array-section'
 import { ValkeyUserFields } from './valkey-user-fields'
 import type { ValkeyInstanceFormData, ValkeyUserFormData } from '@/lib/types'
 
-interface Props { value: ValkeyInstanceFormData; onChange: (v: ValkeyInstanceFormData) => void; clusterId: string }
+interface Props { value: ValkeyInstanceFormData; onChange: (v: ValkeyInstanceFormData) => void; clusterId: string; tenantId?: string }
 
-export function ValkeyInstanceFields({ value, onChange, clusterId }: Props) {
+export function ValkeyInstanceFields({ value, onChange, clusterId, tenantId }: Props) {
   return (
     <div className="space-y-3">
+      {tenantId && <SubscriptionSelect tenantId={tenantId} value={value.subscription_id} onChange={(subscription_id) => onChange({ ...value, subscription_id })} />}
       <div className="space-y-2">
         <Label>Max Memory (MB)</Label>
         <Input type="number" value={value.max_memory_mb ?? 64} onChange={(e) => onChange({ ...value, max_memory_mb: parseInt(e.target.value) || 64 })} />

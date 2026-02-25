@@ -326,6 +326,9 @@ export function ZoneDetailPage() {
   } else if (zone.tenant_id) {
     subtitleParts.push(`Tenant: ${zone.tenant_id}`)
   }
+  if (zone.subscription_id) {
+    subtitleParts.push(`Subscription: ${zone.subscription_id}`)
+  }
 
   return (
     <div className="space-y-6">

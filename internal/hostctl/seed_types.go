@@ -1,15 +1,21 @@
 package hostctl
 
 type SeedConfig struct {
-	APIURL       string          `yaml:"api_url"`
-	APIKey       string          `yaml:"api_key"`
-	LBTrafficURL string          `yaml:"lb_traffic_url"`
-	Region       string          `yaml:"region"`
-	Cluster      string          `yaml:"cluster"`
-	Brands       []BrandDef      `yaml:"brands"`
-	Zones        []ZoneDef       `yaml:"zones"`
-	Tenants      []TenantDef     `yaml:"tenants"`
-	OIDCClients  []OIDCClientDef `yaml:"oidc_clients"`
+	APIURL          string              `yaml:"api_url"`
+	APIKey          string              `yaml:"api_key"`
+	LBTrafficURL    string              `yaml:"lb_traffic_url"`
+	Region          string              `yaml:"region"`
+	Cluster         string              `yaml:"cluster"`
+	Brands          []BrandDef          `yaml:"brands"`
+	Zones           []ZoneDef           `yaml:"zones"`
+	Tenants         []TenantDef         `yaml:"tenants"`
+	OIDCClients     []OIDCClientDef     `yaml:"oidc_clients"`
+	RegionRuntimes  []RegionRuntimeDef  `yaml:"region_runtimes"`
+}
+
+type RegionRuntimeDef struct {
+	Runtime string `yaml:"runtime"`
+	Version string `yaml:"version"`
 }
 
 type OIDCClientDef struct {
@@ -70,17 +76,18 @@ type SSHKeyDef struct {
 }
 
 type WebrootDef struct {
-	Subscription   string            `yaml:"subscription"`
-	Runtime        string            `yaml:"runtime"`
-	RuntimeVersion string            `yaml:"runtime_version"`
-	RuntimeConfig  map[string]any    `yaml:"runtime_config"`
-	PublicFolder   string            `yaml:"public_folder"`
-	EnvFileName    string            `yaml:"env_file_name"`
-	EnvVars        []EnvVarDef       `yaml:"env_vars"`
-	FQDNs          []FQDNDef         `yaml:"fqdns"`
-	Fixture        *FixtureDef       `yaml:"fixture"`
-	Daemons        []DaemonDef       `yaml:"daemons"`
-	CronJobs       []CronJobDef      `yaml:"cron_jobs"`
+	Subscription           string            `yaml:"subscription"`
+	Runtime                string            `yaml:"runtime"`
+	RuntimeVersion         string            `yaml:"runtime_version"`
+	RuntimeConfig          map[string]any    `yaml:"runtime_config"`
+	PublicFolder           string            `yaml:"public_folder"`
+	EnvFileName            string            `yaml:"env_file_name"`
+	ServiceHostnameEnabled *bool             `yaml:"service_hostname_enabled"`
+	EnvVars                []EnvVarDef       `yaml:"env_vars"`
+	FQDNs                  []FQDNDef         `yaml:"fqdns"`
+	Fixture                *FixtureDef       `yaml:"fixture"`
+	Daemons                []DaemonDef       `yaml:"daemons"`
+	CronJobs               []CronJobDef      `yaml:"cron_jobs"`
 }
 
 type EnvVarDef struct {

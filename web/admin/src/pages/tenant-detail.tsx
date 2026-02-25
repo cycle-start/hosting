@@ -953,10 +953,10 @@ export function TenantDetailPage() {
       <Dialog open={createWebrootOpen} onOpenChange={setCreateWebrootOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Create Webroot</DialogTitle></DialogHeader>
-          <WebrootFields value={wrForm} onChange={setWrForm} />
+          <WebrootFields value={wrForm} onChange={setWrForm} tenantId={id} regionId={tenant.region_id} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateWebrootOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateWebroot} disabled={createWebrootMut.isPending || !wrForm.runtime}>
+            <Button onClick={handleCreateWebroot} disabled={createWebrootMut.isPending || !wrForm.runtime || !wrForm.subscription_id}>
               {createWebrootMut.isPending ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>
@@ -967,10 +967,10 @@ export function TenantDetailPage() {
       <Dialog open={createDbOpen} onOpenChange={setCreateDbOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Create Database</DialogTitle></DialogHeader>
-          <DatabaseFields value={dbForm} onChange={setDbForm} clusterId={tenant.cluster_id} />
+          <DatabaseFields value={dbForm} onChange={setDbForm} clusterId={tenant.cluster_id} tenantId={id} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateDbOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateDb} disabled={createDbMut.isPending || !dbForm.shard_id}>
+            <Button onClick={handleCreateDb} disabled={createDbMut.isPending || !dbForm.shard_id || !dbForm.subscription_id}>
               {createDbMut.isPending ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>
@@ -981,10 +981,10 @@ export function TenantDetailPage() {
       <Dialog open={createValkeyOpen} onOpenChange={setCreateValkeyOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Create Valkey Instance</DialogTitle></DialogHeader>
-          <ValkeyInstanceFields value={vkForm} onChange={setVkForm} clusterId={tenant.cluster_id} />
+          <ValkeyInstanceFields value={vkForm} onChange={setVkForm} clusterId={tenant.cluster_id} tenantId={id} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateValkeyOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateValkey} disabled={createValkeyMut.isPending || !vkForm.shard_id}>
+            <Button onClick={handleCreateValkey} disabled={createValkeyMut.isPending || !vkForm.shard_id || !vkForm.subscription_id}>
               {createValkeyMut.isPending ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>
@@ -995,10 +995,10 @@ export function TenantDetailPage() {
       <Dialog open={createS3Open} onOpenChange={setCreateS3Open}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Create S3 Bucket</DialogTitle></DialogHeader>
-          <S3BucketFields value={s3Form} onChange={setS3Form} clusterId={tenant.cluster_id} />
+          <S3BucketFields value={s3Form} onChange={setS3Form} clusterId={tenant.cluster_id} tenantId={id} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateS3Open(false)}>Cancel</Button>
-            <Button onClick={handleCreateS3} disabled={createS3Mut.isPending || !s3Form.shard_id}>
+            <Button onClick={handleCreateS3} disabled={createS3Mut.isPending || !s3Form.shard_id || !s3Form.subscription_id}>
               {createS3Mut.isPending ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>
@@ -1062,12 +1062,12 @@ export function TenantDetailPage() {
         <DialogContent>
           <DialogHeader><DialogTitle>Create Zone</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <ZoneFields value={znForm} onChange={setZnForm} />
+            <ZoneFields value={znForm} onChange={setZnForm} tenantId={id} />
             <p className="text-xs text-muted-foreground">Region: {tenant.region_name || tenant.region_id} (inherited from tenant)</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateZoneOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateZone} disabled={createZoneMut.isPending || !znForm.name}>
+            <Button onClick={handleCreateZone} disabled={createZoneMut.isPending || !znForm.name || !znForm.subscription_id}>
               {createZoneMut.isPending ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>
