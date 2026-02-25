@@ -1411,7 +1411,7 @@ Silences suppress alert notifications during planned maintenance. Use the Grafan
 **Create a silence (2-hour maintenance window):**
 
 ```bash
-curl -s -X POST http://grafana.hosting.test/api/alertmanager/grafana/api/v2/silences \
+curl -s -X POST http://grafana.massive-hosting.com/api/alertmanager/grafana/api/v2/silences \
   -H "Content-Type: application/json" \
   -u admin:admin \
   -d '{
@@ -1433,7 +1433,7 @@ curl -s -X POST http://grafana.hosting.test/api/alertmanager/grafana/api/v2/sile
 **Silence all alerts for a severity:**
 
 ```bash
-curl -s -X POST http://grafana.hosting.test/api/alertmanager/grafana/api/v2/silences \
+curl -s -X POST http://grafana.massive-hosting.com/api/alertmanager/grafana/api/v2/silences \
   -H "Content-Type: application/json" \
   -u admin:admin \
   -d '{
@@ -1455,14 +1455,14 @@ curl -s -X POST http://grafana.hosting.test/api/alertmanager/grafana/api/v2/sile
 **List active silences:**
 
 ```bash
-curl -s http://grafana.hosting.test/api/alertmanager/grafana/api/v2/silences \
+curl -s http://grafana.massive-hosting.com/api/alertmanager/grafana/api/v2/silences \
   -u admin:admin | jq '.[] | {id: .id, comment: .comment, endsAt: .endsAt, status: .status.state}'
 ```
 
 **Delete (expire) a silence:**
 
 ```bash
-curl -s -X DELETE http://grafana.hosting.test/api/alertmanager/grafana/api/v2/silence/<silence-id> \
+curl -s -X DELETE http://grafana.massive-hosting.com/api/alertmanager/grafana/api/v2/silence/<silence-id> \
   -u admin:admin
 ```
 
@@ -1476,7 +1476,7 @@ curl -s -X DELETE http://grafana.hosting.test/api/alertmanager/grafana/api/v2/si
 ### 7.3 UI Access
 
 Grafana provides a built-in Silence management UI at:
-`http://grafana.hosting.test/alerting/silences`
+`http://grafana.massive-hosting.com/alerting/silences`
 
 This is the preferred method for ad-hoc silences. The API is for automation and scripted maintenance windows.
 

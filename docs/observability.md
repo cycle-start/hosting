@@ -42,7 +42,7 @@ The `path` label uses chi's route pattern (e.g. `/tenants/{id}`) rather than the
 
 ## Grafana
 
-Grafana runs at `http://grafana.hosting.test` (port 3000) with anonymous read access enabled (`GF_AUTH_ANONYMOUS_ENABLED=true`, viewer role). Admin credentials are `admin`/`admin`.
+Grafana runs at `http://grafana.massive-hosting.com` (port 3000) with anonymous read access enabled (`GF_AUTH_ANONYMOUS_ENABLED=true`, viewer role). Admin credentials are `admin`/`admin`.
 
 ### Pre-configured datasources
 

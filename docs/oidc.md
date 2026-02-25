@@ -72,7 +72,7 @@ Authorization: X-API-Key ...
   "id": "cloudbeaver",
   "secret": "my-secret",
   "name": "CloudBeaver",
-  "redirect_uris": ["https://dbadmin.hosting.test/api/auth/callback"]
+  "redirect_uris": ["https://dbadmin.massive-hosting.com/api/auth/callback"]
 }
 ```
 Returns `201 Created`. The client secret is stored as a bcrypt hash and cannot be retrieved after creation. If a client with the same ID already exists, it is updated (upsert).

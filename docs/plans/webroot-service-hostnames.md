@@ -10,7 +10,7 @@ Web service hostnames don't belong at the tenant level — they're per-webroot. 
 
 `{webroot_name}.{tenant_name}.{brand.base_hostname}`
 
-Example: `main.acme-corp.customers.hosting.test`
+Example: `main.acme-corp.mhst.io`
 
 ### Database Changes
 

@@ -525,10 +525,10 @@ func TestBrandCRUD(t *testing.T) {
     // Step 1: Create brand.
     //   POST /brands
     //   Body: { "id": brandID, "name": "E2E CRUD Brand",
-    //           "base_hostname": "crud.hosting.test",
-    //           "primary_ns": "ns1.crud.hosting.test",
-    //           "secondary_ns": "ns2.crud.hosting.test",
-    //           "hostmaster_email": "hostmaster@crud.hosting.test" }
+    //           "base_hostname": "crud.mhst.io",
+    //           "primary_ns": "ns1.crud.mhst.io",
+    //           "secondary_ns": "ns2.crud.mhst.io",
+    //           "hostmaster_email": "hostmaster@crud.mhst.io" }
     //   Expect: 201
 
     // Step 2: Get brand.
@@ -1217,7 +1217,7 @@ The tests should be implemented in this order, based on risk and coverage value:
 
 | Component | Required for | Notes |
 |-----------|-------------|-------|
-| Core API at `api.hosting.test` | All tests | Already required |
+| Core API at `api.massive-hosting.com` | All tests | Already required |
 | Web shard (2+ nodes) | Shared storage, FQDN binding | Already available |
 | Database shard | Database tests, DB migration, DB backup | Already available |
 | Valkey shard | Valkey tests, Valkey migration | Must exist in cluster |
@@ -1234,7 +1234,7 @@ The tests should be implemented in this order, based on risk and coverage value:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `HOSTING_E2E` | (unset) | Set to `1` to enable E2E tests |
-| `CORE_API_URL` | `https://api.hosting.test/api/v1` | Core API base URL |
+| `CORE_API_URL` | `https://api.massive-hosting.com/api/v1` | Core API base URL |
 | `WEB_TRAFFIC_URL` | `https://10.10.10.2` | HAProxy URL for web traffic |
 | `HOSTING_API_KEY` | `hst_dev_e2e_test_key_00000000` | Default API key |
 | `SSH_KEY_PATH` | `~/.ssh/id_rsa` | SSH private key for node access |

@@ -72,11 +72,12 @@ controlpanelUi:
 
 # Shared application config (non-secret, goes into ConfigMap)
 config:
+  baseDomain: "example.com"
   logLevel: info
   registryUrl: ""
   acmeEmail: ""
   acmeDirectoryUrl: "https://acme-v02.api.letsencrypt.org/directory"
-  oidcIssuerUrl: "http://api.hosting.localhost"
+  oidcIssuerUrl: ""
   auditLogRetentionDays: "90"
   backupRetentionDays: "30"
   regionId: ""
@@ -134,6 +135,7 @@ ingress:
   enabled: false
   className: ""
   annotations: {}
+  extraHosts: []
   hosts: []
   #  - host: hosting.example.com
   #    paths:

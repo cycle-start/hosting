@@ -46,9 +46,9 @@ start() {
     echo "  route add 10.10.10.0 mask 255.255.255.0 $WSL_IP"
     echo ""
     echo "Add to C:\\Windows\\System32\\drivers\\etc\\hosts:"
-    echo "  10.10.10.2  admin.hosting.test api.hosting.test temporal.hosting.test grafana.hosting.test prometheus.hosting.test loki.hosting.test loki-tenant.hosting.test traefik.hosting.test mcp.hosting.test"
-    echo "  10.10.10.60 dbadmin.hosting.test"
-    echo "  10.10.10.70 acme.hosting.test www.acme.hosting.test"
+    echo "  10.10.10.2  admin.$BASE_DOMAIN api.$BASE_DOMAIN temporal.$BASE_DOMAIN grafana.$BASE_DOMAIN prometheus.$BASE_DOMAIN loki.$BASE_DOMAIN loki-tenant.$BASE_DOMAIN traefik.$BASE_DOMAIN mcp.$BASE_DOMAIN home.$BASE_DOMAIN"
+    echo "  10.10.10.60 dbadmin.$BASE_DOMAIN"
+    echo "  10.10.10.70 acme.mhst.io www.acme.mhst.io"
 }
 
 stop() {

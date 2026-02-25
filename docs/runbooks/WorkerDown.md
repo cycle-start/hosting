@@ -25,7 +25,7 @@ Critical -- All async platform operations are blocked. New tenant provisioning, 
    kubectl --context hosting logs deployment/hosting-worker --previous --tail=50
    ```
 3. Check if the worker is registered with Temporal:
-   - Open Temporal Web UI at `http://temporal.hosting.test`
+   - Open Temporal Web UI at `http://temporal.massive-hosting.com`
    - Check task queue workers under the relevant task queues
 4. Check Temporal server health:
    ```bash

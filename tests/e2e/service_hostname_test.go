@@ -46,7 +46,7 @@ func TestServiceHostname(t *testing.T) {
 	))
 
 	// Compute the expected service hostname: {webroot}.{tenant}.{brand.base_hostname}
-	serviceHostname := fmt.Sprintf("svc-site.%s.e2e.hosting.test", tenantName)
+	serviceHostname := fmt.Sprintf("svc-site.%s.e2e.%s", tenantName, e2eDomain)
 	t.Logf("expected service hostname: %s", serviceHostname)
 
 	// Verify DNS record was created for the service hostname.
@@ -96,7 +96,7 @@ func TestServiceHostnameDisabled(t *testing.T) {
 	tenant := parseJSON(t, body)
 	tenantName, _ := tenant["name"].(string)
 
-	serviceHostname := fmt.Sprintf("no-svc-site.%s.e2e.hosting.test", tenantName)
+	serviceHostname := fmt.Sprintf("no-svc-site.%s.e2e.%s", tenantName, e2eDomain)
 
 	// Verify the service hostname does NOT resolve in DNS.
 	dnsNodeIPs := findNodeIPsByRole(t, clusterID, "dns")
@@ -121,7 +121,7 @@ func TestServiceHostnameToggle(t *testing.T) {
 	tenant := parseJSON(t, body)
 	tenantName, _ := tenant["name"].(string)
 
-	serviceHostname := fmt.Sprintf("toggle-site.%s.e2e.hosting.test", tenantName)
+	serviceHostname := fmt.Sprintf("toggle-site.%s.e2e.%s", tenantName, e2eDomain)
 
 	// Write a test file.
 	ips := findNodeIPsByRole(t, clusterID, "web")

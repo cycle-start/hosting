@@ -24,7 +24,7 @@ Critical -- All async platform operations are stalled. Existing tenant services 
    kubectl --context hosting logs statefulset/temporal --tail=100
    ```
 3. Check Temporal Web UI:
-   - Open `http://temporal.hosting.test`
+   - Open `http://temporal.massive-hosting.com`
    - Look for failing workflows, stuck activities, or high latency
 4. Check Temporal's database:
    ```bash
@@ -50,7 +50,7 @@ Critical -- All async platform operations are stalled. Existing tenant services 
   Wait for PostgreSQL to be ready, then restart Temporal.
 - Check and fix network connectivity:
   ```bash
-  kubectl --context hosting exec deployment/hosting-worker -- nslookup temporal.hosting.test
+  kubectl --context hosting exec deployment/hosting-worker -- nslookup temporal.massive-hosting.com
   ```
 
 ### Long-term

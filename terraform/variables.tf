@@ -39,7 +39,7 @@ variable "controlplane_ip" {
 variable "base_domain" {
   description = "Base domain for control plane hostnames (e.g. admin.<base_domain>)"
   type        = string
-  default     = "hosting.test"
+  default     = "massive-hosting.com"
 }
 
 variable "region_id" {

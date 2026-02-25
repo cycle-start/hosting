@@ -21,7 +21,7 @@ brands:
       - vm-cluster-1
 
 zones:
-  - name: hosting.test
+  - name: mhst.io
     brand: "Acme Hosting"
     tenant: acme-corp
 
@@ -30,7 +30,7 @@ oidc_clients:
     secret: cloudbeaver-secret
     name: CloudBeaver DB Admin
     redirect_uris:
-      - http://dbadmin.hosting.test/oauth2/callback
+      - http://dbadmin.${BASE_DOMAIN}/oauth2/callback
 
 tenants:
   - name: acme-corp
@@ -76,7 +76,7 @@ tenants:
             value: reverb
             secret: false
         fqdns:
-          - fqdn: acme.hosting.test
+          - fqdn: acme.mhst.io
             ssl_enabled: false
         fixture:
           tarball: .build/laravel-reverb.tar.gz
@@ -142,12 +142,12 @@ tenants:
       - type: web
       - type: database
     email_accounts:
-      - fqdn: acme.hosting.test
-        address: info@acme.hosting.test
+      - fqdn: acme.mhst.io
+        address: info@acme.mhst.io
         display_name: Acme Info
         aliases:
-          - address: contact@acme.hosting.test
-          - address: hello@acme.hosting.test
+          - address: contact@acme.mhst.io
+          - address: hello@acme.mhst.io
         forwards:
           - destination: admin@example.com
             keep_copy: true
@@ -155,8 +155,8 @@ tenants:
           subject: "Thanks for reaching out!"
           body: "We received your message and will get back to you shortly."
           enabled: true
-      - fqdn: acme.hosting.test
-        address: support@acme.hosting.test
+      - fqdn: acme.mhst.io
+        address: support@acme.mhst.io
         display_name: Acme Support
         forwards:
           - destination: helpdesk@example.com

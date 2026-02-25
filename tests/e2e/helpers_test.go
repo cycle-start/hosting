@@ -24,9 +24,13 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// e2eDomain is the base domain for e2e testing.
+// Override with HOSTING_E2E_DOMAIN env var.
+var e2eDomain = "massive-hosting.com"
+
 // coreAPIURL is the base URL for the hosting core API.
 // Override with CORE_API_URL env var.
-var coreAPIURL = "https://api.hosting.test/api/v1"
+var coreAPIURL = "https://api.massive-hosting.com/api/v1"
 
 // webTrafficURL is the base URL for testing web traffic through HAProxy.
 // Override with WEB_TRAFFIC_URL env var.
@@ -42,8 +46,13 @@ func TestMain(m *testing.M) {
 		fmt.Println("Skipping e2e tests (set HOSTING_E2E=1 to run)")
 		os.Exit(0)
 	}
+	if d := os.Getenv("HOSTING_E2E_DOMAIN"); d != "" {
+		e2eDomain = d
+	}
 	if u := os.Getenv("CORE_API_URL"); u != "" {
 		coreAPIURL = u
+	} else {
+		coreAPIURL = "https://api." + e2eDomain + "/api/v1"
 	}
 	if u := os.Getenv("WEB_TRAFFIC_URL"); u != "" {
 		webTrafficURL = u
@@ -509,10 +518,10 @@ func findOrCreateBrand(t *testing.T) string {
 	// Create brand.
 	resp, body = httpPost(t, coreAPIURL+"/brands", map[string]interface{}{
 		"name":             "E2E Test Brand",
-		"base_hostname":    "e2e.hosting.test",
-		"primary_ns":       "ns1.e2e.hosting.test",
-		"secondary_ns":     "ns2.e2e.hosting.test",
-		"hostmaster_email": "hostmaster@e2e.hosting.test",
+		"base_hostname":    "e2e." + e2eDomain,
+		"primary_ns":       "ns1.e2e." + e2eDomain,
+		"secondary_ns":     "ns2.e2e." + e2eDomain,
+		"hostmaster_email": "hostmaster@e2e." + e2eDomain,
 	})
 	if resp.StatusCode != 201 && resp.StatusCode != 200 {
 		t.Fatalf("create brand: status %d body=%s", resp.StatusCode, body)

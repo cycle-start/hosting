@@ -31,7 +31,7 @@ proto:
 build-admin:
     cd web/admin && npm run build
 
-# Start admin UI dev server (with API proxy to api.hosting.test)
+# Start admin UI dev server (with API proxy to api.$BASE_DOMAIN)
 dev-admin:
     cd web/admin && npm run dev
 
@@ -458,8 +458,8 @@ vm-deploy:
     # Import into k3s containerd
     docker save hosting-core-api:latest hosting-worker:latest hosting-admin-ui:latest hosting-mcp-server:latest controlpanel-api:latest controlpanel-ui:latest | \
       ssh {{ssh_opts}} ubuntu@{{cp}} "sudo k3s ctr images import -"
-    # Apply infra manifests (includes Traefik config and Ingress)
-    kubectl --context hosting apply -f deploy/k3s/
+    # Apply infra manifests (Traefik config, Grafana, etc.) with domain substitution
+    for f in deploy/k3s/*.yaml; do envsubst < "$f" | kubectl --context hosting apply -f -; done
     # Deploy SSL certs (mkcert if available, otherwise self-signed)
     just _ssl-deploy
     # Create Grafana dashboards ConfigMap
@@ -484,6 +484,7 @@ vm-deploy:
     @if [ ! -f deploy/helm/hosting/charts/postgresql-*.tgz ]; then helm dependency build deploy/helm/hosting; fi
     helm --kube-context hosting upgrade --install hosting \
       deploy/helm/hosting -f deploy/helm/hosting/values-dev.yaml \
+      --set config.baseDomain="$BASE_DOMAIN" \
       --set secrets.coreDatabaseUrl="$CORE_DATABASE_URL" \
       --set secrets.powerdnsDatabaseUrl="$POWERDNS_DATABASE_URL" \
       --set secrets.stalwartAdminToken="$STALWART_ADMIN_TOKEN" \
@@ -538,7 +539,7 @@ dev-k3s:
 
 # Generate trusted SSL certs with mkcert and deploy to Traefik + LB VM
 ssl-init:
-    mkcert -cert-file /tmp/hosting-cert.pem -key-file /tmp/hosting-key.pem "*.hosting.test" "hosting.test"
+    mkcert -cert-file /tmp/hosting-cert.pem -key-file /tmp/hosting-key.pem "*.$BASE_DOMAIN" "$BASE_DOMAIN"
     # Deploy to Traefik (k3s)
     kubectl --context hosting -n kube-system create secret tls traefik-default-cert \
       --cert=/tmp/hosting-cert.pem --key=/tmp/hosting-key.pem \
@@ -552,7 +553,7 @@ ssl-init:
     scp {{ssh_opts}} /tmp/hosting-key.pem ubuntu@10.10.10.60:/tmp/dbadmin-key.pem
     ssh {{ssh_opts}} ubuntu@10.10.10.60 "sudo mkdir -p /etc/nginx/certs && sudo cp /tmp/dbadmin.pem /etc/nginx/certs/dbadmin.pem && sudo cp /tmp/dbadmin-key.pem /etc/nginx/certs/dbadmin-key.pem && sudo systemctl reload nginx"
     rm /tmp/hosting-cert.pem /tmp/hosting-key.pem /tmp/hosting.pem
-    @echo "Trusted SSL certs installed on Traefik, LB VM, and DB Admin VM. Visit https://admin.hosting.test"
+    @echo "Trusted SSL certs installed on Traefik, LB VM, and DB Admin VM. Visit https://admin.$BASE_DOMAIN"
 
 # Deploy SSL certs: uses mkcert (trusted) if available, otherwise self-signed
 _ssl-deploy:
@@ -560,13 +561,13 @@ _ssl-deploy:
     set -e
     if command -v mkcert &>/dev/null; then
       echo "Using mkcert for trusted SSL certs..."
-      mkcert -cert-file /tmp/hosting-cert.pem -key-file /tmp/hosting-key.pem "*.hosting.test" "hosting.test"
+      mkcert -cert-file /tmp/hosting-cert.pem -key-file /tmp/hosting-key.pem "*.$BASE_DOMAIN" "$BASE_DOMAIN"
     else
       echo "mkcert not found, using self-signed certs (browsers will show warnings)..."
       openssl req -x509 -newkey rsa:2048 \
         -keyout /tmp/hosting-key.pem -out /tmp/hosting-cert.pem \
-        -days 365 -nodes -subj '/CN=*.hosting.test' \
-        -addext 'subjectAltName=DNS:*.hosting.test,DNS:hosting.test' 2>/dev/null
+        -days 365 -nodes -subj "/CN=*.$BASE_DOMAIN" \
+        -addext "subjectAltName=DNS:*.$BASE_DOMAIN,DNS:$BASE_DOMAIN" 2>/dev/null
     fi
     # Deploy to Traefik (k3s)
     kubectl --context hosting -n kube-system create secret tls traefik-default-cert \
@@ -600,11 +601,11 @@ forward-status:
 
 # Open Grafana UI
 vm-grafana:
-    @echo "http://grafana.hosting.test (admin/admin)"
+    @echo "http://grafana.$BASE_DOMAIN (admin/admin)"
 
 # Open Prometheus UI
 vm-prometheus:
-    @echo "http://prometheus.hosting.test"
+    @echo "http://prometheus.$BASE_DOMAIN"
 
 # Deploy Vector config to all running VMs
 vm-bootstrap-vector:
@@ -635,4 +636,8 @@ build-laravel-fixture:
 
 # Seed dev tenants (builds fixture if needed)
 seed: build-laravel-fixture
-    go run ./cmd/hostctl seed -f seeds/dev-tenants.yaml -timeout 5m
+    #!/usr/bin/env bash
+    set -euo pipefail
+    envsubst < seeds/dev-tenants.yaml > /tmp/dev-tenants-resolved.yaml
+    go run ./cmd/hostctl seed -f /tmp/dev-tenants-resolved.yaml -timeout 5m
+    rm -f /tmp/dev-tenants-resolved.yaml

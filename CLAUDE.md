@@ -9,7 +9,7 @@ go test ./...
 go vet ./...
 ```
 
-E2E tests (requires running control plane at `api.hosting.test`):
+E2E tests (requires running control plane at `api.massive-hosting.com`):
 ```bash
 HOSTING_E2E=1 go test ./tests/e2e/... -v
 ```

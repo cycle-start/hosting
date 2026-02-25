@@ -63,7 +63,7 @@ func TestLaravelReverbQueue(t *testing.T) {
 	t.Logf("webroot %s active", webrootID)
 
 	// Create FQDN (unique per run to avoid stale soft-deleted records).
-	fqdn := fmt.Sprintf("reverb-%d.hosting.test.", time.Now().UnixNano())
+	fqdn := fmt.Sprintf("reverb-%d.%s.", time.Now().UnixNano(), e2eDomain)
 	fqdnID := createTestFQDN(t, webrootID, fqdn)
 	t.Logf("fqdn %s active (id=%s)", fqdn, fqdnID)
 	fqdnHost := strings.TrimSuffix(fqdn, ".")

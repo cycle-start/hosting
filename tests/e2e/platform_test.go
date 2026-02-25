@@ -89,7 +89,7 @@ func TestPlatformE2E(t *testing.T) {
 		sshExec(t, nodeIP, "echo '"+phpContent+"' | sudo tee /var/www/storage/acme-corp/main-site/public/index.php")
 
 		// Wait for the page to be served through HAProxy
-		resp, body := waitForHTTP(t, webTrafficURL, "acme.hosting.test", httpTimeout)
+		resp, body := waitForHTTP(t, webTrafficURL, "acme.mhst.io", httpTimeout)
 
 		// Assert response body
 		if resp.StatusCode != 200 {

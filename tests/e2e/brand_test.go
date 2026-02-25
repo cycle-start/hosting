@@ -14,10 +14,10 @@ func TestBrandCRUD(t *testing.T) {
 	// Create brand.
 	resp, body := httpPost(t, coreAPIURL+"/brands", map[string]interface{}{
 		"name":             "E2E CRUD Brand",
-		"base_hostname":    "crud.hosting.test",
-		"primary_ns":       "ns1.crud.hosting.test",
-		"secondary_ns":     "ns2.crud.hosting.test",
-		"hostmaster_email": "hostmaster@crud.hosting.test",
+		"base_hostname":    "crud." + e2eDomain,
+		"primary_ns":       "ns1.crud." + e2eDomain,
+		"secondary_ns":     "ns2.crud." + e2eDomain,
+		"hostmaster_email": "hostmaster@crud." + e2eDomain,
 	})
 	require.Equal(t, 201, resp.StatusCode, "create brand: %s", body)
 	brand := parseJSON(t, body)
@@ -86,7 +86,7 @@ func TestBrandIsolation(t *testing.T) {
 
 	// Create two brands.
 	brandIDs := make([]string, 2)
-	brandHostnames := []string{"iso-a.hosting.test", "iso-b.hosting.test"}
+	brandHostnames := []string{"iso-a." + e2eDomain, "iso-b." + e2eDomain}
 
 	for i, name := range brandNames {
 		resp, body := httpPost(t, coreAPIURL+"/brands", map[string]interface{}{

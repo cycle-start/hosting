@@ -109,7 +109,7 @@ See [Getting Started](docs/getting-started.md) for the full walkthrough includin
 | | |
 |---|---|
 | [STATUS.md](STATUS.md) | Full feature inventory and roadmap |
-| [API Docs](http://api.hosting.test/docs) | OpenAPI / Swagger (requires running cluster) |
+| [API Docs](http://api.massive-hosting.com/docs) | OpenAPI / Swagger (requires running cluster) |
 
 ## Tech Stack
 

@@ -91,11 +91,11 @@ Via the tenant logs API:
 ```bash
 # All cron logs for a tenant
 curl -H "X-API-Key: ..." \
-  "http://api.hosting.test/api/v1/tenants/{id}/logs?log_type=cron"
+  "http://api.massive-hosting.com/api/v1/tenants/{id}/logs?log_type=cron"
 
 # Logs for a specific cron job
 curl -H "X-API-Key: ..." \
-  "http://api.hosting.test/api/v1/tenants/{id}/logs?log_type=cron&cron_job_id={cronJobID}"
+  "http://api.massive-hosting.com/api/v1/tenants/{id}/logs?log_type=cron&cron_job_id={cronJobID}"
 ```
 
 ## Auto-Disable on Repeated Failures
@@ -115,10 +115,10 @@ Each cron service unit has `ExecStopPost=+/usr/local/bin/cron-outcome` which run
 
 ```bash
 # Via API
-curl -X POST -H "X-API-Key: ..." http://api.hosting.test/api/v1/cron-jobs/{id}/enable
+curl -X POST -H "X-API-Key: ..." http://api.massive-hosting.com/api/v1/cron-jobs/{id}/enable
 
 # Or retry (also resets the failure counter)
-curl -X POST -H "X-API-Key: ..." http://api.hosting.test/api/v1/cron-jobs/{id}/retry
+curl -X POST -H "X-API-Key: ..." http://api.massive-hosting.com/api/v1/cron-jobs/{id}/retry
 ```
 
 Both `enable` and `retry` accept jobs in `auto_disabled` status and reset the failure counter to 0.

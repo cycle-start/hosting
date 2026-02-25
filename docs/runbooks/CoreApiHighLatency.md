@@ -27,7 +27,7 @@ Warning at P99 > 2s, Critical at P99 > 5s. At critical levels, API clients may t
    kubectl --context hosting top pods | grep core-api
    ```
 4. Check Temporal task queue latency:
-   - Open Temporal Web UI at `http://temporal.hosting.test`
+   - Open Temporal Web UI at `http://temporal.massive-hosting.com`
    - Check schedule-to-start latency on task queues
 5. Check control plane node resources:
    ```bash

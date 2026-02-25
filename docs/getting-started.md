@@ -59,7 +59,7 @@ route add 10.10.10.0 mask 255.255.255.0 <WSL2_IP>
 **In `C:\Windows\System32\drivers\etc\hosts` (as Administrator):**
 
 ```
-10.10.10.2  admin.hosting.test api.hosting.test mcp.hosting.test temporal.hosting.test dbadmin.hosting.test
+10.10.10.2  admin.massive-hosting.com api.massive-hosting.com mcp.massive-hosting.com temporal.massive-hosting.com dbadmin.massive-hosting.com
 ```
 
 After this, all services are accessible from the Windows browser. See [Local Networking](local-networking.md) for details.
@@ -88,16 +88,16 @@ You can also run each step individually: `just migrate`, `just create-dev-key`, 
 
 ```bash
 # Admin UI
-open http://admin.hosting.test
+open http://admin.massive-hosting.com
 
 # Core API
-curl -s -H "Authorization: Bearer hst_dev_e2e_test_key_00000000" https://api.hosting.test/api/v1/tenants | jq
+curl -s -H "Authorization: Bearer hst_dev_e2e_test_key_00000000" https://api.massive-hosting.com/api/v1/tenants | jq
 
 # Temporal UI
-open http://temporal.hosting.test
+open http://temporal.massive-hosting.com
 
 # Tenant site (after seeding — add host entry for 10.10.10.70)
-curl -k https://acme.hosting.test
+curl -k https://acme.mhst.io
 ```
 
 ### 5. Run e2e tests

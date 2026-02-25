@@ -1,41 +1,64 @@
-{{- if .Values.ingress.enabled }}
+{{- if .Values.config.baseDomain }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "hosting.fullname" . }}
-  labels:
-    {{- include "hosting.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
+  name: control-plane
   annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
 spec:
-  {{- if .Values.ingress.className }}
-  ingressClassName: {{ .Values.ingress.className | quote }}
-  {{- end }}
-  {{- if .Values.ingress.tls }}
-  tls:
-    {{- toYaml .Values.ingress.tls | nindent 4 }}
-  {{- end }}
   rules:
-    {{- range .Values.ingress.hosts }}
-    - host: {{ .host | quote }}
+    - host: admin.{{ .Values.config.baseDomain }}
       http:
         paths:
-          {{- range .paths }}
-          - path: {{ .path }}
+          - path: /
             pathType: Prefix
             backend:
               service:
-                {{- if eq .service "core-api" }}
-                name: {{ include "hosting.fullname" $ }}-core-api
+                name: hosting-admin-ui
                 port:
-                  name: http
-                {{- else }}
-                name: {{ include "hosting.fullname" $ }}-admin-ui
+                  number: 3001
+    - host: api.{{ .Values.config.baseDomain }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hosting-core-api
                 port:
-                  name: http
-                {{- end }}
-          {{- end }}
+                  number: 8090
+    - host: home.{{ .Values.config.baseDomain }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hosting-controlpanel-ui
+                port:
+                  number: 3002
+    {{- if .Values.mcpServer.enabled }}
+    - host: mcp.{{ .Values.config.baseDomain }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hosting-mcp-server
+                port:
+                  number: 8091
+    {{- end }}
+    {{- range .Values.ingress.extraHosts }}
+    - host: {{ .host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .service }}
+                port:
+                  number: {{ .port }}
     {{- end }}
 {{- end }}

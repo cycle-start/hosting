@@ -147,7 +147,8 @@ export function LogViewer({ query, title }: LogViewerProps) {
     }
   }, [filteredEntries.length, paused])
 
-  const grafanaUrl = `http://grafana.hosting.test/explore?orgId=1&left=${encodeURIComponent(JSON.stringify({ datasource: 'loki', queries: [{ expr: query, refId: 'A' }] }))}`
+  const grafanaBase = import.meta.env.VITE_GRAFANA_URL || ''
+  const grafanaUrl = grafanaBase ? `${grafanaBase}/explore?orgId=1&left=${encodeURIComponent(JSON.stringify({ datasource: 'loki', queries: [{ expr: query, refId: 'A' }] }))}` : ''
 
   return (
     <div className="space-y-3">
@@ -194,15 +195,17 @@ export function LogViewer({ query, title }: LogViewerProps) {
           {filteredEntries.length} entries
         </span>
 
-        <a
-          href={grafanaUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ExternalLink className="h-3 w-3" />
-          Grafana
-        </a>
+        {grafanaUrl && (
+          <a
+            href={grafanaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ExternalLink className="h-3 w-3" />
+            Grafana
+          </a>
+        )}
       </div>
 
       {/* Log stream */}

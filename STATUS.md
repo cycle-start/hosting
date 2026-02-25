@@ -4,7 +4,7 @@
 
 **Build:** Go 1.26, compiles clean, `go vet` passes, all test packages pass.
 **Infrastructure:** k3s control plane (core-api, worker, admin-ui, MCP server, Temporal, PostgreSQL, Loki, Grafana, Prometheus, Alloy). Nodes run on VMs provisioned by Terraform/libvirt with Packer golden images.
-**Dev Environment:** 10 VMs (controlplane + 2 web + 1 db + 1 dns + 1 valkey + 1 storage + 1 dbadmin + 1 lb + 1 gateway) on libvirt, accessible at `*.hosting.test`.
+**Dev Environment:** 10 VMs (controlplane + 2 web + 1 db + 1 dns + 1 valkey + 1 storage + 1 dbadmin + 1 lb + 1 gateway) on libvirt, accessible at `*.massive-hosting.com`.
 **CLI:** `hostctl cluster apply` bootstraps infrastructure; `hostctl seed` populates tenant data; `hostctl converge-shard` triggers convergence. Auto-loads `.env` for API key.
 
 ---
@@ -13,7 +13,7 @@
 
 ### Core API (REST)
 
-Full CRUD REST API at `api.hosting.test/api/v1` with OpenAPI docs at `/docs`.
+Full CRUD REST API at `api.massive-hosting.com/api/v1` with OpenAPI docs at `/docs`.
 
 **Authentication & Authorization:**
 - API key auth (`X-API-Key` header) with fine-grained scopes (`resource:action` format)
@@ -65,7 +65,7 @@ Full CRUD REST API at `api.hosting.test/api/v1` with OpenAPI docs at `/docs`.
 
 **MCP Server:**
 - Dynamic tool generation from OpenAPI spec, grouped by domain (infrastructure, tenants, web, databases, dns, email, storage, platform)
-- Available at `mcp.hosting.test`
+- Available at `mcp.massive-hosting.com`
 
 **Response patterns:**
 - List endpoints: `{items: [...], next_cursor, has_more}` with search/sort/status filtering
@@ -191,7 +191,7 @@ React SPA (TypeScript, Vite, Tailwind, shadcn/ui) served by Go binary on port 30
 - **Ansible configuration management:** Dynamic API-backed inventory, 17 roles covering all VM types, tag-based selective deployment (`just deploy-node-agent`, `just ansible-role web --tags php`)
 - **k3s control plane:** Helm chart deploys core-api, worker, admin-ui, MCP server; k3s manifests for Temporal, PostgreSQL, Loki, Grafana, Prometheus, Alloy, Traefik ingress
 - **Image delivery:** `docker build` -> `docker save` -> SSH pipe -> `k3s ctr images import`
-- **Networking:** `*.hosting.test` domain via Traefik ingress, WSL2 -> libvirt routing via `just forward`
+- **Networking:** `*.massive-hosting.com` domain via Traefik ingress, WSL2 -> libvirt routing via `just forward`
 
 ### Resource Naming
 

@@ -10,7 +10,7 @@ A brand represents an independent hosting identity -- for example, a reseller or
 |-------|---------|
 | `id` | Caller-provided slug (e.g. `"acme"`, `"myhost"`). Immutable after creation. |
 | `name` | Human-readable display name |
-| `base_hostname` | Base domain for generating tenant hostnames (e.g. `hosting.test`) |
+| `base_hostname` | Base domain for generating tenant hostnames (e.g. `mhst.io`) |
 | `primary_ns` | Primary nameserver hostname for SOA records (e.g. `ns1.acme.com`) |
 | `secondary_ns` | Secondary nameserver hostname for SOA records |
 | `hostmaster_email` | Hostmaster contact for SOA records (e.g. `hostmaster@acme.com`) |

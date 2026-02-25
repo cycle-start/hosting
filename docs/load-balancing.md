@@ -96,7 +96,7 @@ Open http://10.10.10.2:8404/stats (or `http://localhost:8404/stats` if using Doc
 ### Check response headers
 
 ```bash
-curl -v http://10.10.10.2 -H "Host: acme.hosting.test"
+curl -v http://10.10.10.2 -H "Host: acme.mhst.io"
 ```
 
 Look for:

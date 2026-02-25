@@ -15,7 +15,7 @@ Warning at 100 pending tasks or schedule-to-start latency above 30s. Critical at
 
 ## Investigation Steps
 1. Check Temporal Web UI task queues:
-   - Open `http://temporal.hosting.test`
+   - Open `http://temporal.massive-hosting.com`
    - Navigate to task queues and check pending task counts and pollers
 2. Check worker pod status:
    ```bash

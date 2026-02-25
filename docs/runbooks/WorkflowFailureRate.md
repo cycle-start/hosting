@@ -15,7 +15,7 @@ Warning at 5% workflow failure or 10% activity failure rate. Critical if the rat
 
 ## Investigation Steps
 1. Check Temporal Web UI for failing workflows:
-   - Open `http://temporal.hosting.test`
+   - Open `http://temporal.massive-hosting.com`
    - Filter by status "Failed" or "TimedOut"
    - Inspect the specific activity that failed and its error message
 2. Check worker logs for errors:

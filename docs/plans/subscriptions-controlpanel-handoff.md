@@ -723,7 +723,7 @@ The webroot detail page currently shows FQDNs via `useFQDNs(webrootId)` which ca
 
 ## Testing Notes
 
-- The dev API runs at `https://api.hosting.test/api/v1`
+- The dev API runs at `https://api.massive-hosting.com/api/v1`
 - Create a subscription before creating resources -- all resource creation will fail validation without a valid `subscription_id`
 - Subscription IDs must be valid UUIDs (use `crypto.randomUUID()` in the browser)
 - Deleting a subscription cascades to ALL child resources -- the UI should show a strong warning

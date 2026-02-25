@@ -99,16 +99,16 @@ Edit `C:\Windows\System32\drivers\etc\hosts` as Administrator:
 
 ```
 # Control plane services (Traefik on controlplane VM)
-10.10.10.2  admin.hosting.test api.hosting.test home.hosting.test mcp.hosting.test temporal.hosting.test grafana.hosting.test prometheus.hosting.test loki.hosting.test traefik.hosting.test
+10.10.10.2  admin.massive-hosting.com api.massive-hosting.com home.massive-hosting.com mcp.massive-hosting.com temporal.massive-hosting.com grafana.massive-hosting.com prometheus.massive-hosting.com loki.massive-hosting.com traefik.massive-hosting.com
 
 # DB Admin (CloudBeaver — runs on its own VM, port 8978)
-10.10.10.60  dbadmin.hosting.test
+10.10.10.60  dbadmin.massive-hosting.com
 
 # Tenant sites (HAProxy on LB VM) — add seeded + new tenant FQDNs here
-10.10.10.70  acme.hosting.test www.acme.hosting.test
+10.10.10.70  acme.mhst.io
 ```
 
-The seed file (`seeds/dev-tenants.yaml`) creates two tenant FQDNs: `acme.hosting.test` and `www.acme.hosting.test`. These must point to the LB VM (`10.10.10.70`), **not** the controlplane. When adding new tenant FQDNs, always add them to the `10.10.10.70` line.
+The seed file (`seeds/dev-tenants.yaml`) creates a tenant FQDN `acme.mhst.io`. This must point to the LB VM (`10.10.10.70`), **not** the controlplane. When adding new tenant FQDNs, always add them to the `10.10.10.70` line.
 
 ## SSL/TLS (optional)
 
@@ -144,12 +144,12 @@ Then on Windows either:
 just ssl-init
 ```
 
-This generates a wildcard cert for `*.hosting.test` and deploys it to both Traefik (as a k8s TLS Secret) and the LB VM HAProxy. All `https://*.hosting.test` URLs will work without warnings.
+This generates a wildcard cert for `*.massive-hosting.com` and deploys it to both Traefik (as a k8s TLS Secret) and the LB VM HAProxy. All `https://*.massive-hosting.com` URLs will work without warnings.
 
 ### Verify
 
 ```bash
-curl -v https://api.hosting.test/healthz
+curl -v https://api.massive-hosting.com/healthz
 ```
 
 Both HTTP and HTTPS work simultaneously — no forced redirect.
@@ -158,21 +158,21 @@ Both HTTP and HTTPS work simultaneously — no forced redirect.
 
 | URL | Service | Routed by | IP |
 |-----|---------|-----------|-----|
-| `https://admin.hosting.test` | Admin UI | Traefik | 10.10.10.2 |
-| `https://api.hosting.test` | Core API | Traefik | 10.10.10.2 |
-| `https://home.hosting.test` | Control Panel (customer) | Traefik | 10.10.10.2 |
-| `https://mcp.hosting.test` | MCP Server (LLM tool access) | Traefik | 10.10.10.2 |
-| `https://temporal.hosting.test` | Temporal UI | Traefik | 10.10.10.2 |
-| `https://grafana.hosting.test` | Grafana (logs/metrics) | Traefik | 10.10.10.2 |
-| `https://prometheus.hosting.test` | Prometheus | Traefik | 10.10.10.2 |
-| `https://loki.hosting.test` | Loki (log aggregation) | Traefik | 10.10.10.2 |
-| `https://traefik.hosting.test` | Traefik dashboard | Traefik | 10.10.10.2 |
-| `https://dbadmin.hosting.test` | DB Admin (CloudBeaver) | Direct (nginx) | 10.10.10.60 |
-| `https://acme.hosting.test` | Tenant site | HAProxy | 10.10.10.70 |
+| `https://admin.massive-hosting.com` | Admin UI | Traefik | 10.10.10.2 |
+| `https://api.massive-hosting.com` | Core API | Traefik | 10.10.10.2 |
+| `https://home.massive-hosting.com` | Control Panel (customer) | Traefik | 10.10.10.2 |
+| `https://mcp.massive-hosting.com` | MCP Server (LLM tool access) | Traefik | 10.10.10.2 |
+| `https://temporal.massive-hosting.com` | Temporal UI | Traefik | 10.10.10.2 |
+| `https://grafana.massive-hosting.com` | Grafana (logs/metrics) | Traefik | 10.10.10.2 |
+| `https://prometheus.massive-hosting.com` | Prometheus | Traefik | 10.10.10.2 |
+| `https://loki.massive-hosting.com` | Loki (log aggregation) | Traefik | 10.10.10.2 |
+| `https://traefik.massive-hosting.com` | Traefik dashboard | Traefik | 10.10.10.2 |
+| `https://dbadmin.massive-hosting.com` | DB Admin (CloudBeaver) | Direct (nginx) | 10.10.10.60 |
+| `https://acme.mhst.io` | Tenant site | HAProxy | 10.10.10.70 |
 
 HTTP (`http://`) also works on all URLs — no forced redirect.
 
-Control plane hostnames are configured via k8s Ingress resources in `deploy/k3s/ingress.yaml`. Tenant routing is via the HAProxy FQDN map on the LB VM. The domain is controlled by the `base_domain` Terraform variable (default: `hosting.test`).
+Control plane hostnames are configured via the Helm chart Ingress template (`deploy/helm/hosting/templates/ingress.yaml`), generated from `config.baseDomain`. Tenant routing is via the HAProxy FQDN map on the LB VM. The domain is controlled by the `BASE_DOMAIN` env var (default: `massive-hosting.com`).
 
 ### Authentication
 
@@ -193,38 +193,38 @@ Most control plane services are open (no auth) since they're only accessible wit
 
 1. Create a tenant (via admin UI or API)
 2. Create a webroot on the tenant
-3. Add an FQDN using a `.hosting.test` subdomain, e.g. `mysite.hosting.test`
+3. Add an FQDN using a `.mhst.io` subdomain, e.g. `mysite.mhst.io`
 4. The FQDN binding workflow:
    - Adds the FQDN to the HAProxy map on each LB node via the node-agent
    - Creates DNS records in PowerDNS (if a matching zone exists)
-5. Add `10.10.10.70  mysite.hosting.test` to your Windows hosts file
-6. Visit `http://mysite.hosting.test` in the browser
+5. Add `10.10.10.70  mysite.mhst.io` to your Windows hosts file
+6. Visit `http://mysite.mhst.io` in the browser
 
-The seed file (`seeds/dev-tenants.yaml`) creates a zone `hosting.test` under the `acme-brand`. Any FQDN ending in `.hosting.test` will match this zone and get auto-DNS records created.
+The seed file (`seeds/dev-tenants.yaml`) creates a zone `mhst.io` under the `acme-brand`. Any FQDN ending in `.mhst.io` will match this zone and get auto-DNS records created.
 
 ### Example: adding a second tenant
 
 ```bash
 # Create tenant via API
-curl -X POST http://api.hosting.test/api/v1/tenants \
+curl -X POST http://api.massive-hosting.com/api/v1/tenants \
   -H "X-API-Key: hst_..." \
   -H "Content-Type: application/json" \
   -d '{"brand_id": "acme-brand", "shard_id": "<web-shard-id>"}'
 
 # Create webroot (use tenant ID from response)
-curl -X POST http://api.hosting.test/api/v1/tenants/<id>/webroots \
+curl -X POST http://api.massive-hosting.com/api/v1/tenants/<id>/webroots \
   -H "X-API-Key: hst_..." \
   -H "Content-Type: application/json" \
   -d '{"name": "main", "runtime": "php", "runtime_version": "8.5"}'
 
 # Add FQDN (use webroot ID from response)
-curl -X POST http://api.hosting.test/api/v1/webroots/<id>/fqdns \
+curl -X POST http://api.massive-hosting.com/api/v1/webroots/<id>/fqdns \
   -H "X-API-Key: hst_..." \
   -H "Content-Type: application/json" \
-  -d '{"fqdn": "newsite.hosting.test"}'
+  -d '{"fqdn": "newsite.mhst.io"}'
 
 # Add to Windows hosts file (point to LB VM), then visit
-open http://newsite.hosting.test
+open http://newsite.mhst.io
 ```
 
 ## Verifying DNS records
@@ -232,16 +232,12 @@ open http://newsite.hosting.test
 The platform creates DNS records in PowerDNS when FQDNs are bound. PowerDNS runs on the DNS node VM. You can query it directly from WSL2:
 
 ```bash
-dig @10.10.10.30 hosting.test SOA
-dig @10.10.10.30 acme.hosting.test A
-dig @10.10.10.30 hosting.test NS
+dig @10.10.10.30 mhst.io SOA
+dig @10.10.10.30 acme.mhst.io A
+dig @10.10.10.30 mhst.io NS
 ```
 
 These DNS records aren't used for browser routing in dev (we use hosts file entries), but they confirm the platform's DNS pipeline works correctly and would be used in production.
-
-## Why `.test` instead of `.localhost`?
-
-Browsers hardcode `.localhost` to resolve to `127.0.0.1` per [RFC 6761](https://datatracker.ietf.org/doc/html/rfc6761), ignoring hosts file entries. Since the control plane runs on `10.10.10.2` (not localhost), we use `.test` which is also RFC 6761 reserved but browsers resolve it normally via hosts file / DNS.
 
 ## Debugging
 
@@ -266,7 +262,7 @@ ping 10.10.10.70
 curl http://10.10.10.2:8090/healthz
 
 # Via Traefik
-curl -H "Host: api.hosting.test" http://10.10.10.2/api/v1/healthz
+curl -H "Host: api.massive-hosting.com" http://10.10.10.2/api/v1/healthz
 
 # Check forwarding rules
 just forward-status
@@ -281,7 +277,7 @@ just lb-show
 ### Check response headers
 
 ```bash
-curl -v http://acme.hosting.test
+curl -v http://acme.mhst.io
 ```
 
 Look for:

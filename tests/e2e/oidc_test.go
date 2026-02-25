@@ -9,7 +9,7 @@ import (
 func TestOIDCDiscovery(t *testing.T) {
 	// The OIDC discovery endpoint is public (no auth required).
 	// Use the base URL without /api/v1.
-	baseURL := "https://api.hosting.test"
+	baseURL := "https://api." + e2eDomain
 	resp, body := httpGet(t, baseURL+"/.well-known/openid-configuration")
 	if resp.StatusCode == 404 {
 		t.Skip("OIDC not configured")
@@ -22,7 +22,7 @@ func TestOIDCDiscovery(t *testing.T) {
 }
 
 func TestOIDCJWKS(t *testing.T) {
-	baseURL := "https://api.hosting.test"
+	baseURL := "https://api." + e2eDomain
 	resp, body := httpGet(t, baseURL+"/oidc/jwks")
 	if resp.StatusCode == 404 {
 		t.Skip("OIDC not configured")

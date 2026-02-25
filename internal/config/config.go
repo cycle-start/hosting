@@ -63,7 +63,7 @@ type Config struct {
 
 	SSHCAPrivateKey string // SSH_CA_PRIVATE_KEY — PEM-encoded SSH CA private key (for web terminal)
 
-	WireGuardEndpoint string // WIREGUARD_ENDPOINT — public endpoint for WireGuard VPN (e.g. "vpn.hosting.test:51820")
+	WireGuardEndpoint string // WIREGUARD_ENDPOINT — public endpoint for WireGuard VPN (e.g. "vpn.massive-hosting.com:51820")
 }
 
 func Load() (*Config, error) {

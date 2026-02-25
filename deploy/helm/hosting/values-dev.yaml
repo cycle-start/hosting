@@ -45,7 +45,7 @@ controlpanelApi:
   hostNetwork: true
   migrate: true
   hostingApiKey: "hst_dev"
-  corsOrigins: "http://home.hosting.test,http://localhost:5173"
+  corsOrigins: ""
   devMode: "true"
 
 controlpanelUi:
@@ -54,13 +54,28 @@ controlpanelUi:
   hostNetwork: true
 
 config:
+  baseDomain: "massive-hosting.com"
   registryUrl: "localhost:5000"
-  oidcIssuerUrl: "http://api.hosting.test"
   regionId: "dev"
   clusterId: "vm-cluster-1"
 
 # Secrets are loaded from .env via --set flags in `just vm-deploy`
 secrets: {}
+
+ingress:
+  extraHosts:
+    - host: temporal.massive-hosting.com
+      service: temporal-ui
+      port: 8080
+    - host: grafana.massive-hosting.com
+      service: grafana
+      port: 3000
+    - host: prometheus.massive-hosting.com
+      service: prometheus
+      port: 9090
+    - host: loki.massive-hosting.com
+      service: loki
+      port: 3100
 
 temporal:
   address: "127.0.0.1:7233"

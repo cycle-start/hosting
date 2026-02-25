@@ -40,7 +40,7 @@ spec:
     - web
     - websecure
   routes:
-    - match: Host(`traefik.hosting.test`)
+    - match: Host(`traefik.${BASE_DOMAIN}`)
       kind: Rule
       services:
         - name: api@internal

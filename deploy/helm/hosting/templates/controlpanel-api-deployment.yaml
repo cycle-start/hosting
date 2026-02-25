@@ -70,7 +70,7 @@ spec:
             - name: HOSTING_API_KEY
               value: {{ .Values.controlpanelApi.hostingApiKey | default "hst_dev" | quote }}
             - name: CORS_ORIGINS
-              value: {{ .Values.controlpanelApi.corsOrigins | default "http://localhost:5173" | quote }}
+              value: {{ .Values.controlpanelApi.corsOrigins | default (printf "http://home.%s,https://home.%s" .Values.config.baseDomain .Values.config.baseDomain) | quote }}
             - name: DEV_MODE
               value: {{ .Values.controlpanelApi.devMode | default "false" | quote }}
             {{- with .Values.controlpanelApi.extraEnv }}
