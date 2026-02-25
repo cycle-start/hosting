@@ -56,6 +56,18 @@ func ClusterApply(configPath string, timeout time.Duration) error {
 	}
 	fmt.Printf("Region %q: %s\n", cfg.Region.Name, regionID)
 
+	// 1b. Seed region runtimes
+	for _, rr := range cfg.RegionRuntimes {
+		fmt.Printf("Adding region runtime %s %s...\n", rr.Runtime, rr.Version)
+		_, err := client.Post(fmt.Sprintf("/regions/%s/runtimes", regionID), map[string]any{
+			"runtime": rr.Runtime,
+			"version": rr.Version,
+		})
+		if err != nil {
+			return fmt.Errorf("add region runtime %s %s: %w", rr.Runtime, rr.Version, err)
+		}
+	}
+
 	// 2. Find or create cluster
 	clusterID, created, err := findOrCreateCluster(client, regionID, cfg.Cluster)
 	if err != nil {

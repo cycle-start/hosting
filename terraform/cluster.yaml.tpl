@@ -5,6 +5,20 @@ api_key: hst_dev_e2e_test_key_00000000
 region:
   name: dev
 
+region_runtimes:
+  - runtime: php
+    version: "8.5"
+  - runtime: php
+    version: "8.3"
+  - runtime: node
+    version: "22"
+  - runtime: python
+    version: "3.12"
+  - runtime: ruby
+    version: "3.3"
+  - runtime: static
+    version: "1"
+
 cluster:
   name: vm-cluster-1
   lb_addresses:

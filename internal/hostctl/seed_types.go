@@ -1,16 +1,15 @@
 package hostctl
 
 type SeedConfig struct {
-	APIURL          string              `yaml:"api_url"`
-	APIKey          string              `yaml:"api_key"`
-	LBTrafficURL    string              `yaml:"lb_traffic_url"`
-	Region          string              `yaml:"region"`
-	Cluster         string              `yaml:"cluster"`
-	Brands          []BrandDef          `yaml:"brands"`
-	Zones           []ZoneDef           `yaml:"zones"`
-	Tenants         []TenantDef         `yaml:"tenants"`
-	OIDCClients     []OIDCClientDef     `yaml:"oidc_clients"`
-	RegionRuntimes  []RegionRuntimeDef  `yaml:"region_runtimes"`
+	APIURL       string          `yaml:"api_url"`
+	APIKey       string          `yaml:"api_key"`
+	LBTrafficURL string          `yaml:"lb_traffic_url"`
+	Region       string          `yaml:"region"`
+	Cluster      string          `yaml:"cluster"`
+	Brands       []BrandDef      `yaml:"brands"`
+	Zones        []ZoneDef       `yaml:"zones"`
+	Tenants      []TenantDef     `yaml:"tenants"`
+	OIDCClients  []OIDCClientDef `yaml:"oidc_clients"`
 }
 
 type RegionRuntimeDef struct {

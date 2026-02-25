@@ -4,6 +4,20 @@ api_url: http://10.10.10.2:8090/api/v1
 region:
   name: dev
 
+region_runtimes:
+  - runtime: php
+    version: "8.5"
+  - runtime: php
+    version: "8.3"
+  - runtime: node
+    version: "22"
+  - runtime: python
+    version: "3.12"
+  - runtime: ruby
+    version: "3.3"
+  - runtime: static
+    version: "1"
+
 cluster:
   name: vm-cluster-1
   lb_addresses:

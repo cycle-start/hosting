@@ -5,20 +5,6 @@ lb_traffic_url: https://10.10.10.70
 region: dev
 cluster: vm-cluster-1
 
-region_runtimes:
-  - runtime: php
-    version: "8.5"
-  - runtime: php
-    version: "8.3"
-  - runtime: node
-    version: "22"
-  - runtime: python
-    version: "3.12"
-  - runtime: ruby
-    version: "3.3"
-  - runtime: static
-    version: "1"
-
 brands:
   - id: "brand_acme_dev_000000000001"
     name: "Acme Hosting"
