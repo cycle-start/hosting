@@ -454,7 +454,7 @@ vm-deploy:
     docker build -t hosting-admin-ui:latest -f docker/admin-ui.Dockerfile .
     docker build -t hosting-mcp-server:latest -f docker/mcp-server.Dockerfile .
     docker build -t controlpanel-api:latest -f docker/controlpanel-api.Dockerfile ../controlpanel-api
-    docker build -t controlpanel-ui:latest -f docker/controlpanel-ui.Dockerfile --build-context controlpanel=../controlpanel .
+    docker build -t controlpanel-ui:latest ../controlpanel
     # Import into k3s containerd
     docker save hosting-core-api:latest hosting-worker:latest hosting-admin-ui:latest hosting-mcp-server:latest controlpanel-api:latest controlpanel-ui:latest | \
       ssh {{ssh_opts}} ubuntu@{{cp}} "sudo k3s ctr images import -"
