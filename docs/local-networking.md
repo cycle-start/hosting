@@ -39,7 +39,8 @@ libvirt network 10.10.10.0/24
   |-- dns-1-node-0  (10.10.10.30)  — PowerDNS + node-agent
   |-- valkey-1-node-0 (10.10.10.40) — Valkey + node-agent
   |-- storage-1-node-0 (10.10.10.50) — Ceph (S3/CephFS) + node-agent
-  '-- dbadmin-1-node-0 (10.10.10.60) — CloudBeaver + node-agent
+  |-- dbadmin-1-node-0 (10.10.10.60) — CloudBeaver + node-agent
+  '-- gateway-1-node-0 (10.10.10.90) — WireGuard VPN + node-agent
 ```
 
 Control plane and tenant traffic are split across two separate entry points:

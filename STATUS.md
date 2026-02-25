@@ -4,7 +4,7 @@
 
 **Build:** Go 1.26, compiles clean, `go vet` passes, all test packages pass.
 **Infrastructure:** k3s control plane (core-api, worker, admin-ui, MCP server, Temporal, PostgreSQL, Loki, Grafana, Prometheus, Alloy). Nodes run on VMs provisioned by Terraform/libvirt with Packer golden images.
-**Dev Environment:** 9 VMs (controlplane + 2 web + 1 db + 1 dns + 1 valkey + 1 storage + 1 dbadmin + 1 lb) on libvirt, accessible at `*.hosting.test`.
+**Dev Environment:** 10 VMs (controlplane + 2 web + 1 db + 1 dns + 1 valkey + 1 storage + 1 dbadmin + 1 lb + 1 gateway) on libvirt, accessible at `*.hosting.test`.
 **CLI:** `hostctl cluster apply` bootstraps infrastructure; `hostctl seed` populates tenant data; `hostctl converge-shard` triggers convergence. Auto-loads `.env` for API key.
 
 ---
@@ -31,7 +31,7 @@ Full CRUD REST API at `api.hosting.test/api/v1` with OpenAPI docs at `/docs`.
 | Regions | CRUD `/regions`, runtimes sub-resource | No | |
 | Clusters | CRUD `/regions/{id}/clusters` | No | |
 | Cluster LB Addrs | CRUD `/clusters/{id}/lb-addresses` | No | |
-| Shards | CRUD `/clusters/{id}/shards`, converge, retry | Yes | Roles: web, database, dns, email, valkey, s3 |
+| Shards | CRUD `/clusters/{id}/shards`, converge, retry | Yes | Roles: web, database, dns, email, valkey, s3, gateway |
 | Nodes | CRUD `/clusters/{id}/nodes` | No | UUID-based Temporal task queue routing |
 | Tenants | CRUD, suspend/unsuspend/migrate/retry `/tenants` | Yes | Resource summary, resource usage, login sessions, retry-failed |
 | Webroots | CRUD `/tenants/{id}/webroots`, retry | Yes | PHP/Node/Python/Ruby/Static runtimes; service hostnames |
@@ -46,6 +46,7 @@ Full CRUD REST API at `api.hosting.test/api/v1` with OpenAPI docs at `/docs`.
 | Database Users | CRUD `/databases/{id}/users`, retry | Yes | Privileges (all/read-only) |
 | Valkey Instances | CRUD `/tenants/{id}/valkey-instances`, migrate, retry | Yes | Managed Redis; eviction, max memory |
 | Valkey Users | CRUD `/valkey-instances/{id}/users`, retry | Yes | ACL-based access |
+| WireGuard Peers | CRUD `/tenants/{id}/wireguard-peers`, retry | Yes | VPN peers for DB/Valkey access |
 | S3 Buckets | CRUD `/tenants/{id}/s3-buckets`, retry | Yes | Ceph RGW; public/private, quotas |
 | S3 Access Keys | CRUD `/s3-buckets/{id}/access-keys`, retry | Yes | 20-char ID, 40-char secret; shown once |
 | Email Accounts | CRUD `/fqdns/{id}/email-accounts`, retry | Yes | Stalwart SMTP/IMAP/JMAP |
@@ -94,11 +95,12 @@ Full CRUD REST API at `api.hosting.test/api/v1` with OpenAPI docs at `/docs`.
 - SSH Key: add, remove (syncs authorized_keys across all shard nodes)
 - Egress Rule: sync (whitelist model — accept CIDRs + final reject; no rules = unrestricted)
 - Database Access Rule: sync (internal-only default; rules add external CIDRs on top)
+- WireGuard Peer: create (generate keypair + PSK, configure gateway), delete (remove from gateway)
 - Backup: create, restore, delete; cron cleanup of old backups
 
 **Infrastructure workflows:**
 - Daemon: create, update, delete, enable, disable
-- `ConvergeShardWorkflow`: role-aware (web/database/valkey/LB), cleans orphaned nginx configs before provisioning, collects errors without stopping
+- `ConvergeShardWorkflow`: role-aware (web/database/valkey/LB/gateway), cleans orphaned nginx configs before provisioning, collects errors without stopping
 - `TenantProvisionWorkflow`: long-running orchestrator, processes provision signals sequentially as child workflows, uses ContinueAsNew after 1000 iterations
 - `UpdateServiceHostnamesWorkflow`: auto-generates DNS records for tenant services
 - `CollectResourceUsageWorkflow`: cron (every 30 min), fans out to web/DB nodes, collects per-resource disk usage, upserts to `resource_usage` table
@@ -118,6 +120,7 @@ Runs on each VM node, connecting to Temporal via `node-{uuid}` task queue:
 - **ValkeyManager:** Instance lifecycle (config + systemd units, dual-stack bind), ACL user management, RDB dump/import
 - **S3Manager:** Ceph RGW bucket/user management via `radosgw-admin`, tenant-scoped naming (`{tenantID}--{bucketName}`)
 - **TenantULAManager:** Per-tenant ULA IPv6 addresses on web/DB/Valkey nodes, nftables UID binding (web), service ingress filtering (DB/Valkey), cross-shard routing
+- **WireGuardManager:** WireGuard interface management, per-peer configuration with nftables FORWARD rules, full convergence sync
 - **Runtime managers:** PHP-FPM (socket activation, configurable PM/php.ini via runtime_config), Node.js, Python (gunicorn), Ruby (puma), Static
 
 ### DNS (PowerDNS)
@@ -339,6 +342,18 @@ Names are `{prefix}{10-char-random}`, globally unique, auto-generated on creatio
 - `ConfigureRoutesV2` supports cross-shard peers — web nodes route to DB/Valkey and vice versa
 - Creation workflows (`CreateDatabaseWorkflow`, `CreateValkeyInstanceWorkflow`) configure ULA on shard nodes (non-fatal)
 - Convergence workflows set up ULA addresses and cross-shard routes for DB and Valkey shards
+
+### WireGuard VPN Gateway
+
+- Dedicated gateway shard role for WireGuard VPN access to tenant DB and Valkey ULA addresses
+- Server-generated client keypair + PSK; private key and full `.conf` returned once on creation, never stored
+- Client assigned address: `fd00:{hash}:ffff::{peer_index}/128` (shard index `0xFFFF` reserved for gateway)
+- Per-peer nftables FORWARD rules restrict each peer to only their tenant's ULA addresses (policy drop)
+- Gateway convergence: syncs all peers, computes allowed ULAs per peer from DB/Valkey shards, sets up transit routes
+- Gateway nodes have transit routes to all DB and Valkey shard ULA prefixes
+- Feature gated behind `wireguard` subscription module
+- Terraform + cloud-init + Ansible role for gateway VM provisioning (WireGuard packages, IPv6 forwarding, server keypair)
+- Transit offset 768-1023 for gateway role
 
 ---
 

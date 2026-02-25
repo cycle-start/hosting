@@ -189,6 +189,7 @@ Each node role gets a separate range of transit indices to avoid collisions:
 | Web | 0 | 0–255 |
 | Database | 256 | 256–511 |
 | Valkey | 512 | 512–767 |
+| Gateway | 768 | 768–1023 |
 
 Each node adds its transit address (`fd00:{hash}:0::{transit_index}/64`) to its primary interface, then adds routes to peer nodes' ULA prefixes (`fd00:{hash}:{peer_shard_index}::/48`) via their transit addresses.
 
@@ -217,7 +218,85 @@ ping6 fd00:{hash}:{db_idx}::{uid}
 mysql -h fd00:{hash}:{db_idx}::{uid} -P 3306 -u <user> -p
 ```
 
+## WireGuard VPN Gateway
+
+Tenants can create WireGuard VPN peers to access their DB and Valkey ULA addresses from external machines (developer laptops, CI servers, etc.).
+
+### Architecture
+
+```
+Developer laptop                 Gateway node (10.10.10.90)            DB/Valkey nodes
+┌──────────┐  WireGuard tunnel  ┌───────────────────────┐  ULA routes ┌─────────────┐
+│ wg0      ├───────────────────►│ wg0: fd00:…:ffff::0/64│────────────►│ tenant0:    │
+│ fd00:…   │                    │ nftables FORWARD per  │             │ fd00:…::uid │
+│ :ffff::N │                    │ peer → tenant ULAs    │             │             │
+└──────────┘                    └───────────────────────┘             └─────────────┘
+```
+
+- Client address: `fd00:{hash}:ffff::{peer_index}/128` (shard index `0xFFFF` reserved for gateway)
+- Gateway has transit routes to all DB and Valkey node ULA prefixes
+- Gateway's `tenant_service_ingress` allows `fd00::/16` traffic, so WireGuard client traffic is accepted at service nodes
+
+### API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/tenants/{id}/wireguard-peers` | List peers for a tenant |
+| POST | `/tenants/{id}/wireguard-peers` | Create a peer |
+| GET | `/wireguard-peers/{id}` | Get a peer |
+| DELETE | `/wireguard-peers/{id}` | Delete a peer |
+| POST | `/wireguard-peers/{id}/retry` | Retry a failed peer |
+
+### Request Body (Create)
+
+```json
+{
+  "name": "Edvins laptop",
+  "subscription_id": "sub_xxx"
+}
+```
+
+### Response (Create — 202 Accepted)
+
+```json
+{
+  "peer": { "id": "...", "name": "Edvins laptop", "assigned_ip": "fd00:…:ffff::1", ... },
+  "private_key": "...",
+  "client_config": "[Interface]\nPrivateKey = ...\nAddress = fd00:…:ffff::1/128\n\n[Peer]\nPublicKey = ...\n..."
+}
+```
+
+The `private_key` and `client_config` are returned **once** on creation and never stored. The user must save the `.conf` file.
+
+### Per-Peer Firewall
+
+Each peer gets nftables FORWARD rules allowing traffic only to their tenant's ULA addresses on DB and Valkey nodes. The `wg_forward` table defaults to `policy drop`:
+
+```
+table ip6 wg_forward {
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+        ip6 saddr fd00:…:ffff::1 ip6 daddr fd00:…:{db_idx}::5000 accept
+        ip6 saddr fd00:…:ffff::1 ip6 daddr fd00:…:{valkey_idx}::5000 accept
+    }
+}
+```
+
+### Convergence
+
+Gateway shard convergence:
+1. Ensures WireGuard interface on each gateway node
+2. Lists all peers for tenants in the cluster
+3. Computes per-peer allowed ULAs (all DB + Valkey ULAs for the peer's tenant)
+4. Syncs all peers to each gateway node
+5. Sets up transit routes to all DB and Valkey shard nodes
+
+### Feature Gate
+
+WireGuard peers require a subscription with the `wireguard` module.
+
 ## Authorization
 
 - Egress rules use `network:read/write/delete` scopes
 - Database access rules use `databases:read/write/delete` scopes (shared with database management)
+- WireGuard peers use `wireguard:read/write/delete` scopes
