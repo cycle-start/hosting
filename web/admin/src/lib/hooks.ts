@@ -184,6 +184,14 @@ export function useShards(clusterId: string, params?: ListParams) {
   })
 }
 
+export function useConvergeShard() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (shardId: string) => api.post(`/shards/${shardId}/converge`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shards'] }),
+  })
+}
+
 // Nodes
 export function useNodes(clusterId: string, params?: ListParams) {
   return useQuery({

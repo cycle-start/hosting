@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Plus, Trash2, Server } from 'lucide-react'
+import { Plus, Trash2, Server, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,9 +17,9 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { CopyButton } from '@/components/shared/copy-button'
-import { formatDate, truncateID } from '@/lib/utils'
-import { useRegions, useClusters, useCreateCluster, useDeleteCluster } from '@/lib/hooks'
-import type { Cluster } from '@/lib/types'
+import { cn, formatDate, truncateID } from '@/lib/utils'
+import { useRegions, useClusters, useCreateCluster, useDeleteCluster, useShards, useConvergeShard } from '@/lib/hooks'
+import type { Cluster, Shard } from '@/lib/types'
 
 export function ClustersPage() {
   const [selectedRegion, setSelectedRegion] = useState('')
@@ -102,6 +102,9 @@ export function ClustersPage() {
     }
   }
 
+  // Shards for the first (or selected) cluster
+  const selectedCluster = clusters.length > 0 ? clusters[0] : null
+
   return (
     <div className="space-y-6">
       <ResourceHeader
@@ -137,7 +140,10 @@ export function ClustersPage() {
           action={{ label: 'Create Cluster', onClick: () => { setFormRegion(selectedRegion); setCreateOpen(true) } }}
         />
       ) : (
-        <DataTable columns={columns} data={clusters} loading={isLoading} searchColumn="name" searchPlaceholder="Search clusters..." />
+        <>
+          <DataTable columns={columns} data={clusters} loading={isLoading} searchColumn="name" searchPlaceholder="Search clusters..." />
+          {selectedCluster && <ShardsSection clusterId={selectedCluster.id} />}
+        </>
       )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -183,6 +189,80 @@ export function ClustersPage() {
         onConfirm={handleDelete}
         loading={deleteMutation.isPending}
       />
+    </div>
+  )
+}
+
+function ShardsSection({ clusterId }: { clusterId: string }) {
+  const { data, isLoading } = useShards(clusterId, { limit: 100 })
+  const convergeMutation = useConvergeShard()
+  const [convergingId, setConvergingId] = useState<string | null>(null)
+
+  const shards = data?.items ?? []
+
+  const handleConverge = async (shard: Shard) => {
+    setConvergingId(shard.id)
+    try {
+      await convergeMutation.mutateAsync(shard.id)
+      toast.success(`Converging ${shard.name}`)
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Failed to trigger convergence')
+    } finally {
+      setConvergingId(null)
+    }
+  }
+
+  const columns: ColumnDef<Shard>[] = [
+    {
+      accessorKey: 'name',
+      header: 'Name',
+    },
+    {
+      accessorKey: 'role',
+      header: 'Role',
+      size: 120,
+      cell: ({ row }) => <code className="text-xs">{row.original.role}</code>,
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      size: 110,
+      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    },
+    {
+      accessorKey: 'updated_at',
+      header: 'Updated',
+      size: 180,
+      cell: ({ row }) => <span className="text-sm text-muted-foreground">{formatDate(row.original.updated_at)}</span>,
+    },
+    {
+      id: 'actions',
+      size: 120,
+      cell: ({ row }) => {
+        const isConverging = convergingId === row.original.id
+        return (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleConverge(row.original)}
+            disabled={isConverging}
+          >
+            <RefreshCw className={cn("mr-2 h-3 w-3", isConverging && "animate-spin")} />
+            {isConverging ? 'Converging...' : 'Converge'}
+          </Button>
+        )
+      },
+    },
+  ]
+
+  return (
+    <div className="space-y-3">
+      <h3 className="text-lg font-semibold">Shards</h3>
+      {!isLoading && shards.length === 0 ? (
+        <EmptyState icon={Server} title="No shards" description="This cluster has no shards." />
+      ) : (
+        <DataTable columns={columns} data={shards} loading={isLoading} searchColumn="name" searchPlaceholder="Search shards..." />
+      )}
     </div>
   )
 }
