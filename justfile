@@ -276,7 +276,8 @@ ansible-bootstrap: build-node-agent build-dbadmin-proxy
 
 # --- VM Infrastructure ---
 
-# Create VMs with Terraform and register them with the platform
+# Create VMs, provision with Ansible, deploy control plane, and bootstrap.
+# This is the full "bring everything up from scratch" command.
 # (Requires golden images — run `just packer-base` first)
 vm-up:
     @if sudo virsh net-info hosting 2>/dev/null | grep -q 'Active:.*no'; then \
@@ -284,15 +285,19 @@ vm-up:
         sudo virsh net-start hosting; \
     fi
     cd terraform && terraform apply -auto-approve
-    @sudo virsh list --all --name | xargs -I{} sudo virsh start {} 2>/dev/null; true
-    just _wait-api
-    go run ./cmd/hostctl cluster apply -f clusters/vm-generated.yaml -f seeds/runtimes.yaml
+    just _wait-ssh
+    just ansible-bootstrap
+    just _rerun-cloudinit
+    just _wait-k3s
+    just vm-kubeconfig
+    just vm-deploy
+    just bootstrap
 
 # Nuclear rebuild: base image, destroy/recreate VMs, provision, deploy, bootstrap
 vm-rebuild:
     just packer-base
     just vm-down
-    just dev-k3s
+    just vm-up
 
 # Wait for k3s API to be reachable on the control plane VM
 [private]
@@ -518,22 +523,6 @@ vm-pods:
 # Stream k3s pod logs (e.g. just vm-log hosting-core-api)
 vm-log name:
     kubectl --context hosting logs -f deployment/{{name}}
-
-# Full dev setup: create VMs, provision, deploy control plane, bootstrap
-# Assumes base image exists (run `just packer-base` first, or use `just vm-rebuild`)
-dev-k3s:
-    cd terraform && terraform apply -auto-approve
-    @if sudo virsh net-info hosting 2>/dev/null | grep -q 'Active:.*no'; then \
-        echo "Starting libvirt network 'hosting'..."; \
-        sudo virsh net-start hosting; \
-    fi
-    just _wait-ssh
-    just ansible-bootstrap
-    just _rerun-cloudinit
-    just _wait-k3s
-    just vm-kubeconfig
-    just vm-deploy
-    just bootstrap
 
 # --- SSL ---
 
