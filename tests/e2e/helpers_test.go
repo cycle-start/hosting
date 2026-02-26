@@ -557,10 +557,11 @@ func createTestTenant(t *testing.T, name string) (tenantID, regionID, clusterID,
 	}
 
 	createResp, createBody := httpPost(t, coreAPIURL+"/tenants", map[string]interface{}{
-		"brand_id":   brandID,
-		"region_id":  regionID,
-		"cluster_id": clusterID,
-		"shard_id":   webShardID,
+		"brand_id":    brandID,
+		"customer_id": "cust_e2e_" + name,
+		"region_id":   regionID,
+		"cluster_id":  clusterID,
+		"shard_id":    webShardID,
 	})
 	if createResp.StatusCode != 202 {
 		t.Fatalf("create tenant %q: status %d body=%s", name, createResp.StatusCode, createBody)
