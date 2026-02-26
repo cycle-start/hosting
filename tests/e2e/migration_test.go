@@ -47,7 +47,8 @@ func TestDatabaseMigration(t *testing.T) {
 		t.Skip("no database shard found")
 	}
 
-	dbID, _ := createTestDatabase(t, tenantID, dbShardID, "e2e_migratedb")
+	subID := createTestSubscription(t, tenantID, "e2e-migrate-db")
+	dbID := createTestDatabase(t, tenantID, dbShardID, subID)
 
 	// Find a second database shard.
 	resp, body := httpGet(t, fmt.Sprintf("%s/clusters/%s/shards", coreAPIURL, clusterID))
@@ -85,7 +86,8 @@ func TestValkeyMigration(t *testing.T) {
 		t.Skip("no valkey shard found")
 	}
 
-	instanceID := createTestValkeyInstance(t, tenantID, valkeyShardID, "e2e-migrate-cache")
+	subID := createTestSubscription(t, tenantID, "e2e-migrate-valkey")
+	instanceID := createTestValkeyInstance(t, tenantID, valkeyShardID, subID)
 
 	// Find a second valkey shard.
 	resp, body := httpGet(t, fmt.Sprintf("%s/clusters/%s/shards", coreAPIURL, clusterID))

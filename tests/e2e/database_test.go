@@ -16,10 +16,13 @@ func TestDatabaseCRUD(t *testing.T) {
 		t.Skip("no database shard found in cluster; skipping database tests")
 	}
 
+	// Step 0: Create a subscription (required for database creation).
+	subID := createTestSubscription(t, tenantID, "e2e-db-crud")
+
 	// Step 1: Create a database for the tenant.
 	resp, body := httpPost(t, fmt.Sprintf("%s/tenants/%s/databases", coreAPIURL, tenantID), map[string]interface{}{
-		"name":     "e2e_testdb",
-		"shard_id": dbShardID,
+		"shard_id":        dbShardID,
+		"subscription_id": subID,
 	})
 	require.Equal(t, 202, resp.StatusCode, "create database: %s", body)
 	db := parseJSON(t, body)
@@ -47,7 +50,7 @@ func TestDatabaseCRUD(t *testing.T) {
 
 	// Step 4: Create a database user.
 	resp, body = httpPost(t, fmt.Sprintf("%s/databases/%s/users", coreAPIURL, dbID), map[string]interface{}{
-		"username":   "e2e_user",
+		"username":   dbID + "_user",
 		"password":   "Str0ngP@ssw0rd!",
 		"privileges": []string{"ALL"},
 	})
@@ -118,10 +121,11 @@ func TestDatabaseUserCreateValidation(t *testing.T) {
 		t.Skip("no database shard found")
 	}
 
-	// Create a database first.
+	// Create a subscription and database first.
+	subID := createTestSubscription(t, tenantID, "e2e-db-valuser")
 	resp, body := httpPost(t, fmt.Sprintf("%s/tenants/%s/databases", coreAPIURL, tenantID), map[string]interface{}{
-		"name":     "e2e_valdb",
-		"shard_id": dbShardID,
+		"shard_id":        dbShardID,
+		"subscription_id": subID,
 	})
 	require.Equal(t, 202, resp.StatusCode, body)
 	db := parseJSON(t, body)
@@ -130,7 +134,7 @@ func TestDatabaseUserCreateValidation(t *testing.T) {
 
 	// Try to create a user with a short password.
 	resp, body = httpPost(t, fmt.Sprintf("%s/databases/%s/users", coreAPIURL, dbID), map[string]interface{}{
-		"username":   "baduser",
+		"username":   dbID + "_baduser",
 		"password":   "short",
 		"privileges": []string{"ALL"},
 	})

@@ -2,8 +2,10 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -11,16 +13,8 @@ import (
 func createWireGuardTestTenant(t *testing.T, name string) (tenantID, subID string) {
 	t.Helper()
 	tid, _, _, _, _ := createTestTenant(t, name)
-
-	// Create a subscription.
-	subIDValue := fmt.Sprintf("sub_e2e_%s", name)
-	resp, body := httpPost(t, fmt.Sprintf("%s/tenants/%s/subscriptions", coreAPIURL, tid), map[string]interface{}{
-		"id":   subIDValue,
-		"name": "Web Hosting",
-	})
-	require.Equal(t, 201, resp.StatusCode, "create subscription: %s", body)
-
-	return tid, subIDValue
+	subID = createTestSubscription(t, tid, name)
+	return tid, subID
 }
 
 func TestWireGuardPeerCRUD(t *testing.T) {
@@ -126,4 +120,91 @@ func TestWireGuardPeerMultiple(t *testing.T) {
 	require.Equal(t, 202, resp.StatusCode, "delete peer: %s", body)
 	waitForStatus(t, coreAPIURL+"/wireguard-peers/"+peerIDs[0], "deleted", provisionTimeout)
 	t.Logf("deleted peer %s", peerIDs[0])
+}
+
+// TestWireGuardPeerServiceMetadata verifies that creating a WireGuard peer
+// for a tenant with databases and Valkey instances includes service metadata
+// comments in the client_config (used by hosting-cli for auto-proxy).
+func TestWireGuardPeerServiceMetadata(t *testing.T) {
+	// Create tenant with full infrastructure: web shard + DB shard + Valkey shard.
+	tenantID, _, clusterID, _, dbShardID := createTestTenant(t, "e2e-wg-svcmeta")
+	if dbShardID == "" {
+		t.Skip("no database shard found in cluster; skipping service metadata test")
+	}
+	valkeyShardID := findValkeyShardID(t, clusterID)
+	if valkeyShardID == "" {
+		t.Skip("no valkey shard found in cluster; skipping service metadata test")
+	}
+
+	// Create a subscription (required for database, Valkey, and WireGuard).
+	subID := createTestSubscription(t, tenantID, "e2e-wg-svcmeta")
+
+	// Create a database and Valkey instance for the tenant.
+	dbID := createTestDatabase(t, tenantID, dbShardID, subID)
+	t.Logf("created database: %s", dbID)
+
+	valkeyID := createTestValkeyInstance(t, tenantID, valkeyShardID, subID)
+	t.Logf("created valkey instance: %s", valkeyID)
+
+	// Create WireGuard peer.
+	resp, body := httpPost(t, fmt.Sprintf("%s/tenants/%s/wireguard-peers", coreAPIURL, tenantID), map[string]interface{}{
+		"name":            "e2e-svcmeta-peer",
+		"subscription_id": subID,
+	})
+	require.Equal(t, 202, resp.StatusCode, "create wireguard peer: %s", body)
+	result := parseJSON(t, body)
+	peerObj := result["peer"].(map[string]interface{})
+	peerID := peerObj["id"].(string)
+	t.Cleanup(func() { httpDelete(t, coreAPIURL+"/wireguard-peers/"+peerID) })
+
+	clientConfig, _ := result["client_config"].(string)
+	require.NotEmpty(t, clientConfig, "client_config should be returned on create")
+	t.Logf("client_config:\n%s", clientConfig)
+
+	// Verify the client_config contains service metadata comments.
+	assert.Contains(t, clientConfig, "# hosting-cli:services", "client_config should contain service metadata header")
+
+	// Parse service lines from the config.
+	var mysqlAddr, valkeyAddr string
+	inServices := false
+	for _, line := range strings.Split(clientConfig, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "# hosting-cli:services" {
+			inServices = true
+			continue
+		}
+		if inServices && strings.HasPrefix(line, "# ") {
+			parts := strings.SplitN(strings.TrimPrefix(line, "# "), "=", 2)
+			if len(parts) == 2 {
+				switch strings.TrimSpace(parts[0]) {
+				case "mysql":
+					mysqlAddr = strings.TrimSpace(parts[1])
+				case "valkey":
+					valkeyAddr = strings.TrimSpace(parts[1])
+				}
+			}
+		}
+	}
+
+	// Both services should have ULA addresses.
+	assert.NotEmpty(t, mysqlAddr, "client_config should contain mysql service address")
+	assert.NotEmpty(t, valkeyAddr, "client_config should contain valkey service address")
+	t.Logf("service addresses: mysql=%s valkey=%s", mysqlAddr, valkeyAddr)
+
+	// Addresses should be ULA (fd00: prefix).
+	if mysqlAddr != "" {
+		assert.True(t, strings.HasPrefix(mysqlAddr, "fd00:"), "mysql address should be ULA: %s", mysqlAddr)
+	}
+	if valkeyAddr != "" {
+		assert.True(t, strings.HasPrefix(valkeyAddr, "fd00:"), "valkey address should be ULA: %s", valkeyAddr)
+	}
+
+	// MySQL and Valkey should have different addresses (different shard indices).
+	if mysqlAddr != "" && valkeyAddr != "" {
+		assert.NotEqual(t, mysqlAddr, valkeyAddr, "mysql and valkey should have different ULA addresses")
+	}
+
+	// Wait for peer to become active (validates the full workflow still works).
+	waitForStatus(t, coreAPIURL+"/wireguard-peers/"+peerID, "active", provisionTimeout)
+	t.Logf("WireGuard peer with service metadata active")
 }

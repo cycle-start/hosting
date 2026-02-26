@@ -35,12 +35,13 @@ func TestLaravelReverbQueue(t *testing.T) {
 	tenantName := tenant["name"].(string)
 	t.Logf("tenant: name=%s", tenantName)
 
-	// Create database + user.
-	dbID, dbName := createTestDatabase(t, tenantID, dbShardID, "e2e_reverb_db")
-	dbUsername := dbName + "_app"
+	// Create subscription + database + user.
+	subID := createTestSubscription(t, tenantID, "e2e-reverb")
+	dbID := createTestDatabase(t, tenantID, dbShardID, subID)
+	dbUsername := dbID + "_app"
 	dbPassword := "ReverbT3stPass99"
 	createDatabaseUser(t, dbID, dbUsername, dbPassword)
-	t.Logf("database %s (name=%s) active, user created", dbID, dbName)
+	t.Logf("database %s active, user created", dbID)
 
 	// Find DB node IP for MySQL host.
 	dbNodeIPs := findNodeIPsByRole(t, clusterID, "database")
@@ -111,7 +112,7 @@ func TestLaravelReverbQueue(t *testing.T) {
 		"DB_CONNECTION":        "mysql",
 		"DB_HOST":              dbHost,
 		"DB_PORT":              "3306",
-		"DB_DATABASE":          dbName,
+		"DB_DATABASE":          dbID,
 		"DB_USERNAME":          dbUsername,
 		"DB_PASSWORD":          dbPassword,
 		"BROADCAST_CONNECTION": "reverb",

@@ -661,29 +661,40 @@ func createTestZone(t *testing.T, tenantID, regionID, name string) string {
 	return zoneID
 }
 
+// createTestSubscription creates a subscription for a tenant and returns its ID.
+func createTestSubscription(t *testing.T, tenantID, name string) string {
+	t.Helper()
+	subID := fmt.Sprintf("sub_e2e_%s_%d", name, time.Now().UnixNano())
+	resp, body := httpPost(t, fmt.Sprintf("%s/tenants/%s/subscriptions", coreAPIURL, tenantID), map[string]interface{}{
+		"id":   subID,
+		"name": "Web Hosting",
+	})
+	require.Equal(t, 201, resp.StatusCode, "create subscription: %s", body)
+	return subID
+}
+
 // createTestDatabase creates a database and waits for it to become active.
-func createTestDatabase(t *testing.T, tenantID, shardID, name string) (string, string) {
+func createTestDatabase(t *testing.T, tenantID, shardID, subscriptionID string) string {
 	t.Helper()
 	resp, body := httpPost(t, fmt.Sprintf("%s/tenants/%s/databases", coreAPIURL, tenantID), map[string]interface{}{
-		"name":     name,
-		"shard_id": shardID,
+		"shard_id":        shardID,
+		"subscription_id": subscriptionID,
 	})
 	require.Equal(t, 202, resp.StatusCode, "create database: %s", body)
 	db := parseJSON(t, body)
 	dbID := db["id"].(string)
-	dbName := db["name"].(string)
 	t.Cleanup(func() { httpDelete(t, coreAPIURL+"/databases/"+dbID) })
 	waitForStatus(t, coreAPIURL+"/databases/"+dbID, "active", provisionTimeout)
-	return dbID, dbName
+	return dbID
 }
 
 // createTestValkeyInstance creates a Valkey instance and waits for it to become active.
-func createTestValkeyInstance(t *testing.T, tenantID, shardID, name string) string {
+func createTestValkeyInstance(t *testing.T, tenantID, shardID, subscriptionID string) string {
 	t.Helper()
 	resp, body := httpPost(t, fmt.Sprintf("%s/tenants/%s/valkey-instances", coreAPIURL, tenantID), map[string]interface{}{
-		"name":          name,
-		"shard_id":      shardID,
-		"max_memory_mb": 64,
+		"shard_id":        shardID,
+		"max_memory_mb":   64,
+		"subscription_id": subscriptionID,
 	})
 	require.Equal(t, 202, resp.StatusCode, "create valkey instance: %s", body)
 	inst := parseJSON(t, body)

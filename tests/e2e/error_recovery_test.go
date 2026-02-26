@@ -26,7 +26,8 @@ func TestDatabaseRetry(t *testing.T) {
 		t.Skip("no database shard found")
 	}
 
-	dbID, _ := createTestDatabase(t, tenantID, dbShardID, "e2e_retrydb")
+	subID := createTestSubscription(t, tenantID, "e2e-db-retry")
+	dbID := createTestDatabase(t, tenantID, dbShardID, subID)
 
 	resp, body := httpPost(t, coreAPIURL+"/databases/"+dbID+"/retry", nil)
 	require.True(t, resp.StatusCode == 202 || resp.StatusCode == 200,
@@ -129,7 +130,8 @@ func TestValkeyRetry(t *testing.T) {
 		t.Skip("no valkey shard found")
 	}
 
-	instanceID := createTestValkeyInstance(t, tenantID, valkeyShardID, "e2e-retry-cache")
+	subID := createTestSubscription(t, tenantID, "e2e-valkey-retry")
+	instanceID := createTestValkeyInstance(t, tenantID, valkeyShardID, subID)
 
 	resp, body := httpPost(t, coreAPIURL+"/valkey-instances/"+instanceID+"/retry", nil)
 	require.True(t, resp.StatusCode == 202 || resp.StatusCode == 200,

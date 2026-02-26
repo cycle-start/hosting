@@ -14,11 +14,14 @@ func TestValkeyInstanceCRUD(t *testing.T) {
 		t.Skip("no valkey shard found in cluster; skipping valkey tests")
 	}
 
+	// Create a subscription (required for Valkey instance creation).
+	subID := createTestSubscription(t, tenantID, "e2e-valkey-crud")
+
 	// Create a Valkey instance.
 	resp, body := httpPost(t, fmt.Sprintf("%s/tenants/%s/valkey-instances", coreAPIURL, tenantID), map[string]interface{}{
-		"name":          "e2e-cache",
-		"shard_id":      valkeyShardID,
-		"max_memory_mb": 64,
+		"shard_id":        valkeyShardID,
+		"max_memory_mb":   64,
+		"subscription_id": subID,
 	})
 	require.Equal(t, 202, resp.StatusCode, "create valkey instance: %s", body)
 	inst := parseJSON(t, body)
@@ -51,7 +54,7 @@ func TestValkeyInstanceCRUD(t *testing.T) {
 
 	// Create a Valkey user.
 	resp, body = httpPost(t, fmt.Sprintf("%s/valkey-instances/%s/users", coreAPIURL, instID), map[string]interface{}{
-		"username":    "e2e-app",
+		"username":    instID + "_app",
 		"password":    "TestP@ssw0rd!123",
 		"privileges":  []string{"+@all"},
 		"key_pattern": "~*",
