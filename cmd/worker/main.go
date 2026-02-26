@@ -192,6 +192,8 @@ func main() {
 	w.RegisterWorkflow(workflow.CheckCertExpiryWorkflow)
 	w.RegisterWorkflow(workflow.CheckCephFSHealthWorkflow)
 	w.RegisterWorkflow(workflow.CollectResourceUsageWorkflow)
+	w.RegisterWorkflow(workflow.CreateWireGuardPeerWorkflow)
+	w.RegisterWorkflow(workflow.DeleteWireGuardPeerWorkflow)
 
 	if cfg.MetricsAddr != "" {
 		metricsSrv := metrics.NewServer(cfg.MetricsAddr)

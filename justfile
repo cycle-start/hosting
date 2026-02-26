@@ -355,7 +355,7 @@ _wait-api:
 _wait-ssh:
     #!/usr/bin/env bash
     echo "Waiting for SSH on all VMs..."
-    ALL_IPS="10.10.10.2 10.10.10.10 10.10.10.11 10.10.10.20 10.10.10.30 10.10.10.40 10.10.10.50 10.10.10.60 10.10.10.70 10.10.10.80"
+    ALL_IPS="10.10.10.2 10.10.10.10 10.10.10.11 10.10.10.20 10.10.10.30 10.10.10.40 10.10.10.50 10.10.10.60 10.10.10.70 10.10.10.80 10.10.10.90"
     for ip in $ALL_IPS; do
         printf "  %s: " "$ip"
         for i in $(seq 1 60); do
@@ -378,7 +378,7 @@ _wait-ssh:
 _rerun-cloudinit:
     #!/usr/bin/env bash
     echo "Re-running cloud-init on all VMs (clean + reboot)..."
-    ALL_IPS="10.10.10.2 10.10.10.10 10.10.10.11 10.10.10.20 10.10.10.30 10.10.10.40 10.10.10.50 10.10.10.60 10.10.10.70 10.10.10.80"
+    ALL_IPS="10.10.10.2 10.10.10.10 10.10.10.11 10.10.10.20 10.10.10.30 10.10.10.40 10.10.10.50 10.10.10.60 10.10.10.70 10.10.10.80 10.10.10.90"
     for ip in $ALL_IPS; do
         echo "  Rebooting $ip..."
         ssh {{ssh_opts}} ubuntu@$ip "sudo cloud-init clean --logs && sudo reboot" 2>/dev/null || true

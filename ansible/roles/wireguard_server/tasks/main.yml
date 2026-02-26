@@ -27,9 +27,3 @@
     wg pubkey < /etc/wireguard/server.key > /etc/wireguard/server.pub
   args:
     creates: /etc/wireguard/server.key
-
-- name: Enable and start node-agent
-  systemd:
-    name: node-agent
-    enabled: true
-    state: started
