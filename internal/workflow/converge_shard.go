@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -887,6 +888,27 @@ func convergeValkeyShard(ctx workflow.Context, shardID string, nodes []model.Nod
 func convergeGatewayShard(ctx workflow.Context, shard model.Shard, nodes []model.Node) []string {
 	var errs []string
 	clusterID := shard.ClusterID
+
+	// Retrieve the WireGuard public key from the first gateway node and store it in shard config.
+	if len(nodes) > 0 {
+		gwNodeCtx := nodeActivityCtx(ctx, nodes[0].ID)
+		var pubKey string
+		if err := workflow.ExecuteActivity(gwNodeCtx, "GetWireGuardPublicKey").Get(ctx, &pubKey); err != nil {
+			errs = append(errs, fmt.Sprintf("get wireguard public key from %s: %v", nodes[0].ID, err))
+		} else if pubKey != "" {
+			cfg := model.GatewayShardConfig{
+				ListenPort: 51820,
+				PublicKey:  pubKey,
+			}
+			cfgJSON, _ := json.Marshal(cfg)
+			if err := workflow.ExecuteActivity(ctx, "UpdateShardConfig", activity.UpdateShardConfigParams{
+				ShardID: shard.ID,
+				Config:  cfgJSON,
+			}).Get(ctx, nil); err != nil {
+				errs = append(errs, fmt.Sprintf("update gateway shard config: %v", err))
+			}
+		}
+	}
 
 	// List all WireGuard peers for tenants in this cluster.
 	var peers []model.WireGuardPeer

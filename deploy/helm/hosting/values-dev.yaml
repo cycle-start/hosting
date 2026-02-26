@@ -58,6 +58,7 @@ config:
   registryUrl: "localhost:5000"
   regionId: "dev"
   clusterId: "vm-cluster-1"
+  wireguardEndpoint: "10.10.10.90:51820"
 
 # Secrets are loaded from .env via --set flags in `just vm-deploy`
 secrets: {}

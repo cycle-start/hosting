@@ -24,3 +24,4 @@ data:
   LLM_BASE_URL: {{ .Values.config.llmBaseUrl | quote }}
   LLM_MODEL: {{ .Values.config.llmModel | quote }}
   LLM_MAX_TURNS: {{ .Values.config.llmMaxTurns | quote }}
+  WIREGUARD_ENDPOINT: {{ .Values.config.wireguardEndpoint | quote }}

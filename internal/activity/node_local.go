@@ -1326,6 +1326,14 @@ func (a *NodeLocal) RemoveWireGuardPeer(ctx context.Context, params RemoveWireGu
 	return a.wireguard.RemovePeer(ctx, params.PublicKey, params.AssignedIP)
 }
 
+// GetWireGuardPublicKey returns the WireGuard server public key from the gateway node.
+func (a *NodeLocal) GetWireGuardPublicKey(ctx context.Context) (string, error) {
+	if a.wireguard == nil {
+		return "", nil
+	}
+	return a.wireguard.GetPublicKey(ctx)
+}
+
 // SyncWireGuardPeers performs full convergence of all WireGuard peers on a gateway node.
 func (a *NodeLocal) SyncWireGuardPeers(ctx context.Context, params SyncWireGuardPeersParams) error {
 	if a.wireguard == nil {

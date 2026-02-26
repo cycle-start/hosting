@@ -92,6 +92,7 @@ config:
   llmBaseUrl: ""
   llmModel: "Qwen/Qwen2.5-72B-Instruct"
   llmMaxTurns: "10"
+  wireguardEndpoint: ""
 
 # Secrets — either inline or reference an existing K8s Secret
 secrets:

@@ -14,6 +14,7 @@ const (
 	wgInterface  = "wg0"
 	wgListenPort = 51820
 	wgKeyFile    = "/etc/wireguard/server.key"
+	wgPubKeyFile = "/etc/wireguard/server.pub"
 )
 
 // WireGuardManager manages WireGuard interface and peer configuration on gateway nodes.
@@ -26,6 +27,15 @@ func NewWireGuardManager(logger zerolog.Logger) *WireGuardManager {
 	return &WireGuardManager{
 		logger: logger.With().Str("component", "wireguard").Logger(),
 	}
+}
+
+// GetPublicKey reads the WireGuard server public key from disk.
+func (m *WireGuardManager) GetPublicKey(ctx context.Context) (string, error) {
+	data, err := os.ReadFile(wgPubKeyFile)
+	if err != nil {
+		return "", fmt.Errorf("read wireguard public key: %w", err)
+	}
+	return strings.TrimSpace(string(data)), nil
 }
 
 // ensureInterface creates the wg0 interface if not present and configures it,
