@@ -169,7 +169,7 @@ wait-api:
 bootstrap-controlpanel:
     just create-controlpanel-db
     goose -dir ../controlpanel-api/migrations postgres "postgres://controlpanel:controlpanel@{{cp}}:5432/controlpanel?sslmode=disable" up
-    DATABASE_URL="postgres://controlpanel:controlpanel@{{cp}}:5432/controlpanel?sslmode=disable" HOSTING_API_URL="http://{{cp}}:8090" HOSTING_API_KEY="$HOSTING_API_KEY" go run ../controlpanel-api/seeds/dev.go
+    DATABASE_URL="postgres://controlpanel:controlpanel@{{cp}}:5432/controlpanel?sslmode=disable" HOSTING_API_URL="http://{{cp}}:8090/api/v1" HOSTING_API_KEY="$HOSTING_API_KEY" go run ../controlpanel-api/seeds/dev.go
 
 # Full bootstrap: wipe DBs, migrate, create keys, register cluster, seed tenants
 bootstrap: wait-db reset-db migrate docs create-dev-key create-agent-key wait-api cluster-apply seed bootstrap-controlpanel

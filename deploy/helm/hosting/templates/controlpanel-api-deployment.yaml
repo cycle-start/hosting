@@ -63,9 +63,9 @@ spec:
               value: ":{{ .Values.controlpanelApi.port }}"
             - name: HOSTING_API_URL
               {{- if .Values.controlpanelApi.hostNetwork }}
-              value: "http://127.0.0.1:{{ .Values.coreApi.port }}"
+              value: "http://127.0.0.1:{{ .Values.coreApi.port }}/api/v1"
               {{- else }}
-              value: "http://{{ include "hosting.fullname" . }}-core-api:{{ .Values.coreApi.port }}"
+              value: "http://{{ include "hosting.fullname" . }}-core-api:{{ .Values.coreApi.port }}/api/v1"
               {{- end }}
             - name: HOSTING_API_KEY
               value: {{ .Values.controlpanelApi.hostingApiKey | default "hst_dev" | quote }}
