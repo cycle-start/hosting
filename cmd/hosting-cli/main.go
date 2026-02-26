@@ -41,13 +41,13 @@ func main() {
 
 func cmdImport(args []string) {
 	fs := flag.NewFlagSet("import", flag.ExitOnError)
-	name := fs.String("name", "", "Profile name (default: derived from filename)")
-	tenantID := fs.String("tenant", "", "Tenant ID to associate with this profile")
+	tenantID := fs.String("tenant", "", "Tenant ID (also used as profile name unless -name is given)")
+	name := fs.String("name", "", "Override profile name (default: tenant ID, or filename)")
 	setActive := fs.Bool("set-active", true, "Set this profile as active after import")
 	fs.Parse(args)
 
 	if fs.NArg() < 1 {
-		fmt.Fprintln(os.Stderr, "Usage: hosting-cli import [-name NAME] [-tenant TENANT_ID] <config-file>")
+		fmt.Fprintln(os.Stderr, "Usage: hosting-cli import [-tenant TENANT_ID] [-name NAME] <config-file>")
 		os.Exit(1)
 	}
 
@@ -318,25 +318,24 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, `hosting-cli — WireGuard tunnel client for hosting platform
 
 Usage:
-  hosting-cli import [-name NAME] [-tenant ID] <config-file>
+  hosting-cli import [-tenant ID] <config-file>
   hosting-cli profiles [delete <name>]
-  hosting-cli use <profile-name>
+  hosting-cli use <tenant-id>
   hosting-cli active
-  hosting-cli tunnel [profile-name]
+  hosting-cli tunnel [tenant-id]
   hosting-cli proxy [-mysql-port 3306] [-valkey-port 6379]
   hosting-cli proxy -target [addr]:port -port <local-port>
   hosting-cli status
 
 Commands:
-  import     Import a WireGuard config file as a profile
+  import     Import a WireGuard config file (profile named after tenant ID)
   profiles   List saved profiles (or delete one)
-  use        Set the active profile (context switch)
-  active     Show details of the active profile
+  use        Set the active tenant
+  active     Show details of the active tenant profile
   tunnel     Establish a WireGuard tunnel
   proxy      Establish tunnel and proxy services to localhost
   status     Show profile and service info
 
-Profiles are stored in ~/.config/hosting/profiles/. Each profile
-can be associated with a tenant ID for multi-tenant management.
-Use "hosting-cli use <name>" to switch between tenants.`)
+Profiles are stored in ~/.config/hosting/profiles/, keyed by tenant ID.
+Use "hosting-cli use <tenant-id>" to switch between tenants.`)
 }

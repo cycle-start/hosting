@@ -14,31 +14,32 @@ go install github.com/edvin/hosting/cmd/hosting-cli@latest
 
 1. **Create a WireGuard peer** in the control panel (requires a subscription with the `wireguard` module)
 2. **Download the `.conf` file** when prompted (the private key is shown only once)
-3. **Import the config** (name defaults to filename, or use `-name`):
+3. **Import the config:**
    ```bash
-   hosting-cli import acme-corp.conf -tenant t_abc1234567
+   hosting-cli import my-laptop.conf -tenant t_a8k2mxp4q7
    ```
+   This saves the profile as `t_a8k2mxp4q7` (the tenant ID is used as the profile name by default).
 4. **Start proxying:**
    ```bash
    hosting-cli proxy
    ```
 5. **Connect to your database:**
    ```bash
-   mysql -h 127.0.0.1 -P 3306 -u db_abc1234567_admin -p
+   mysql -h 127.0.0.1 -P 3306 -u db_xr9f3k1m7n_admin -p
    ```
 
 ## Commands
 
 ### `import`
 
-Import a WireGuard config file as a named profile.
+Import a WireGuard config file as a profile.
 
 ```bash
-hosting-cli import <config-file> [-name NAME] [-tenant TENANT_ID] [-set-active=true]
+hosting-cli import <config-file> [-tenant TENANT_ID] [-name NAME] [-set-active=true]
 ```
 
-- `-name` — Profile name (default: derived from filename)
-- `-tenant` — Associate profile with a tenant ID for multi-tenant management
+- `-tenant` — Tenant ID; also used as the profile name unless `-name` is given
+- `-name` — Override the profile name (default: tenant ID, or filename if no tenant)
 - `-set-active` — Set as active profile after import (default: true)
 
 The config file is copied to `~/.config/hosting/profiles/` along with metadata JSON.
@@ -54,8 +55,8 @@ hosting-cli profiles
 Output:
 ```
 NAME                 TENANT                         ACTIVE
-acme-corp            t_abc1234567                    *
-globex               t_def7654321
+t_a8k2mxp4q7        t_a8k2mxp4q7                    *
+t_n3jf7w2x9p        t_n3jf7w2x9p
 ```
 
 Delete a profile:
@@ -68,7 +69,7 @@ hosting-cli profiles delete <name>
 Switch the active profile (context switch between tenants).
 
 ```bash
-hosting-cli use <profile-name>
+hosting-cli use t_n3jf7w2x9p
 ```
 
 All commands that need a profile (tunnel, proxy, etc.) default to the active profile.
@@ -83,10 +84,10 @@ hosting-cli active
 
 Output:
 ```
-Active profile: acme-corp
-Tenant:         t_abc1234567
+Active profile: t_a8k2mxp4q7
+Tenant:         t_a8k2mxp4q7
 Address:        fd00:abcd:ffff::1/128
-Endpoint:       gw.example.com:51820
+Endpoint:       gw.massive-hosting.com:51820
 Services:
   mysql → fd00:abcd:101::1388 (port 3306)
   valkey → fd00:abcd:201::1388 (port 6379)
@@ -117,7 +118,7 @@ hosting-cli proxy -target [fd00::1]:3306 -port 3307
 
 With service metadata in the config, `proxy` automatically sets up forwarding:
 ```
-Establishing tunnel with profile "acme-corp"...
+Establishing tunnel with profile "t_a8k2mxp4q7"...
 Proxying services:
   mysql → localhost:3306
   valkey → localhost:6379
@@ -135,33 +136,33 @@ hosting-cli status
 
 ## Multi-Tenant Profiles
 
-Each profile is stored with a tenant ID, enabling easy switching between tenants:
+Each profile maps to a tenant. The profile name defaults to the tenant ID, so switching tenants is straightforward:
 
 ```bash
 # Import configs for different tenants
-hosting-cli import acme-corp.conf -tenant t_abc1234567
-hosting-cli import globex.conf -tenant t_def7654321
+hosting-cli import laptop.conf -tenant t_a8k2mxp4q7
+hosting-cli import laptop.conf -tenant t_n3jf7w2x9p
 
 # Switch between tenants
-hosting-cli use acme-corp
-hosting-cli proxy  # connects to Acme Corp's DB
+hosting-cli use t_a8k2mxp4q7
+hosting-cli proxy  # proxies t_a8k2mxp4q7's MySQL and Valkey
 
-hosting-cli use globex
-hosting-cli proxy  # connects to Globex's DB
+hosting-cli use t_n3jf7w2x9p
+hosting-cli proxy  # proxies t_n3jf7w2x9p's MySQL and Valkey
 
-# One-off connection to a different tenant without switching
-hosting-cli proxy -profile acme-corp
+# One-off connection without switching the active tenant
+hosting-cli proxy -profile t_a8k2mxp4q7
 ```
 
 Profiles are stored in `~/.config/hosting/profiles/`:
 ```
 ~/.config/hosting/
-  state.json                    # active profile
+  state.json                       # active profile
   profiles/
-    acme-corp.conf              # WireGuard config
-    acme-corp.json              # metadata (name, tenant_id)
-    globex.conf
-    globex.json
+    t_a8k2mxp4q7.conf             # WireGuard config
+    t_a8k2mxp4q7.json             # metadata (name, tenant_id)
+    t_n3jf7w2x9p.conf
+    t_n3jf7w2x9p.json
 ```
 
 ## Service Discovery

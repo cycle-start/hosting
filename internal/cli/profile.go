@@ -71,10 +71,14 @@ func Import(configPath, name, tenantID string) (*Profile, error) {
 	}
 	_ = cfg // validated
 
-	// Derive name from filename if not provided.
+	// Derive name: prefer tenant ID, then filename.
 	if name == "" {
-		base := filepath.Base(configPath)
-		name = strings.TrimSuffix(base, filepath.Ext(base))
+		if tenantID != "" {
+			name = tenantID
+		} else {
+			base := filepath.Base(configPath)
+			name = strings.TrimSuffix(base, filepath.Ext(base))
+		}
 	}
 
 	// Sanitize name.
