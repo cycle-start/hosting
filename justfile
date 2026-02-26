@@ -459,7 +459,7 @@ vm-deploy:
     docker save hosting-core-api:latest hosting-worker:latest hosting-admin-ui:latest hosting-mcp-server:latest controlpanel-api:latest controlpanel-ui:latest | \
       ssh {{ssh_opts}} ubuntu@{{cp}} "sudo k3s ctr images import -"
     # Apply infra manifests (Traefik config, Grafana, etc.) with domain substitution
-    for f in deploy/k3s/*.yaml; do envsubst < "$f" | kubectl --context hosting apply -f -; done
+    for f in deploy/k3s/*.yaml; do envsubst '$BASE_DOMAIN' < "$f" | kubectl --context hosting apply -f -; done
     # Deploy SSL certs (mkcert if available, otherwise self-signed)
     just _ssl-deploy
     # Create Grafana dashboards ConfigMap
@@ -638,6 +638,6 @@ build-laravel-fixture:
 seed: build-laravel-fixture
     #!/usr/bin/env bash
     set -euo pipefail
-    envsubst < seeds/dev-tenants.yaml > /tmp/dev-tenants-resolved.yaml
+    envsubst '$BASE_DOMAIN' < seeds/dev-tenants.yaml > /tmp/dev-tenants-resolved.yaml
     go run ./cmd/hostctl seed -f /tmp/dev-tenants-resolved.yaml -timeout 5m
     rm -f /tmp/dev-tenants-resolved.yaml
