@@ -66,7 +66,6 @@ type CreateDatabaseNested struct {
 	SubscriptionID string                           `json:"subscription_id" validate:"required"`
 	ShardID        string                           `json:"shard_id" validate:"required"`
 	Users          []CreateDatabaseUserNested       `json:"users" validate:"omitempty,dive"`
-	AccessRules    []CreateDatabaseAccessRuleNested `json:"access_rules" validate:"omitempty,dive"`
 }
 
 type CreateDatabaseUserNested struct {
@@ -103,11 +102,6 @@ type CreateSSHKeyNested struct {
 }
 
 type CreateEgressRuleNested struct {
-	CIDR        string `json:"cidr" validate:"required"`
-	Description string `json:"description"`
-}
-
-type CreateDatabaseAccessRuleNested struct {
 	CIDR        string `json:"cidr" validate:"required"`
 	Description string `json:"description"`
 }

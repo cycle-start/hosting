@@ -44,7 +44,6 @@ type Services struct {
 	S3AccessKey        *S3AccessKeyService
 	SSHKey             *SSHKeyService
 	TenantEgressRule   *TenantEgressRuleService
-	DatabaseAccessRule *DatabaseAccessRuleService
 	Backup             *BackupService
 	CronJob            *CronJobService
 	Daemon             *DaemonService
@@ -98,7 +97,6 @@ func newServicesFromDB(db DB, tc temporalclient.Client, oidcIssuerURL string, se
 		S3AccessKey:        NewS3AccessKeyService(db, tc),
 		SSHKey:             NewSSHKeyService(db, tc),
 		TenantEgressRule:   NewTenantEgressRuleService(db, tc),
-		DatabaseAccessRule: NewDatabaseAccessRuleService(db, tc),
 		Backup:             NewBackupService(db, tc),
 		CronJob:            NewCronJobService(db, tc),
 		Daemon:             NewDaemonService(db, tc),

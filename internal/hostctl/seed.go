@@ -345,16 +345,6 @@ func Seed(configPath string, timeout time.Duration) error {
 					"subscription_id": resolveSubID(d.Subscription),
 					"shard_id":        dbShardID,
 				}
-				if len(d.AccessRules) > 0 {
-					var rules []map[string]any
-					for _, r := range d.AccessRules {
-						rules = append(rules, map[string]any{
-							"cidr":        r.CIDR,
-							"description": r.Description,
-						})
-					}
-					dbEntry["access_rules"] = rules
-				}
 				dbs = append(dbs, dbEntry)
 			}
 			tenantBody["databases"] = dbs

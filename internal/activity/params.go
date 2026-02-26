@@ -394,14 +394,6 @@ type ULARoutePeerParam struct {
 	TransitIndex int
 }
 
-// SyncDatabaseUserHostsParams holds parameters for rebuilding MySQL user host patterns.
-type SyncDatabaseUserHostsParams struct {
-	DatabaseName    string
-	Users           []model.DatabaseUser
-	AccessRules     []model.DatabaseAccessRule
-	InternalNetworkCIDR string
-}
-
 // ConfigureWireGuardPeerParams holds parameters for adding a WireGuard peer on a gateway node.
 type ConfigureWireGuardPeerParams struct {
 	PublicKey    string

@@ -118,12 +118,6 @@ func resolveTenantIDFromDatabaseUser(ctx context.Context, db DB, userID string) 
 	return id, err
 }
 
-func resolveTenantIDFromDatabaseAccessRule(ctx context.Context, db DB, ruleID string) (string, error) {
-	var id string
-	err := db.QueryRow(ctx, "SELECT d.tenant_id FROM databases d JOIN database_access_rules dar ON dar.database_id = d.id WHERE dar.id = $1", ruleID).Scan(&id)
-	return id, err
-}
-
 func resolveTenantIDFromValkeyInstance(ctx context.Context, db DB, instanceID string) (string, error) {
 	var id string
 	err := db.QueryRow(ctx, "SELECT tenant_id FROM valkey_instances WHERE id = $1", instanceID).Scan(&id)

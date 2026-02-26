@@ -1085,41 +1085,6 @@ func (a *CoreDB) FinalizeTenantEgressRules(ctx context.Context, tenantID string)
 	return nil
 }
 
-// SetDatabaseAccessRulesProvisioning sets all pending/deleting rules for a database to provisioning.
-func (a *CoreDB) SetDatabaseAccessRulesProvisioning(ctx context.Context, databaseID string) error {
-	_, err := a.db.Exec(ctx,
-		`UPDATE database_access_rules SET status = 'provisioning', updated_at = now()
-		 WHERE database_id = $1 AND status IN ('pending', 'deleting', 'failed')`, databaseID)
-	if err != nil {
-		return fmt.Errorf("set database access rules provisioning: %w", err)
-	}
-	return nil
-}
-
-// GetActiveDatabaseAccessRules returns all active + provisioning access rules for a database.
-func (a *CoreDB) GetActiveDatabaseAccessRules(ctx context.Context, databaseID string) ([]model.DatabaseAccessRule, error) {
-	rows, err := a.db.Query(ctx,
-		`SELECT id, database_id, cidr, description, status, status_message, created_at, updated_at
-		 FROM database_access_rules
-		 WHERE database_id = $1 AND status NOT IN ('deleting', 'deleted')
-		 ORDER BY id`, databaseID)
-	if err != nil {
-		return nil, fmt.Errorf("get active database access rules: %w", err)
-	}
-	defer rows.Close()
-
-	var rules []model.DatabaseAccessRule
-	for rows.Next() {
-		var r model.DatabaseAccessRule
-		if err := rows.Scan(&r.ID, &r.DatabaseID, &r.CIDR, &r.Description,
-			&r.Status, &r.StatusMessage, &r.CreatedAt, &r.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan database access rule: %w", err)
-		}
-		rules = append(rules, r)
-	}
-	return rules, rows.Err()
-}
-
 // GetActiveDatabaseUsers returns all active database users for a database.
 func (a *CoreDB) GetActiveDatabaseUsers(ctx context.Context, databaseID string) ([]model.DatabaseUser, error) {
 	rows, err := a.db.Query(ctx,
@@ -1142,22 +1107,6 @@ func (a *CoreDB) GetActiveDatabaseUsers(ctx context.Context, databaseID string) 
 		users = append(users, u)
 	}
 	return users, rows.Err()
-}
-
-// FinalizeDatabaseAccessRules sets provisioning rules to active and hard-deletes deleting rules.
-func (a *CoreDB) FinalizeDatabaseAccessRules(ctx context.Context, databaseID string) error {
-	_, err := a.db.Exec(ctx,
-		`UPDATE database_access_rules SET status = 'active', updated_at = now()
-		 WHERE database_id = $1 AND status = 'provisioning'`, databaseID)
-	if err != nil {
-		return fmt.Errorf("finalize database access rules (active): %w", err)
-	}
-	_, err = a.db.Exec(ctx,
-		`DELETE FROM database_access_rules WHERE database_id = $1 AND status = 'deleting'`, databaseID)
-	if err != nil {
-		return fmt.Errorf("finalize database access rules (delete): %w", err)
-	}
-	return nil
 }
 
 // ListSSHKeysByTenantID retrieves all SSH keys for a tenant.
@@ -1220,28 +1169,6 @@ func (a *CoreDB) ListEgressRulesByTenantID(ctx context.Context, tenantID string)
 		var r model.TenantEgressRule
 		if err := rows.Scan(&r.ID, &r.TenantID, &r.CIDR, &r.Description, &r.Status, &r.StatusMessage, &r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan egress rule row: %w", err)
-		}
-		rules = append(rules, r)
-	}
-	return rules, rows.Err()
-}
-
-// ListDatabaseAccessRulesByDatabaseID retrieves all access rules for a database.
-func (a *CoreDB) ListDatabaseAccessRulesByDatabaseID(ctx context.Context, databaseID string) ([]model.DatabaseAccessRule, error) {
-	rows, err := a.db.Query(ctx,
-		`SELECT id, database_id, cidr, description, status, status_message, created_at, updated_at
-		 FROM database_access_rules WHERE database_id = $1`, databaseID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("list database access rules by database: %w", err)
-	}
-	defer rows.Close()
-
-	var rules []model.DatabaseAccessRule
-	for rows.Next() {
-		var r model.DatabaseAccessRule
-		if err := rows.Scan(&r.ID, &r.DatabaseID, &r.CIDR, &r.Description, &r.Status, &r.StatusMessage, &r.CreatedAt, &r.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan database access rule row: %w", err)
 		}
 		rules = append(rules, r)
 	}

@@ -114,10 +114,9 @@ type DaemonDef struct {
 }
 
 type DatabaseDef struct {
-	Subscription string                  `yaml:"subscription"`
-	Shard        string                  `yaml:"shard"`
-	Users       []DatabaseUserDef       `yaml:"users"`
-	AccessRules []DatabaseAccessRuleDef `yaml:"access_rules"`
+	Subscription string            `yaml:"subscription"`
+	Shard        string            `yaml:"shard"`
+	Users        []DatabaseUserDef `yaml:"users"`
 }
 
 type DatabaseUserDef struct {
@@ -174,11 +173,6 @@ type EmailAutoReplyDef struct {
 }
 
 type EgressRuleDef struct {
-	CIDR        string `yaml:"cidr"`
-	Description string `yaml:"description"`
-}
-
-type DatabaseAccessRuleDef struct {
 	CIDR        string `yaml:"cidr"`
 	Description string `yaml:"description"`
 }

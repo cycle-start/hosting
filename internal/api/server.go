@@ -134,7 +134,6 @@ func (s *Server) setupRoutes() {
 		s3AccessKey := handler.NewS3AccessKey(s.services.S3AccessKey)
 		sshKey := handler.NewSSHKey(s.services.SSHKey, s.services.Tenant)
 		egressRule := handler.NewTenantEgressRule(s.services.TenantEgressRule, s.services.Tenant)
-		dbAccessRule := handler.NewDatabaseAccessRule(s.services.DatabaseAccessRule, s.services.Database)
 		subscription := handler.NewSubscription(s.services)
 		emailAccount := handler.NewEmailAccount(s.services)
 		emailAlias := handler.NewEmailAlias(s.services.EmailAlias)
@@ -630,22 +629,6 @@ func (s *Server) setupRoutes() {
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireScope("network", "delete"))
 			r.Delete("/egress-rules/{id}", egressRule.Delete)
-		})
-
-		// Database access rules
-		r.Group(func(r chi.Router) {
-			r.Use(mw.RequireScope("databases", "read"))
-			r.Get("/databases/{databaseID}/access-rules", dbAccessRule.ListByDatabase)
-			r.Get("/database-access-rules/{id}", dbAccessRule.Get)
-		})
-		r.Group(func(r chi.Router) {
-			r.Use(mw.RequireScope("databases", "write"))
-			r.Post("/databases/{databaseID}/access-rules", dbAccessRule.Create)
-			r.Post("/database-access-rules/{id}/retry", dbAccessRule.Retry)
-		})
-		r.Group(func(r chi.Router) {
-			r.Use(mw.RequireScope("databases", "delete"))
-			r.Delete("/database-access-rules/{id}", dbAccessRule.Delete)
 		})
 
 		// Email accounts

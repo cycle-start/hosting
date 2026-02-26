@@ -122,7 +122,6 @@ func (a *CoreDB) DeleteTenantDBRows(ctx context.Context, tenantID string) error 
 
 		// Cross-shard leftovers (idempotent — usually already deleted by Phase 1 workflows).
 		`DELETE FROM database_users WHERE database_id IN (SELECT id FROM databases WHERE tenant_id=$1)`,
-		`DELETE FROM database_access_rules WHERE database_id IN (SELECT id FROM databases WHERE tenant_id=$1)`,
 		`DELETE FROM databases WHERE tenant_id=$1`,
 		`DELETE FROM valkey_users WHERE valkey_instance_id IN (SELECT id FROM valkey_instances WHERE tenant_id=$1)`,
 		`DELETE FROM valkey_instances WHERE tenant_id=$1`,

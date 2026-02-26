@@ -979,20 +979,6 @@ func (a *NodeLocal) SyncEgressRules(ctx context.Context, params SyncEgressRulesP
 }
 
 // --------------------------------------------------------------------------
-// Database access rules activities
-// --------------------------------------------------------------------------
-
-// SyncDatabaseUserHosts rebuilds MySQL users with host patterns based on access rules.
-func (a *NodeLocal) SyncDatabaseUserHosts(ctx context.Context, params SyncDatabaseUserHostsParams) error {
-	a.logger.Info().Str("database", params.DatabaseName).Int("user_count", len(params.Users)).Int("rule_count", len(params.AccessRules)).Msg("SyncDatabaseUserHosts")
-	internalCIDR := params.InternalNetworkCIDR
-	if internalCIDR == "" {
-		internalCIDR = "10.0.0.0/8"
-	}
-	return asNonRetryable(a.database.SyncUserHosts(ctx, params.DatabaseName, params.Users, params.AccessRules, internalCIDR))
-}
-
-// --------------------------------------------------------------------------
 // Env file helpers
 // --------------------------------------------------------------------------
 

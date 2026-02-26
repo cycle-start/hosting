@@ -109,15 +109,6 @@ func CreateDatabaseWorkflow(ctx workflow.Context, databaseID string) error {
 		}
 	}
 
-	var accessRules []model.DatabaseAccessRule
-	_ = workflow.ExecuteActivity(ctx, "ListDatabaseAccessRulesByDatabaseID", databaseID).Get(ctx, &accessRules)
-	for _, ar := range accessRules {
-		if ar.Status == model.StatusPending {
-			children = append(children, ChildWorkflowSpec{WorkflowName: "SyncDatabaseAccessWorkflow", WorkflowID: fmt.Sprintf("sync-db-access-%s", databaseID), Arg: databaseID})
-			break // Only need ONE sync
-		}
-	}
-
 	if errs := fanOutChildWorkflows(ctx, children); len(errs) > 0 {
 		workflow.GetLogger(ctx).Warn("child workflow failures", "errors", joinErrors(errs))
 	}

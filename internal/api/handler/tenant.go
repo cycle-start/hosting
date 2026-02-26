@@ -306,23 +306,6 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 					return fmt.Errorf("create database user %s: %w", ur.Username, err)
 				}
 			}
-
-			// Nested database access rule creation
-			for _, ar := range dr.AccessRules {
-				now3 := time.Now()
-				rule := &model.DatabaseAccessRule{
-					ID:          platform.NewID(),
-					DatabaseID:  database.ID,
-					CIDR:        ar.CIDR,
-					Description: ar.Description,
-					Status:      model.StatusPending,
-					CreatedAt:   now3,
-					UpdatedAt:   now3,
-				}
-				if err := tx.DatabaseAccessRule.Create(skipCtx, rule); err != nil {
-					return fmt.Errorf("create database access rule %s: %w", ar.CIDR, err)
-				}
-			}
 		}
 
 		// Nested valkey instance creation

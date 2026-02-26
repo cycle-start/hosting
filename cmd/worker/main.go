@@ -182,7 +182,6 @@ func main() {
 	w.RegisterWorkflow(workflow.CleanupOldBackupsWorkflow)
 	w.RegisterWorkflow(workflow.CheckReplicationHealthWorkflow)
 	w.RegisterWorkflow(workflow.SyncEgressRulesWorkflow)
-	w.RegisterWorkflow(workflow.SyncDatabaseAccessWorkflow)
 	w.RegisterWorkflow(workflow.ProcessIncidentQueueWorkflow)
 	w.RegisterWorkflow(workflow.InvestigateIncidentWorkflow)
 	w.RegisterWorkflow(workflow.EscalateStaleIncidentsWorkflow)
