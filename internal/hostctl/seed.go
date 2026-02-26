@@ -614,6 +614,28 @@ func Seed(configPath string, timeout time.Duration) error {
 				return fmt.Errorf("backups for tenant %q: %w", t.Name, err)
 			}
 		}
+
+		// Create WireGuard peers
+		for _, wg := range t.WireGuardPeers {
+			subID := resolveSubID(wg.Subscription)
+			fmt.Printf("  Creating WireGuard peer %q...\n", wg.Name)
+			resp, err := client.Post(fmt.Sprintf("/tenants/%s/wireguard-peers", tenantID), map[string]any{
+				"name":            wg.Name,
+				"subscription_id": subID,
+			})
+			if err != nil {
+				return fmt.Errorf("create wireguard peer %q: %w", wg.Name, err)
+			}
+			peerID, err := extractNestedID(resp, "peer")
+			if err != nil {
+				return fmt.Errorf("parse wireguard peer ID: %w", err)
+			}
+			fmt.Printf("    Peer %q: %s, awaiting workflow...\n", wg.Name, peerID)
+			if err := client.AwaitWorkflow(fmt.Sprintf("wireguard-peer-%s", peerID)); err != nil {
+				return fmt.Errorf("await wireguard peer %q: %w", wg.Name, err)
+			}
+			fmt.Printf("    Peer %q: active\n", wg.Name)
+		}
 	}
 
 	// 4. Create OIDC clients

@@ -138,6 +138,8 @@ tenants:
       - shard: storage-1
         public: true
         quota_bytes: 10737418240
+    wireguard_peers:
+      - name: dev-laptop
     backups:
       - type: web
       - type: database

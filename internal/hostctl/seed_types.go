@@ -56,7 +56,8 @@ type TenantDef struct {
 	S3Buckets       []S3BucketDef       `yaml:"s3_buckets"`
 	EmailAccounts   []EmailAcctDef      `yaml:"email_accounts"`
 	EgressRules     []EgressRuleDef     `yaml:"egress_rules"`
-	Backups         []BackupDef         `yaml:"backups"`
+	Backups         []BackupDef          `yaml:"backups"`
+	WireGuardPeers  []WireGuardPeerDef   `yaml:"wireguard_peers"`
 }
 
 type SubscriptionDef struct {
@@ -192,4 +193,9 @@ type CronJobDef struct {
 
 type BackupDef struct {
 	Type string `yaml:"type"` // "web" or "database"
+}
+
+type WireGuardPeerDef struct {
+	Subscription string `yaml:"subscription"`
+	Name         string `yaml:"name"`
 }

@@ -437,3 +437,23 @@ func extractID(resp *Response) (string, error) {
 	}
 	return resource.ID, nil
 }
+
+// extractNestedID extracts the "id" field from a nested object in the response.
+// e.g., for {"peer": {"id": "wg_xxx"}}, use extractNestedID(resp, "peer").
+func extractNestedID(resp *Response, key string) (string, error) {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(resp.Body, &raw); err != nil {
+		return "", fmt.Errorf("parse response: %w", err)
+	}
+	nested, ok := raw[key]
+	if !ok {
+		return "", fmt.Errorf("key %q not found in response", key)
+	}
+	var resource struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(nested, &resource); err != nil {
+		return "", fmt.Errorf("parse nested %q ID: %w", key, err)
+	}
+	return resource.ID, nil
+}
