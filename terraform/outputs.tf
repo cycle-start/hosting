@@ -58,6 +58,36 @@ output "dbadmin_node_ids" {
   value       = { for k, v in random_uuid.dbadmin_node_id : var.dbadmin_nodes[k].name => v.result }
 }
 
+output "lb_node_ips" {
+  description = "IP addresses of LB nodes"
+  value       = { for k, v in var.lb_nodes : v.name => v.ip }
+}
+
+output "lb_node_ids" {
+  description = "Generated UUIDs for LB nodes"
+  value       = { for k, v in random_uuid.lb_node_id : var.lb_nodes[k].name => v.result }
+}
+
+output "email_node_ips" {
+  description = "IP addresses of email nodes"
+  value       = { for k, v in var.email_nodes : v.name => v.ip }
+}
+
+output "email_node_ids" {
+  description = "Generated UUIDs for email nodes"
+  value       = { for k, v in random_uuid.email_node_id : var.email_nodes[k].name => v.result }
+}
+
+output "gateway_node_ips" {
+  description = "IP addresses of gateway nodes"
+  value       = { for k, v in var.gateway_nodes : v.name => v.ip }
+}
+
+output "gateway_node_ids" {
+  description = "Generated UUIDs for gateway nodes"
+  value       = { for k, v in random_uuid.gateway_node_id : var.gateway_nodes[k].name => v.result }
+}
+
 output "controlplane_ip" {
   description = "IP address of the k3s control plane VM"
   value       = var.controlplane_ip

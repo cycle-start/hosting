@@ -6,6 +6,14 @@
     state: present
     update_cache: true
 
+# HAProxy auto-starts on install with the default config. Stop it so we can
+# configure directories and certs before starting with our custom config.
+- name: Stop HAProxy after install
+  systemd:
+    name: haproxy
+    state: stopped
+  failed_when: false
+
 - name: Create HAProxy map directory
   file:
     path: /var/lib/haproxy/maps
@@ -67,6 +75,13 @@
     recurse: true
     owner: haproxy
     group: haproxy
+
+# Reset failure counter so systemd doesn't refuse to start after the
+# auto-start failures from the install step.
+- name: Reset HAProxy systemd failure state
+  command: systemctl reset-failed haproxy.service
+  changed_when: false
+  failed_when: false
 
 - name: Enable and start HAProxy
   systemd:
