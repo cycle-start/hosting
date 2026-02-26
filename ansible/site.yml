@@ -1,3 +1,11 @@
+- name: Wait for cloud-init
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Wait for cloud-init to finish
+      ansible.builtin.command: cloud-init status --wait
+      changed_when: false
+
 - name: Storage nodes
   hosts: storage
   roles:
