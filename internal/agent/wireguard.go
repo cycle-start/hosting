@@ -10,6 +10,12 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const (
+	wgInterface  = "wg0"
+	wgListenPort = 51820
+	wgKeyFile    = "/etc/wireguard/server.key"
+)
+
 // WireGuardManager manages WireGuard interface and peer configuration on gateway nodes.
 type WireGuardManager struct {
 	logger zerolog.Logger
@@ -22,41 +28,32 @@ func NewWireGuardManager(logger zerolog.Logger) *WireGuardManager {
 	}
 }
 
-// EnsureInterface creates the wg0 interface if not present and configures it.
-func (m *WireGuardManager) EnsureInterface(ctx context.Context, listenPort int, privateKey string) error {
-	// Check if wg0 exists.
-	if _, err := exec.CommandContext(ctx, "ip", "link", "show", "wg0").CombinedOutput(); err != nil {
-		// Create the interface.
-		if out, err := exec.CommandContext(ctx, "ip", "link", "add", "wg0", "type", "wireguard").CombinedOutput(); err != nil {
-			return fmt.Errorf("create wg0: %s: %w", string(out), err)
-		}
+// ensureInterface creates the wg0 interface if not present and configures it,
+// reading the private key from /etc/wireguard/server.key.
+func (m *WireGuardManager) ensureInterface(ctx context.Context) error {
+	// Check if wg0 already exists and is up.
+	if _, err := exec.CommandContext(ctx, "ip", "link", "show", wgInterface).CombinedOutput(); err == nil {
+		return nil // Already exists.
 	}
 
-	// Set private key via temp file.
-	keyFile, err := os.CreateTemp("", "wg-key-*")
-	if err != nil {
-		return fmt.Errorf("create temp key file: %w", err)
+	// Create the interface.
+	if out, err := exec.CommandContext(ctx, "ip", "link", "add", wgInterface, "type", "wireguard").CombinedOutput(); err != nil {
+		return fmt.Errorf("create %s: %s: %w", wgInterface, string(out), err)
 	}
-	defer os.Remove(keyFile.Name())
-	if _, err := keyFile.WriteString(privateKey); err != nil {
-		keyFile.Close()
-		return fmt.Errorf("write private key: %w", err)
-	}
-	keyFile.Close()
 
-	if out, err := exec.CommandContext(ctx, "wg", "set", "wg0",
-		"listen-port", fmt.Sprintf("%d", listenPort),
-		"private-key", keyFile.Name(),
+	if out, err := exec.CommandContext(ctx, "wg", "set", wgInterface,
+		"listen-port", fmt.Sprintf("%d", wgListenPort),
+		"private-key", wgKeyFile,
 	).CombinedOutput(); err != nil {
-		return fmt.Errorf("wg set wg0: %s: %w", string(out), err)
+		return fmt.Errorf("wg set %s: %s: %w", wgInterface, string(out), err)
 	}
 
 	// Bring interface up.
-	if out, err := exec.CommandContext(ctx, "ip", "link", "set", "wg0", "up").CombinedOutput(); err != nil {
-		return fmt.Errorf("ip link set wg0 up: %s: %w", string(out), err)
+	if out, err := exec.CommandContext(ctx, "ip", "link", "set", wgInterface, "up").CombinedOutput(); err != nil {
+		return fmt.Errorf("ip link set %s up: %s: %w", wgInterface, string(out), err)
 	}
 
-	m.logger.Info().Int("listen_port", listenPort).Msg("WireGuard interface ensured")
+	m.logger.Info().Int("listen_port", wgListenPort).Msg("WireGuard interface created")
 	return nil
 }
 
@@ -70,6 +67,10 @@ type AddPeerParams struct {
 
 // AddPeer adds a WireGuard peer to the wg0 interface and sets up nftables FORWARD rules.
 func (m *WireGuardManager) AddPeer(ctx context.Context, params AddPeerParams) error {
+	if err := m.ensureInterface(ctx); err != nil {
+		return fmt.Errorf("ensure wg interface: %w", err)
+	}
+
 	// Write PSK to temp file.
 	pskFile, err := os.CreateTemp("", "wg-psk-*")
 	if err != nil {
@@ -84,7 +85,7 @@ func (m *WireGuardManager) AddPeer(ctx context.Context, params AddPeerParams) er
 
 	allowedIPs := params.AssignedIP + "/128"
 
-	if out, err := exec.CommandContext(ctx, "wg", "set", "wg0",
+	if out, err := exec.CommandContext(ctx, "wg", "set", wgInterface,
 		"peer", params.PublicKey,
 		"preshared-key", pskFile.Name(),
 		"allowed-ips", allowedIPs,
@@ -94,7 +95,7 @@ func (m *WireGuardManager) AddPeer(ctx context.Context, params AddPeerParams) er
 
 	// Add route for the peer's assigned IP.
 	if out, err := exec.CommandContext(ctx, "ip", "-6", "route", "replace",
-		params.AssignedIP+"/128", "dev", "wg0").CombinedOutput(); err != nil {
+		params.AssignedIP+"/128", "dev", wgInterface).CombinedOutput(); err != nil {
 		return fmt.Errorf("ip route add %s: %s: %w", params.AssignedIP, string(out), err)
 	}
 
@@ -107,14 +108,18 @@ func (m *WireGuardManager) AddPeer(ctx context.Context, params AddPeerParams) er
 
 // RemovePeer removes a WireGuard peer from the wg0 interface.
 func (m *WireGuardManager) RemovePeer(ctx context.Context, publicKey string, assignedIP string) error {
-	if out, err := exec.CommandContext(ctx, "wg", "set", "wg0",
+	if err := m.ensureInterface(ctx); err != nil {
+		return fmt.Errorf("ensure wg interface: %w", err)
+	}
+
+	if out, err := exec.CommandContext(ctx, "wg", "set", wgInterface,
 		"peer", publicKey, "remove",
 	).CombinedOutput(); err != nil {
 		return fmt.Errorf("wg remove peer %s: %s: %w", publicKey, string(out), err)
 	}
 
 	// Remove route.
-	exec.CommandContext(ctx, "ip", "-6", "route", "del", assignedIP+"/128", "dev", "wg0").CombinedOutput()
+	exec.CommandContext(ctx, "ip", "-6", "route", "del", assignedIP+"/128", "dev", wgInterface).CombinedOutput()
 
 	// Remove nftables FORWARD rules.
 	m.removeForwardRules(ctx, assignedIP)
@@ -125,6 +130,10 @@ func (m *WireGuardManager) RemovePeer(ctx context.Context, publicKey string, ass
 
 // SyncPeers performs full convergence: rebuilds all peers from desired state.
 func (m *WireGuardManager) SyncPeers(ctx context.Context, peers []AddPeerParams) error {
+	if err := m.ensureInterface(ctx); err != nil {
+		return fmt.Errorf("ensure wg interface: %w", err)
+	}
+
 	// Get current peers from wg show.
 	currentPeers, err := m.listCurrentPeers(ctx)
 	if err != nil {
@@ -140,7 +149,7 @@ func (m *WireGuardManager) SyncPeers(ctx context.Context, peers []AddPeerParams)
 	// Remove peers not in desired state.
 	for _, pubkey := range currentPeers {
 		if _, ok := desired[pubkey]; !ok {
-			exec.CommandContext(ctx, "wg", "set", "wg0", "peer", pubkey, "remove").CombinedOutput()
+			exec.CommandContext(ctx, "wg", "set", wgInterface, "peer", pubkey, "remove").CombinedOutput()
 		}
 	}
 
@@ -159,7 +168,7 @@ func (m *WireGuardManager) SyncPeers(ctx context.Context, peers []AddPeerParams)
 }
 
 func (m *WireGuardManager) listCurrentPeers(ctx context.Context) ([]string, error) {
-	out, err := exec.CommandContext(ctx, "wg", "show", "wg0", "peers").CombinedOutput()
+	out, err := exec.CommandContext(ctx, "wg", "show", wgInterface, "peers").CombinedOutput()
 	if err != nil {
 		// Interface may not exist yet.
 		return nil, nil
