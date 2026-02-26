@@ -8,6 +8,23 @@ spec:
     requests:
       storage: 1Gi
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-core-init
+data:
+  create-controlpanel-db.sql: |
+    -- Create controlpanel database and user (idempotent).
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'controlpanel') THEN
+        CREATE ROLE controlpanel WITH LOGIN PASSWORD 'controlpanel';
+      END IF;
+    END
+    $$;
+    SELECT 'CREATE DATABASE controlpanel OWNER controlpanel'
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'controlpanel')\gexec
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -40,7 +57,12 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: postgres-core-data
+        - name: init-scripts
+          configMap:
+            name: postgres-core-init

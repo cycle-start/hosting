@@ -51,7 +51,7 @@ write_files:
       # Main HTTP/HTTPS frontend (tenant traffic only)
       frontend http
           bind *:80
-          bind *:443 ssl crt /etc/haproxy/certs/hosting.pem
+          bind *:443 ssl crt /etc/haproxy/certs/hosting.pem alpn http/1.1
           # Tenant routing via dynamic map
           use_backend %[req.hdr(host),lower,map(/var/lib/haproxy/maps/fqdn-to-shard.map,shard-default)]
 

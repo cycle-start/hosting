@@ -5,10 +5,15 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"strings"
+	"sync"
 
 	"github.com/rs/zerolog"
 )
+
+// mapFileMu serializes writes to the on-disk map file.
+var mapFileMu sync.Mutex
 
 const (
 	haproxyMapPath      = "/var/lib/haproxy/maps/fqdn-to-shard.map"
@@ -40,7 +45,8 @@ type DeleteLBMapEntryParams struct {
 
 // SetLBMapEntry sets a mapping from an FQDN to an LB backend in the HAProxy map file
 // via the Runtime API. It uses "set map" to update existing entries, falling back
-// to "add map" for new entries.
+// to "add map" for new entries. The on-disk map file is also updated so entries
+// survive HAProxy restarts.
 func (a *NodeLB) SetLBMapEntry(ctx context.Context, params SetLBMapEntryParams) error {
 	// Strip trailing dot from FQDN — HAProxy matches against the Host header
 	// which never includes the DNS trailing dot.
@@ -66,11 +72,16 @@ func (a *NodeLB) SetLBMapEntry(ctx context.Context, params SetLBMapEntryParams) 
 		}
 	}
 
+	// Persist to on-disk map file so entries survive HAProxy restarts.
+	if err := persistMapEntry(fqdn, params.LBBackend); err != nil {
+		a.logger.Warn().Err(err).Str("fqdn", fqdn).Msg("failed to persist map entry to disk (runtime entry is set)")
+	}
+
 	return nil
 }
 
 // DeleteLBMapEntry removes an FQDN mapping from the HAProxy map file
-// via the Runtime API.
+// via the Runtime API. The on-disk map file is also updated.
 func (a *NodeLB) DeleteLBMapEntry(ctx context.Context, params DeleteLBMapEntryParams) error {
 	fqdn := strings.TrimSuffix(params.FQDN, ".")
 
@@ -86,7 +97,70 @@ func (a *NodeLB) DeleteLBMapEntry(ctx context.Context, params DeleteLBMapEntryPa
 	if resp != "" && !strings.Contains(strings.ToLower(resp), "not found") && strings.Contains(strings.ToLower(resp), "err") {
 		return fmt.Errorf("del map entry %s: %s", fqdn, resp)
 	}
+
+	// Remove from on-disk map file.
+	if err := removeMapEntry(fqdn); err != nil {
+		a.logger.Warn().Err(err).Str("fqdn", fqdn).Msg("failed to remove map entry from disk (runtime entry is deleted)")
+	}
 	return nil
+}
+
+// persistMapEntry adds or updates an FQDN→backend mapping in the on-disk map file.
+func persistMapEntry(fqdn, backend string) error {
+	mapFileMu.Lock()
+	defer mapFileMu.Unlock()
+
+	entries, err := readMapFile(haproxyMapPath)
+	if err != nil {
+		return err
+	}
+	entries[fqdn] = backend
+	return writeMapFile(haproxyMapPath, entries)
+}
+
+// removeMapEntry deletes an FQDN from the on-disk map file.
+func removeMapEntry(fqdn string) error {
+	mapFileMu.Lock()
+	defer mapFileMu.Unlock()
+
+	entries, err := readMapFile(haproxyMapPath)
+	if err != nil {
+		return err
+	}
+	delete(entries, fqdn)
+	return writeMapFile(haproxyMapPath, entries)
+}
+
+// readMapFile reads the HAProxy map file into a map of fqdn→backend.
+func readMapFile(path string) (map[string]string, error) {
+	entries := make(map[string]string)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return entries, nil
+		}
+		return nil, fmt.Errorf("read map file: %w", err)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) >= 2 {
+			entries[parts[0]] = parts[1]
+		}
+	}
+	return entries, nil
+}
+
+// writeMapFile atomically writes the map entries to disk.
+func writeMapFile(path string, entries map[string]string) error {
+	var buf strings.Builder
+	for fqdn, backend := range entries {
+		fmt.Fprintf(&buf, "%s %s\n", fqdn, backend)
+	}
+	return os.WriteFile(path, []byte(buf.String()), 0644)
 }
 
 // haproxyCommand sends a command to HAProxy's Runtime API via TCP and returns

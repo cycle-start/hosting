@@ -46,7 +46,6 @@ controlpanelApi:
   hostNetwork: true
   migrate: true
   hostingApiKey: "hst_dev"
-  corsOrigins: ""
   devMode: "true"
 
 controlpanelUi:

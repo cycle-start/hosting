@@ -20,8 +20,21 @@ apt-get install -y \
 # Create directories used by node-agent at runtime.
 mkdir -p /var/www/storage /etc/ssl/hosting /etc/ceph /etc/ssh/sshd_config.d
 
-# Pre-configure dummy kernel module for tenant0 ULA interface.
+# Pre-configure tenant0 dummy interface for per-tenant ULA IPv6 addresses.
+# The dummy kernel module is loaded at boot by systemd-modules-load, and the
+# interface is created by systemd-networkd from the .netdev/.network files.
 echo "dummy" > /etc/modules-load.d/dummy.conf
+cat > /etc/systemd/network/50-tenant0.netdev << 'EOF'
+[NetDev]
+Name=tenant0
+Kind=dummy
+EOF
+cat > /etc/systemd/network/50-tenant0.network << 'EOF'
+[Match]
+Name=tenant0
+[Network]
+Description=Tenant ULA addresses
+EOF
 
 # SSH hardening config.
 cp /tmp/00-hosting-base.conf /etc/ssh/sshd_config.d/00-hosting-base.conf

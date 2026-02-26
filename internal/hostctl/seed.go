@@ -484,22 +484,38 @@ func Seed(configPath string, timeout time.Duration) error {
 			ctx.fqdn = t.Webroots[0].FQDNs[0].FQDN
 		}
 
-		// List webroots (for fixture deployment paths and backup source IDs)
-		type resourceRef struct {
-			ID string `json:"id"`
+		// List webroots (for fixture deployment paths and backup source IDs).
+		// Match by runtime+version since API may return in different order than YAML.
+		type webrootRef struct {
+			ID             string `json:"id"`
+			Runtime        string `json:"runtime"`
+			RuntimeVersion string `json:"runtime_version"`
 		}
-		var webroots []resourceRef
+		var apiWebroots []webrootRef
 		if len(t.Webroots) > 0 {
 			webrootResp, err := client.Get(fmt.Sprintf("/tenants/%s/webroots", tenantID))
 			if err != nil {
 				return fmt.Errorf("list webroots for tenant %q: %w", t.Name, err)
 			}
 			if items, err := webrootResp.Items(); err == nil {
-				_ = json.Unmarshal(items, &webroots)
+				_ = json.Unmarshal(items, &apiWebroots)
 			}
-			if len(webroots) > 0 {
-				ctx.webrootID = webroots[0].ID
+		}
+		// Build ordered list matching YAML definition order.
+		type resourceRef struct {
+			ID string `json:"id"`
+		}
+		webroots := make([]resourceRef, len(t.Webroots))
+		for i, w := range t.Webroots {
+			for _, aw := range apiWebroots {
+				if aw.Runtime == w.Runtime && aw.RuntimeVersion == w.RuntimeVersion {
+					webroots[i] = resourceRef{ID: aw.ID}
+					break
+				}
 			}
+		}
+		if len(webroots) > 0 {
+			ctx.webrootID = webroots[0].ID
 		}
 
 		// List databases (for user creation, fixture .env, backup source IDs)

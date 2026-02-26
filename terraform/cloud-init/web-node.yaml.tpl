@@ -129,6 +129,10 @@ write_files:
       }
 
 runcmd:
+  # Ensure tenant0 dummy interface is up (must run before anything that might
+  # fail, since cloud-init runcmd stops on first error).
+  - modprobe dummy
+  - systemctl restart systemd-networkd
   # Wait for the CephFS mount to succeed (storage node needs time to boot and
   # create the CephFS filesystem). Retry mount for up to 5 minutes.
   - systemctl daemon-reload
@@ -141,8 +145,3 @@ runcmd:
   - systemctl enable var-www-storage.mount
   # Verify mount succeeded.
   - "mountpoint -q /var/www/storage || { echo 'FATAL: CephFS not mounted'; exit 1; }"
-  # Ensure tenant0 dummy interface is up (module loaded by systemd-modules-load
-  # from /etc/modules-load.d/dummy.conf, interface created by systemd-networkd
-  # from /etc/systemd/network/50-tenant0.netdev).
-  - modprobe dummy
-  - systemctl restart systemd-networkd
