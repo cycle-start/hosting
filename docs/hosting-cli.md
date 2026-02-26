@@ -14,9 +14,9 @@ go install github.com/edvin/hosting/cmd/hosting-cli@latest
 
 1. **Create a WireGuard peer** in the control panel (requires a subscription with the `wireguard` module)
 2. **Download the `.conf` file** when prompted (the private key is shown only once)
-3. **Import the config:**
+3. **Import the config** (name defaults to filename, or use `-name`):
    ```bash
-   hosting-cli import peer.conf -tenant t_abc1234567
+   hosting-cli import acme-corp.conf -tenant t_abc1234567
    ```
 4. **Start proxying:**
    ```bash
@@ -54,8 +54,8 @@ hosting-cli profiles
 Output:
 ```
 NAME                 TENANT                         ACTIVE
-my-laptop            t_abc1234567                    *
-ci-server            t_def7654321
+acme-corp            t_abc1234567                    *
+globex               t_def7654321
 ```
 
 Delete a profile:
@@ -83,7 +83,7 @@ hosting-cli active
 
 Output:
 ```
-Active profile: my-laptop
+Active profile: acme-corp
 Tenant:         t_abc1234567
 Address:        fd00:abcd:ffff::1/128
 Endpoint:       gw.example.com:51820
@@ -117,7 +117,7 @@ hosting-cli proxy -target [fd00::1]:3306 -port 3307
 
 With service metadata in the config, `proxy` automatically sets up forwarding:
 ```
-Establishing tunnel with profile "my-laptop"...
+Establishing tunnel with profile "acme-corp"...
 Proxying services:
   mysql → localhost:3306
   valkey → localhost:6379
@@ -135,22 +135,22 @@ hosting-cli status
 
 ## Multi-Tenant Profiles
 
-Each profile is stored with an optional tenant ID, enabling easy context switching:
+Each profile is stored with a tenant ID, enabling easy switching between tenants:
 
 ```bash
 # Import configs for different tenants
-hosting-cli import staging.conf -tenant t_staging -name staging
-hosting-cli import production.conf -tenant t_prod -name production
+hosting-cli import acme-corp.conf -tenant t_abc1234567
+hosting-cli import globex.conf -tenant t_def7654321
 
-# Switch contexts
-hosting-cli use staging
-hosting-cli proxy  # connects to staging DB
+# Switch between tenants
+hosting-cli use acme-corp
+hosting-cli proxy  # connects to Acme Corp's DB
 
-hosting-cli use production
-hosting-cli proxy  # connects to production DB
+hosting-cli use globex
+hosting-cli proxy  # connects to Globex's DB
 
-# Override without switching
-hosting-cli proxy -profile staging
+# One-off connection to a different tenant without switching
+hosting-cli proxy -profile acme-corp
 ```
 
 Profiles are stored in `~/.config/hosting/profiles/`:
@@ -158,10 +158,10 @@ Profiles are stored in `~/.config/hosting/profiles/`:
 ~/.config/hosting/
   state.json                    # active profile
   profiles/
-    staging.conf                # WireGuard config
-    staging.json                # metadata (name, tenant_id)
-    production.conf
-    production.json
+    acme-corp.conf              # WireGuard config
+    acme-corp.json              # metadata (name, tenant_id)
+    globex.conf
+    globex.json
 ```
 
 ## Service Discovery
