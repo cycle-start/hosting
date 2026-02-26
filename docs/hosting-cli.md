@@ -39,6 +39,7 @@ hosting-cli import <config-file> [-tenant TENANT_ID] [-name NAME] [-set-active=t
 ```
 
 - `-tenant` — Tenant ID; also used as the profile name unless `-name` is given
+- `-alias` — Human-friendly label (e.g. `staging`, `acme`); can be used anywhere a profile name is accepted
 - `-name` — Override the profile name (default: tenant ID, or filename if no tenant)
 - `-set-active` — Set as active profile after import (default: true)
 
@@ -54,9 +55,9 @@ hosting-cli profiles
 
 Output:
 ```
-NAME                 TENANT                         ACTIVE
-t_a8k2mxp4q7        t_a8k2mxp4q7                    *
-t_n3jf7w2x9p        t_n3jf7w2x9p
+NAME                 ALIAS           TENANT                         ACTIVE
+t_a8k2mxp4q7        staging         t_a8k2mxp4q7                   *
+t_n3jf7w2x9p        -               t_n3jf7w2x9p
 ```
 
 Delete a profile:
@@ -66,10 +67,11 @@ hosting-cli profiles delete <name>
 
 ### `use`
 
-Switch the active profile (context switch between tenants).
+Switch the active profile (context switch between tenants). Accepts a tenant ID or alias.
 
 ```bash
 hosting-cli use t_n3jf7w2x9p
+hosting-cli use staging        # works if an alias was set
 ```
 
 All commands that need a profile (tunnel, proxy, etc.) default to the active profile.
@@ -136,22 +138,23 @@ hosting-cli status
 
 ## Multi-Tenant Profiles
 
-Each profile maps to a tenant. The profile name defaults to the tenant ID, so switching tenants is straightforward:
+Each profile maps to a tenant. The profile name defaults to the tenant ID, and you can add an alias for convenience:
 
 ```bash
-# Import configs for different tenants
-hosting-cli import laptop.conf -tenant t_a8k2mxp4q7
-hosting-cli import laptop.conf -tenant t_n3jf7w2x9p
+# Import with aliases
+hosting-cli import laptop.conf -tenant t_a8k2mxp4q7 -alias staging
+hosting-cli import laptop.conf -tenant t_n3jf7w2x9p -alias production
 
-# Switch between tenants
-hosting-cli use t_a8k2mxp4q7
-hosting-cli proxy  # proxies t_a8k2mxp4q7's MySQL and Valkey
+# Switch by alias
+hosting-cli use staging
+hosting-cli proxy  # proxies staging's MySQL and Valkey
 
+# Or by tenant ID
 hosting-cli use t_n3jf7w2x9p
 hosting-cli proxy  # proxies t_n3jf7w2x9p's MySQL and Valkey
 
-# One-off connection without switching the active tenant
-hosting-cli proxy -profile t_a8k2mxp4q7
+# One-off connection without switching
+hosting-cli proxy -profile production
 ```
 
 Profiles are stored in `~/.config/hosting/profiles/`:

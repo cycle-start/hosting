@@ -18,7 +18,8 @@ const (
 type Profile struct {
 	Name     string `json:"name"`
 	TenantID string `json:"tenant_id"`
-	FilePath string `json:"file_path"` // path to the .conf file
+	Alias    string `json:"alias,omitempty"` // human-friendly label (e.g. "staging", "acme-corp")
+	FilePath string `json:"file_path"`       // path to the .conf file
 }
 
 // State holds the active profile selection.
@@ -56,9 +57,10 @@ func ensureConfigDir() (string, error) {
 }
 
 // Import copies a WireGuard config file into the profile store.
-// The name parameter is used as the profile name. If empty, it's derived from the filename.
+// The name parameter is used as the profile name. If empty, it defaults to tenantID or filename.
 // The tenantID parameter associates the profile with a tenant for context switching.
-func Import(configPath, name, tenantID string) (*Profile, error) {
+// The alias parameter is an optional human-friendly label.
+func Import(configPath, name, tenantID, alias string) (*Profile, error) {
 	dir, err := ensureConfigDir()
 	if err != nil {
 		return nil, err
@@ -99,6 +101,7 @@ func Import(configPath, name, tenantID string) (*Profile, error) {
 	profile := &Profile{
 		Name:     name,
 		TenantID: tenantID,
+		Alias:    alias,
 		FilePath: destPath,
 	}
 
@@ -198,10 +201,31 @@ func DeleteProfile(name string) error {
 	return nil
 }
 
-// SetActive sets the active profile.
-func SetActive(name string) error {
-	// Verify profile exists.
-	_, _, err := LoadProfile(name)
+// ResolveProfile finds a profile by name or alias and returns the profile name.
+func ResolveProfile(nameOrAlias string) (string, error) {
+	// Try exact name first.
+	_, _, err := LoadProfile(nameOrAlias)
+	if err == nil {
+		return nameOrAlias, nil
+	}
+
+	// Try alias.
+	profiles, err := ListProfiles()
+	if err != nil {
+		return "", err
+	}
+	for _, p := range profiles {
+		if p.Alias != "" && p.Alias == nameOrAlias {
+			return p.Name, nil
+		}
+	}
+
+	return "", fmt.Errorf("profile %q not found (checked name and alias)", nameOrAlias)
+}
+
+// SetActive sets the active profile. Accepts a profile name or alias.
+func SetActive(nameOrAlias string) error {
+	name, err := ResolveProfile(nameOrAlias)
 	if err != nil {
 		return err
 	}

@@ -43,23 +43,24 @@ func cmdImport(args []string) {
 	fs := flag.NewFlagSet("import", flag.ExitOnError)
 	tenantID := fs.String("tenant", "", "Tenant ID (also used as profile name unless -name is given)")
 	name := fs.String("name", "", "Override profile name (default: tenant ID, or filename)")
+	alias := fs.String("alias", "", "Human-friendly alias for this tenant (e.g. \"staging\", \"acme\")")
 	setActive := fs.Bool("set-active", true, "Set this profile as active after import")
 	fs.Parse(args)
 
 	if fs.NArg() < 1 {
-		fmt.Fprintln(os.Stderr, "Usage: hosting-cli import [-tenant TENANT_ID] [-name NAME] <config-file>")
+		fmt.Fprintln(os.Stderr, "Usage: hosting-cli import [-tenant ID] [-alias NAME] <config-file>")
 		os.Exit(1)
 	}
 
-	profile, err := cli.Import(fs.Arg(0), *name, *tenantID)
+	profile, err := cli.Import(fs.Arg(0), *name, *tenantID, *alias)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
 	fmt.Printf("Imported profile %q", profile.Name)
-	if profile.TenantID != "" {
-		fmt.Printf(" (tenant: %s)", profile.TenantID)
+	if profile.Alias != "" {
+		fmt.Printf(" (%s)", profile.Alias)
 	}
 	fmt.Println()
 
@@ -86,17 +87,21 @@ func cmdProfiles(args []string) {
 
 	active, _ := cli.GetActive()
 
-	fmt.Printf("%-20s %-30s %s\n", "NAME", "TENANT", "ACTIVE")
+	fmt.Printf("%-20s %-15s %-30s %s\n", "NAME", "ALIAS", "TENANT", "ACTIVE")
 	for _, p := range profiles {
 		marker := ""
 		if p.Name == active {
-			marker = " *"
+			marker = "*"
+		}
+		alias := p.Alias
+		if alias == "" {
+			alias = "-"
 		}
 		tenant := p.TenantID
 		if tenant == "" {
 			tenant = "-"
 		}
-		fmt.Printf("%-20s %-30s %s\n", p.Name, tenant, marker)
+		fmt.Printf("%-20s %-15s %-30s %s\n", p.Name, alias, tenant, marker)
 	}
 
 	// Handle delete subcommand.
@@ -115,7 +120,7 @@ func cmdProfiles(args []string) {
 
 func cmdUse(args []string) {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "Usage: hosting-cli use <profile-name>")
+		fmt.Fprintln(os.Stderr, "Usage: hosting-cli use <tenant-id-or-alias>")
 		os.Exit(1)
 	}
 
@@ -142,6 +147,9 @@ func cmdActive() {
 	}
 
 	fmt.Printf("Active profile: %s\n", profile.Name)
+	if profile.Alias != "" {
+		fmt.Printf("Alias:          %s\n", profile.Alias)
+	}
 	if profile.TenantID != "" {
 		fmt.Printf("Tenant:         %s\n", profile.TenantID)
 	}
@@ -155,24 +163,36 @@ func cmdActive() {
 	}
 }
 
-func cmdTunnel(args []string) {
-	fs := flag.NewFlagSet("tunnel", flag.ExitOnError)
-	profileName := fs.String("profile", "", "Profile to use (default: active profile)")
-	fs.Parse(args)
-
-	name := *profileName
-	if name == "" && fs.NArg() > 0 {
-		name = fs.Arg(0)
+// resolveProfileName resolves a profile name from explicit value, positional arg, or active profile.
+// Supports aliases at every level.
+func resolveProfileName(explicit string, positional string) string {
+	input := explicit
+	if input == "" {
+		input = positional
 	}
-	if name == "" {
-		var err error
-		name, err = cli.GetActive()
-		if err != nil || name == "" {
-			fmt.Fprintln(os.Stderr, "No profile specified and no active profile set.")
-			fmt.Fprintln(os.Stderr, "Usage: hosting-cli tunnel [profile-name]")
+	if input != "" {
+		name, err := cli.ResolveProfile(input)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
+		return name
 	}
+	active, err := cli.GetActive()
+	if err != nil || active == "" {
+		fmt.Fprintln(os.Stderr, "No profile specified and no active profile set.")
+		fmt.Fprintln(os.Stderr, "Usage: hosting-cli use <tenant-id-or-alias>")
+		os.Exit(1)
+	}
+	return active
+}
+
+func cmdTunnel(args []string) {
+	fs := flag.NewFlagSet("tunnel", flag.ExitOnError)
+	profileName := fs.String("profile", "", "Profile name, tenant ID, or alias (default: active)")
+	fs.Parse(args)
+
+	name := resolveProfileName(*profileName, fs.Arg(0))
 
 	_, cfg, err := cli.LoadProfile(name)
 	if err != nil {
@@ -200,23 +220,14 @@ func cmdTunnel(args []string) {
 
 func cmdProxy(args []string) {
 	fs := flag.NewFlagSet("proxy", flag.ExitOnError)
-	profileName := fs.String("profile", "", "Profile to use (default: active profile)")
+	profileName := fs.String("profile", "", "Profile name, tenant ID, or alias (default: active)")
 	mysqlPort := fs.Int("mysql-port", 3306, "Local port for MySQL proxy")
 	valkeyPort := fs.Int("valkey-port", 6379, "Local port for Valkey proxy")
 	target := fs.String("target", "", "Override target address (e.g. [fd00::1]:3306)")
 	localPort := fs.Int("port", 0, "Local port when using -target")
 	fs.Parse(args)
 
-	name := *profileName
-	if name == "" {
-		var err error
-		name, err = cli.GetActive()
-		if err != nil || name == "" {
-			fmt.Fprintln(os.Stderr, "No profile specified and no active profile set.")
-			fmt.Fprintln(os.Stderr, "Usage: hosting-cli proxy [-profile NAME] [-mysql-port 3306] [-valkey-port 6379]")
-			os.Exit(1)
-		}
-	}
+	name := resolveProfileName(*profileName, "")
 
 	_, cfg, err := cli.LoadProfile(name)
 	if err != nil {
@@ -303,6 +314,9 @@ func cmdStatus() {
 	}
 
 	fmt.Printf("Profile:    %s\n", profile.Name)
+	if profile.Alias != "" {
+		fmt.Printf("Alias:      %s\n", profile.Alias)
+	}
 	if profile.TenantID != "" {
 		fmt.Printf("Tenant:     %s\n", profile.TenantID)
 	}
