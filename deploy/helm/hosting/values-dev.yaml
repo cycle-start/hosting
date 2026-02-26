@@ -45,7 +45,7 @@ controlpanelApi:
   port: 8092
   hostNetwork: true
   migrate: true
-  hostingApiKey: "hst_dev"
+  hostingApiKey: "hst_dev_e2e_test_key_00000000"
   devMode: "true"
 
 controlpanelUi:

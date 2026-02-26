@@ -56,7 +56,7 @@ controlpanelApi:
   port: 8080
   hostNetwork: false
   migrate: true
-  hostingApiKey: "hst_dev"
+  hostingApiKey: "hst_dev_e2e_test_key_00000000"
   corsOrigins: "http://localhost:5173"
   devMode: "false"
   resources: {}
