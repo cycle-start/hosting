@@ -33,7 +33,7 @@ import {
   useCreateZone, useDeleteZone,
   useRetryTenantFailed, useRetryWebroot, useRetryDatabase,
   useRetryValkeyInstance, useRetryS3Bucket, useRetrySSHKey, useRetryZone, useRetryBackup,
-  useWireGuardPeers, useCreateWireGuardPeer, useDeleteWireGuardPeer, useSubscriptions,
+  useWireGuardPeers, useCreateWireGuardPeer, useDeleteWireGuardPeer, useRetryWireGuardPeer, useSubscriptions,
 } from '@/lib/hooks'
 import type { Webroot, Database, ValkeyInstance, S3Bucket, SSHKey, Backup, Zone, EmailAccount, WebrootFormData, DatabaseFormData, ValkeyInstanceFormData, S3BucketFormData, SSHKeyFormData, ZoneFormData, WireGuardPeer, WireGuardPeerFormData, WireGuardPeerCreateResult } from '@/lib/types'
 import { WebrootFields } from '@/components/forms/webroot-fields'
@@ -133,6 +133,8 @@ export function TenantDetailPage() {
   const { data: backupsData, isLoading: backupsLoading } = useBackups(id)
   const { data: emailData, isLoading: emailLoading } = useTenantEmailAccounts(id)
   const { data: zonesData, isLoading: zonesLoading } = useZones()
+  const { data: wgData, isLoading: wgLoading } = useWireGuardPeers(id)
+  const { data: subsData } = useSubscriptions(id)
 
   const suspendMutation = useSuspendTenant()
   const unsuspendMutation = useUnsuspendTenant()
@@ -160,6 +162,9 @@ export function TenantDetailPage() {
   const retrySftpMut = useRetrySSHKey()
   const retryZoneMut = useRetryZone()
   const retryBackupMut = useRetryBackup()
+  const createWgMut = useCreateWireGuardPeer()
+  const deleteWgMut = useDeleteWireGuardPeer()
+  const retryWgMut = useRetryWireGuardPeer()
 
   if (isLoading || !tenant) {
     return (
@@ -187,6 +192,7 @@ export function TenantDetailPage() {
     setS3Form(defaultS3)
     setSftpForm(defaultSftp)
     setZnForm(defaultZone)
+    setWgForm(defaultWg)
     setBkType('web'); setBkSource('')
   }
 
@@ -275,6 +281,15 @@ export function TenantDetailPage() {
     try {
       await createZoneMut.mutateAsync({ name: znForm.name, subscription_id: znForm.subscription_id, tenant_id: id, region_id: tenant.region_id })
       toast.success('Zone created'); setCreateZoneOpen(false); resetForm()
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
+  }
+
+  const handleCreateWgPeer = async () => {
+    if (!wgForm.name || !wgForm.subscription_id) return
+    try {
+      const result = await createWgMut.mutateAsync({ tenant_id: id, name: wgForm.name, subscription_id: wgForm.subscription_id })
+      setCreateWgOpen(false); resetForm()
+      setWgConfigResult(result)
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') }
   }
 
@@ -586,6 +601,51 @@ export function TenantDetailPage() {
     },
   ]
 
+  const wgColumns: ColumnDef<WireGuardPeer>[] = [
+    { accessorKey: 'name', header: 'Name', cell: ({ row }) => <span className="font-medium">{row.original.name}</span> },
+    { accessorKey: 'assigned_ip', header: 'Assigned IP', cell: ({ row }) => <code className="text-xs">{row.original.assigned_ip}</code> },
+    { accessorKey: 'endpoint', header: 'Endpoint', cell: ({ row }) => <code className="text-xs">{row.original.endpoint}</code> },
+    {
+      accessorKey: 'status', header: 'Status',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <StatusBadge status={row.original.status} />
+          {row.original.status_message && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertCircle className="h-3 w-3 text-destructive cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="text-xs">{row.original.status_message}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'created_at', header: 'Created',
+      cell: ({ row }) => <span className="text-sm text-muted-foreground">{formatDate(row.original.created_at)}</span>,
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => (
+        <div className="flex gap-1">
+          {row.original.status === 'failed' && (
+            <Button variant="ghost" size="icon" title="Retry" onClick={(e) => { e.stopPropagation(); retryWgMut.mutate(row.original.id, { onSuccess: () => toast.success('Retrying WireGuard peer'), onError: (e) => toast.error(e.message) }) }}>
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteWgPeer(row.original) }}>
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      ),
+    },
+  ]
+
   const backupColumns: ColumnDef<Backup>[] = [
     { accessorKey: 'type', header: 'Type', cell: ({ row }) => <span className="capitalize">{row.original.type}</span> },
     { accessorKey: 'source_name', header: 'Source' },
@@ -771,6 +831,7 @@ export function TenantDetailPage() {
           <TabsTrigger value="s3"><HardDrive className="mr-1.5 h-4 w-4" /> S3 ({s3Data?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="sftp"><Key className="mr-1.5 h-4 w-4" /> SSH Keys ({sftpData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="email"><Mail className="mr-1.5 h-4 w-4" /> Email ({emailData?.items?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="wireguard"><Shield className="mr-1.5 h-4 w-4" /> WireGuard ({wgData?.items?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="backups"><Archive className="mr-1.5 h-4 w-4" /> Backups ({backupsData?.items?.length ?? 0})</TabsTrigger>
           <Separator orientation="vertical" className="mx-1 h-6" />
           <TabsTrigger value="access-logs"><ScrollText className="mr-1.5 h-4 w-4" /> Access Logs</TabsTrigger>
@@ -869,6 +930,19 @@ export function TenantDetailPage() {
           )}
         </TabsContent>
 
+        <TabsContent value="wireguard">
+          <div className="mb-4 flex justify-end">
+            <Button size="sm" onClick={() => { resetForm(); setCreateWgOpen(true) }}>
+              <Plus className="mr-2 h-4 w-4" /> Create Peer
+            </Button>
+          </div>
+          {!wgLoading && (wgData?.items?.length ?? 0) === 0 ? (
+            <EmptyState icon={Shield} title="No WireGuard peers" description="Create a WireGuard peer for tunnel access to databases and services." action={{ label: 'Create Peer', onClick: () => { resetForm(); setCreateWgOpen(true) } }} />
+          ) : (
+            <DataTable columns={wgColumns} data={wgData?.items ?? []} loading={wgLoading} emptyMessage="No WireGuard peers" />
+          )}
+        </TabsContent>
+
         <TabsContent value="backups">
           <div className="mb-4 flex justify-end">
             <Button size="sm" onClick={() => { resetForm(); setCreateBackupOpen(true) }}>
@@ -925,6 +999,12 @@ export function TenantDetailPage() {
         description={`Delete SSH key "${deleteSftp?.name}"?`}
         confirmLabel="Delete" variant="destructive" loading={deleteSftpMut.isPending}
         onConfirm={async () => { try { await deleteSftpMut.mutateAsync(deleteSftp!.id); toast.success('SSH key deleted'); setDeleteSftp(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
+
+      {/* Delete WireGuard Peer */}
+      <ConfirmDialog open={!!deleteWgPeer} onOpenChange={(o) => !o && setDeleteWgPeer(null)} title="Delete WireGuard Peer"
+        description={`Delete WireGuard peer "${deleteWgPeer?.name}"? The tunnel configuration will stop working.`}
+        confirmLabel="Delete" variant="destructive" loading={deleteWgMut.isPending}
+        onConfirm={async () => { try { await deleteWgMut.mutateAsync(deleteWgPeer!.id); toast.success('WireGuard peer deleted'); setDeleteWgPeer(null) } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Failed') } }} />
 
       {/* Delete Backup */}
       <ConfirmDialog open={!!deleteBackupTarget} onOpenChange={(o) => !o && setDeleteBackupTarget(null)} title="Delete Backup"
@@ -1077,6 +1157,64 @@ export function TenantDetailPage() {
             <Button onClick={handleCreateZone} disabled={createZoneMut.isPending || !znForm.name || !znForm.subscription_id}>
               {createZoneMut.isPending ? 'Creating...' : 'Create'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create WireGuard Peer Dialog */}
+      <Dialog open={createWgOpen} onOpenChange={setCreateWgOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Create WireGuard Peer</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input placeholder="e.g. my-laptop" value={wgForm.name} onChange={(e) => setWgForm({ ...wgForm, name: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Subscription</Label>
+              <Select value={wgForm.subscription_id} onValueChange={(v) => setWgForm({ ...wgForm, subscription_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Select subscription..." /></SelectTrigger>
+                <SelectContent>
+                  {(subsData?.items ?? []).map(s => <SelectItem key={s.id} value={s.id}>{s.name || s.id}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateWgOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateWgPeer} disabled={createWgMut.isPending || !wgForm.name || !wgForm.subscription_id}>
+              {createWgMut.isPending ? 'Creating...' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* WireGuard Config Result Dialog */}
+      <Dialog open={!!wgConfigResult} onOpenChange={(o) => !o && setWgConfigResult(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>WireGuard Configuration</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-start gap-2 rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500" />
+              <p className="text-sm text-yellow-700 dark:text-yellow-400">Save this configuration now — the private key cannot be retrieved again.</p>
+            </div>
+            <pre className="max-h-80 overflow-auto rounded-md bg-muted p-4 text-xs font-mono">{wgConfigResult?.client_config}</pre>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => {
+                if (!wgConfigResult) return
+                const blob = new Blob([wgConfigResult.client_config], { type: 'text/plain' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url; a.download = `${wgConfigResult.peer.name}.conf`; a.click()
+                URL.revokeObjectURL(url)
+              }}>
+                <Download className="mr-2 h-4 w-4" /> Download .conf
+              </Button>
+              <CopyButton value={wgConfigResult?.client_config ?? ''} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setWgConfigResult(null)}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

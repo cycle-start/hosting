@@ -890,6 +890,14 @@ export function useDeleteWireGuardPeer() {
   })
 }
 
+export function useRetryWireGuardPeer() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/wireguard-peers/${id}/retry`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['wireguard-peers'] }),
+  })
+}
+
 // SSH Keys
 export function useSSHKeys(tenantId: string) {
   return useQuery({

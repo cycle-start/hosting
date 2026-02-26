@@ -291,6 +291,43 @@ Gateway shard convergence:
 4. Syncs all peers to each gateway node
 5. Sets up transit routes to all DB and Valkey shard nodes
 
+### Service Metadata in Client Config
+
+The `client_config` returned on peer creation includes service metadata comments that enable automatic service discovery by the `hosting-cli` tool:
+
+```ini
+[Interface]
+PrivateKey = ...
+Address = fd00:…:ffff::1/128
+
+[Peer]
+PublicKey = ...
+PresharedKey = ...
+Endpoint = gw.example.com:51820
+AllowedIPs = fd00::/16
+PersistentKeepalive = 25
+
+# hosting-cli:services
+# mysql=fd00:abcd:101::1388
+# valkey=fd00:abcd:201::1388
+```
+
+Service addresses are computed from the tenant's databases and Valkey instances at creation time using the same ULA scheme (`fd00:{cluster_hash}:{transit_index}::{tenant_uid}`). The `hosting-cli proxy` command parses these comments to automatically set up local port forwarding.
+
+### CLI Tunnel Tool (`hosting-cli`)
+
+A standalone binary that establishes userspace WireGuard tunnels without requiring root or kernel modules (uses `golang.zx2c4.com/wireguard/tun/netstack`).
+
+**Workflow:**
+1. Create a WireGuard peer in the control panel
+2. Download the `.conf` file
+3. `hosting-cli import peer.conf -tenant <tenant-id>` — saves profile with tenant association
+4. `hosting-cli proxy` — establishes tunnel and proxies MySQL/Valkey to localhost
+
+**Multi-tenant support:** Profiles are stored with tenant IDs. `hosting-cli use <name>` switches between tenants. All commands default to the active profile but accept `-profile` to override.
+
+See `docs/hosting-cli.md` for full documentation.
+
 ### Feature Gate
 
 WireGuard peers require a subscription with the `wireguard` module.

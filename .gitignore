@@ -5,6 +5,7 @@
 /worker
 /node-agent
 /hostctl
+/hosting-cli
 /mcp-server
 *.exe
 

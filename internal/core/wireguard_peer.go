@@ -91,6 +91,51 @@ func (s *WireGuardPeerService) Create(ctx context.Context, peer *model.WireGuard
 		gatewayPublicKey = "GATEWAY_PUBLIC_KEY_NOT_CONFIGURED"
 	}
 
+	// Look up tenant UID for ULA computation.
+	var tenantUID int
+	err = s.db.QueryRow(ctx, "SELECT uid FROM tenants WHERE id = $1", peer.TenantID).Scan(&tenantUID)
+	if err != nil {
+		return nil, fmt.Errorf("get tenant uid: %w", err)
+	}
+
+	// Build service metadata comments for CLI tool.
+	var serviceLines string
+	type svcRow struct {
+		svcType   string
+		shardRole string
+		shardIdx  int
+	}
+	var services []svcRow
+	rows, err := s.db.Query(ctx, `
+		SELECT 'mysql' AS svc_type, s.role, nsa.shard_index
+		FROM databases d
+		JOIN shards s ON s.id = d.shard_id
+		JOIN node_shard_assignments nsa ON nsa.shard_id = d.shard_id AND nsa.shard_index = 1
+		WHERE d.tenant_id = $1 AND d.status NOT IN ('deleting', 'deleted', 'failed')
+		UNION ALL
+		SELECT 'valkey' AS svc_type, s.role, nsa.shard_index
+		FROM valkey_instances v
+		JOIN shards s ON s.id = v.shard_id
+		JOIN node_shard_assignments nsa ON nsa.shard_id = v.shard_id AND nsa.shard_index = 1
+		WHERE v.tenant_id = $1 AND v.status NOT IN ('deleting', 'deleted', 'failed')
+	`, peer.TenantID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var sr svcRow
+			if err := rows.Scan(&sr.svcType, &sr.shardRole, &sr.shardIdx); err == nil {
+				services = append(services, sr)
+			}
+		}
+	}
+	if len(services) > 0 {
+		serviceLines = "\n# hosting-cli:services\n"
+		for _, sr := range services {
+			ula := ComputeTenantULA(clusterID, TransitIndex(sr.shardRole, sr.shardIdx), tenantUID)
+			serviceLines += fmt.Sprintf("# %s=%s\n", sr.svcType, ula)
+		}
+	}
+
 	// Build client config.
 	clientConfig := fmt.Sprintf(`[Interface]
 PrivateKey = %s
@@ -103,6 +148,7 @@ Endpoint = %s
 AllowedIPs = fd00::/16
 PersistentKeepalive = 25
 `, privateKey.String(), peer.AssignedIP, gatewayPublicKey, psk.String(), peer.Endpoint)
+	clientConfig += serviceLines
 
 	if err := signalProvision(ctx, s.tc, s.db, peer.TenantID, model.ProvisionTask{
 		WorkflowName: "CreateWireGuardPeerWorkflow",

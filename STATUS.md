@@ -185,6 +185,22 @@ React SPA (TypeScript, Vite, Tailwind, shadcn/ui) served by Go binary on port 30
 - `hostctl converge-shard <shard-id>`: triggers manual shard convergence
 - Auto-loads `.env` file for `HOSTING_API_KEY`
 
+### Tunnel CLI (`hosting-cli`)
+
+Userspace WireGuard tunnel client for accessing tenant MySQL and Valkey services from a local machine (no root required):
+
+- `hosting-cli import <config> [-tenant ID]`: import WireGuard config, associate with tenant
+- `hosting-cli profiles`: list saved profiles with active indicator
+- `hosting-cli use <name>`: switch active profile (context switch between tenants)
+- `hosting-cli active`: show active profile details and available services
+- `hosting-cli tunnel [name]`: establish WireGuard tunnel via netstack (userspace)
+- `hosting-cli proxy [-mysql-port 3306] [-valkey-port 6379]`: tunnel + auto-proxy services to localhost
+- `hosting-cli proxy -target [addr]:port -port <local-port>`: manual target proxy
+- `hosting-cli status`: show profile and service info
+- Multi-tenant profiles: each profile stored with tenant ID, context switchable via `use`
+- Service auto-discovery: parses `# hosting-cli:services` metadata comments from WireGuard config
+- Client config includes service ULA addresses (MySQL, Valkey) embedded as comments at creation time
+
 ### Infrastructure
 
 - **VM provisioning:** Terraform + libvirt with single Packer base image (Ubuntu + HWE kernel), Ansible for role-specific software
@@ -354,6 +370,9 @@ Names are `{prefix}{10-char-random}`, globally unique, auto-generated on creatio
 - Feature gated behind `wireguard` subscription module
 - Terraform + cloud-init + Ansible role for gateway VM provisioning (WireGuard packages, IPv6 forwarding, server keypair)
 - Transit offset 768-1023 for gateway role
+- Service metadata embedded in client config (`# hosting-cli:services` comments with MySQL/Valkey ULA addresses)
+- Full admin UI: WireGuard tab on tenant detail page (create peer, view config with download/copy, delete, retry failed)
+- Full control panel UI: list page with card grid, create form, config display with download/copy/CLI hint, detail page with info + delete
 
 ---
 
