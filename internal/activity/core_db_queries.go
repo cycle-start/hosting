@@ -15,7 +15,7 @@ import (
 // ListValkeyInstancesByTenantID retrieves all valkey instances for a tenant.
 func (a *CoreDB) ListValkeyInstancesByTenantID(ctx context.Context, tenantID string) ([]model.ValkeyInstance, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, shard_id, port, max_memory_mb, password, status, status_message, suspend_reason, created_at, updated_at
+		`SELECT id, tenant_id, shard_id, port, max_memory_mb, password_hash, status, status_message, suspend_reason, created_at, updated_at
 		 FROM valkey_instances WHERE tenant_id = $1`, tenantID,
 	)
 	if err != nil {
@@ -27,7 +27,7 @@ func (a *CoreDB) ListValkeyInstancesByTenantID(ctx context.Context, tenantID str
 	for rows.Next() {
 		var v model.ValkeyInstance
 		if err := rows.Scan(&v.ID, &v.TenantID, &v.ShardID, &v.Port, &v.MaxMemoryMB,
-			&v.Password, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt); err != nil {
+			&v.PasswordHash, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan valkey instance row: %w", err)
 		}
 		instances = append(instances, v)
@@ -193,9 +193,9 @@ func (a *CoreDB) GetDatabaseByID(ctx context.Context, id string) (*model.Databas
 func (a *CoreDB) GetDatabaseUserByID(ctx context.Context, id string) (*model.DatabaseUser, error) {
 	var u model.DatabaseUser
 	err := a.db.QueryRow(ctx,
-		`SELECT id, database_id, username, password, privileges, status, status_message, created_at, updated_at
+		`SELECT id, database_id, username, password_hash, privileges, status, status_message, created_at, updated_at
 		 FROM database_users WHERE id = $1`, id,
-	).Scan(&u.ID, &u.DatabaseID, &u.Username, &u.Password, &u.Privileges, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.DatabaseID, &u.Username, &u.PasswordHash, &u.Privileges, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get database user by id: %w", err)
 	}
@@ -480,10 +480,10 @@ func (a *CoreDB) ListDatabasesByTenantID(ctx context.Context, tenantID string) (
 func (a *CoreDB) GetValkeyInstanceByID(ctx context.Context, id string) (*model.ValkeyInstance, error) {
 	var v model.ValkeyInstance
 	err := a.db.QueryRow(ctx,
-		`SELECT id, tenant_id, shard_id, port, max_memory_mb, password, status, status_message, suspend_reason, created_at, updated_at
+		`SELECT id, tenant_id, shard_id, port, max_memory_mb, password_hash, status, status_message, suspend_reason, created_at, updated_at
 		 FROM valkey_instances WHERE id = $1`, id,
 	).Scan(&v.ID, &v.TenantID, &v.ShardID, &v.Port, &v.MaxMemoryMB,
-		&v.Password, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt)
+		&v.PasswordHash, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get valkey instance by id: %w", err)
 	}
@@ -494,9 +494,9 @@ func (a *CoreDB) GetValkeyInstanceByID(ctx context.Context, id string) (*model.V
 func (a *CoreDB) GetValkeyUserByID(ctx context.Context, id string) (*model.ValkeyUser, error) {
 	var u model.ValkeyUser
 	err := a.db.QueryRow(ctx,
-		`SELECT id, valkey_instance_id, username, password, privileges, key_pattern, status, status_message, created_at, updated_at
+		`SELECT id, valkey_instance_id, username, password_hash, privileges, key_pattern, status, status_message, created_at, updated_at
 		 FROM valkey_users WHERE id = $1`, id,
-	).Scan(&u.ID, &u.ValkeyInstanceID, &u.Username, &u.Password,
+	).Scan(&u.ID, &u.ValkeyInstanceID, &u.Username, &u.PasswordHash,
 		&u.Privileges, &u.KeyPattern, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get valkey user by id: %w", err)
@@ -574,7 +574,7 @@ func (a *CoreDB) ListDatabasesByShard(ctx context.Context, shardID string) ([]mo
 // ListValkeyInstancesByShard retrieves all valkey instances assigned to a shard (excluding deleted).
 func (a *CoreDB) ListValkeyInstancesByShard(ctx context.Context, shardID string) ([]model.ValkeyInstance, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, tenant_id, shard_id, port, max_memory_mb, password, status, status_message, suspend_reason, created_at, updated_at
+		`SELECT id, tenant_id, shard_id, port, max_memory_mb, password_hash, status, status_message, suspend_reason, created_at, updated_at
 		 FROM valkey_instances WHERE shard_id = $1 ORDER BY id`, shardID,
 	)
 	if err != nil {
@@ -585,7 +585,7 @@ func (a *CoreDB) ListValkeyInstancesByShard(ctx context.Context, shardID string)
 	var instances []model.ValkeyInstance
 	for rows.Next() {
 		var v model.ValkeyInstance
-		if err := rows.Scan(&v.ID, &v.TenantID, &v.ShardID, &v.Port, &v.MaxMemoryMB, &v.Password, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt); err != nil {
+		if err := rows.Scan(&v.ID, &v.TenantID, &v.ShardID, &v.Port, &v.MaxMemoryMB, &v.PasswordHash, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan valkey instance row: %w", err)
 		}
 		instances = append(instances, v)
@@ -596,7 +596,7 @@ func (a *CoreDB) ListValkeyInstancesByShard(ctx context.Context, shardID string)
 // ListDatabaseUsersByDatabaseID retrieves all users for a database (excluding deleted).
 func (a *CoreDB) ListDatabaseUsersByDatabaseID(ctx context.Context, databaseID string) ([]model.DatabaseUser, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, database_id, username, password, privileges, status, status_message, created_at, updated_at
+		`SELECT id, database_id, username, password_hash, privileges, status, status_message, created_at, updated_at
 		 FROM database_users WHERE database_id = $1`, databaseID,
 	)
 	if err != nil {
@@ -607,7 +607,7 @@ func (a *CoreDB) ListDatabaseUsersByDatabaseID(ctx context.Context, databaseID s
 	var users []model.DatabaseUser
 	for rows.Next() {
 		var u model.DatabaseUser
-		if err := rows.Scan(&u.ID, &u.DatabaseID, &u.Username, &u.Password, &u.Privileges, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.DatabaseID, &u.Username, &u.PasswordHash, &u.Privileges, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan database user row: %w", err)
 		}
 		users = append(users, u)
@@ -618,7 +618,7 @@ func (a *CoreDB) ListDatabaseUsersByDatabaseID(ctx context.Context, databaseID s
 // ListValkeyUsersByInstanceID retrieves all users for a valkey instance (excluding deleted).
 func (a *CoreDB) ListValkeyUsersByInstanceID(ctx context.Context, instanceID string) ([]model.ValkeyUser, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, valkey_instance_id, username, password, privileges, key_pattern, status, status_message, created_at, updated_at
+		`SELECT id, valkey_instance_id, username, password_hash, privileges, key_pattern, status, status_message, created_at, updated_at
 		 FROM valkey_users WHERE valkey_instance_id = $1`, instanceID,
 	)
 	if err != nil {
@@ -629,7 +629,7 @@ func (a *CoreDB) ListValkeyUsersByInstanceID(ctx context.Context, instanceID str
 	var users []model.ValkeyUser
 	for rows.Next() {
 		var u model.ValkeyUser
-		if err := rows.Scan(&u.ID, &u.ValkeyInstanceID, &u.Username, &u.Password, &u.Privileges, &u.KeyPattern, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.ValkeyInstanceID, &u.Username, &u.PasswordHash, &u.Privileges, &u.KeyPattern, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan valkey user row: %w", err)
 		}
 		users = append(users, u)
@@ -859,9 +859,9 @@ func (a *CoreDB) GetS3BucketByID(ctx context.Context, id string) (*model.S3Bucke
 func (a *CoreDB) GetS3AccessKeyByID(ctx context.Context, id string) (*model.S3AccessKey, error) {
 	var k model.S3AccessKey
 	err := a.db.QueryRow(ctx,
-		`SELECT id, s3_bucket_id, access_key_id, secret_access_key, permissions, status, status_message, created_at, updated_at
+		`SELECT id, s3_bucket_id, access_key_id, secret_key_hash, permissions, status, status_message, created_at, updated_at
 		 FROM s3_access_keys WHERE id = $1`, id,
-	).Scan(&k.ID, &k.S3BucketID, &k.AccessKeyID, &k.SecretAccessKey,
+	).Scan(&k.ID, &k.S3BucketID, &k.AccessKeyID, &k.SecretKeyHash,
 		&k.Permissions, &k.Status, &k.StatusMessage, &k.CreatedAt, &k.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get s3 access key by id: %w", err)
@@ -1088,7 +1088,7 @@ func (a *CoreDB) FinalizeTenantEgressRules(ctx context.Context, tenantID string)
 // GetActiveDatabaseUsers returns all active database users for a database.
 func (a *CoreDB) GetActiveDatabaseUsers(ctx context.Context, databaseID string) ([]model.DatabaseUser, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, database_id, username, password, privileges, status, status_message, created_at, updated_at
+		`SELECT id, database_id, username, password_hash, privileges, status, status_message, created_at, updated_at
 		 FROM database_users
 		 WHERE database_id = $1 AND status = 'active'
 		 ORDER BY id`, databaseID)
@@ -1100,7 +1100,7 @@ func (a *CoreDB) GetActiveDatabaseUsers(ctx context.Context, databaseID string) 
 	var users []model.DatabaseUser
 	for rows.Next() {
 		var u model.DatabaseUser
-		if err := rows.Scan(&u.ID, &u.DatabaseID, &u.Username, &u.Password,
+		if err := rows.Scan(&u.ID, &u.DatabaseID, &u.Username, &u.PasswordHash,
 			&u.Privileges, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan database user: %w", err)
 		}
@@ -1178,7 +1178,7 @@ func (a *CoreDB) ListEgressRulesByTenantID(ctx context.Context, tenantID string)
 // ListS3AccessKeysByBucketID retrieves all access keys for an S3 bucket.
 func (a *CoreDB) ListS3AccessKeysByBucketID(ctx context.Context, bucketID string) ([]model.S3AccessKey, error) {
 	rows, err := a.db.Query(ctx,
-		`SELECT id, s3_bucket_id, access_key_id, secret_access_key, permissions, status, status_message, created_at, updated_at
+		`SELECT id, s3_bucket_id, access_key_id, secret_key_hash, permissions, status, status_message, created_at, updated_at
 		 FROM s3_access_keys WHERE s3_bucket_id = $1`, bucketID,
 	)
 	if err != nil {
@@ -1189,7 +1189,7 @@ func (a *CoreDB) ListS3AccessKeysByBucketID(ctx context.Context, bucketID string
 	var keys []model.S3AccessKey
 	for rows.Next() {
 		var k model.S3AccessKey
-		if err := rows.Scan(&k.ID, &k.S3BucketID, &k.AccessKeyID, &k.SecretAccessKey, &k.Permissions, &k.Status, &k.StatusMessage, &k.CreatedAt, &k.UpdatedAt); err != nil {
+		if err := rows.Scan(&k.ID, &k.S3BucketID, &k.AccessKeyID, &k.SecretKeyHash, &k.Permissions, &k.Status, &k.StatusMessage, &k.CreatedAt, &k.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan s3 access key row: %w", err)
 		}
 		keys = append(keys, k)

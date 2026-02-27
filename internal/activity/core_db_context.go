@@ -138,12 +138,12 @@ func (a *CoreDB) GetDatabaseUserContext(ctx context.Context, userID string) (*Da
 
 	// JOIN database_users with databases.
 	err := a.db.QueryRow(ctx,
-		`SELECT u.id, u.database_id, u.username, u.password, u.privileges, u.status, u.status_message, u.created_at, u.updated_at,
+		`SELECT u.id, u.database_id, u.username, u.password_hash, u.privileges, u.status, u.status_message, u.created_at, u.updated_at,
 		        d.id, d.tenant_id, d.shard_id, d.node_id, d.status, d.status_message, d.suspend_reason, d.created_at, d.updated_at
 		 FROM database_users u
 		 JOIN databases d ON d.id = u.database_id
 		 WHERE u.id = $1`, userID,
-	).Scan(&dc.User.ID, &dc.User.DatabaseID, &dc.User.Username, &dc.User.Password, &dc.User.Privileges, &dc.User.Status, &dc.User.StatusMessage, &dc.User.CreatedAt, &dc.User.UpdatedAt,
+	).Scan(&dc.User.ID, &dc.User.DatabaseID, &dc.User.Username, &dc.User.PasswordHash, &dc.User.Privileges, &dc.User.Status, &dc.User.StatusMessage, &dc.User.CreatedAt, &dc.User.UpdatedAt,
 		&dc.Database.ID, &dc.Database.TenantID, &dc.Database.ShardID, &dc.Database.NodeID, &dc.Database.Status, &dc.Database.StatusMessage, &dc.Database.SuspendReason, &dc.Database.CreatedAt, &dc.Database.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get database user context: %w", err)
@@ -167,13 +167,13 @@ func (a *CoreDB) GetValkeyUserContext(ctx context.Context, userID string) (*Valk
 
 	// JOIN valkey_users with valkey_instances.
 	err := a.db.QueryRow(ctx,
-		`SELECT u.id, u.valkey_instance_id, u.username, u.password, u.privileges, u.key_pattern, u.status, u.status_message, u.created_at, u.updated_at,
-		        i.id, i.tenant_id, i.shard_id, i.port, i.max_memory_mb, i.password, i.status, i.status_message, i.suspend_reason, i.created_at, i.updated_at
+		`SELECT u.id, u.valkey_instance_id, u.username, u.password_hash, u.privileges, u.key_pattern, u.status, u.status_message, u.created_at, u.updated_at,
+		        i.id, i.tenant_id, i.shard_id, i.port, i.max_memory_mb, i.password_hash, i.status, i.status_message, i.suspend_reason, i.created_at, i.updated_at
 		 FROM valkey_users u
 		 JOIN valkey_instances i ON i.id = u.valkey_instance_id
 		 WHERE u.id = $1`, userID,
-	).Scan(&vc.User.ID, &vc.User.ValkeyInstanceID, &vc.User.Username, &vc.User.Password, &vc.User.Privileges, &vc.User.KeyPattern, &vc.User.Status, &vc.User.StatusMessage, &vc.User.CreatedAt, &vc.User.UpdatedAt,
-		&vc.Instance.ID, &vc.Instance.TenantID, &vc.Instance.ShardID, &vc.Instance.Port, &vc.Instance.MaxMemoryMB, &vc.Instance.Password, &vc.Instance.Status, &vc.Instance.StatusMessage, &vc.Instance.SuspendReason, &vc.Instance.CreatedAt, &vc.Instance.UpdatedAt)
+	).Scan(&vc.User.ID, &vc.User.ValkeyInstanceID, &vc.User.Username, &vc.User.PasswordHash, &vc.User.Privileges, &vc.User.KeyPattern, &vc.User.Status, &vc.User.StatusMessage, &vc.User.CreatedAt, &vc.User.UpdatedAt,
+		&vc.Instance.ID, &vc.Instance.TenantID, &vc.Instance.ShardID, &vc.Instance.Port, &vc.Instance.MaxMemoryMB, &vc.Instance.PasswordHash, &vc.Instance.Status, &vc.Instance.StatusMessage, &vc.Instance.SuspendReason, &vc.Instance.CreatedAt, &vc.Instance.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get valkey user context: %w", err)
 	}
@@ -245,12 +245,12 @@ func (a *CoreDB) GetS3AccessKeyContext(ctx context.Context, keyID string) (*S3Ac
 
 	// JOIN s3_access_keys with s3_buckets.
 	err := a.db.QueryRow(ctx,
-		`SELECT k.id, k.s3_bucket_id, k.access_key_id, k.secret_access_key, k.permissions, k.status, k.status_message, k.created_at, k.updated_at,
+		`SELECT k.id, k.s3_bucket_id, k.access_key_id, k.secret_key_hash, k.permissions, k.status, k.status_message, k.created_at, k.updated_at,
 		        b.id, b.tenant_id, b.shard_id, b.public, b.quota_bytes, b.status, b.status_message, b.suspend_reason, b.created_at, b.updated_at
 		 FROM s3_access_keys k
 		 JOIN s3_buckets b ON b.id = k.s3_bucket_id
 		 WHERE k.id = $1`, keyID,
-	).Scan(&sc.Key.ID, &sc.Key.S3BucketID, &sc.Key.AccessKeyID, &sc.Key.SecretAccessKey, &sc.Key.Permissions, &sc.Key.Status, &sc.Key.StatusMessage, &sc.Key.CreatedAt, &sc.Key.UpdatedAt,
+	).Scan(&sc.Key.ID, &sc.Key.S3BucketID, &sc.Key.AccessKeyID, &sc.Key.SecretKeyHash, &sc.Key.Permissions, &sc.Key.Status, &sc.Key.StatusMessage, &sc.Key.CreatedAt, &sc.Key.UpdatedAt,
 		&sc.Bucket.ID, &sc.Bucket.TenantID, &sc.Bucket.ShardID, &sc.Bucket.Public, &sc.Bucket.QuotaBytes, &sc.Bucket.Status, &sc.Bucket.StatusMessage, &sc.Bucket.SuspendReason, &sc.Bucket.CreatedAt, &sc.Bucket.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get s3 access key context: %w", err)

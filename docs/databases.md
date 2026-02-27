@@ -41,14 +41,14 @@ Database and user names are validated with `^[a-zA-Z0-9_]+$` to prevent SQL inje
 | `ID`             | `string`   | `id`                | Platform-generated unique ID         |
 | `DatabaseID`     | `string`   | `database_id`       | Parent database                      |
 | `Username`       | `string`   | `username`          | MySQL username                       |
-| `Password`       | `string`   | `password`          | MySQL password (write-only)          |
+| `PasswordHash`   | `string`   | `-`                 | MySQL native password hash (internal)|
 | `Privileges`     | `[]string` | `privileges`        | MySQL privilege list                 |
 | `Status`         | `string`   | `status`            | Lifecycle status                     |
 | `StatusMessage`  | `*string`  | `status_message`    | Error details when `status=failed`   |
 | `CreatedAt`      | `time`     | `created_at`        | Creation timestamp                   |
 | `UpdatedAt`      | `time`     | `updated_at`        | Last update timestamp                |
 
-**Password handling:** The password is stored in the core DB for workflow execution but is **never returned** in GET or LIST responses. It is only accepted on create/update.
+**Password handling:** The API accepts a plaintext password on create/update, which is immediately hashed using MySQL's `mysql_native_password` format (`"*" + HEX(SHA1(SHA1(password)))`) and stored as `password_hash`. The plaintext is never persisted. The hash is passed directly to MySQL's `CREATE USER ... AS` syntax, so retries work without needing the original password. The hash is **never returned** in API responses.
 
 ### Allowed Privileges
 
@@ -152,8 +152,8 @@ The `DatabaseManager` on each node agent executes MySQL commands via the `mysql`
 
 - **CreateDatabase**: `CREATE DATABASE IF NOT EXISTS \`name\``
 - **DeleteDatabase**: `DROP DATABASE IF EXISTS \`name\``
-- **CreateUser**: `DROP USER IF EXISTS` -> `CREATE USER` -> `GRANT` -> `FLUSH PRIVILEGES`
-- **UpdateUser**: `ALTER USER` (password) -> `REVOKE ALL` -> `GRANT` -> `FLUSH PRIVILEGES`
+- **CreateUser**: `DROP USER IF EXISTS` -> `CREATE USER ... IDENTIFIED WITH mysql_native_password AS '{hash}'` -> `GRANT` -> `FLUSH PRIVILEGES`
+- **UpdateUser**: `ALTER USER ... IDENTIFIED WITH mysql_native_password AS '{hash}'` -> `REVOKE ALL` -> `GRANT` -> `FLUSH PRIVILEGES`
 - **DeleteUser**: `DROP USER IF EXISTS`
 - **DumpDatabase**: `mysqldump --single-transaction --routines --triggers | gzip > path`
 - **ImportDatabase**: `gunzip -c path | mysql dbname`

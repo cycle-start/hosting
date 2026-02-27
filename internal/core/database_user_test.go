@@ -36,7 +36,6 @@ func TestDatabaseUserService_Create_Success(t *testing.T) {
 		ID:         "test-dbuser-1",
 		DatabaseID: "test-database-1",
 		Username:   "admin",
-		Password:   "secret",
 		Privileges: []string{"ALL"},
 		Status:     model.StatusPending,
 		CreatedAt:  time.Now(),
@@ -59,7 +58,7 @@ func TestDatabaseUserService_Create_Success(t *testing.T) {
 	wfRun.On("GetRunID").Return("mock-run-id")
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
-	err := svc.Create(ctx, user)
+	err := svc.Create(ctx, user, "secret")
 	require.NoError(t, err)
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
@@ -75,7 +74,7 @@ func TestDatabaseUserService_Create_InsertError(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("unique violation"))
 
-	err := svc.Create(ctx, user)
+	err := svc.Create(ctx, user, "secret")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "insert database user")
 	db.AssertExpectations(t)
@@ -100,7 +99,7 @@ func TestDatabaseUserService_Create_WorkflowError(t *testing.T) {
 
 	tc.On("ExecuteWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
-	err := svc.Create(ctx, user)
+	err := svc.Create(ctx, user, "secret")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "signal CreateDatabaseUserWorkflow")
 	db.AssertExpectations(t)
@@ -236,7 +235,6 @@ func TestDatabaseUserService_Update_Success(t *testing.T) {
 	user := &model.DatabaseUser{
 		ID:         "test-dbuser-1",
 		Username:   "admin",
-		Password:   "new-pass",
 		Privileges: []string{"ALL"},
 	}
 
@@ -250,13 +248,12 @@ func TestDatabaseUserService_Update_Success(t *testing.T) {
 	}}
 	db.On("QueryRow", ctx, mock.AnythingOfType("string"), mock.Anything).Return(resolveRow).Once()
 
-
 	wfRun := &temporalmocks.WorkflowRun{}
 	wfRun.On("GetID").Return("mock-wf-id")
 	wfRun.On("GetRunID").Return("mock-run-id")
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
-	err := svc.Update(ctx, user)
+	err := svc.Update(ctx, user, "new-pass")
 	require.NoError(t, err)
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
@@ -271,7 +268,7 @@ func TestDatabaseUserService_Update_DBError(t *testing.T) {
 	user := &model.DatabaseUser{ID: "test-dbuser-1"}
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
 
-	err := svc.Update(ctx, user)
+	err := svc.Update(ctx, user, "pass")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "update database user")
 	db.AssertExpectations(t)
@@ -295,7 +292,7 @@ func TestDatabaseUserService_Update_WorkflowError(t *testing.T) {
 
 	tc.On("ExecuteWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("temporal down"))
 
-	err := svc.Update(ctx, user)
+	err := svc.Update(ctx, user, "pass")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "signal UpdateDatabaseUserWorkflow")
 	db.AssertExpectations(t)

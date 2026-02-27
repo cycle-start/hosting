@@ -196,7 +196,7 @@ type DatabaseConnectionInfo struct {
 func (s *OIDCService) GetDatabaseConnectionInfo(ctx context.Context, databaseID string) (*DatabaseConnectionInfo, error) {
 	var info DatabaseConnectionInfo
 	err := s.db.QueryRow(ctx, `
-		SELECT d.name, COALESCE(host(n.ip_address), ''), 3306
+		SELECT d.id, COALESCE(host(n.ip_address), ''), 3306
 		FROM databases d
 		LEFT JOIN node_shard_assignments ns ON ns.shard_id = d.shard_id AND ns.shard_index = 1
 		LEFT JOIN nodes n ON n.id = ns.node_id

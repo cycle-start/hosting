@@ -39,14 +39,14 @@ API request --> Core DB (desired state) --> Temporal workflow --> Node agent (ra
 | `ID`               | `string`  | `id`                  | Platform-generated unique ID        |
 | `S3BucketID`       | `string`  | `s3_bucket_id`        | Parent bucket                       |
 | `AccessKeyID`      | `string`  | `access_key_id`       | S3 access key ID (20 chars)         |
-| `SecretAccessKey`   | `string`  | `secret_access_key`   | S3 secret key (40 chars, shown once)|
+| `SecretKeyHash`    | `string`  | `-`                   | SHA256 hash of secret key (internal)|
 | `Permissions`      | `string`  | `permissions`         | `read-only` or `read-write`         |
 | `Status`           | `string`  | `status`              | Lifecycle status                    |
 | `StatusMessage`    | `*string` | `status_message`      | Error details when `status=failed`  |
 | `CreatedAt`        | `time`    | `created_at`          | Creation timestamp                  |
 | `UpdatedAt`        | `time`    | `updated_at`          | Last update timestamp               |
 
-**Secret key handling:** The `secret_access_key` is **only returned once** in the creation response (HTTP 201). It is redacted in all subsequent GET and LIST responses. There is no way to retrieve it again -- if lost, delete the key and create a new one.
+**Secret key handling:** The `secret_access_key` is **only returned once** in the creation response (HTTP 201). The core DB stores only a `SHA256(secret)` hash for audit purposes. The plaintext secret is passed to the Ceph RGW node via the Temporal workflow argument (required by the S3 protocol for HMAC request signing). It is never stored in the control plane database. There is no way to retrieve the secret again -- if lost, delete the key and create a new one. S3 access keys do not support retry; delete and recreate instead.
 
 ### Bucket Naming
 
@@ -84,7 +84,6 @@ For example, tenant `abc123` creating bucket `media` results in the RGW bucket `
 | `GET`    | `/s3-buckets/{bucketID}/access-keys`      | 200    | List access keys for a bucket     |
 | `POST`   | `/s3-buckets/{bucketID}/access-keys`      | 201    | Create an access key              |
 | `DELETE` | `/s3-access-keys/{id}`                    | 202    | Delete an access key              |
-| `POST`   | `/s3-access-keys/{id}/retry`              | 202    | Retry a failed provisioning       |
 
 Note: access key creation returns **201** (not 202) because the secret is included in the response body.
 

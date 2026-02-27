@@ -9,7 +9,7 @@ type ValkeyInstance struct {
 	ShardID        *string `json:"shard_id,omitempty" db:"shard_id"`
 	Port           int     `json:"port" db:"port"`
 	MaxMemoryMB    int     `json:"max_memory_mb" db:"max_memory_mb"`
-	Password       string  `json:"password,omitempty" db:"password"`
+	PasswordHash   string  `json:"password_hash,omitempty" db:"password_hash"`
 	Status         string  `json:"status" db:"status"`
 	StatusMessage  *string `json:"status_message,omitempty" db:"status_message"`
 	SuspendReason  string  `json:"suspend_reason" db:"suspend_reason"`

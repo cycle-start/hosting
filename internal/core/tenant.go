@@ -504,7 +504,7 @@ func (s *TenantService) RetryFailed(ctx context.Context, tenantID string) (int, 
 		{`SELECT ar.id, ar.subject FROM email_autoreplies ar JOIN email_accounts ea ON ea.id = ar.email_account_id JOIN fqdns f ON f.id = ea.fqdn_id JOIN webroots w ON w.id = f.webroot_id WHERE w.tenant_id = $1 AND ar.status = 'failed'`, "email_autoreplies", "UpdateEmailAutoReplyWorkflow", "email-autoreply"},
 		{"SELECT id, name FROM ssh_keys WHERE tenant_id = $1 AND status = 'failed'", "ssh_keys", "AddSSHKeyWorkflow", "ssh-key"},
 		{"SELECT id, id FROM s3_buckets WHERE tenant_id = $1 AND status = 'failed'", "s3_buckets", "CreateS3BucketWorkflow", "s3-bucket"},
-		{`SELECT k.id, k.access_key_id FROM s3_access_keys k JOIN s3_buckets b ON b.id = k.s3_bucket_id WHERE b.tenant_id = $1 AND k.status = 'failed'`, "s3_access_keys", "CreateS3AccessKeyWorkflow", "s3-access-key"},
+		// S3 access keys cannot be retried (plaintext secret is not stored). Delete and recreate instead.
 		{"SELECT id, type || '/' || source_name FROM backups WHERE tenant_id = $1 AND status = 'failed'", "backups", "CreateBackupWorkflow", "backup-create"},
 		{"SELECT id, id FROM cron_jobs WHERE tenant_id = $1 AND status = 'failed'", "cron_jobs", "CreateCronJobWorkflow", "cron-job"},
 	}

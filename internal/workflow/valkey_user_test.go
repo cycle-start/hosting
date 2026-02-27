@@ -38,7 +38,7 @@ func (s *CreateValkeyUserWorkflowTestSuite) TestSuccess() {
 		ID:               userID,
 		ValkeyInstanceID: instanceID,
 		Username:         "appuser",
-		Password:         "secret123",
+		PasswordHash:         "secret123",
 		Privileges:       []string{"allcommands"},
 		KeyPattern:       "*",
 	}
@@ -63,7 +63,7 @@ func (s *CreateValkeyUserWorkflowTestSuite) TestSuccess() {
 		InstanceName: instanceID,
 		Port:         6379,
 		Username:     "appuser",
-		Password:     "secret123",
+		PasswordHash:     "secret123",
 		Privileges:   []string{"allcommands"},
 		KeyPattern:   "*",
 	}).Return(nil)
@@ -110,7 +110,7 @@ func (s *CreateValkeyUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 		ID:               userID,
 		ValkeyInstanceID: instanceID,
 		Username:         "appuser",
-		Password:         "secret123",
+		PasswordHash:         "secret123",
 		Privileges:       []string{"allcommands"},
 		KeyPattern:       "*",
 	}
@@ -146,7 +146,7 @@ func (s *CreateValkeyUserWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 		ID:               userID,
 		ValkeyInstanceID: instanceID,
 		Username:         "appuser",
-		Password:         "secret123",
+		PasswordHash:         "secret123",
 		Privileges:       []string{"allcommands"},
 		KeyPattern:       "*",
 	}
@@ -205,7 +205,7 @@ func (s *UpdateValkeyUserWorkflowTestSuite) TestSuccess() {
 		ID:               userID,
 		ValkeyInstanceID: instanceID,
 		Username:         "appuser",
-		Password:         "newsecret456",
+		PasswordHash:         "newsecret456",
 		Privileges:       []string{"allcommands"},
 		KeyPattern:       "app:*",
 	}
@@ -228,7 +228,7 @@ func (s *UpdateValkeyUserWorkflowTestSuite) TestSuccess() {
 		InstanceName: instanceID,
 		Port:         6379,
 		Username:     "appuser",
-		Password:     "newsecret456",
+		PasswordHash:     "newsecret456",
 		Privileges:   []string{"allcommands"},
 		KeyPattern:   "app:*",
 	}).Return(nil)
@@ -249,7 +249,7 @@ func (s *UpdateValkeyUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 		ID:               userID,
 		ValkeyInstanceID: instanceID,
 		Username:         "appuser",
-		Password:         "newsecret456",
+		PasswordHash:         "newsecret456",
 		Privileges:       []string{"allcommands"},
 		KeyPattern:       "*",
 	}
@@ -314,7 +314,7 @@ func (s *DeleteValkeyUserWorkflowTestSuite) TestSuccess() {
 		ID:               userID,
 		ValkeyInstanceID: instanceID,
 		Username:         "appuser",
-		Password:         "secret123",
+		PasswordHash:         "secret123",
 	}
 	instance := model.ValkeyInstance{
 		ID:      instanceID,
@@ -353,7 +353,7 @@ func (s *DeleteValkeyUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() {
 		ID:               userID,
 		ValkeyInstanceID: instanceID,
 		Username:         "appuser",
-		Password:         "secret123",
+		PasswordHash:         "secret123",
 	}
 	instance := model.ValkeyInstance{
 		ID:      instanceID,

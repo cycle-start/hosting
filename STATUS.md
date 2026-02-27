@@ -19,6 +19,7 @@ Full CRUD REST API at `api.massive-hosting.com/api/v1` with OpenAPI docs at `/do
 - API key auth (`X-API-Key` header) with fine-grained scopes (`resource:action` format)
 - Brand-based access control (keys authorized for specific brands or `*` for platform admin)
 - All mutations audit-logged with sanitized request bodies (passwords/keys redacted)
+- Credential hashing: MySQL passwords stored as `mysql_native_password` hashes, Valkey passwords as SHA256 hashes, S3 secrets as SHA256 hashes. Plaintext is never persisted in the control plane DB.
 
 | Resource | Endpoints | Async | Notes |
 |---|---|---|---|
@@ -48,7 +49,7 @@ Full CRUD REST API at `api.massive-hosting.com/api/v1` with OpenAPI docs at `/do
 | Valkey Users | CRUD `/valkey-instances/{id}/users`, retry | Yes | ACL-based access |
 | WireGuard Peers | CRUD `/tenants/{id}/wireguard-peers`, retry | Yes | VPN peers for DB/Valkey access |
 | S3 Buckets | CRUD `/tenants/{id}/s3-buckets`, retry | Yes | Ceph RGW; public/private, quotas |
-| S3 Access Keys | CRUD `/s3-buckets/{id}/access-keys`, retry | Yes | 20-char ID, 40-char secret; shown once |
+| S3 Access Keys | CRUD `/s3-buckets/{id}/access-keys` | Yes | 20-char ID, 40-char secret; shown once |
 | Email Accounts | CRUD `/fqdns/{id}/email-accounts`, retry | Yes | Stalwart SMTP/IMAP/JMAP |
 | Email Aliases | CRUD `/email-accounts/{id}/aliases`, retry | Yes | |
 | Email Forwards | CRUD `/email-accounts/{id}/forwards`, retry | Yes | External forwarding with keep-copy |
@@ -117,7 +118,7 @@ Runs on each VM node, connecting to Temporal via `node-{uuid}` task queue:
 - **NginxManager:** Per-webroot server blocks from templates, SSL cert installation, config test + reload, orphaned config cleanup
 - **SSHManager:** SSH/SFTP configuration, authorized_keys sync across all shard nodes
 - **DatabaseManager:** MySQL CREATE/DROP DATABASE/USER, GRANT, dump/import for migrations
-- **ValkeyManager:** Instance lifecycle (config + systemd units, dual-stack bind), ACL user management, RDB dump/import
+- **ValkeyManager:** Instance lifecycle (config + ACL file + systemd units, dual-stack bind, Unix socket auth), ACL user management with hashed passwords, RDB dump/import
 - **S3Manager:** Ceph RGW bucket/user management via `radosgw-admin`, tenant-scoped naming (`{tenantID}--{bucketName}`)
 - **TenantULAManager:** Per-tenant ULA IPv6 addresses on web/DB/Valkey nodes, nftables UID binding (web), service ingress filtering (DB/Valkey), cross-shard routing
 - **WireGuardManager:** WireGuard interface management, per-peer configuration with nftables FORWARD rules, full convergence sync

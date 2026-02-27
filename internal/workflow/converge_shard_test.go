@@ -60,7 +60,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusConverging)).Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 
-	// Batch data fetch (replaces ListTenantsByShard + ListWebrootsByTenantID + GetFQDNsByWebrootID + ListDaemonsByWebroot + ListCronJobsByWebroot).
+	// Batch data fetch.
 	s.env.OnActivity("GetShardDesiredState", mock.Anything, shardID).Return(&activity.ShardDesiredState{
 		Tenants: tenants,
 		Webroots: map[string][]model.Webroot{
@@ -98,6 +98,12 @@ func (s *ConvergeShardWorkflowTestSuite) TestWebShard() {
 
 	// ReloadNginx for each node.
 	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
+
+	// ULA: nodes have no ShardIndex so ConfigureTenantAddresses and ConfigureULARoutesV2 are skipped.
+	// Cross-shard ULA route lookups still execute.
+	s.env.OnActivity("ListShardsByClusterAndRole", mock.Anything, "", model.ShardRoleDatabase).Return([]model.Shard{}, nil)
+	s.env.OnActivity("ListShardsByClusterAndRole", mock.Anything, "", model.ShardRoleValkey).Return([]model.Shard{}, nil)
+
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusActive)).Return(nil)
 
 	s.env.ExecuteWorkflow(ConvergeShardWorkflow, ConvergeShardParams{ShardID: shardID})
@@ -115,10 +121,10 @@ func (s *ConvergeShardWorkflowTestSuite) TestDatabaseShard() {
 		{ID: "node-1"},
 	}
 	databases := []model.Database{
-		{ID: "db-1", ShardID: &shardID, Status: model.StatusActive},
+		{ID: "db-1", TenantID: "t-1", ShardID: &shardID, Status: model.StatusActive},
 	}
 	users := []model.DatabaseUser{
-		{ID: "dbu-1", DatabaseID: "db-1", Username: "admin", Password: "pass", Privileges: []string{"ALL"}, Status: model.StatusActive},
+		{ID: "dbu-1", DatabaseID: "db-1", Username: "admin", PasswordHash: "pass", Privileges: []string{"ALL"}, Status: model.StatusActive},
 	}
 
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
@@ -132,9 +138,16 @@ func (s *ConvergeShardWorkflowTestSuite) TestDatabaseShard() {
 	s.env.OnActivity("CreateDatabaseUser", mock.Anything, activity.CreateDatabaseUserParams{
 		DatabaseName: "db-1",
 		Username:     "admin",
-		Password:     "pass",
+		PasswordHash: "pass",
 		Privileges:   []string{"ALL"},
 	}).Return(nil)
+
+	// ULA: tenant addresses (nodes have no ShardIndex so ConfigureServiceTenantAddr is skipped).
+	s.env.OnActivity("GetTenantByID", mock.Anything, "t-1").Return(&model.Tenant{ID: "t-1"}, nil)
+	// Cross-shard ULA route lookups.
+	s.env.OnActivity("ListShardsByClusterAndRole", mock.Anything, "", model.ShardRoleWeb).Return([]model.Shard{}, nil)
+	s.env.OnActivity("ListShardsByClusterAndRole", mock.Anything, "", model.ShardRoleValkey).Return([]model.Shard{}, nil)
+
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusActive)).Return(nil)
 
 	s.env.ExecuteWorkflow(ConvergeShardWorkflow, ConvergeShardParams{ShardID: shardID})
@@ -152,20 +165,27 @@ func (s *ConvergeShardWorkflowTestSuite) TestValkeyShard() {
 		{ID: "node-1"},
 	}
 	instances := []model.ValkeyInstance{
-		{ID: "vk-1", ShardID: &shardID, Port: 6379, Password: "vkpass", MaxMemoryMB: 128, Status: model.StatusActive},
+		{ID: "vk-1", TenantID: "t-1", ShardID: &shardID, Port: 6379, PasswordHash: "vkpass", MaxMemoryMB: 128, Status: model.StatusActive},
 	}
 	users := []model.ValkeyUser{
-		{ID: "vku-1", ValkeyInstanceID: "vk-1", Username: "app", Password: "apppass", Privileges: []string{"allcommands"}, KeyPattern: "*", Status: model.StatusActive},
+		{ID: "vku-1", ValkeyInstanceID: "vk-1", Username: "app", PasswordHash: "apppass", Privileges: []string{"allcommands"}, KeyPattern: "*", Status: model.StatusActive},
 	}
 
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusConverging)).Return(nil)
 	s.env.OnActivity("ListNodesByShard", mock.Anything, shardID).Return(nodes, nil)
 	s.env.OnActivity("ListValkeyInstancesByShard", mock.Anything, shardID).Return(instances, nil)
+
+	// ULA: tenant addresses (nodes have no ShardIndex so ConfigureServiceTenantAddr is skipped).
+	s.env.OnActivity("GetTenantByID", mock.Anything, "t-1").Return(&model.Tenant{ID: "t-1"}, nil)
+	// Cross-shard ULA route lookups.
+	s.env.OnActivity("ListShardsByClusterAndRole", mock.Anything, "", model.ShardRoleWeb).Return([]model.Shard{}, nil)
+	s.env.OnActivity("ListShardsByClusterAndRole", mock.Anything, "", model.ShardRoleDatabase).Return([]model.Shard{}, nil)
+
 	s.env.OnActivity("CreateValkeyInstance", mock.Anything, activity.CreateValkeyInstanceParams{
 		Name:        "vk-1",
 		Port:        6379,
-		Password:    "vkpass",
+		PasswordHash:    "vkpass",
 		MaxMemoryMB: 128,
 	}).Return(nil)
 	s.env.OnActivity("ListValkeyUsersByInstanceID", mock.Anything, "vk-1").Return(users, nil)
@@ -173,7 +193,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestValkeyShard() {
 		InstanceName: "vk-1",
 		Port:         6379,
 		Username:     "app",
-		Password:     "apppass",
+		PasswordHash:     "apppass",
 		Privileges:   []string{"allcommands"},
 		KeyPattern:   "*",
 	}).Return(nil)
@@ -245,6 +265,11 @@ func (s *ConvergeShardWorkflowTestSuite) TestSkipsInactiveResources() {
 	}).Return(nil)
 
 	s.env.OnActivity("ReloadNginx", mock.Anything).Return(nil)
+
+	// ULA: cross-shard route lookups (nodes have no ShardIndex so address config is skipped).
+	s.env.OnActivity("ListShardsByClusterAndRole", mock.Anything, "", model.ShardRoleDatabase).Return([]model.Shard{}, nil)
+	s.env.OnActivity("ListShardsByClusterAndRole", mock.Anything, "", model.ShardRoleValkey).Return([]model.Shard{}, nil)
+
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchShardStatus(shardID, model.StatusActive)).Return(nil)
 
 	s.env.ExecuteWorkflow(ConvergeShardWorkflow, ConvergeShardParams{ShardID: shardID})
@@ -273,7 +298,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestPartialFailureContinues() {
 		{ID: "node-bad"},
 	}
 	databases := []model.Database{
-		{ID: "db-1", ShardID: &shardID, Status: model.StatusActive},
+		{ID: "db-1", TenantID: "t-1", ShardID: &shardID, Status: model.StatusActive},
 	}
 
 	s.env.OnActivity("GetShardByID", mock.Anything, shardID).Return(&shard, nil)
@@ -290,6 +315,12 @@ func (s *ConvergeShardWorkflowTestSuite) TestPartialFailureContinues() {
 
 	// User listing still runs (workflow doesn't stop).
 	s.env.OnActivity("ListDatabaseUsersByDatabaseID", mock.Anything, "db-1").Return([]model.DatabaseUser{}, nil)
+
+	// ULA: tenant addresses (nodes have no ShardIndex so ConfigureServiceTenantAddr is skipped).
+	s.env.OnActivity("GetTenantByID", mock.Anything, "t-1").Return(&model.Tenant{ID: "t-1"}, nil)
+	// Cross-shard ULA route lookups.
+	s.env.OnActivity("ListShardsByClusterAndRole", mock.Anything, "", model.ShardRoleWeb).Return([]model.Shard{}, nil)
+	s.env.OnActivity("ListShardsByClusterAndRole", mock.Anything, "", model.ShardRoleValkey).Return([]model.Shard{}, nil)
 
 	// SetReadOnly(true) on replica (node-bad) - fails.
 	s.env.OnActivity("SetReadOnly", mock.Anything, true).Return(fmt.Errorf("node unreachable"))

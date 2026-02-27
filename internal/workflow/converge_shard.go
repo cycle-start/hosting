@@ -602,7 +602,7 @@ func convergeDatabaseShard(ctx workflow.Context, shardID string, nodes []model.N
 			err = workflow.ExecuteActivity(primaryCtx, "CreateDatabaseUser", activity.CreateDatabaseUserParams{
 				DatabaseName: database.ID,
 				Username:     user.Username,
-				Password:     user.Password,
+				PasswordHash: user.PasswordHash,
 				Privileges:   user.Privileges,
 			}).Get(ctx, nil)
 			if err != nil {
@@ -841,10 +841,10 @@ func convergeValkeyShard(ctx workflow.Context, shardID string, nodes []model.Nod
 		for _, node := range nodes {
 			nodeCtx := nodeActivityCtx(ctx, node.ID)
 			err = workflow.ExecuteActivity(nodeCtx, "CreateValkeyInstance", activity.CreateValkeyInstanceParams{
-				Name:        instance.ID,
-				Port:        instance.Port,
-				Password:    instance.Password,
-				MaxMemoryMB: instance.MaxMemoryMB,
+				Name:         instance.ID,
+				Port:         instance.Port,
+				PasswordHash: instance.PasswordHash,
+				MaxMemoryMB:  instance.MaxMemoryMB,
 			}).Get(ctx, nil)
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("create valkey instance %s on node %s: %v", instance.ID, node.ID, err))
@@ -871,7 +871,7 @@ func convergeValkeyShard(ctx workflow.Context, shardID string, nodes []model.Nod
 					InstanceName: instance.ID,
 					Port:         instance.Port,
 					Username:     user.Username,
-					Password:     user.Password,
+					PasswordHash: user.PasswordHash,
 					Privileges:   user.Privileges,
 					KeyPattern:   user.KeyPattern,
 				}).Get(ctx, nil)

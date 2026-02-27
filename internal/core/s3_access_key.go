@@ -6,9 +6,17 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/edvin/hosting/internal/crypto"
 	"github.com/edvin/hosting/internal/model"
 	temporalclient "go.temporal.io/sdk/client"
 )
+
+// CreateS3AccessKeyArgs is passed as the workflow Arg so the plaintext secret
+// is available for the Ceph RGW activity (S3 protocol requires the raw key).
+type CreateS3AccessKeyArgs struct {
+	KeyID          string `json:"key_id"`
+	SecretAccessKey string `json:"secret_access_key"`
+}
 
 type S3AccessKeyService struct {
 	db DB
@@ -33,50 +41,56 @@ func generateRandomString(length int) (string, error) {
 	return string(result), nil
 }
 
-func (s *S3AccessKeyService) Create(ctx context.Context, key *model.S3AccessKey) error {
+// Create generates access key credentials, stores a hash of the secret in the DB,
+// and passes the plaintext secret to the workflow for Ceph provisioning.
+// Returns the plaintext secret for the one-time API response.
+func (s *S3AccessKeyService) Create(ctx context.Context, key *model.S3AccessKey) (string, error) {
 	accessKeyID, err := generateRandomString(20)
 	if err != nil {
-		return fmt.Errorf("generate access key id: %w", err)
+		return "", fmt.Errorf("generate access key id: %w", err)
 	}
 	secretAccessKey, err := generateRandomString(40)
 	if err != nil {
-		return fmt.Errorf("generate secret access key: %w", err)
+		return "", fmt.Errorf("generate secret access key: %w", err)
 	}
 
 	key.AccessKeyID = accessKeyID
-	key.SecretAccessKey = secretAccessKey
+	key.SecretKeyHash = crypto.GenericHash(secretAccessKey)
 
 	_, err = s.db.Exec(ctx,
-		`INSERT INTO s3_access_keys (id, s3_bucket_id, access_key_id, secret_access_key, permissions, status, created_at, updated_at)
+		`INSERT INTO s3_access_keys (id, s3_bucket_id, access_key_id, secret_key_hash, permissions, status, created_at, updated_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		key.ID, key.S3BucketID, key.AccessKeyID, key.SecretAccessKey,
+		key.ID, key.S3BucketID, key.AccessKeyID, key.SecretKeyHash,
 		key.Permissions, key.Status, key.CreatedAt, key.UpdatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("insert s3 access key: %w", err)
+		return "", fmt.Errorf("insert s3 access key: %w", err)
 	}
 
 	tenantID, err := resolveTenantIDFromS3Bucket(ctx, s.db, key.S3BucketID)
 	if err != nil {
-		return fmt.Errorf("resolve tenant for s3 access key: %w", err)
+		return "", fmt.Errorf("resolve tenant for s3 access key: %w", err)
 	}
 	if err := signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
 		WorkflowName: "CreateS3AccessKeyWorkflow",
 		WorkflowID:   fmt.Sprintf("create-s3-access-key-%s", key.ID),
-		Arg:          key.ID,
+		Arg: CreateS3AccessKeyArgs{
+			KeyID:          key.ID,
+			SecretAccessKey: secretAccessKey,
+		},
 	}); err != nil {
-		return fmt.Errorf("signal CreateS3AccessKeyWorkflow: %w", err)
+		return "", fmt.Errorf("signal CreateS3AccessKeyWorkflow: %w", err)
 	}
 
-	return nil
+	return secretAccessKey, nil
 }
 
 func (s *S3AccessKeyService) GetByID(ctx context.Context, id string) (*model.S3AccessKey, error) {
 	var k model.S3AccessKey
 	err := s.db.QueryRow(ctx,
-		`SELECT id, s3_bucket_id, access_key_id, secret_access_key, permissions, status, status_message, created_at, updated_at
+		`SELECT id, s3_bucket_id, access_key_id, secret_key_hash, permissions, status, status_message, created_at, updated_at
 		 FROM s3_access_keys WHERE id = $1`, id,
-	).Scan(&k.ID, &k.S3BucketID, &k.AccessKeyID, &k.SecretAccessKey,
+	).Scan(&k.ID, &k.S3BucketID, &k.AccessKeyID, &k.SecretKeyHash,
 		&k.Permissions, &k.Status, &k.StatusMessage, &k.CreatedAt, &k.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get s3 access key %s: %w", id, err)
@@ -85,7 +99,7 @@ func (s *S3AccessKeyService) GetByID(ctx context.Context, id string) (*model.S3A
 }
 
 func (s *S3AccessKeyService) ListByBucket(ctx context.Context, bucketID string, limit int, cursor string) ([]model.S3AccessKey, bool, error) {
-	query := `SELECT id, s3_bucket_id, access_key_id, secret_access_key, permissions, status, status_message, created_at, updated_at FROM s3_access_keys WHERE s3_bucket_id = $1`
+	query := `SELECT id, s3_bucket_id, access_key_id, secret_key_hash, permissions, status, status_message, created_at, updated_at FROM s3_access_keys WHERE s3_bucket_id = $1`
 	args := []any{bucketID}
 	argIdx := 2
 
@@ -108,7 +122,7 @@ func (s *S3AccessKeyService) ListByBucket(ctx context.Context, bucketID string, 
 	var keys []model.S3AccessKey
 	for rows.Next() {
 		var k model.S3AccessKey
-		if err := rows.Scan(&k.ID, &k.S3BucketID, &k.AccessKeyID, &k.SecretAccessKey,
+		if err := rows.Scan(&k.ID, &k.S3BucketID, &k.AccessKeyID, &k.SecretKeyHash,
 			&k.Permissions, &k.Status, &k.StatusMessage, &k.CreatedAt, &k.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan s3 access key: %w", err)
 		}
@@ -148,28 +162,4 @@ func (s *S3AccessKeyService) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
-}
-
-func (s *S3AccessKeyService) Retry(ctx context.Context, id string) error {
-	var status, accessKeyID string
-	err := s.db.QueryRow(ctx, "SELECT status, access_key_id FROM s3_access_keys WHERE id = $1", id).Scan(&status, &accessKeyID)
-	if err != nil {
-		return fmt.Errorf("get s3 access key status: %w", err)
-	}
-	if status != model.StatusFailed {
-		return fmt.Errorf("s3 access key %s is not in failed state (current: %s)", id, status)
-	}
-	_, err = s.db.Exec(ctx, "UPDATE s3_access_keys SET status = $1, status_message = NULL, updated_at = now() WHERE id = $2", model.StatusProvisioning, id)
-	if err != nil {
-		return fmt.Errorf("set s3 access key %s status to provisioning: %w", id, err)
-	}
-	tenantID, err := resolveTenantIDFromS3AccessKey(ctx, s.db, id)
-	if err != nil {
-		return fmt.Errorf("resolve tenant for s3 access key: %w", err)
-	}
-	return signalProvision(ctx, s.tc, s.db, tenantID, model.ProvisionTask{
-		WorkflowName: "CreateS3AccessKeyWorkflow",
-		WorkflowID:   workflowID("s3-access-key", id),
-		Arg:          id,
-	})
 }

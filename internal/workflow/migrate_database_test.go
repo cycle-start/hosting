@@ -45,7 +45,7 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestSuccess() {
 			ID:         "user-1",
 			DatabaseID: databaseID,
 			Username:   "appuser",
-			Password:   "secret123",
+			PasswordHash:   "secret123",
 			Privileges: []string{"SELECT", "INSERT"},
 		},
 	}
@@ -84,7 +84,7 @@ func (s *MigrateDatabaseWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("CreateDatabaseUser", mock.Anything, activity.CreateDatabaseUserParams{
 		DatabaseName: databaseID,
 		Username:     "appuser",
-		Password:     "secret123",
+		PasswordHash:     "secret123",
 		Privileges:   []string{"SELECT", "INSERT"},
 	}).Return(nil)
 

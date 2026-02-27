@@ -8,7 +8,7 @@ Valkey instances are provisioned on **valkey shards** (`shard.role = "valkey"`).
 API request --> Core DB (desired state) --> Temporal workflow --> Node agent (valkey-cli / systemd)
 ```
 
-- Each Valkey instance gets a **unique port** (auto-assigned) and an **auto-generated password**.
+- Each Valkey instance gets a **unique port** (auto-assigned) and an **auto-generated password** (stored as a SHA256 hash).
 - Instances run as `valkey@{name}.service` systemd units with config at `{configDir}/{name}.conf`.
 - Data is persisted with both RDB snapshots and AOF (append-only file).
 - The default eviction policy is `allkeys-lru`.
@@ -26,7 +26,7 @@ API request --> Core DB (desired state) --> Temporal workflow --> Node agent (va
 | `ShardID`        | `*string` | `shard_id`          | Valkey shard assignment               |
 | `Port`           | `int`     | `port`              | TCP port (auto-assigned)              |
 | `MaxMemoryMB`    | `int`     | `max_memory_mb`     | Memory limit in MB (default: 64)      |
-| `Password`       | `string`  | `password`          | Instance password (write-only)        |
+| `PasswordHash`   | `string`  | `-`                 | SHA256 password hash (internal)       |
 | `Status`         | `string`  | `status`            | Lifecycle status                      |
 | `StatusMessage`  | `*string` | `status_message`    | Error details when `status=failed`    |
 | `CreatedAt`      | `time`    | `created_at`        | Creation timestamp                    |
@@ -40,7 +40,7 @@ API request --> Core DB (desired state) --> Temporal workflow --> Node agent (va
 | `ID`               | `string`   | `id`                  | Platform-generated unique ID        |
 | `ValkeyInstanceID` | `string`   | `valkey_instance_id`  | Parent instance                     |
 | `Username`         | `string`   | `username`            | ACL username (slug)                 |
-| `Password`         | `string`   | `password`            | User password (write-only)          |
+| `PasswordHash`     | `string`   | `-`                   | SHA256 password hash (internal)     |
 | `Privileges`       | `[]string` | `privileges`          | ACL command categories              |
 | `KeyPattern`       | `string`   | `key_pattern`         | Key access pattern (default: `~*`)  |
 | `Status`           | `string`   | `status`              | Lifecycle status                    |
@@ -48,7 +48,7 @@ API request --> Core DB (desired state) --> Temporal workflow --> Node agent (va
 | `CreatedAt`        | `time`     | `created_at`          | Creation timestamp                  |
 | `UpdatedAt`        | `time`     | `updated_at`          | Last update timestamp               |
 
-**Password handling:** Instance and user passwords are **redacted** in all GET and LIST responses. The instance password is auto-generated on creation and never returned to the caller.
+**Password handling:** The API accepts a plaintext password on create/update, which is immediately hashed using SHA256 (`HEX(SHA256(password))`) and stored as `password_hash`. The plaintext is never persisted. The hash is passed directly to Valkey's ACL system using the `#hash` prefix, so retries work without needing the original password. The instance password is auto-generated on creation and returned once in the 202 response. Passwords are **never returned** in GET or LIST responses.
 
 ### Key Pattern
 
@@ -171,8 +171,8 @@ The `ValkeyManager` on each node agent manages instances via config files, `valk
 
 ### Instance Management
 
-- **CreateInstance**: Write config to `{configDir}/{name}.conf` -> create data dir -> start `valkey-server --daemonize yes` -> enable systemd unit. Idempotent: if the instance exists, config is converged and running config is updated via `CONFIG SET`.
-- **DeleteInstance**: `SHUTDOWN NOSAVE` via valkey-cli -> stop systemd unit -> remove config file -> remove data directory.
+- **CreateInstance**: Write config to `{configDir}/{name}.conf` -> write ACL file to `{configDir}/{name}.acl` -> create data dir -> start `valkey-server --daemonize yes` -> enable systemd unit. Idempotent: if the instance exists, config is converged and running config is updated via `CONFIG SET`.
+- **DeleteInstance**: `SHUTDOWN NOSAVE` via valkey-cli -> stop systemd unit -> remove config, ACL, and data files.
 
 ### Instance Config
 
@@ -180,9 +180,11 @@ Generated config for each instance:
 
 ```
 port {port}
-bind 0.0.0.0
+bind 0.0.0.0 ::
 protected-mode yes
-requirepass {password}
+unixsocket /run/valkey/{name}.sock
+unixsocketperm 700
+aclfile {configDir}/{name}.acl
 maxmemory {maxMemoryMB}mb
 maxmemory-policy allkeys-lru
 dir {dataDir}/{name}
@@ -191,11 +193,21 @@ appendonly yes
 appendfilename "appendonly.aof"
 ```
 
+Authentication uses an **ACL file** instead of `requirepass`. The ACL file contains:
+
+```
+user default on #{passwordHash} ~* &* +@all
+```
+
+The `#` prefix tells Valkey the value is a pre-computed SHA256 hash, not a plaintext password. The node agent connects via the **Unix socket** (`/run/valkey/{name}.sock`) for local management, avoiding the need to pass passwords on the command line.
+
 ### User Management (ACL)
 
-- **CreateUser**: `ACL SETUSER {username} on >{password} {keyPattern} {privileges...}` -> `ACL SAVE`
-- **UpdateUser**: `ACL DELUSER` -> `ACL SETUSER` (delete and recreate) -> `ACL SAVE`
+- **CreateUser**: `ACL SETUSER {username} on #{passwordHash} {keyPattern} {privileges...}` -> `ACL SAVE`
+- **UpdateUser**: `ACL DELUSER` -> `ACL SETUSER` (delete and recreate with hash) -> `ACL SAVE`
 - **DeleteUser**: `ACL DELUSER {username}` -> `ACL SAVE`
+
+All `valkey-cli` commands use `-s /run/valkey/{name}.sock` (Unix socket) instead of `-p {port} -a {password}`.
 
 ### Data Migration
 

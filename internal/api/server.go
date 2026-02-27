@@ -592,7 +592,6 @@ func (s *Server) setupRoutes() {
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireScope("s3", "write"))
 			r.Post("/s3-buckets/{bucketID}/access-keys", s3AccessKey.Create)
-			r.Post("/s3-access-keys/{id}/retry", s3AccessKey.Retry)
 		})
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequireScope("s3", "delete"))

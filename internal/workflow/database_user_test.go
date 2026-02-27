@@ -38,7 +38,7 @@ func (s *CreateDatabaseUserWorkflowTestSuite) TestSuccess() {
 		ID:         userID,
 		DatabaseID: databaseID,
 		Username:   "appuser",
-		Password:   "secret123",
+		PasswordHash:   "secret123",
 		Privileges: []string{"SELECT", "INSERT", "UPDATE"},
 	}
 	database := model.Database{
@@ -63,7 +63,7 @@ func (s *CreateDatabaseUserWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("CreateDatabaseUser", mock.Anything, activity.CreateDatabaseUserParams{
 		DatabaseName: databaseID,
 		Username:     "appuser",
-		Password:     "secret123",
+		PasswordHash:     "secret123",
 		Privileges:   []string{"SELECT", "INSERT", "UPDATE"},
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -96,7 +96,7 @@ func (s *CreateDatabaseUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() 
 		ID:         userID,
 		DatabaseID: databaseID,
 		Username:   "appuser",
-		Password:   "secret123",
+		PasswordHash:   "secret123",
 		Privileges: []string{"ALL"},
 	}
 	database := model.Database{
@@ -164,7 +164,7 @@ func (s *UpdateDatabaseUserWorkflowTestSuite) TestSuccess() {
 		ID:         userID,
 		DatabaseID: databaseID,
 		Username:   "appuser",
-		Password:   "newsecret456",
+		PasswordHash:   "newsecret456",
 		Privileges: []string{"SELECT", "INSERT"},
 	}
 	database := model.Database{
@@ -187,7 +187,7 @@ func (s *UpdateDatabaseUserWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("UpdateDatabaseUser", mock.Anything, activity.UpdateDatabaseUserParams{
 		DatabaseName: databaseID,
 		Username:     "appuser",
-		Password:     "newsecret456",
+		PasswordHash:     "newsecret456",
 		Privileges:   []string{"SELECT", "INSERT"},
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -207,7 +207,7 @@ func (s *UpdateDatabaseUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() 
 		ID:         userID,
 		DatabaseID: databaseID,
 		Username:   "appuser",
-		Password:   "newsecret456",
+		PasswordHash:   "newsecret456",
 		Privileges: []string{"SELECT"},
 	}
 	database := model.Database{
@@ -273,7 +273,7 @@ func (s *DeleteDatabaseUserWorkflowTestSuite) TestSuccess() {
 		ID:         userID,
 		DatabaseID: databaseID,
 		Username:   "appuser",
-		Password:   "secret123",
+		PasswordHash:   "secret123",
 	}
 	database := model.Database{
 		ID:      databaseID,
@@ -310,7 +310,7 @@ func (s *DeleteDatabaseUserWorkflowTestSuite) TestAgentFails_SetsStatusFailed() 
 		ID:         userID,
 		DatabaseID: databaseID,
 		Username:   "appuser",
-		Password:   "secret123",
+		PasswordHash:   "secret123",
 	}
 	database := model.Database{
 		ID:      databaseID,

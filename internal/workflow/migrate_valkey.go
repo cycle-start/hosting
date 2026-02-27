@@ -94,10 +94,10 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 	// Create the instance on the target node.
 	targetCtx := nodeActivityCtx(ctx, targetNode.ID)
 	err = workflow.ExecuteActivity(targetCtx, "CreateValkeyInstance", activity.CreateValkeyInstanceParams{
-		Name:        instance.ID,
-		Port:        instance.Port,
-		Password:    instance.Password,
-		MaxMemoryMB: instance.MaxMemoryMB,
+		Name:         instance.ID,
+		Port:         instance.Port,
+		PasswordHash: instance.PasswordHash,
+		MaxMemoryMB:  instance.MaxMemoryMB,
 	}).Get(ctx, nil)
 	if err != nil {
 		_ = setResourceFailed(ctx, "valkey_instances", instanceID, err)
@@ -109,7 +109,6 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 	err = workflow.ExecuteActivity(sourceCtx, "DumpValkeyData", activity.DumpValkeyDataParams{
 		Name:     instance.ID,
 		Port:     instance.Port,
-		Password: instance.Password,
 		DumpPath: dumpPath,
 	}).Get(ctx, nil)
 	if err != nil {
@@ -141,7 +140,7 @@ func MigrateValkeyInstanceWorkflow(ctx workflow.Context, params MigrateValkeyIns
 			InstanceName: instance.ID,
 			Port:         instance.Port,
 			Username:     user.Username,
-			Password:     user.Password,
+			PasswordHash: user.PasswordHash,
 			Privileges:   user.Privileges,
 			KeyPattern:   user.KeyPattern,
 		}).Get(ctx, nil)

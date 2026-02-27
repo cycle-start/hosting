@@ -433,13 +433,13 @@ func (a *NodeLocal) DeleteDatabase(ctx context.Context, name string) error {
 // CreateDatabaseUser creates a MySQL user locally on this node.
 func (a *NodeLocal) CreateDatabaseUser(ctx context.Context, params CreateDatabaseUserParams) error {
 	a.logger.Info().Str("username", params.Username).Msg("CreateDatabaseUser")
-	return asNonRetryable(a.database.CreateUser(ctx, params.DatabaseName, params.Username, params.Password, params.Privileges))
+	return asNonRetryable(a.database.CreateUser(ctx, params.DatabaseName, params.Username, params.PasswordHash, params.Privileges))
 }
 
 // UpdateDatabaseUser updates a MySQL user locally on this node.
 func (a *NodeLocal) UpdateDatabaseUser(ctx context.Context, params UpdateDatabaseUserParams) error {
 	a.logger.Info().Str("username", params.Username).Msg("UpdateDatabaseUser")
-	return asNonRetryable(a.database.UpdateUser(ctx, params.DatabaseName, params.Username, params.Password, params.Privileges))
+	return asNonRetryable(a.database.UpdateUser(ctx, params.DatabaseName, params.Username, params.PasswordHash, params.Privileges))
 }
 
 // DeleteDatabaseUser drops a MySQL user locally on this node.
@@ -483,7 +483,7 @@ func (a *NodeLocal) StopReplication(ctx context.Context) error {
 // CreateValkeyInstance creates a Valkey instance locally on this node.
 func (a *NodeLocal) CreateValkeyInstance(ctx context.Context, params CreateValkeyInstanceParams) error {
 	a.logger.Info().Str("instance", params.Name).Msg("CreateValkeyInstance")
-	return asNonRetryable(a.valkey.CreateInstance(ctx, params.Name, params.Port, params.Password, params.MaxMemoryMB))
+	return asNonRetryable(a.valkey.CreateInstance(ctx, params.Name, params.Port, params.PasswordHash, params.MaxMemoryMB))
 }
 
 // DeleteValkeyInstance deletes a Valkey instance locally on this node.
@@ -495,13 +495,13 @@ func (a *NodeLocal) DeleteValkeyInstance(ctx context.Context, params DeleteValke
 // CreateValkeyUser creates a Valkey ACL user locally on this node.
 func (a *NodeLocal) CreateValkeyUser(ctx context.Context, params CreateValkeyUserParams) error {
 	a.logger.Info().Str("username", params.Username).Msg("CreateValkeyUser")
-	return asNonRetryable(a.valkey.CreateUser(ctx, params.InstanceName, params.Port, params.Username, params.Password, params.Privileges, params.KeyPattern))
+	return asNonRetryable(a.valkey.CreateUser(ctx, params.InstanceName, params.Port, params.Username, params.PasswordHash, params.Privileges, params.KeyPattern))
 }
 
 // UpdateValkeyUser updates a Valkey ACL user locally on this node.
 func (a *NodeLocal) UpdateValkeyUser(ctx context.Context, params UpdateValkeyUserParams) error {
 	a.logger.Info().Str("username", params.Username).Msg("UpdateValkeyUser")
-	return asNonRetryable(a.valkey.UpdateUser(ctx, params.InstanceName, params.Port, params.Username, params.Password, params.Privileges, params.KeyPattern))
+	return asNonRetryable(a.valkey.UpdateUser(ctx, params.InstanceName, params.Port, params.Username, params.PasswordHash, params.Privileges, params.KeyPattern))
 }
 
 // DeleteValkeyUser deletes a Valkey ACL user locally on this node.
@@ -529,7 +529,7 @@ func (a *NodeLocal) ImportMySQLDatabase(ctx context.Context, params ImportMySQLD
 // DumpValkeyData triggers a Valkey BGSAVE and copies the RDB file to the dump path.
 func (a *NodeLocal) DumpValkeyData(ctx context.Context, params DumpValkeyDataParams) error {
 	a.logger.Info().Str("instance", params.Name).Int("port", params.Port).Str("path", params.DumpPath).Msg("DumpValkeyData")
-	return asNonRetryable(a.valkey.DumpData(ctx, params.Name, params.Port, params.Password, params.DumpPath))
+	return asNonRetryable(a.valkey.DumpData(ctx, params.Name, params.Port, params.DumpPath))
 }
 
 // ImportValkeyData stops the instance, replaces the RDB file, and restarts.

@@ -296,13 +296,12 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 					ID:         platform.NewID(),
 					DatabaseID: database.ID,
 					Username:   ur.Username,
-					Password:   ur.Password,
 					Privileges: ur.Privileges,
 					Status:     model.StatusPending,
 					CreatedAt:  now3,
 					UpdatedAt:  now3,
 				}
-				if err := tx.DatabaseUser.Create(skipCtx, user); err != nil {
+				if err := tx.DatabaseUser.Create(skipCtx, user, ur.Password); err != nil {
 					return fmt.Errorf("create database user %s: %w", ur.Username, err)
 				}
 			}
@@ -316,18 +315,18 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 			if maxMemoryMB == 0 {
 				maxMemoryMB = 64
 			}
+			valkeyPassword := generatePassword()
 			instance := &model.ValkeyInstance{
 				ID:             platform.NewName("kv"),
 				TenantID:       tenant.ID,
 				SubscriptionID: vr.SubscriptionID,
 				ShardID:        &vShardID,
-				MaxMemoryMB: maxMemoryMB,
-				Password:    generatePassword(),
-				Status:      model.StatusPending,
-				CreatedAt:   now2,
-				UpdatedAt:   now2,
+				MaxMemoryMB:    maxMemoryMB,
+				Status:         model.StatusPending,
+				CreatedAt:      now2,
+				UpdatedAt:      now2,
 			}
-			if err := tx.ValkeyInstance.Create(skipCtx, instance); err != nil {
+			if err := tx.ValkeyInstance.Create(skipCtx, instance, valkeyPassword); err != nil {
 				return fmt.Errorf("create valkey instance: %w", err)
 			}
 			for _, ur := range vr.Users {
@@ -340,14 +339,13 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 					ID:               platform.NewID(),
 					ValkeyInstanceID: instance.ID,
 					Username:         ur.Username,
-					Password:         ur.Password,
 					Privileges:       ur.Privileges,
 					KeyPattern:       keyPattern,
 					Status:           model.StatusPending,
 					CreatedAt:        now3,
 					UpdatedAt:        now3,
 				}
-				if err := tx.ValkeyUser.Create(skipCtx, user); err != nil {
+				if err := tx.ValkeyUser.Create(skipCtx, user, ur.Password); err != nil {
 					return fmt.Errorf("create valkey user %s: %w", ur.Username, err)
 				}
 			}
@@ -387,7 +385,7 @@ func (h *Tenant) Create(w http.ResponseWriter, r *http.Request) {
 					CreatedAt:   now3,
 					UpdatedAt:   now3,
 				}
-				if err := tx.S3AccessKey.Create(skipCtx, key); err != nil {
+				if _, err := tx.S3AccessKey.Create(skipCtx, key); err != nil {
 					return fmt.Errorf("create s3 access key: %w", err)
 				}
 			}

@@ -92,7 +92,7 @@ variable "web_shard_name" {
 variable "core_api_token" {
   description = "Bearer token for node-agent to call core-api internal endpoints (cron outcome reporting)"
   type        = string
-  default     = ""
+  default     = "hst_dev_e2e_test_key_00000000"
   sensitive   = true
 }
 

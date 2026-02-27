@@ -56,14 +56,16 @@ func TestS3AccessKeyService_Create_Success(t *testing.T) {
 	wfRun.On("GetRunID").Return("mock-run-id")
 	tc.On("SignalWithStartWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(wfRun, nil)
 
-	err := svc.Create(ctx, key)
+	secret, err := svc.Create(ctx, key)
 	require.NoError(t, err)
 
-	// Assert that AccessKeyID and SecretAccessKey were generated
+	// Assert that AccessKeyID and secret were generated.
 	assert.NotEmpty(t, key.AccessKeyID)
-	assert.NotEmpty(t, key.SecretAccessKey)
+	assert.NotEmpty(t, secret)
 	assert.Len(t, key.AccessKeyID, 20)
-	assert.Len(t, key.SecretAccessKey, 40)
+	assert.Len(t, secret, 40)
+	// SecretKeyHash should be stored, not plaintext.
+	assert.NotEmpty(t, key.SecretKeyHash)
 
 	db.AssertExpectations(t)
 	tc.AssertExpectations(t)
@@ -86,7 +88,7 @@ func TestS3AccessKeyService_Create_InsertError(t *testing.T) {
 
 	db.On("Exec", ctx, mock.AnythingOfType("string"), mock.Anything).Return(pgconn.CommandTag{}, errors.New("db error"))
 
-	err := svc.Create(ctx, key)
+	_, err := svc.Create(ctx, key)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "insert s3 access key")
 	db.AssertExpectations(t)
@@ -107,7 +109,7 @@ func TestS3AccessKeyService_GetByID_Success(t *testing.T) {
 		*(dest[0].(*string)) = keyID
 		*(dest[1].(*string)) = "test-bucket-1"
 		*(dest[2].(*string)) = "AKIAIOSFODNN7EXAMPLE"
-		*(dest[3].(*string)) = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+		*(dest[3].(*string)) = "abc123hash"
 		*(dest[4].(*string)) = "read-write"
 		*(dest[5].(*string)) = model.StatusActive
 		*(dest[6].(**string)) = nil // status_message
@@ -123,7 +125,7 @@ func TestS3AccessKeyService_GetByID_Success(t *testing.T) {
 	assert.Equal(t, keyID, result.ID)
 	assert.Equal(t, "test-bucket-1", result.S3BucketID)
 	assert.Equal(t, "AKIAIOSFODNN7EXAMPLE", result.AccessKeyID)
-	assert.Equal(t, "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", result.SecretAccessKey)
+	assert.Equal(t, "abc123hash", result.SecretKeyHash)
 	assert.Equal(t, "read-write", result.Permissions)
 	assert.Equal(t, model.StatusActive, result.Status)
 	assert.Equal(t, now, result.CreatedAt)
@@ -166,7 +168,7 @@ func TestS3AccessKeyService_ListByBucket_Success(t *testing.T) {
 			*(dest[0].(*string)) = id1
 			*(dest[1].(*string)) = bucketID
 			*(dest[2].(*string)) = "AKIAIOSFODNN7EXAMPLE"
-			*(dest[3].(*string)) = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+			*(dest[3].(*string)) = "abc123hash"
 			*(dest[4].(*string)) = "read-write"
 			*(dest[5].(*string)) = model.StatusActive
 			*(dest[6].(**string)) = nil // status_message

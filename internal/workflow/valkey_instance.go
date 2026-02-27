@@ -60,10 +60,10 @@ func CreateValkeyInstanceWorkflow(ctx workflow.Context, instanceID string) error
 	for _, node := range nodes {
 		nodeCtx := nodeActivityCtx(ctx, node.ID)
 		err = workflow.ExecuteActivity(nodeCtx, "CreateValkeyInstance", activity.CreateValkeyInstanceParams{
-			Name:        instance.ID,
-			Port:        instance.Port,
-			Password:    instance.Password,
-			MaxMemoryMB: instance.MaxMemoryMB,
+			Name:         instance.ID,
+			Port:         instance.Port,
+			PasswordHash: instance.PasswordHash,
+			MaxMemoryMB:  instance.MaxMemoryMB,
 		}).Get(ctx, nil)
 		if err != nil {
 			_ = setResourceFailed(ctx, "valkey_instances", instanceID, err)

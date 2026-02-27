@@ -52,7 +52,7 @@ func (h *ValkeyUser) ListByInstance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i := range users {
-		users[i].Password = ""
+		users[i].PasswordHash = ""
 	}
 	var nextCursor string
 	if hasMore && len(users) > 0 {
@@ -107,7 +107,6 @@ func (h *ValkeyUser) Create(w http.ResponseWriter, r *http.Request) {
 		ID:               platform.NewID(),
 		ValkeyInstanceID: instanceID,
 		Username:         req.Username,
-		Password:         req.Password,
 		Privileges:       req.Privileges,
 		KeyPattern:       keyPattern,
 		Status:           model.StatusPending,
@@ -115,12 +114,12 @@ func (h *ValkeyUser) Create(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:        now,
 	}
 
-	if err := h.svc.Create(r.Context(), user); err != nil {
+	if err := h.svc.Create(r.Context(), user, req.Password); err != nil {
 		response.WriteServiceError(w, err)
 		return
 	}
 
-	user.Password = ""
+	user.PasswordHash = ""
 	response.WriteJSON(w, http.StatusAccepted, user)
 }
 
@@ -148,7 +147,7 @@ func (h *ValkeyUser) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user.Password = ""
+	user.PasswordHash = ""
 	response.WriteJSON(w, http.StatusOK, user)
 }
 
@@ -184,9 +183,6 @@ func (h *ValkeyUser) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Password != "" {
-		user.Password = req.Password
-	}
 	if req.Privileges != nil {
 		user.Privileges = req.Privileges
 	}
@@ -194,12 +190,12 @@ func (h *ValkeyUser) Update(w http.ResponseWriter, r *http.Request) {
 		user.KeyPattern = req.KeyPattern
 	}
 
-	if err := h.svc.Update(r.Context(), user); err != nil {
+	if err := h.svc.Update(r.Context(), user, req.Password); err != nil {
 		response.WriteServiceError(w, err)
 		return
 	}
 
-	user.Password = ""
+	user.PasswordHash = ""
 	response.WriteJSON(w, http.StatusAccepted, user)
 }
 

@@ -113,20 +113,8 @@ func CreateS3BucketWorkflow(ctx workflow.Context, bucketID string) error {
 		return err
 	}
 
-	// Spawn pending child workflows in parallel.
-	var children []ChildWorkflowSpec
-
-	var accessKeys []model.S3AccessKey
-	_ = workflow.ExecuteActivity(ctx, "ListS3AccessKeysByBucketID", bucketID).Get(ctx, &accessKeys)
-	for _, k := range accessKeys {
-		if k.Status == model.StatusPending {
-			children = append(children, ChildWorkflowSpec{WorkflowName: "CreateS3AccessKeyWorkflow", WorkflowID: fmt.Sprintf("create-s3-access-key-%s", k.ID), Arg: k.ID})
-		}
-	}
-
-	if errs := fanOutChildWorkflows(ctx, children); len(errs) > 0 {
-		workflow.GetLogger(ctx).Warn("child workflow failures", "errors", joinErrors(errs))
-	}
+	// S3 access key workflows are dispatched individually by the core service
+	// (which has the plaintext secret needed for Ceph provisioning).
 	return nil
 }
 

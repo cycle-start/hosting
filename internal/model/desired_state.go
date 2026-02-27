@@ -84,31 +84,31 @@ type DesiredDatabase struct {
 
 // DesiredDBUser is a database user in the desired state.
 type DesiredDBUser struct {
-	ID         string   `json:"id"`
-	Username   string   `json:"username"`
-	Password   string   `json:"password"`
-	Privileges []string `json:"privileges"`
-	Status     string   `json:"status"`
+	ID           string   `json:"id"`
+	Username     string   `json:"username"`
+	PasswordHash string   `json:"password_hash"`
+	Privileges   []string `json:"privileges"`
+	Status       string   `json:"status"`
 }
 
 // DesiredValkeyInstance is a Valkey instance in the desired state.
 type DesiredValkeyInstance struct {
-	ID          string              `json:"id"`
-	Port        int                 `json:"port"`
-	Password    string              `json:"password"`
-	MaxMemoryMB int                 `json:"max_memory_mb"`
-	Status      string              `json:"status"`
-	Users       []DesiredValkeyUser `json:"users,omitempty"`
+	ID           string              `json:"id"`
+	Port         int                 `json:"port"`
+	PasswordHash string              `json:"password_hash"`
+	MaxMemoryMB  int                 `json:"max_memory_mb"`
+	Status       string              `json:"status"`
+	Users        []DesiredValkeyUser `json:"users,omitempty"`
 }
 
 // DesiredValkeyUser is a Valkey user in the desired state.
 type DesiredValkeyUser struct {
-	ID         string `json:"id"`
-	Username   string `json:"username"`
-	Password   string `json:"password"`
-	Privileges string `json:"privileges"`
-	KeyPattern string `json:"key_pattern"`
-	Status     string `json:"status"`
+	ID           string `json:"id"`
+	Username     string `json:"username"`
+	PasswordHash string `json:"password_hash"`
+	Privileges   string `json:"privileges"`
+	KeyPattern   string `json:"key_pattern"`
+	Status       string `json:"status"`
 }
 
 // DesiredFQDNMapping is an FQDN-to-backend mapping for LB shards.

@@ -6,7 +6,7 @@ type DatabaseUser struct {
 	ID         string   `json:"id" db:"id"`
 	DatabaseID string   `json:"database_id" db:"database_id"`
 	Username   string   `json:"username" db:"username"`
-	Password   string   `json:"password,omitempty" db:"password"`
+	PasswordHash string `json:"password_hash,omitempty" db:"password_hash"`
 	Privileges []string `json:"privileges" db:"privileges"`
 	Status        string   `json:"status" db:"status"`
 	StatusMessage *string  `json:"status_message,omitempty" db:"status_message"`

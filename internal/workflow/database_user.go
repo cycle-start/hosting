@@ -60,7 +60,7 @@ func CreateDatabaseUserWorkflow(ctx workflow.Context, userID string) error {
 	err = workflow.ExecuteActivity(primaryCtx, "CreateDatabaseUser", activity.CreateDatabaseUserParams{
 		DatabaseName: dctx.Database.ID,
 		Username:     dctx.User.Username,
-		Password:     dctx.User.Password,
+		PasswordHash: dctx.User.PasswordHash,
 		Privileges:   dctx.User.Privileges,
 	}).Get(ctx, nil)
 	if err != nil {
@@ -125,7 +125,7 @@ func UpdateDatabaseUserWorkflow(ctx workflow.Context, userID string) error {
 	err = workflow.ExecuteActivity(primaryCtx, "UpdateDatabaseUser", activity.UpdateDatabaseUserParams{
 		DatabaseName: dctx.Database.ID,
 		Username:     dctx.User.Username,
-		Password:     dctx.User.Password,
+		PasswordHash: dctx.User.PasswordHash,
 		Privileges:   dctx.User.Privileges,
 	}).Get(ctx, nil)
 	if err != nil {

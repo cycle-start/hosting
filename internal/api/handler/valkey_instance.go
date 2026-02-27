@@ -56,7 +56,7 @@ func (h *ValkeyInstance) ListByTenant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i := range instances {
-		instances[i].Password = ""
+		instances[i].PasswordHash = ""
 	}
 	var nextCursor string
 	if hasMore && len(instances) > 0 {
@@ -99,6 +99,8 @@ func (h *ValkeyInstance) Create(w http.ResponseWriter, r *http.Request) {
 		maxMemoryMB = 64
 	}
 
+	password := generatePassword()
+
 	now := time.Now()
 	shardID := req.ShardID
 	instance := &model.ValkeyInstance{
@@ -106,14 +108,13 @@ func (h *ValkeyInstance) Create(w http.ResponseWriter, r *http.Request) {
 		TenantID:       tenantID,
 		SubscriptionID: req.SubscriptionID,
 		ShardID:        &shardID,
-		MaxMemoryMB: maxMemoryMB,
-		Password:    generatePassword(),
-		Status:      model.StatusPending,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		MaxMemoryMB:    maxMemoryMB,
+		Status:         model.StatusPending,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 
-	if err := h.svc.Create(r.Context(), instance); err != nil {
+	if err := h.svc.Create(r.Context(), instance, password); err != nil {
 		response.WriteServiceError(w, err)
 		return
 	}
@@ -129,21 +130,28 @@ func (h *ValkeyInstance) Create(w http.ResponseWriter, r *http.Request) {
 			ID:               platform.NewID(),
 			ValkeyInstanceID: instance.ID,
 			Username:         ur.Username,
-			Password:         ur.Password,
 			Privileges:       ur.Privileges,
 			KeyPattern:       keyPattern,
 			Status:           model.StatusPending,
 			CreatedAt:        now2,
 			UpdatedAt:        now2,
 		}
-		if err := h.userSvc.Create(r.Context(), user); err != nil {
+		if err := h.userSvc.Create(r.Context(), user, ur.Password); err != nil {
 			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create valkey user %s: %s", ur.Username, err.Error()))
 			return
 		}
 	}
 
-	instance.Password = ""
-	response.WriteJSON(w, http.StatusAccepted, instance)
+	// Return the password once in the creation response.
+	instance.PasswordHash = ""
+	type instanceWithPassword struct {
+		*model.ValkeyInstance
+		Password string `json:"password"`
+	}
+	response.WriteJSON(w, http.StatusAccepted, instanceWithPassword{
+		ValkeyInstance: instance,
+		Password:       password,
+	})
 }
 
 // Get godoc
@@ -174,7 +182,7 @@ func (h *ValkeyInstance) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	instance.Password = ""
+	instance.PasswordHash = ""
 	response.WriteJSON(w, http.StatusOK, instance)
 }
 

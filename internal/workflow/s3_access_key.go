@@ -8,11 +8,13 @@ import (
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/edvin/hosting/internal/activity"
+	"github.com/edvin/hosting/internal/core"
 	"github.com/edvin/hosting/internal/model"
 )
 
 // CreateS3AccessKeyWorkflow provisions a new S3 access key via the node agent.
-func CreateS3AccessKeyWorkflow(ctx workflow.Context, keyID string) error {
+// The args struct carries the plaintext secret needed for Ceph RGW provisioning.
+func CreateS3AccessKeyWorkflow(ctx workflow.Context, args core.CreateS3AccessKeyArgs) error {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
@@ -23,6 +25,8 @@ func CreateS3AccessKeyWorkflow(ctx workflow.Context, keyID string) error {
 		},
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
+
+	keyID := args.KeyID
 
 	// Set status to provisioning.
 	err := workflow.ExecuteActivity(ctx, "UpdateResourceStatus", activity.UpdateResourceStatusParams{
@@ -59,7 +63,7 @@ func CreateS3AccessKeyWorkflow(ctx workflow.Context, keyID string) error {
 	err = workflow.ExecuteActivity(nodeCtx, "CreateS3AccessKey", activity.CreateS3AccessKeyParams{
 		TenantID:        sctx.Bucket.TenantID,
 		AccessKeyID:     sctx.Key.AccessKeyID,
-		SecretAccessKey: sctx.Key.SecretAccessKey,
+		SecretAccessKey: args.SecretAccessKey,
 	}).Get(ctx, nil)
 	if err != nil {
 		_ = setResourceFailed(ctx, "s3_access_keys", keyID, err)

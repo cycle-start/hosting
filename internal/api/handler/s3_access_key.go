@@ -48,9 +48,6 @@ func (h *S3AccessKey) ListByBucket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for i := range keys {
-		keys[i].SecretAccessKey = ""
-	}
 	var nextCursor string
 	if hasMore && len(keys) > 0 {
 		nextCursor = keys[len(keys)-1].ID
@@ -98,13 +95,21 @@ func (h *S3AccessKey) Create(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:   now,
 	}
 
-	if err := h.svc.Create(r.Context(), key); err != nil {
+	secretAccessKey, err := h.svc.Create(r.Context(), key)
+	if err != nil {
 		response.WriteServiceError(w, err)
 		return
 	}
 
-	// Return with secret visible (only shown on creation)
-	response.WriteJSON(w, http.StatusCreated, key)
+	// Return with secret visible (only shown on creation).
+	type keyWithSecret struct {
+		*model.S3AccessKey
+		SecretAccessKey string `json:"secret_access_key"`
+	}
+	response.WriteJSON(w, http.StatusCreated, keyWithSecret{
+		S3AccessKey:    key,
+		SecretAccessKey: secretAccessKey,
+	})
 }
 
 // Delete godoc
@@ -133,26 +138,3 @@ func (h *S3AccessKey) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-// Retry godoc
-//
-//	@Summary		Retry a failed S3 access key
-//	@Description	Re-triggers the provisioning workflow for an access key that previously failed. Returns 202 immediately.
-//	@Tags			S3 Access Keys
-//	@Security		ApiKeyAuth
-//	@Param			id path string true "S3 access key ID"
-//	@Success		202
-//	@Failure		400 {object} response.ErrorResponse
-//	@Failure		500 {object} response.ErrorResponse
-//	@Router			/s3-access-keys/{id}/retry [post]
-func (h *S3AccessKey) Retry(w http.ResponseWriter, r *http.Request) {
-	id, err := request.RequireID(chi.URLParam(r, "id"))
-	if err != nil {
-		response.WriteError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if err := h.svc.Retry(r.Context(), id); err != nil {
-		response.WriteServiceError(w, err)
-		return
-	}
-	w.WriteHeader(http.StatusAccepted)
-}

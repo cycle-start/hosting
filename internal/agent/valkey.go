@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -41,30 +40,22 @@ func (m *ValkeyManager) configPath(name string) string {
 	return filepath.Join(m.configDir, fmt.Sprintf("%s.conf", name))
 }
 
-// readInstancePassword reads the requirepass from a Valkey instance config file.
-func (m *ValkeyManager) readInstancePassword(name string) (string, error) {
-	f, err := os.Open(m.configPath(name))
-	if err != nil {
-		return "", fmt.Errorf("open config for %s: %w", name, err)
-	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if strings.HasPrefix(line, "requirepass ") {
-			return strings.TrimPrefix(line, "requirepass "), nil
-		}
-	}
-	return "", fmt.Errorf("requirepass not found in config for %s", name)
+// aclPath returns the path to a Valkey instance ACL file.
+func (m *ValkeyManager) aclPath(name string) string {
+	return filepath.Join(m.configDir, fmt.Sprintf("%s.acl", name))
 }
 
-// execValkeyCLI runs a valkey-cli command against the specified port with auth.
-func (m *ValkeyManager) execValkeyCLI(ctx context.Context, port int, password string, valkeyArgs ...string) (string, error) {
-	args := []string{"-p", fmt.Sprintf("%d", port), "-a", password, "--no-auth-warning"}
+// socketPath returns the path to a Valkey instance Unix socket.
+func (m *ValkeyManager) socketPath(name string) string {
+	return fmt.Sprintf("/run/valkey/%s.sock", name)
+}
+
+// execValkeyCLI runs a valkey-cli command against the instance's Unix socket.
+func (m *ValkeyManager) execValkeyCLI(ctx context.Context, name string, valkeyArgs ...string) (string, error) {
+	args := []string{"-s", m.socketPath(name)}
 	args = append(args, valkeyArgs...)
 	cmd := exec.CommandContext(ctx, "valkey-cli", args...)
-	m.logger.Debug().Int("port", port).Strs("args", valkeyArgs).Msg("executing valkey-cli command")
+	m.logger.Debug().Str("instance", name).Strs("args", valkeyArgs).Msg("executing valkey-cli command")
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -73,10 +64,11 @@ func (m *ValkeyManager) execValkeyCLI(ctx context.Context, port int, password st
 	return strings.TrimSpace(string(output)), nil
 }
 
-// CreateInstance provisions a new Valkey instance with config and systemd unit.
+// CreateInstance provisions a new Valkey instance with config, ACL file, and systemd unit.
+// Auth is via ACL file (no requirepass). Local management uses the Unix socket.
 // This method is idempotent: if the instance already exists, its config is
 // converged and a running instance is updated via CONFIG SET.
-func (m *ValkeyManager) CreateInstance(ctx context.Context, name string, port int, password string, maxMemoryMB int) error {
+func (m *ValkeyManager) CreateInstance(ctx context.Context, name string, port int, passwordHash string, maxMemoryMB int) error {
 	if err := validateName(name); err != nil {
 		return err
 	}
@@ -87,34 +79,45 @@ func (m *ValkeyManager) CreateInstance(ctx context.Context, name string, port in
 	config := fmt.Sprintf(`port %d
 bind 0.0.0.0 ::
 protected-mode yes
-requirepass %s
+unixsocket /run/valkey/%s.sock
+unixsocketperm 700
 maxmemory %dmb
 maxmemory-policy allkeys-lru
 dir %s
 dbfilename dump.rdb
 appendonly yes
 appendfilename "appendonly.aof"
-`, port, password, maxMemoryMB, dataPath)
+aclfile %s
+`, port, name, maxMemoryMB, dataPath, m.aclPath(name))
+
+	aclContent := fmt.Sprintf("user default on #%s ~* &* +@all\n", passwordHash)
+
+	// Ensure /run/valkey exists for the Unix socket.
+	if err := os.MkdirAll("/run/valkey", 0755); err != nil {
+		return status.Errorf(codes.Internal, "create socket dir: %v", err)
+	}
 
 	// Check if instance already exists (idempotency on retry).
-	if existingPassword, err := m.readInstancePassword(name); err == nil {
+	if _, err := os.Stat(m.aclPath(name)); err == nil {
 		m.logger.Info().Str("instance", name).Msg("instance already exists, converging config")
 
-		// Rewrite config file to desired state.
+		// Rewrite config and ACL file to desired state.
 		if err := os.WriteFile(m.configPath(name), []byte(config), 0640); err != nil {
 			return status.Errorf(codes.Internal, "rewrite config: %v", err)
 		}
+		if err := os.WriteFile(m.aclPath(name), []byte(aclContent), 0640); err != nil {
+			return status.Errorf(codes.Internal, "rewrite acl: %v", err)
+		}
 
 		// Try to update running instance via CLI.
-		if _, pingErr := m.execValkeyCLI(ctx, port, existingPassword, "PING"); pingErr == nil {
+		if _, pingErr := m.execValkeyCLI(ctx, name, "PING"); pingErr == nil {
 			// Instance is running — update config live.
-			if _, err := m.execValkeyCLI(ctx, port, existingPassword, "CONFIG", "SET", "maxmemory", fmt.Sprintf("%dmb", maxMemoryMB)); err != nil {
+			if _, err := m.execValkeyCLI(ctx, name, "CONFIG", "SET", "maxmemory", fmt.Sprintf("%dmb", maxMemoryMB)); err != nil {
 				m.logger.Warn().Err(err).Msg("CONFIG SET maxmemory failed")
 			}
-			if existingPassword != password {
-				if _, err := m.execValkeyCLI(ctx, port, existingPassword, "CONFIG", "SET", "requirepass", password); err != nil {
-					m.logger.Warn().Err(err).Msg("CONFIG SET requirepass failed")
-				}
+			// Reload ACL from file.
+			if _, err := m.execValkeyCLI(ctx, name, "ACL", "LOAD"); err != nil {
+				m.logger.Warn().Err(err).Msg("ACL LOAD failed")
 			}
 			return nil
 		}
@@ -136,6 +139,10 @@ appendfilename "appendonly.aof"
 	// New instance — create from scratch.
 	if err := os.MkdirAll(dataPath, 0750); err != nil {
 		return status.Errorf(codes.Internal, "create data dir: %v", err)
+	}
+
+	if err := os.WriteFile(m.aclPath(name), []byte(aclContent), 0640); err != nil {
+		return status.Errorf(codes.Internal, "write acl: %v", err)
 	}
 
 	if err := os.WriteFile(m.configPath(name), []byte(config), 0640); err != nil {
@@ -165,14 +172,13 @@ func (m *ValkeyManager) DeleteInstance(ctx context.Context, name string, port in
 
 	m.logger.Info().Str("instance", name).Int("port", port).Msg("deleting valkey instance")
 
-	// Stop the valkey instance via CLI shutdown (graceful).
-	instancePassword, err := m.readInstancePassword(name)
-	if err == nil {
-		if _, shutdownErr := m.execValkeyCLI(ctx, port, instancePassword, "SHUTDOWN", "NOSAVE"); shutdownErr != nil {
+	// Stop the valkey instance via CLI shutdown (graceful) using Unix socket.
+	if _, err := os.Stat(m.socketPath(name)); err == nil {
+		if _, shutdownErr := m.execValkeyCLI(ctx, name, "SHUTDOWN", "NOSAVE"); shutdownErr != nil {
 			m.logger.Warn().Err(shutdownErr).Msg("valkey SHUTDOWN failed, continuing cleanup")
 		}
 	} else {
-		m.logger.Warn().Err(err).Msg("could not read instance password for shutdown, continuing cleanup")
+		m.logger.Warn().Msg("socket not found for shutdown, continuing cleanup")
 	}
 
 	// Also try service manager stop for systemd environments.
@@ -186,6 +192,11 @@ func (m *ValkeyManager) DeleteInstance(ctx context.Context, name string, port in
 		return status.Errorf(codes.Internal, "remove config: %v", err)
 	}
 
+	// Remove ACL file.
+	if err := os.Remove(m.aclPath(name)); err != nil && !os.IsNotExist(err) {
+		return status.Errorf(codes.Internal, "remove acl: %v", err)
+	}
+
 	// Remove data directory.
 	dataPath := filepath.Join(m.dataDir, name)
 	if err := os.RemoveAll(dataPath); err != nil {
@@ -196,7 +207,7 @@ func (m *ValkeyManager) DeleteInstance(ctx context.Context, name string, port in
 }
 
 // DumpData triggers a Valkey BGSAVE and copies the RDB file to the dump path.
-func (m *ValkeyManager) DumpData(ctx context.Context, name string, port int, password, dumpPath string) error {
+func (m *ValkeyManager) DumpData(ctx context.Context, name string, port int, dumpPath string) error {
 	if err := validateName(name); err != nil {
 		return err
 	}
@@ -209,7 +220,7 @@ func (m *ValkeyManager) DumpData(ctx context.Context, name string, port int, pas
 	}
 
 	// Record LASTSAVE before BGSAVE.
-	beforeSave, err := m.execValkeyCLI(ctx, port, password, "LASTSAVE")
+	beforeSave, err := m.execValkeyCLI(ctx, name, "LASTSAVE")
 	if err != nil {
 		return fmt.Errorf("LASTSAVE before: %w", err)
 	}
@@ -219,7 +230,7 @@ func (m *ValkeyManager) DumpData(ctx context.Context, name string, port int, pas
 	}
 
 	// Trigger BGSAVE.
-	if _, err := m.execValkeyCLI(ctx, port, password, "BGSAVE"); err != nil {
+	if _, err := m.execValkeyCLI(ctx, name, "BGSAVE"); err != nil {
 		return fmt.Errorf("BGSAVE: %w", err)
 	}
 
@@ -231,7 +242,7 @@ func (m *ValkeyManager) DumpData(ctx context.Context, name string, port int, pas
 		case <-time.After(500 * time.Millisecond):
 		}
 
-		afterSave, err := m.execValkeyCLI(ctx, port, password, "LASTSAVE")
+		afterSave, err := m.execValkeyCLI(ctx, name, "LASTSAVE")
 		if err != nil {
 			return fmt.Errorf("LASTSAVE poll: %w", err)
 		}
@@ -265,9 +276,8 @@ func (m *ValkeyManager) ImportData(ctx context.Context, name string, port int, d
 
 	// Stop the instance.
 	serviceName := fmt.Sprintf("valkey@%s.service", name)
-	instancePassword, err := m.readInstancePassword(name)
-	if err == nil {
-		if _, shutdownErr := m.execValkeyCLI(ctx, port, instancePassword, "SHUTDOWN", "NOSAVE"); shutdownErr != nil {
+	if _, err := os.Stat(m.socketPath(name)); err == nil {
+		if _, shutdownErr := m.execValkeyCLI(ctx, name, "SHUTDOWN", "NOSAVE"); shutdownErr != nil {
 			m.logger.Warn().Err(shutdownErr).Msg("valkey SHUTDOWN failed, trying service manager")
 		}
 	}
@@ -311,20 +321,15 @@ func (m *ValkeyManager) ImportData(ctx context.Context, name string, port int, d
 }
 
 // CreateUser creates a Valkey ACL user via valkey-cli.
-func (m *ValkeyManager) CreateUser(ctx context.Context, instanceName string, port int, username, password string, privileges []string, keyPattern string) error {
+func (m *ValkeyManager) CreateUser(ctx context.Context, instanceName string, port int, username, passwordHash string, privileges []string, keyPattern string) error {
 	if err := validateName(username); err != nil {
 		return err
 	}
 
 	m.logger.Info().Str("instance", instanceName).Str("username", username).Msg("creating valkey user")
 
-	instancePassword, err := m.readInstancePassword(instanceName)
-	if err != nil {
-		return status.Errorf(codes.Internal, "read instance password: %v", err)
-	}
-
-	// Build ACL SETUSER command: ACL SETUSER username on >password ~keyPattern +@priv1 +@priv2
-	aclArgs := []string{"ACL", "SETUSER", username, "on", ">" + password}
+	// Build ACL SETUSER command: ACL SETUSER username on #hash ~keyPattern +@priv1 +@priv2
+	aclArgs := []string{"ACL", "SETUSER", username, "on", "#" + passwordHash}
 	if keyPattern != "" {
 		aclArgs = append(aclArgs, keyPattern)
 	} else {
@@ -332,12 +337,12 @@ func (m *ValkeyManager) CreateUser(ctx context.Context, instanceName string, por
 	}
 	aclArgs = append(aclArgs, privileges...)
 
-	if _, err := m.execValkeyCLI(ctx, port, instancePassword, aclArgs...); err != nil {
+	if _, err := m.execValkeyCLI(ctx, instanceName, aclArgs...); err != nil {
 		return err
 	}
 
 	// Persist ACL changes.
-	if _, err := m.execValkeyCLI(ctx, port, instancePassword, "ACL", "SAVE"); err != nil {
+	if _, err := m.execValkeyCLI(ctx, instanceName, "ACL", "SAVE"); err != nil {
 		m.logger.Warn().Err(err).Msg("ACL SAVE failed")
 	}
 
@@ -345,25 +350,20 @@ func (m *ValkeyManager) CreateUser(ctx context.Context, instanceName string, por
 }
 
 // UpdateUser updates a Valkey ACL user by deleting and recreating.
-func (m *ValkeyManager) UpdateUser(ctx context.Context, instanceName string, port int, username, password string, privileges []string, keyPattern string) error {
+func (m *ValkeyManager) UpdateUser(ctx context.Context, instanceName string, port int, username, passwordHash string, privileges []string, keyPattern string) error {
 	if err := validateName(username); err != nil {
 		return err
 	}
 
 	m.logger.Info().Str("instance", instanceName).Str("username", username).Msg("updating valkey user")
 
-	instancePassword, err := m.readInstancePassword(instanceName)
-	if err != nil {
-		return status.Errorf(codes.Internal, "read instance password: %v", err)
-	}
-
 	// Delete existing user first.
-	if _, err := m.execValkeyCLI(ctx, port, instancePassword, "ACL", "DELUSER", username); err != nil {
+	if _, err := m.execValkeyCLI(ctx, instanceName, "ACL", "DELUSER", username); err != nil {
 		m.logger.Warn().Err(err).Str("username", username).Msg("ACL DELUSER failed, continuing with create")
 	}
 
 	// Recreate user with new settings.
-	aclArgs := []string{"ACL", "SETUSER", username, "on", ">" + password}
+	aclArgs := []string{"ACL", "SETUSER", username, "on", "#" + passwordHash}
 	if keyPattern != "" {
 		aclArgs = append(aclArgs, keyPattern)
 	} else {
@@ -371,12 +371,12 @@ func (m *ValkeyManager) UpdateUser(ctx context.Context, instanceName string, por
 	}
 	aclArgs = append(aclArgs, privileges...)
 
-	if _, err := m.execValkeyCLI(ctx, port, instancePassword, aclArgs...); err != nil {
+	if _, err := m.execValkeyCLI(ctx, instanceName, aclArgs...); err != nil {
 		return err
 	}
 
 	// Persist ACL changes.
-	if _, err := m.execValkeyCLI(ctx, port, instancePassword, "ACL", "SAVE"); err != nil {
+	if _, err := m.execValkeyCLI(ctx, instanceName, "ACL", "SAVE"); err != nil {
 		m.logger.Warn().Err(err).Msg("ACL SAVE failed")
 	}
 
@@ -393,14 +393,13 @@ func (m *ValkeyManager) DeleteUser(ctx context.Context, instanceName string, por
 
 	m.logger.Info().Str("instance", instanceName).Str("username", username).Msg("deleting valkey user")
 
-	instancePassword, err := m.readInstancePassword(instanceName)
-	if err != nil {
-		// Instance config not found — instance already deleted, user is gone.
+	// Instance config not found — instance already deleted, user is gone.
+	if _, err := os.Stat(m.aclPath(instanceName)); os.IsNotExist(err) {
 		m.logger.Info().Str("instance", instanceName).Str("username", username).Msg("instance config not found, treating user as deleted")
 		return nil
 	}
 
-	if _, err := m.execValkeyCLI(ctx, port, instancePassword, "ACL", "DELUSER", username); err != nil {
+	if _, err := m.execValkeyCLI(ctx, instanceName, "ACL", "DELUSER", username); err != nil {
 		// If the instance is unreachable, log and return nil — the user can't
 		// exist on an instance that is already gone.
 		m.logger.Warn().Err(err).Str("username", username).Msg("ACL DELUSER failed, treating as success")
@@ -408,7 +407,7 @@ func (m *ValkeyManager) DeleteUser(ctx context.Context, instanceName string, por
 	}
 
 	// Persist ACL changes.
-	if _, err := m.execValkeyCLI(ctx, port, instancePassword, "ACL", "SAVE"); err != nil {
+	if _, err := m.execValkeyCLI(ctx, instanceName, "ACL", "SAVE"); err != nil {
 		m.logger.Warn().Err(err).Msg("ACL SAVE failed")
 	}
 

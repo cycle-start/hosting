@@ -3,7 +3,7 @@ CREATE TABLE valkey_users (
     id                 TEXT PRIMARY KEY,
     valkey_instance_id TEXT NOT NULL REFERENCES valkey_instances(id) ON DELETE CASCADE,
     username           TEXT NOT NULL,
-    password           TEXT NOT NULL,
+    password_hash      TEXT NOT NULL,
     privileges         TEXT[] NOT NULL DEFAULT '{+@all}',
     key_pattern        TEXT NOT NULL DEFAULT '~*',
     status             TEXT NOT NULL DEFAULT 'pending',

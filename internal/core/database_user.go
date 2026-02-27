@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/edvin/hosting/internal/crypto"
 	"github.com/edvin/hosting/internal/model"
 	temporalclient "go.temporal.io/sdk/client"
 )
@@ -17,11 +18,13 @@ func NewDatabaseUserService(db DB, tc temporalclient.Client) *DatabaseUserServic
 	return &DatabaseUserService{db: db, tc: tc}
 }
 
-func (s *DatabaseUserService) Create(ctx context.Context, user *model.DatabaseUser) error {
+func (s *DatabaseUserService) Create(ctx context.Context, user *model.DatabaseUser, plaintextPassword string) error {
+	user.PasswordHash = crypto.MysqlNativePasswordHash(plaintextPassword)
+
 	_, err := s.db.Exec(ctx,
-		`INSERT INTO database_users (id, database_id, username, password, privileges, status, created_at, updated_at)
+		`INSERT INTO database_users (id, database_id, username, password_hash, privileges, status, created_at, updated_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		user.ID, user.DatabaseID, user.Username, user.Password,
+		user.ID, user.DatabaseID, user.Username, user.PasswordHash,
 		user.Privileges, user.Status, user.CreatedAt, user.UpdatedAt,
 	)
 	if err != nil {
@@ -46,9 +49,9 @@ func (s *DatabaseUserService) Create(ctx context.Context, user *model.DatabaseUs
 func (s *DatabaseUserService) GetByID(ctx context.Context, id string) (*model.DatabaseUser, error) {
 	var u model.DatabaseUser
 	err := s.db.QueryRow(ctx,
-		`SELECT id, database_id, username, password, privileges, status, status_message, created_at, updated_at
+		`SELECT id, database_id, username, password_hash, privileges, status, status_message, created_at, updated_at
 		 FROM database_users WHERE id = $1`, id,
-	).Scan(&u.ID, &u.DatabaseID, &u.Username, &u.Password,
+	).Scan(&u.ID, &u.DatabaseID, &u.Username, &u.PasswordHash,
 		&u.Privileges, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get database user %s: %w", id, err)
@@ -57,7 +60,7 @@ func (s *DatabaseUserService) GetByID(ctx context.Context, id string) (*model.Da
 }
 
 func (s *DatabaseUserService) ListByDatabase(ctx context.Context, dbID string, limit int, cursor string) ([]model.DatabaseUser, bool, error) {
-	query := `SELECT id, database_id, username, password, privileges, status, status_message, created_at, updated_at FROM database_users WHERE database_id = $1`
+	query := `SELECT id, database_id, username, password_hash, privileges, status, status_message, created_at, updated_at FROM database_users WHERE database_id = $1`
 	args := []any{dbID}
 	argIdx := 2
 
@@ -80,7 +83,7 @@ func (s *DatabaseUserService) ListByDatabase(ctx context.Context, dbID string, l
 	var users []model.DatabaseUser
 	for rows.Next() {
 		var u model.DatabaseUser
-		if err := rows.Scan(&u.ID, &u.DatabaseID, &u.Username, &u.Password,
+		if err := rows.Scan(&u.ID, &u.DatabaseID, &u.Username, &u.PasswordHash,
 			&u.Privileges, &u.Status, &u.StatusMessage, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, false, fmt.Errorf("scan database user: %w", err)
 		}
@@ -97,11 +100,15 @@ func (s *DatabaseUserService) ListByDatabase(ctx context.Context, dbID string, l
 	return users, hasMore, nil
 }
 
-func (s *DatabaseUserService) Update(ctx context.Context, user *model.DatabaseUser) error {
+func (s *DatabaseUserService) Update(ctx context.Context, user *model.DatabaseUser, plaintextPassword string) error {
+	if plaintextPassword != "" {
+		user.PasswordHash = crypto.MysqlNativePasswordHash(plaintextPassword)
+	}
+
 	_, err := s.db.Exec(ctx,
-		`UPDATE database_users SET username = $1, password = $2, privileges = $3, updated_at = now()
+		`UPDATE database_users SET username = $1, password_hash = $2, privileges = $3, updated_at = now()
 		 WHERE id = $4`,
-		user.Username, user.Password, user.Privileges, user.ID,
+		user.Username, user.PasswordHash, user.Privileges, user.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update database user %s: %w", user.ID, err)

@@ -124,13 +124,12 @@ func (h *Database) Create(w http.ResponseWriter, r *http.Request) {
 			ID:         platform.NewID(),
 			DatabaseID: database.ID,
 			Username:   ur.Username,
-			Password:   ur.Password,
 			Privileges: ur.Privileges,
 			Status:     model.StatusPending,
 			CreatedAt:  now2,
 			UpdatedAt:  now2,
 		}
-		if err := h.userSvc.Create(r.Context(), user); err != nil {
+		if err := h.userSvc.Create(r.Context(), user, ur.Password); err != nil {
 			response.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create database user %s: %s", ur.Username, err.Error()))
 			return
 		}

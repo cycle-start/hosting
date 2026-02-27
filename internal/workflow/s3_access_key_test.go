@@ -9,6 +9,7 @@ import (
 	"go.temporal.io/sdk/testsuite"
 
 	"github.com/edvin/hosting/internal/activity"
+	"github.com/edvin/hosting/internal/core"
 	"github.com/edvin/hosting/internal/model"
 )
 
@@ -34,12 +35,13 @@ func (s *CreateS3AccessKeyWorkflowTestSuite) TestSuccess() {
 	bucketID := "test-bucket-1"
 	tenantID := "test-tenant-1"
 	shardID := "test-shard-1"
+	secretAccessKey := "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 	key := model.S3AccessKey{
-		ID:              keyID,
-		S3BucketID:      bucketID,
-		AccessKeyID:     "AKIAIOSFODNN7EXAMPLE",
-		SecretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-		Permissions:     "readwrite",
+		ID:           keyID,
+		S3BucketID:   bucketID,
+		AccessKeyID:  "AKIAIOSFODNN7EXAMPLE",
+		SecretKeyHash: "abc123hash",
+		Permissions:  "readwrite",
 	}
 	bucket := model.S3Bucket{
 		ID:       bucketID,
@@ -48,6 +50,11 @@ func (s *CreateS3AccessKeyWorkflowTestSuite) TestSuccess() {
 	}
 	nodes := []model.Node{
 		{ID: "node-1"},
+	}
+
+	args := core.CreateS3AccessKeyArgs{
+		KeyID:          keyID,
+		SecretAccessKey: secretAccessKey,
 	}
 
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -61,12 +68,12 @@ func (s *CreateS3AccessKeyWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("CreateS3AccessKey", mock.Anything, activity.CreateS3AccessKeyParams{
 		TenantID:        tenantID,
 		AccessKeyID:     "AKIAIOSFODNN7EXAMPLE",
-		SecretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+		SecretAccessKey: secretAccessKey,
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "s3_access_keys", ID: keyID, Status: model.StatusActive,
 	}).Return(nil)
-	s.env.ExecuteWorkflow(CreateS3AccessKeyWorkflow, keyID)
+	s.env.ExecuteWorkflow(CreateS3AccessKeyWorkflow, args)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
 }
@@ -74,12 +81,17 @@ func (s *CreateS3AccessKeyWorkflowTestSuite) TestSuccess() {
 func (s *CreateS3AccessKeyWorkflowTestSuite) TestGetKeyFails_SetsStatusFailed() {
 	keyID := "test-key-2"
 
+	args := core.CreateS3AccessKeyArgs{
+		KeyID:          keyID,
+		SecretAccessKey: "some-secret",
+	}
+
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
 		Table: "s3_access_keys", ID: keyID, Status: model.StatusProvisioning,
 	}).Return(nil)
 	s.env.OnActivity("GetS3AccessKeyContext", mock.Anything, keyID).Return(nil, fmt.Errorf("not found"))
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, matchFailedStatus("s3_access_keys", keyID)).Return(nil)
-	s.env.ExecuteWorkflow(CreateS3AccessKeyWorkflow, keyID)
+	s.env.ExecuteWorkflow(CreateS3AccessKeyWorkflow, args)
 	s.True(s.env.IsWorkflowCompleted())
 	s.Error(s.env.GetWorkflowError())
 }
@@ -107,11 +119,11 @@ func (s *DeleteS3AccessKeyWorkflowTestSuite) TestSuccess() {
 	tenantID := "test-tenant-1"
 	shardID := "test-shard-1"
 	key := model.S3AccessKey{
-		ID:              keyID,
-		S3BucketID:      bucketID,
-		AccessKeyID:     "AKIAIOSFODNN7EXAMPLE",
-		SecretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-		Permissions:     "readwrite",
+		ID:           keyID,
+		S3BucketID:   bucketID,
+		AccessKeyID:  "AKIAIOSFODNN7EXAMPLE",
+		SecretKeyHash: "abc123hash",
+		Permissions:  "readwrite",
 	}
 	bucket := model.S3Bucket{
 		ID:       bucketID,

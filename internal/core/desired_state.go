@@ -338,7 +338,7 @@ func (s *DesiredStateService) loadDatabaseState(ctx context.Context, shardID str
 		}
 
 		userRows, err := s.db.Query(ctx, `
-			SELECT id, username, password, privileges, status FROM database_users
+			SELECT id, username, password_hash, privileges, status FROM database_users
 			WHERE database_id = $1 AND status = 'active'
 			ORDER BY username`, d.ID)
 		if err != nil {
@@ -346,7 +346,7 @@ func (s *DesiredStateService) loadDatabaseState(ctx context.Context, shardID str
 		}
 		for userRows.Next() {
 			var u model.DesiredDBUser
-			if err := userRows.Scan(&u.ID, &u.Username, &u.Password, &u.Privileges, &u.Status); err != nil {
+			if err := userRows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Privileges, &u.Status); err != nil {
 				userRows.Close()
 				return fmt.Errorf("scan database user: %w", err)
 			}
@@ -364,7 +364,7 @@ func (s *DesiredStateService) loadDatabaseState(ctx context.Context, shardID str
 
 func (s *DesiredStateService) loadValkeyState(ctx context.Context, shardID string, ss *model.ShardState) error {
 	rows, err := s.db.Query(ctx, `
-		SELECT id, port, password, max_memory_mb, status
+		SELECT id, port, password_hash, max_memory_mb, status
 		FROM valkey_instances WHERE shard_id = $1 AND status = 'active'
 		ORDER BY id`, shardID)
 	if err != nil {
@@ -374,12 +374,12 @@ func (s *DesiredStateService) loadValkeyState(ctx context.Context, shardID strin
 
 	for rows.Next() {
 		var vi model.DesiredValkeyInstance
-		if err := rows.Scan(&vi.ID, &vi.Port, &vi.Password, &vi.MaxMemoryMB, &vi.Status); err != nil {
+		if err := rows.Scan(&vi.ID, &vi.Port, &vi.PasswordHash, &vi.MaxMemoryMB, &vi.Status); err != nil {
 			return fmt.Errorf("scan valkey instance: %w", err)
 		}
 
 		userRows, err := s.db.Query(ctx, `
-			SELECT id, username, password, array_to_string(privileges, ','), key_pattern, status
+			SELECT id, username, password_hash, array_to_string(privileges, ','), key_pattern, status
 			FROM valkey_users WHERE valkey_instance_id = $1 AND status = 'active'
 			ORDER BY username`, vi.ID)
 		if err != nil {
@@ -387,7 +387,7 @@ func (s *DesiredStateService) loadValkeyState(ctx context.Context, shardID strin
 		}
 		for userRows.Next() {
 			var u model.DesiredValkeyUser
-			if err := userRows.Scan(&u.ID, &u.Username, &u.Password, &u.Privileges, &u.KeyPattern, &u.Status); err != nil {
+			if err := userRows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Privileges, &u.KeyPattern, &u.Status); err != nil {
 				userRows.Close()
 				return fmt.Errorf("scan valkey user: %w", err)
 			}

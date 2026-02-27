@@ -55,7 +55,7 @@ func CreateValkeyUserWorkflow(ctx workflow.Context, userID string) error {
 			InstanceName: vctx.Instance.ID,
 			Port:         vctx.Instance.Port,
 			Username:     vctx.User.Username,
-			Password:     vctx.User.Password,
+			PasswordHash: vctx.User.PasswordHash,
 			Privileges:   vctx.User.Privileges,
 			KeyPattern:   vctx.User.KeyPattern,
 		}).Get(ctx, nil)
@@ -117,7 +117,7 @@ func UpdateValkeyUserWorkflow(ctx workflow.Context, userID string) error {
 			InstanceName: vctx.Instance.ID,
 			Port:         vctx.Instance.Port,
 			Username:     vctx.User.Username,
-			Password:     vctx.User.Password,
+			PasswordHash: vctx.User.PasswordHash,
 			Privileges:   vctx.User.Privileges,
 			KeyPattern:   vctx.User.KeyPattern,
 		}).Get(ctx, nil)

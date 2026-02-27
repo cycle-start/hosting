@@ -78,7 +78,7 @@ type ConfigureRuntimeParams struct {
 type CreateDatabaseUserParams struct {
 	DatabaseName string
 	Username     string
-	Password     string
+	PasswordHash string
 	Privileges   []string
 }
 
@@ -86,16 +86,16 @@ type CreateDatabaseUserParams struct {
 type UpdateDatabaseUserParams struct {
 	DatabaseName string
 	Username     string
-	Password     string
+	PasswordHash string
 	Privileges   []string
 }
 
 // CreateValkeyInstanceParams holds parameters for creating a Valkey instance on a node.
 type CreateValkeyInstanceParams struct {
-	Name        string
-	Port        int
-	Password    string
-	MaxMemoryMB int
+	Name         string
+	Port         int
+	PasswordHash string
+	MaxMemoryMB  int
 }
 
 // DeleteValkeyInstanceParams holds parameters for deleting a Valkey instance on a node.
@@ -109,7 +109,7 @@ type CreateValkeyUserParams struct {
 	InstanceName string
 	Port         int
 	Username     string
-	Password     string
+	PasswordHash string
 	Privileges   []string
 	KeyPattern   string
 }
@@ -119,7 +119,7 @@ type UpdateValkeyUserParams struct {
 	InstanceName string
 	Port         int
 	Username     string
-	Password     string
+	PasswordHash string
 	Privileges   []string
 	KeyPattern   string
 }
@@ -168,7 +168,6 @@ type ImportMySQLDatabaseParams struct {
 type DumpValkeyDataParams struct {
 	Name     string
 	Port     int
-	Password string
 	DumpPath string
 }
 

@@ -131,7 +131,7 @@ func MigrateDatabaseWorkflow(ctx workflow.Context, params MigrateDatabaseParams)
 		err = workflow.ExecuteActivity(targetCtx, "CreateDatabaseUser", activity.CreateDatabaseUserParams{
 			DatabaseName: database.ID,
 			Username:     user.Username,
-			Password:     user.Password,
+			PasswordHash: user.PasswordHash,
 			Privileges:   user.Privileges,
 		}).Get(ctx, nil)
 		if err != nil {

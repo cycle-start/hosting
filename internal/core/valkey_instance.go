@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/edvin/hosting/internal/crypto"
 	"github.com/edvin/hosting/internal/model"
 	temporalclient "go.temporal.io/sdk/client"
 )
@@ -23,7 +24,9 @@ func NewValkeyInstanceService(db DB, tc temporalclient.Client) *ValkeyInstanceSe
 	return &ValkeyInstanceService{db: db, tc: tc}
 }
 
-func (s *ValkeyInstanceService) Create(ctx context.Context, instance *model.ValkeyInstance) error {
+func (s *ValkeyInstanceService) Create(ctx context.Context, instance *model.ValkeyInstance, plaintextPassword string) error {
+	instance.PasswordHash = crypto.ValkeyPasswordHash(plaintextPassword)
+
 	// Allocate port: MAX(port) + 1 within shard, starting from 6380.
 	var nextPort int
 	err := s.db.QueryRow(ctx,
@@ -36,10 +39,10 @@ func (s *ValkeyInstanceService) Create(ctx context.Context, instance *model.Valk
 	instance.Port = nextPort
 
 	_, err = s.db.Exec(ctx,
-		`INSERT INTO valkey_instances (id, tenant_id, subscription_id, shard_id, port, max_memory_mb, password, status, created_at, updated_at)
+		`INSERT INTO valkey_instances (id, tenant_id, subscription_id, shard_id, port, max_memory_mb, password_hash, status, created_at, updated_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 		instance.ID, instance.TenantID, instance.SubscriptionID, instance.ShardID, instance.Port,
-		instance.MaxMemoryMB, instance.Password, instance.Status, instance.CreatedAt, instance.UpdatedAt,
+		instance.MaxMemoryMB, instance.PasswordHash, instance.Status, instance.CreatedAt, instance.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("insert valkey instance: %w", err)
@@ -59,13 +62,13 @@ func (s *ValkeyInstanceService) Create(ctx context.Context, instance *model.Valk
 func (s *ValkeyInstanceService) GetByID(ctx context.Context, id string) (*model.ValkeyInstance, error) {
 	var v model.ValkeyInstance
 	err := s.db.QueryRow(ctx,
-		`SELECT vi.id, vi.tenant_id, vi.subscription_id, vi.shard_id, vi.port, vi.max_memory_mb, vi.password, vi.status, vi.status_message, vi.suspend_reason, vi.created_at, vi.updated_at,
+		`SELECT vi.id, vi.tenant_id, vi.subscription_id, vi.shard_id, vi.port, vi.max_memory_mb, vi.password_hash, vi.status, vi.status_message, vi.suspend_reason, vi.created_at, vi.updated_at,
 		        s.name
 		 FROM valkey_instances vi
 		 LEFT JOIN shards s ON s.id = vi.shard_id
 		 WHERE vi.id = $1`, id,
 	).Scan(&v.ID, &v.TenantID, &v.SubscriptionID, &v.ShardID, &v.Port, &v.MaxMemoryMB,
-		&v.Password, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt,
+		&v.PasswordHash, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt,
 		&v.ShardName)
 	if err != nil {
 		return nil, fmt.Errorf("get valkey instance %s: %w", id, err)
@@ -74,7 +77,7 @@ func (s *ValkeyInstanceService) GetByID(ctx context.Context, id string) (*model.
 }
 
 func (s *ValkeyInstanceService) ListByTenant(ctx context.Context, tenantID string, limit int, cursor string) ([]model.ValkeyInstance, bool, error) {
-	query := `SELECT vi.id, vi.tenant_id, vi.subscription_id, vi.shard_id, vi.port, vi.max_memory_mb, vi.password, vi.status, vi.status_message, vi.suspend_reason, vi.created_at, vi.updated_at, s.name FROM valkey_instances vi LEFT JOIN shards s ON s.id = vi.shard_id WHERE vi.tenant_id = $1`
+	query := `SELECT vi.id, vi.tenant_id, vi.subscription_id, vi.shard_id, vi.port, vi.max_memory_mb, vi.password_hash, vi.status, vi.status_message, vi.suspend_reason, vi.created_at, vi.updated_at, s.name FROM valkey_instances vi LEFT JOIN shards s ON s.id = vi.shard_id WHERE vi.tenant_id = $1`
 	args := []any{tenantID}
 	argIdx := 2
 
@@ -98,7 +101,7 @@ func (s *ValkeyInstanceService) ListByTenant(ctx context.Context, tenantID strin
 	for rows.Next() {
 		var v model.ValkeyInstance
 		if err := rows.Scan(&v.ID, &v.TenantID, &v.SubscriptionID, &v.ShardID, &v.Port, &v.MaxMemoryMB,
-			&v.Password, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt,
+			&v.PasswordHash, &v.Status, &v.StatusMessage, &v.SuspendReason, &v.CreatedAt, &v.UpdatedAt,
 			&v.ShardName); err != nil {
 			return nil, false, fmt.Errorf("scan valkey instance: %w", err)
 		}

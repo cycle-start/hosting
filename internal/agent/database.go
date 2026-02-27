@@ -192,7 +192,8 @@ func (m *DatabaseManager) DeleteDatabase(ctx context.Context, name string) error
 }
 
 // CreateUser creates a new MySQL user and grants privileges on the specified database.
-func (m *DatabaseManager) CreateUser(ctx context.Context, dbName, username, password string, privileges []string) error {
+// passwordHash must be the mysql_native_password hash (e.g. "*ABCDEF0123...").
+func (m *DatabaseManager) CreateUser(ctx context.Context, dbName, username, passwordHash string, privileges []string) error {
 	if err := validateName(dbName); err != nil {
 		return err
 	}
@@ -211,18 +212,15 @@ func (m *DatabaseManager) CreateUser(ctx context.Context, dbName, username, pass
 		Strs("privileges", privileges).
 		Msg("creating database user")
 
-	// Escape single quotes in the password to prevent injection.
-	escapedPassword := strings.ReplaceAll(password, "'", "\\'")
-
 	// Drop user if it already exists (idempotent).
 	dropSQL := fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%'", username)
 	if err := m.execMySQL(ctx, dropSQL); err != nil {
 		m.logger.Warn().Err(err).Str("username", username).Msg("drop existing user failed, continuing")
 	}
 
-	// Create the user with mysql_native_password for broad client compatibility
-	// (caching_sha2_password requires SSL for first remote connection).
-	createSQL := fmt.Sprintf("CREATE USER '%s'@'%%' IDENTIFIED WITH mysql_native_password BY '%s'", username, escapedPassword)
+	// Create the user with mysql_native_password using the pre-computed hash (AS syntax).
+	// The hash is hex-safe so no escaping is needed.
+	createSQL := fmt.Sprintf("CREATE USER '%s'@'%%' IDENTIFIED WITH mysql_native_password AS '%s'", username, passwordHash)
 	if err := m.execMySQL(ctx, createSQL); err != nil {
 		return err
 	}
@@ -241,8 +239,9 @@ func (m *DatabaseManager) CreateUser(ctx context.Context, dbName, username, pass
 	return m.execMySQL(ctx, "FLUSH PRIVILEGES")
 }
 
-// UpdateUser modifies an existing MySQL user's password and/or privileges.
-func (m *DatabaseManager) UpdateUser(ctx context.Context, dbName, username, password string, privileges []string) error {
+// UpdateUser modifies an existing MySQL user's password hash and/or privileges.
+// passwordHash must be the mysql_native_password hash (e.g. "*ABCDEF0123...").
+func (m *DatabaseManager) UpdateUser(ctx context.Context, dbName, username, passwordHash string, privileges []string) error {
 	if err := validateName(dbName); err != nil {
 		return err
 	}
@@ -260,10 +259,9 @@ func (m *DatabaseManager) UpdateUser(ctx context.Context, dbName, username, pass
 		Str("username", username).
 		Msg("updating database user")
 
-	// Update password if provided.
-	if password != "" {
-		escapedPassword := strings.ReplaceAll(password, "'", "\\'")
-		alterSQL := fmt.Sprintf("ALTER USER '%s'@'%%' IDENTIFIED BY '%s'", username, escapedPassword)
+	// Update password hash if provided.
+	if passwordHash != "" {
+		alterSQL := fmt.Sprintf("ALTER USER '%s'@'%%' IDENTIFIED WITH mysql_native_password AS '%s'", username, passwordHash)
 		if err := m.execMySQL(ctx, alterSQL); err != nil {
 			return err
 		}

@@ -6,7 +6,7 @@ CREATE TABLE valkey_instances (
     shard_id       TEXT REFERENCES shards(id),
     port           INTEGER NOT NULL,
     max_memory_mb  INTEGER NOT NULL DEFAULT 64,
-    password       TEXT NOT NULL,
+    password_hash  TEXT NOT NULL,
     status         TEXT NOT NULL DEFAULT 'pending',
     status_message TEXT,
     suspend_reason TEXT NOT NULL DEFAULT '',

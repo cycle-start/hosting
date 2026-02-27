@@ -36,7 +36,7 @@ func (s *CreateValkeyInstanceWorkflowTestSuite) TestSuccess() {
 		ID:          instanceID,
 		ShardID:     &shardID,
 		Port:        6379,
-		Password:    "valkeypass",
+		PasswordHash:    "valkeypass",
 		MaxMemoryMB: 256,
 	}
 	nodes := []model.Node{
@@ -51,7 +51,7 @@ func (s *CreateValkeyInstanceWorkflowTestSuite) TestSuccess() {
 	s.env.OnActivity("CreateValkeyInstance", mock.Anything, activity.CreateValkeyInstanceParams{
 		Name:        instanceID,
 		Port:        6379,
-		Password:    "valkeypass",
+		PasswordHash:    "valkeypass",
 		MaxMemoryMB: 256,
 	}).Return(nil)
 	s.env.OnActivity("UpdateResourceStatus", mock.Anything, activity.UpdateResourceStatusParams{
@@ -82,7 +82,7 @@ func (s *CreateValkeyInstanceWorkflowTestSuite) TestAgentFails_SetsStatusFailed(
 		ID:          instanceID,
 		ShardID:     &shardID,
 		Port:        6379,
-		Password:    "valkeypass",
+		PasswordHash:    "valkeypass",
 		MaxMemoryMB: 256,
 	}
 	nodes := []model.Node{
@@ -106,7 +106,7 @@ func (s *CreateValkeyInstanceWorkflowTestSuite) TestNoShard_SetsStatusFailed() {
 	instance := model.ValkeyInstance{
 		ID:          instanceID,
 		Port:        6379,
-		Password:    "valkeypass",
+		PasswordHash:    "valkeypass",
 		MaxMemoryMB: 256,
 	}
 
