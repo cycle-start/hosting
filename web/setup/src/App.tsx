@@ -60,6 +60,15 @@ export default function App() {
 
   const handleChange = async (newConfig: Config) => {
     setConfig(newConfig)
+    // Clear errors for fields that changed so red borders disappear immediately
+    if (errors.length > 0) {
+      setErrors((prev) => prev.filter((e) => {
+        const val = (f: string, obj: any): any => f.split('.').reduce((o, k) => o?.[k], obj)
+        const oldVal = val(e.field, config)
+        const newVal = val(e.field, newConfig)
+        return oldVal === newVal
+      }))
+    }
     setSaving(true)
     try {
       await api.putConfig(newConfig)
@@ -324,35 +333,51 @@ function GeneratedView({
           <ArrowRight className="h-4 w-4 text-primary" />
           Next Steps
         </h3>
-        <ol className="text-sm text-muted-foreground space-y-3 ml-6 list-decimal">
+        <p className="text-sm text-muted-foreground">
+          You can close this wizard now (Ctrl+C in the terminal). The generated files are saved to disk.
+          Continue in a new terminal:
+        </p>
+        <ol className="text-sm text-muted-foreground space-y-4 ml-6 list-decimal">
           {config.deploy_mode === 'multi' && (
-            <li>
-              Generate an SSH CA keypair (if you haven't already):
-              <code className="block mt-1.5 rounded bg-muted px-3 py-2 text-xs font-mono text-foreground">
-                ssh-keygen -t ed25519 -f ssh_ca -N ""
-              </code>
-            </li>
+            <>
+              <li>
+                <span className="text-foreground font-medium">Ensure SSH access to all machines.</span>
+                {' '}Ansible will connect via SSH to install and configure services on each node.
+                Verify you can reach them with your SSH key.
+              </li>
+              <li>
+                <span className="text-foreground font-medium">Generate an SSH CA keypair</span>
+                {' '}(if you haven't already). The platform uses this to issue short-lived SSH certificates for node-to-node communication.
+                <code className="block mt-1.5 rounded bg-muted px-3 py-2 text-xs font-mono text-foreground">
+                  ssh-keygen -t ed25519 -f ssh_ca -N ""
+                </code>
+              </li>
+            </>
           )}
           <li>
-            Run the Ansible playbook to configure {config.deploy_mode === 'single' ? 'this machine' : 'all machines'}:
+            <span className="text-foreground font-medium">Provision {config.deploy_mode === 'single' ? 'this machine' : 'all machines'} with Ansible.</span>
+            {' '}This installs packages, configures services, and deploys agents{config.deploy_mode === 'multi' ? ' across all nodes' : ''}.
             <code className="block mt-1.5 rounded bg-muted px-3 py-2 text-xs font-mono text-foreground">
               ansible-playbook ansible/site.yml -i ansible/inventory/static.ini
             </code>
           </li>
           <li>
-            Register the API key (after DB migration, before cluster apply):
+            <span className="text-foreground font-medium">Register the API key.</span>
+            {' '}This creates the authentication key that all components use to communicate with the control plane API.
             <code className="block mt-1.5 rounded bg-muted px-3 py-2 text-xs font-mono text-foreground">
               ./bin/core-api create-api-key --name setup --raw-key {config.api_key}
             </code>
           </li>
           <li>
-            Apply the cluster configuration:
+            <span className="text-foreground font-medium">Register the cluster topology.</span>
+            {' '}This tells the control plane about the region, cluster, nodes, shards, and available runtimes.
             <code className="block mt-1.5 rounded bg-muted px-3 py-2 text-xs font-mono text-foreground">
               ./bin/hostctl cluster apply -f cluster.yaml
             </code>
           </li>
           <li>
-            Seed the initial brand data:
+            <span className="text-foreground font-medium">Seed the initial brand.</span>
+            {' '}Creates the first brand with its domains, nameservers, and mail configuration.
             <code className="block mt-1.5 rounded bg-muted px-3 py-2 text-xs font-mono text-foreground">
               ./bin/hostctl seed -f seed.yaml
             </code>
@@ -366,17 +391,17 @@ function GeneratedView({
           <FileText className="h-4 w-4 text-muted-foreground" />
           Generated Files
         </h3>
-        <div className="grid grid-cols-[200px_1fr] gap-4 min-h-[400px]">
-          <div className="space-y-1">
+        <div className="rounded-lg border bg-card overflow-hidden min-h-[400px]">
+          <div className="flex border-b bg-muted/50 overflow-x-auto">
             {files.map((f, i) => (
               <button
                 key={f.path}
                 onClick={() => setSelected(i)}
                 className={cn(
-                  'w-full text-left rounded-md px-3 py-1.5 text-xs font-mono transition-colors',
+                  'px-4 py-2 text-xs font-mono whitespace-nowrap border-b-2 transition-colors',
                   i === selected
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                    ? 'border-primary text-foreground bg-card'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
                 )}
               >
                 {f.path}
@@ -386,12 +411,12 @@ function GeneratedView({
           <div className="relative">
             <button
               onClick={copyContent}
-              className="absolute top-2 right-2 rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="absolute top-2 right-2 rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors z-10"
               title="Copy to clipboard"
             >
               {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
             </button>
-            <pre className="rounded-lg border bg-muted/50 p-4 text-xs font-mono overflow-auto whitespace-pre h-full">
+            <pre className="p-4 text-xs font-mono overflow-auto whitespace-pre">
               {files[selected]?.content}
             </pre>
           </div>

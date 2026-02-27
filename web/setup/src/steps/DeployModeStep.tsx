@@ -10,7 +10,7 @@ interface Props {
 const modes: { id: DeployMode; label: string; description: string; icon: typeof Server }[] = [
   {
     id: 'single',
-    label: 'Single Machine',
+    label: 'This Machine',
     description: 'Everything runs on this host. Great for evaluation and small deployments.',
     icon: Server,
   },

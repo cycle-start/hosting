@@ -132,7 +132,7 @@ export function NodesStep({ config, onChange, roles, errors }: Props) {
           <div className="rounded-lg border bg-card overflow-hidden">
             {/* Header row */}
             <div className="grid border-b bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground"
-              style={{ gridTemplateColumns: `1fr repeat(${nodes.length}, 80px)` }}
+              style={{ gridTemplateColumns: `minmax(120px, 1fr) repeat(${nodes.length}, minmax(100px, 1fr))` }}
             >
               <div>Role</div>
               {nodes.map((node, i) => (
@@ -151,7 +151,7 @@ export function NodesStep({ config, onChange, roles, errors }: Props) {
                     'grid items-center px-4 py-2 border-b last:border-b-0',
                     !assigned && 'bg-destructive/5'
                   )}
-                  style={{ gridTemplateColumns: `1fr repeat(${nodes.length}, 80px)` }}
+                  style={{ gridTemplateColumns: `minmax(120px, 1fr) repeat(${nodes.length}, minmax(100px, 1fr))` }}
                 >
                   <div className="min-w-0 pr-2">
                     <div className={cn('text-sm', !assigned && 'text-destructive')}>
