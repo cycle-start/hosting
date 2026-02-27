@@ -1,4 +1,4 @@
-export type DeployMode = 'single' | 'multi' | 'k8s'
+export type DeployMode = 'single' | 'multi'
 
 export type NodeRole =
   | 'controlplane'
@@ -44,14 +44,6 @@ export interface NodeConfig {
   roles: NodeRole[]
 }
 
-export interface StorageConfig {
-  mode: 'builtin' | 'external'
-  s3_endpoint: string
-  s3_access_key: string
-  s3_secret_key: string
-  s3_bucket_name: string
-}
-
 export interface TLSConfig {
   mode: 'letsencrypt' | 'manual'
   email: string
@@ -64,7 +56,6 @@ export interface Config {
   brand: BrandConfig
   control_plane: ControlPlaneConfig
   nodes: NodeConfig[]
-  storage: StorageConfig
   tls: TLSConfig
 }
 
@@ -92,3 +83,12 @@ export interface GeneratedFile {
 export interface GenerateResponse {
   files: GeneratedFile[]
 }
+
+export type StepID =
+  | 'deploy_mode'
+  | 'region'
+  | 'brand'
+  | 'control_plane'
+  | 'nodes'
+  | 'tls'
+  | 'review'

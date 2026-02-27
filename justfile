@@ -177,9 +177,14 @@ release version="":
 
 # --- Build ---
 
-# Build all Go binaries
+# Build all Go binaries (output to bin/)
 build:
-    go build ./cmd/...
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for cmd in cmd/*/; do
+        name=$(basename "$cmd")
+        go build -o "bin/${name}" "./${cmd}"
+    done
 
 # Build the setup wizard (frontend + Go binary)
 build-setup:

@@ -1,4 +1,4 @@
-import { Server, Network, Container } from 'lucide-react'
+import { Server, Network } from 'lucide-react'
 import type { Config, DeployMode } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -19,12 +19,6 @@ const modes: { id: DeployMode; label: string; description: string; icon: typeof 
     label: 'Multiple Machines',
     description: 'Distribute roles across several servers. Assign roles per machine.',
     icon: Network,
-  },
-  {
-    id: 'k8s',
-    label: 'Kubernetes',
-    description: 'Deploy to an existing Kubernetes cluster using Helm.',
-    icon: Container,
   },
 ]
 

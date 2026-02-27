@@ -1,15 +1,18 @@
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import type { Config } from '@/lib/types'
+import { FieldError } from '@/components/field-error'
+import { fieldError } from '@/lib/validation'
+import type { Config, ValidationError } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Database, Server } from 'lucide-react'
 
 interface Props {
   config: Config
   onChange: (config: Config) => void
+  errors: ValidationError[]
 }
 
-export function ControlPlaneStep({ config, onChange }: Props) {
+export function ControlPlaneStep({ config, onChange, errors }: Props) {
   const db = config.control_plane.database
 
   const updateDB = (updates: Partial<typeof db>) => {
@@ -21,6 +24,8 @@ export function ControlPlaneStep({ config, onChange }: Props) {
       },
     })
   }
+
+  const fe = (field: string) => fieldError(errors, field)
 
   return (
     <div className="space-y-6">
@@ -72,7 +77,9 @@ export function ControlPlaneStep({ config, onChange }: Props) {
                   placeholder="db.example.com"
                   value={db.host}
                   onChange={(e) => updateDB({ host: e.target.value })}
+                  className={fe('control_plane.database.host') ? 'border-destructive' : ''}
                 />
+                <FieldError error={fe('control_plane.database.host')} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="db_port">Port</Label>
@@ -82,7 +89,9 @@ export function ControlPlaneStep({ config, onChange }: Props) {
                   placeholder="5432"
                   value={db.port || ''}
                   onChange={(e) => updateDB({ port: parseInt(e.target.value) || 0 })}
+                  className={fe('control_plane.database.port') ? 'border-destructive' : ''}
                 />
+                <FieldError error={fe('control_plane.database.port')} />
               </div>
             </div>
             <div className="space-y-2">
@@ -92,7 +101,9 @@ export function ControlPlaneStep({ config, onChange }: Props) {
                 placeholder="hosting"
                 value={db.name}
                 onChange={(e) => updateDB({ name: e.target.value })}
+                className={fe('control_plane.database.name') ? 'border-destructive' : ''}
               />
+              <FieldError error={fe('control_plane.database.name')} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
@@ -102,7 +113,9 @@ export function ControlPlaneStep({ config, onChange }: Props) {
                   placeholder="hosting"
                   value={db.user}
                   onChange={(e) => updateDB({ user: e.target.value })}
+                  className={fe('control_plane.database.user') ? 'border-destructive' : ''}
                 />
+                <FieldError error={fe('control_plane.database.user')} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="db_password">Password</Label>

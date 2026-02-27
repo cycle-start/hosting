@@ -6,60 +6,57 @@ type DeployMode string
 const (
 	DeployModeSingle DeployMode = "single" // All roles on one machine (localhost)
 	DeployModeMulti  DeployMode = "multi"  // Multiple machines with role assignments
-	DeployModeK8s    DeployMode = "k8s"    // Existing Kubernetes cluster (Helm)
 )
 
-// Config is the in-memory state of the setup wizard.
+// Config is the setup manifest — the single source of truth for a deployment.
+// It can be created by the setup wizard UI or written by hand for automated deployments.
 type Config struct {
-	DeployMode DeployMode `json:"deploy_mode"`
+	DeployMode DeployMode `json:"deploy_mode" yaml:"deploy_mode"`
 
 	// Region & cluster
-	RegionName  string `json:"region_name"`
-	ClusterName string `json:"cluster_name"`
+	RegionName  string `json:"region_name" yaml:"region_name"`
+	ClusterName string `json:"cluster_name" yaml:"cluster_name"`
 
 	// Brand
-	Brand BrandConfig `json:"brand"`
+	Brand BrandConfig `json:"brand" yaml:"brand"`
 
 	// Control plane
-	ControlPlane ControlPlaneConfig `json:"control_plane"`
+	ControlPlane ControlPlaneConfig `json:"control_plane" yaml:"control_plane"`
 
 	// Nodes (multi-node mode only)
-	Nodes []NodeConfig `json:"nodes"`
-
-	// Storage
-	Storage StorageConfig `json:"storage"`
+	Nodes []NodeConfig `json:"nodes" yaml:"nodes,omitempty"`
 
 	// TLS
-	TLS TLSConfig `json:"tls"`
+	TLS TLSConfig `json:"tls" yaml:"tls"`
 }
 
 // BrandConfig holds brand/domain configuration.
 type BrandConfig struct {
-	Name            string `json:"name"`
-	PlatformDomain  string `json:"platform_domain"`  // e.g. "platform.example.com" — admin UI, API, temporal
-	CustomerDomain  string `json:"customer_domain"`   // e.g. "hosting.example.com" — hosted sites base
-	HostmasterEmail string `json:"hostmaster_email"`  // SOA hostmaster
-	MailHostname    string `json:"mail_hostname"`     // MX target, e.g. "mail.hosting.example.com"
-	PrimaryNS       string `json:"primary_ns"`        // e.g. "ns1.hosting.example.com"
-	PrimaryNSIP     string `json:"primary_ns_ip"`     // IP for the primary NS glue record
-	SecondaryNS     string `json:"secondary_ns"`      // e.g. "ns2.hosting.example.com"
-	SecondaryNSIP   string `json:"secondary_ns_ip"`   // IP for the secondary NS glue record
+	Name            string `json:"name" yaml:"name"`
+	PlatformDomain  string `json:"platform_domain" yaml:"platform_domain"`   // e.g. "platform.example.com" — admin UI, API, temporal
+	CustomerDomain  string `json:"customer_domain" yaml:"customer_domain"`   // e.g. "hosting.example.com" — hosted sites base
+	HostmasterEmail string `json:"hostmaster_email" yaml:"hostmaster_email"` // SOA hostmaster
+	MailHostname    string `json:"mail_hostname" yaml:"mail_hostname"`       // MX target, e.g. "mail.hosting.example.com"
+	PrimaryNS       string `json:"primary_ns" yaml:"primary_ns"`             // e.g. "ns1.hosting.example.com"
+	PrimaryNSIP     string `json:"primary_ns_ip" yaml:"primary_ns_ip"`       // IP for the primary NS glue record
+	SecondaryNS     string `json:"secondary_ns" yaml:"secondary_ns"`         // e.g. "ns2.hosting.example.com"
+	SecondaryNSIP   string `json:"secondary_ns_ip" yaml:"secondary_ns_ip"`   // IP for the secondary NS glue record
 }
 
 // ControlPlaneConfig holds control plane infrastructure choices.
 type ControlPlaneConfig struct {
-	Database ControlPlaneDB `json:"database"`
+	Database ControlPlaneDB `json:"database" yaml:"database"`
 }
 
 // ControlPlaneDB controls whether PostgreSQL is managed or external.
 type ControlPlaneDB struct {
-	Mode     string `json:"mode"`     // "builtin" or "external"
-	Host     string `json:"host"`     // External only
-	Port     int    `json:"port"`     // External only
-	Name     string `json:"name"`     // External only
-	User     string `json:"user"`     // External only
-	Password string `json:"password"` // External only
-	SSLMode  string `json:"ssl_mode"` // External only
+	Mode     string `json:"mode" yaml:"mode"`                           // "builtin" or "external"
+	Host     string `json:"host,omitempty" yaml:"host,omitempty"`       // External only
+	Port     int    `json:"port,omitempty" yaml:"port,omitempty"`       // External only
+	Name     string `json:"name,omitempty" yaml:"name,omitempty"`       // External only
+	User     string `json:"user,omitempty" yaml:"user,omitempty"`       // External only
+	Password string `json:"password,omitempty" yaml:"password,omitempty"` // External only
+	SSLMode  string `json:"ssl_mode,omitempty" yaml:"ssl_mode,omitempty"` // External only
 }
 
 // NodeRole is a role that can be assigned to a machine.
@@ -94,24 +91,15 @@ var AllRoles = []NodeRole{
 
 // NodeConfig describes a machine in the deployment.
 type NodeConfig struct {
-	Hostname string     `json:"hostname"`
-	IP       string     `json:"ip"`
-	Roles    []NodeRole `json:"roles"`
-}
-
-// StorageConfig holds object/file storage configuration.
-type StorageConfig struct {
-	Mode         string `json:"mode"`         // "builtin" (Ceph) or "external"
-	S3Endpoint   string `json:"s3_endpoint"`  // External only
-	S3AccessKey  string `json:"s3_access_key"`
-	S3SecretKey  string `json:"s3_secret_key"`
-	S3BucketName string `json:"s3_bucket_name"`
+	Hostname string     `json:"hostname" yaml:"hostname"`
+	IP       string     `json:"ip" yaml:"ip"`
+	Roles    []NodeRole `json:"roles" yaml:"roles"`
 }
 
 // TLSConfig holds TLS/certificate configuration.
 type TLSConfig struct {
-	Mode  string `json:"mode"`  // "letsencrypt" or "manual"
-	Email string `json:"email"` // Let's Encrypt contact email
+	Mode  string `json:"mode" yaml:"mode"`                     // "letsencrypt" or "manual"
+	Email string `json:"email,omitempty" yaml:"email,omitempty"` // Let's Encrypt contact email
 }
 
 // DefaultConfig returns a config with sensible defaults for exploration.
@@ -131,9 +119,6 @@ func DefaultConfig() *Config {
 				User:    "hosting",
 				SSLMode: "disable",
 			},
-		},
-		Storage: StorageConfig{
-			Mode: "builtin",
 		},
 		TLS: TLSConfig{
 			Mode: "letsencrypt",

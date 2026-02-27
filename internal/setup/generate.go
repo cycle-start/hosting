@@ -21,9 +21,20 @@ type GeneratedFile struct {
 	Content string `json:"content"`
 }
 
-// Generate produces all deployment configuration files from the wizard config.
+// Generate produces all deployment configuration files from the setup manifest.
 func Generate(cfg *Config, outputDir string) (*GenerateResult, error) {
 	result := &GenerateResult{}
+
+	// 1. Write the setup manifest itself
+	manifestPath := filepath.Join(outputDir, ManifestFilename)
+	if err := WriteManifest(cfg, manifestPath); err != nil {
+		return nil, fmt.Errorf("write manifest: %w", err)
+	}
+	manifestData, _ := os.ReadFile(manifestPath)
+	result.Files = append(result.Files, GeneratedFile{
+		Path:    ManifestFilename,
+		Content: string(manifestData),
+	})
 
 	// Generate Ceph keys
 	cephFSID := uuid.New().String()
@@ -58,36 +69,36 @@ func Generate(cfg *Config, outputDir string) (*GenerateResult, error) {
 		}
 	}
 
-	// 1. Generate Ansible inventory (static.ini)
+	// 2. Generate Ansible inventory (static.ini)
 	ini := generateInventory(cfg, controlplaneIP)
 	result.Files = append(result.Files, GeneratedFile{
 		Path:    "ansible/inventory/static.ini",
 		Content: ini,
 	})
 
-	// 2. Generate group_vars/all.yml
+	// 3. Generate group_vars/all.yml
 	allYml := generateAllGroupVars(cfg, controlplaneIP, storageNodeIP, cephFSID, cephWebKey)
 	result.Files = append(result.Files, GeneratedFile{
 		Path:    "ansible/inventory/group_vars/all.yml",
 		Content: allYml,
 	})
 
-	// 3. Generate cluster.yaml (for hostctl cluster apply)
+	// 4. Generate cluster.yaml (for hostctl cluster apply)
 	clusterYml := generateClusterYAML(cfg, controlplaneIP)
 	result.Files = append(result.Files, GeneratedFile{
 		Path:    "cluster.yaml",
 		Content: clusterYml,
 	})
 
-	// 4. Generate seed.yaml (brand + initial data)
+	// 5. Generate seed.yaml (brand + initial data)
 	seedYml := generateSeedYAML(cfg)
 	result.Files = append(result.Files, GeneratedFile{
 		Path:    "seed.yaml",
 		Content: seedYml,
 	})
 
-	// Write files to disk
-	for _, f := range result.Files {
+	// Write deployment files to disk (manifest already written above)
+	for _, f := range result.Files[1:] {
 		fullPath := filepath.Join(outputDir, f.Path)
 		if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
 			return nil, fmt.Errorf("mkdir %s: %w", filepath.Dir(fullPath), err)

@@ -21,9 +21,9 @@ func Validate(cfg *Config) []ValidationError {
 
 	// Deploy mode
 	switch cfg.DeployMode {
-	case DeployModeSingle, DeployModeMulti, DeployModeK8s:
+	case DeployModeSingle, DeployModeMulti:
 	default:
-		add("deploy_mode", "Must be single, multi, or k8s")
+		add("deploy_mode", "Must be single or multi")
 	}
 
 	// Region & cluster
@@ -106,6 +106,29 @@ func Validate(cfg *Config) []ValidationError {
 		}
 		if !hasControlPlane {
 			add("nodes", "At least one node must have the controlplane role")
+		}
+
+		// Every role must be assigned to at least one node
+		assignedRoles := map[NodeRole]bool{}
+		for _, n := range cfg.Nodes {
+			for _, r := range n.Roles {
+				assignedRoles[r] = true
+			}
+		}
+		var missing []string
+		roleLabels := map[NodeRole]string{
+			RoleControlPlane: "Control Plane", RoleWeb: "Web", RoleDatabase: "Database",
+			RoleDNS: "DNS", RoleValkey: "Valkey", RoleEmail: "Email",
+			RoleStorage: "Storage", RoleLB: "Load Balancer", RoleGateway: "Gateway",
+			RoleDBAdmin: "DB Admin",
+		}
+		for _, role := range AllRoles {
+			if !assignedRoles[role] {
+				missing = append(missing, roleLabels[role])
+			}
+		}
+		if len(missing) > 0 {
+			add("nodes", fmt.Sprintf("Unassigned roles: %s", strings.Join(missing, ", ")))
 		}
 	}
 

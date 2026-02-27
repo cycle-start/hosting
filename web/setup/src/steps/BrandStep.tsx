@@ -1,18 +1,23 @@
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import type { Config } from '@/lib/types'
+import { FieldError } from '@/components/field-error'
+import { fieldError } from '@/lib/validation'
+import type { Config, ValidationError } from '@/lib/types'
 
 interface Props {
   config: Config
   onChange: (config: Config) => void
+  errors: ValidationError[]
 }
 
-export function BrandStep({ config, onChange }: Props) {
+export function BrandStep({ config, onChange, errors }: Props) {
   const brand = config.brand
 
   const updateBrand = (updates: Partial<typeof brand>) => {
     onChange({ ...config, brand: { ...brand, ...updates } })
   }
+
+  const fe = (field: string) => fieldError(errors, field)
 
   return (
     <div className="space-y-6">
@@ -31,7 +36,9 @@ export function BrandStep({ config, onChange }: Props) {
             placeholder="e.g. Acme Hosting"
             value={brand.name}
             onChange={(e) => updateBrand({ name: e.target.value })}
+            className={fe('brand.name') ? 'border-destructive' : ''}
           />
+          <FieldError error={fe('brand.name')} />
         </div>
 
         <div className="border-t pt-4">
@@ -44,10 +51,14 @@ export function BrandStep({ config, onChange }: Props) {
                 placeholder="e.g. platform.example.com"
                 value={brand.platform_domain}
                 onChange={(e) => updateBrand({ platform_domain: e.target.value })}
+                className={fe('brand.platform_domain') ? 'border-destructive' : ''}
               />
-              <p className="text-xs text-muted-foreground">
-                Admin UI, API, and control plane services will be accessible under this domain.
-              </p>
+              <FieldError error={fe('brand.platform_domain')} />
+              {!fe('brand.platform_domain') && (
+                <p className="text-xs text-muted-foreground">
+                  Admin UI, API, and control plane services will be accessible under this domain.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -57,10 +68,14 @@ export function BrandStep({ config, onChange }: Props) {
                 placeholder="e.g. hosting.example.com"
                 value={brand.customer_domain}
                 onChange={(e) => updateBrand({ customer_domain: e.target.value })}
+                className={fe('brand.customer_domain') ? 'border-destructive' : ''}
               />
-              <p className="text-xs text-muted-foreground">
-                Hosted sites get service hostnames under this domain (e.g. site123.hosting.example.com).
-              </p>
+              <FieldError error={fe('brand.customer_domain')} />
+              {!fe('brand.customer_domain') && (
+                <p className="text-xs text-muted-foreground">
+                  Hosted sites get service hostnames under this domain (e.g. site123.hosting.example.com).
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -76,7 +91,9 @@ export function BrandStep({ config, onChange }: Props) {
                   placeholder="ns1.hosting.example.com"
                   value={brand.primary_ns}
                   onChange={(e) => updateBrand({ primary_ns: e.target.value })}
+                  className={fe('brand.primary_ns') ? 'border-destructive' : ''}
                 />
+                <FieldError error={fe('brand.primary_ns')} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="primary_ns_ip">Primary NS IP</Label>
@@ -85,7 +102,9 @@ export function BrandStep({ config, onChange }: Props) {
                   placeholder="203.0.113.10"
                   value={brand.primary_ns_ip}
                   onChange={(e) => updateBrand({ primary_ns_ip: e.target.value })}
+                  className={fe('brand.primary_ns_ip') ? 'border-destructive' : ''}
                 />
+                <FieldError error={fe('brand.primary_ns_ip')} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -96,7 +115,9 @@ export function BrandStep({ config, onChange }: Props) {
                   placeholder="ns2.hosting.example.com"
                   value={brand.secondary_ns}
                   onChange={(e) => updateBrand({ secondary_ns: e.target.value })}
+                  className={fe('brand.secondary_ns') ? 'border-destructive' : ''}
                 />
+                <FieldError error={fe('brand.secondary_ns')} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="secondary_ns_ip">Secondary NS IP</Label>
@@ -105,7 +126,9 @@ export function BrandStep({ config, onChange }: Props) {
                   placeholder="203.0.113.11"
                   value={brand.secondary_ns_ip}
                   onChange={(e) => updateBrand({ secondary_ns_ip: e.target.value })}
+                  className={fe('brand.secondary_ns_ip') ? 'border-destructive' : ''}
                 />
+                <FieldError error={fe('brand.secondary_ns_ip')} />
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -125,10 +148,14 @@ export function BrandStep({ config, onChange }: Props) {
                 placeholder="mail.hosting.example.com"
                 value={brand.mail_hostname}
                 onChange={(e) => updateBrand({ mail_hostname: e.target.value })}
+                className={fe('brand.mail_hostname') ? 'border-destructive' : ''}
               />
-              <p className="text-xs text-muted-foreground">
-                MX records for customer domains will point to this hostname.
-              </p>
+              <FieldError error={fe('brand.mail_hostname')} />
+              {!fe('brand.mail_hostname') && (
+                <p className="text-xs text-muted-foreground">
+                  MX records for customer domains will point to this hostname.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -138,10 +165,14 @@ export function BrandStep({ config, onChange }: Props) {
                 placeholder="hostmaster@example.com"
                 value={brand.hostmaster_email}
                 onChange={(e) => updateBrand({ hostmaster_email: e.target.value })}
+                className={fe('brand.hostmaster_email') ? 'border-destructive' : ''}
               />
-              <p className="text-xs text-muted-foreground">
-                Used in DNS SOA records as the responsible party contact.
-              </p>
+              <FieldError error={fe('brand.hostmaster_email')} />
+              {!fe('brand.hostmaster_email') && (
+                <p className="text-xs text-muted-foreground">
+                  Used in DNS SOA records as the responsible party contact.
+                </p>
+              )}
             </div>
           </div>
         </div>

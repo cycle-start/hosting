@@ -1,20 +1,25 @@
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import type { Config } from '@/lib/types'
+import { FieldError } from '@/components/field-error'
+import { fieldError } from '@/lib/validation'
+import type { Config, ValidationError } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { ShieldCheck, FileKey } from 'lucide-react'
 
 interface Props {
   config: Config
   onChange: (config: Config) => void
+  errors: ValidationError[]
 }
 
-export function TLSStep({ config, onChange }: Props) {
+export function TLSStep({ config, onChange, errors }: Props) {
   const tls = config.tls
 
   const updateTLS = (updates: Partial<typeof tls>) => {
     onChange({ ...config, tls: { ...tls, ...updates } })
   }
+
+  const fe = (field: string) => fieldError(errors, field)
 
   return (
     <div className="space-y-6">
@@ -64,10 +69,14 @@ export function TLSStep({ config, onChange }: Props) {
               placeholder="admin@example.com"
               value={tls.email}
               onChange={(e) => updateTLS({ email: e.target.value })}
+              className={fe('tls.email') ? 'border-destructive' : ''}
             />
-            <p className="text-xs text-muted-foreground">
-              Let's Encrypt will send expiration warnings to this address.
-            </p>
+            <FieldError error={fe('tls.email')} />
+            {!fe('tls.email') && (
+              <p className="text-xs text-muted-foreground">
+                Let's Encrypt will send expiration warnings to this address.
+              </p>
+            )}
           </div>
         )}
 

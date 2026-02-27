@@ -1,15 +1,5 @@
 # Binaries
 /bin/
-/admin-ui
-/core-api
-/worker
-/node-agent
-/hostctl
-/hosting-cli
-/mcp-server
-/setup
-/controlpanel-api
-/controlpanel-ui
 *.exe
 
 # Local cluster state
@@ -53,6 +43,7 @@ web/admin/dist/
 web/setup/node_modules/
 web/setup/dist/
 cmd/setup/dist/
+setup.yaml
 
 # Generated API docs
 internal/api/docs/

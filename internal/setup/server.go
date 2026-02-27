@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -18,9 +20,18 @@ type Server struct {
 }
 
 // NewServer creates a new setup wizard server.
+// If an existing setup.yaml is found in outputDir, it is loaded as the initial config.
 func NewServer(outputDir string, staticFS fs.FS) *Server {
+	cfg := DefaultConfig()
+
+	// Try loading existing manifest
+	manifestPath := filepath.Join(outputDir, ManifestFilename)
+	if existing, err := LoadManifest(manifestPath); err == nil {
+		cfg = existing
+	}
+
 	return &Server{
-		config:    DefaultConfig(),
+		config:    cfg,
 		outputDir: outputDir,
 		staticFS:  staticFS,
 	}
@@ -146,6 +157,38 @@ func (s *Server) spaHandler() http.Handler {
 		r.URL.Path = "/"
 		fileServer.ServeHTTP(w, r)
 	})
+}
+
+// GenerateFromManifest loads a manifest file and generates deployment files.
+// This is the CLI entry point for `setup generate`.
+func GenerateFromManifest(manifestPath, outputDir string) error {
+	cfg, err := LoadManifest(manifestPath)
+	if err != nil {
+		return err
+	}
+
+	errs := Validate(cfg)
+	if len(errs) > 0 {
+		fmt.Fprintf(os.Stderr, "Validation errors in %s:\n", manifestPath)
+		for _, e := range errs {
+			fmt.Fprintf(os.Stderr, "  %s: %s\n", e.Field, e.Message)
+		}
+		return fmt.Errorf("%d validation errors", len(errs))
+	}
+
+	result, err := Generate(cfg, outputDir)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range result.Files {
+		if f.Path == ManifestFilename {
+			continue // Don't re-announce the manifest
+		}
+		fmt.Printf("  %s\n", f.Path)
+	}
+
+	return nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {

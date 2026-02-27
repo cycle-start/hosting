@@ -1,13 +1,16 @@
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import type { Config } from '@/lib/types'
+import { FieldError } from '@/components/field-error'
+import { fieldError } from '@/lib/validation'
+import type { Config, ValidationError } from '@/lib/types'
 
 interface Props {
   config: Config
   onChange: (config: Config) => void
+  errors: ValidationError[]
 }
 
-export function RegionStep({ config, onChange }: Props) {
+export function RegionStep({ config, onChange, errors }: Props) {
   return (
     <div className="space-y-6">
       <div>
@@ -25,10 +28,14 @@ export function RegionStep({ config, onChange }: Props) {
             placeholder="e.g. eu-west-1, us-east, default"
             value={config.region_name}
             onChange={(e) => onChange({ ...config, region_name: e.target.value })}
+            className={fieldError(errors, 'region_name') ? 'border-destructive' : ''}
           />
-          <p className="text-xs text-muted-foreground">
-            A logical grouping for your infrastructure (e.g. a datacenter location).
-          </p>
+          <FieldError error={fieldError(errors, 'region_name')} />
+          {!fieldError(errors, 'region_name') && (
+            <p className="text-xs text-muted-foreground">
+              A logical grouping for your infrastructure (e.g. a datacenter location).
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -38,10 +45,14 @@ export function RegionStep({ config, onChange }: Props) {
             placeholder="e.g. cluster-1, production"
             value={config.cluster_name}
             onChange={(e) => onChange({ ...config, cluster_name: e.target.value })}
+            className={fieldError(errors, 'cluster_name') ? 'border-destructive' : ''}
           />
-          <p className="text-xs text-muted-foreground">
-            The name for this cluster within the region.
-          </p>
+          <FieldError error={fieldError(errors, 'cluster_name')} />
+          {!fieldError(errors, 'cluster_name') && (
+            <p className="text-xs text-muted-foreground">
+              The name for this cluster within the region.
+            </p>
+          )}
         </div>
       </div>
     </div>
