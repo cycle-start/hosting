@@ -5,8 +5,10 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+
 	"github.com/google/uuid"
 )
 
@@ -105,6 +107,16 @@ func Generate(cfg *Config, outputDir string) (*GenerateResult, error) {
 	result.Files = append(result.Files, GeneratedFile{
 		Path:    "generated/seed.yaml",
 		Content: seedYml,
+	})
+
+	// 6. Generate Ceph web client keyring via docker
+	keyring, err := generateCephKeyring(cephWebKey)
+	if err != nil {
+		return nil, fmt.Errorf("generate ceph keyring: %w", err)
+	}
+	result.Files = append(result.Files, GeneratedFile{
+		Path:    "generated/ceph.client.web.keyring",
+		Content: keyring,
 	})
 
 	// Write deployment files to disk (manifest already written above)
@@ -216,6 +228,7 @@ func generateAllGroupVars(cfg *Config, controlplaneIP, storageNodeIP, cephFSID, 
 	b.WriteString("# Ceph\n")
 	b.WriteString(fmt.Sprintf("ceph_fsid: \"%s\"\n", cephFSID))
 	b.WriteString(fmt.Sprintf("ceph_web_key: \"%s\"\n", cephWebKey))
+	b.WriteString("ceph_web_keyring_file: \"{{ playbook_dir }}/../generated/ceph.client.web.keyring\"\n")
 	b.WriteString(fmt.Sprintf("storage_node_ip: \"%s\"\n\n", storageNodeIP))
 
 	b.WriteString("# Stalwart\n")
@@ -603,5 +616,22 @@ func generateCephKey() (string, error) {
 		return "", err
 	}
 	return base64.StdEncoding.EncodeToString(key), nil
+}
+
+// generateCephKeyring uses docker + ceph-authtool to produce a properly
+// formatted keyring file.  Returns the file content.
+func generateCephKeyring(key string) (string, error) {
+	cmd := exec.Command("docker", "run", "--rm", "quay.io/ceph/ceph:v19",
+		"ceph-authtool", "--create-keyring", "/dev/stdout",
+		"-n", "client.web", "--add-key", key,
+		"--cap", "mon", "allow r",
+		"--cap", "osd", "allow rw pool=cephfs_data",
+		"--cap", "mds", "allow rw",
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("ceph-authtool via docker: %w", err)
+	}
+	return string(out), nil
 }
 
