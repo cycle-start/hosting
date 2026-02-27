@@ -21,10 +21,3 @@ write_files:
       NODE_ROLE=dns
       SERVICE_NAME=node-agent
       METRICS_ADDR=:9100
-  - path: /etc/systemd/resolved.conf.d/no-stub.conf
-    content: |
-      [Resolve]
-      DNSStubListener=no
-
-runcmd:
-  - systemctl restart systemd-resolved

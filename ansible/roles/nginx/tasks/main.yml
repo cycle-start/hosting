@@ -4,6 +4,42 @@
     state: present
     update_cache: true
 
+- name: Deploy hosting JSON log format
+  copy:
+    content: |
+      log_format hosting_json escape=json
+        '{'
+          '"time":"$time_iso8601",'
+          '"remote_addr":"$remote_addr",'
+          '"method":"$request_method",'
+          '"uri":"$request_uri",'
+          '"status":$status,'
+          '"bytes_sent":$bytes_sent,'
+          '"request_time":$request_time,'
+          '"upstream_time":"$upstream_response_time",'
+          '"http_referer":"$http_referer",'
+          '"http_user_agent":"$http_user_agent",'
+          '"host":"$host",'
+          '"server_name":"$server_name"'
+        '}';
+    dest: /etc/nginx/conf.d/hosting-log-format.conf
+  notify: reload nginx
+
+- name: Deploy tenant log rotation config
+  copy:
+    content: |
+      /var/log/hosting/*/*.log {
+          daily
+          rotate 2
+          compress
+          delaycompress
+          missingok
+          notifempty
+          copytruncate
+          maxsize 100M
+      }
+    dest: /etc/logrotate.d/hosting-tenant-logs
+
 - name: Enable nginx
   systemd:
     name: nginx

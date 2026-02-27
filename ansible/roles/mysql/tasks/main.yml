@@ -12,6 +12,19 @@
   args:
     creates: /etc/mysql/mysql.conf.d/replication.cnf
 
+- name: Check for cloud-init staged server-id config
+  stat:
+    path: /usr/local/etc/mysql/server-id.cnf
+  register: staged_server_id
+
+- name: Deploy staged server-id config
+  copy:
+    src: /usr/local/etc/mysql/server-id.cnf
+    dest: /etc/mysql/mysql.conf.d/server-id.cnf
+    remote_src: true
+  when: staged_server_id.stat.exists
+  notify: restart mysql
+
 - name: Deploy GTID replication config
   template:
     src: replication.cnf.j2
@@ -28,3 +41,13 @@
     name: mysql
     enabled: true
     state: started
+
+- name: Create replication user
+  community.mysql.mysql_user:
+    name: repl
+    host: "%"
+    password: "{{ mysql_repl_password }}"
+    priv: "*.*:REPLICATION SLAVE,REPLICATION CLIENT"
+    state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  when: mysql_repl_password is defined

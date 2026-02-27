@@ -16,11 +16,6 @@
     - /etc/ssl/hosting
     - /etc/ceph
 
-- name: Load dummy kernel module on boot
-  copy:
-    content: "dummy\n"
-    dest: /etc/modules-load.d/dummy.conf
-
 - name: Hide other users' processes (hidepid=2)
   lineinfile:
     path: /etc/fstab

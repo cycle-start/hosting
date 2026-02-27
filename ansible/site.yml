@@ -5,9 +5,6 @@
     - name: Wait for cloud-init to finish
       ansible.builtin.command: cloud-init status --wait
       changed_when: false
-      # Cloud-init may report errors for write_files/runcmd that depend on
-      # packages not yet installed (e.g. pdns, stalwart-mail, haproxy users).
-      # Ansible roles handle this configuration after installing packages.
       failed_when: false
 
 - name: Storage nodes
@@ -23,6 +20,7 @@
   roles:
     - { role: ssh_hardening, tags: [ssh] }
     - { role: vector, tags: [vector] }
+    - { role: tenant_network, tags: [network] }
     - { role: nginx, tags: [nginx] }
     - { role: php, tags: [php] }
     - { role: composer, tags: [composer] }
@@ -36,6 +34,7 @@
   roles:
     - { role: ssh_hardening, tags: [ssh] }
     - { role: vector, tags: [vector] }
+    - { role: tenant_network, tags: [network] }
     - { role: mysql, tags: [mysql] }
     - { role: node_agent, tags: [node-agent] }
 
@@ -52,6 +51,7 @@
   roles:
     - { role: ssh_hardening, tags: [ssh] }
     - { role: vector, tags: [vector] }
+    - { role: tenant_network, tags: [network] }
     - { role: valkey_server, tags: [valkey] }
     - { role: node_agent, tags: [node-agent] }
 
@@ -84,6 +84,7 @@
   roles:
     - { role: ssh_hardening, tags: [ssh] }
     - { role: vector, tags: [vector] }
+    - { role: tenant_network, tags: [network] }
     - { role: wireguard_server, tags: [wireguard] }
     - { role: node_agent, tags: [node-agent] }
 

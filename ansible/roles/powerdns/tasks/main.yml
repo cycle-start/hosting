@@ -1,3 +1,23 @@
+- name: Create resolved.conf.d directory
+  file:
+    path: /etc/systemd/resolved.conf.d
+    state: directory
+    mode: "0755"
+
+- name: Disable systemd-resolved stub listener
+  copy:
+    content: |
+      [Resolve]
+      DNSStubListener=no
+    dest: /etc/systemd/resolved.conf.d/no-stub.conf
+  register: resolved_conf
+
+- name: Restart systemd-resolved to free port 53
+  systemd:
+    name: systemd-resolved
+    state: restarted
+  when: resolved_conf.changed
+
 - name: Install PowerDNS
   apt:
     name:

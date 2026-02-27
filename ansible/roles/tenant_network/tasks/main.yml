@@ -1,0 +1,28 @@
+- name: Load dummy kernel module config
+  copy:
+    content: "dummy\n"
+    dest: /etc/modules-load.d/dummy.conf
+
+- name: Load dummy kernel module
+  modprobe:
+    name: dummy
+    state: present
+
+- name: Deploy tenant0 netdev
+  copy:
+    content: |
+      [NetDev]
+      Name=tenant0
+      Kind=dummy
+    dest: /etc/systemd/network/50-tenant0.netdev
+  notify: restart systemd-networkd
+
+- name: Deploy tenant0 network
+  copy:
+    content: |
+      [Match]
+      Name=tenant0
+      [Network]
+      Description=Tenant ULA addresses
+    dest: /etc/systemd/network/50-tenant0.network
+  notify: restart systemd-networkd

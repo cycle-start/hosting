@@ -23,38 +23,11 @@ write_files:
       SERVICE_NAME=node-agent
       METRICS_ADDR=:9100
 
-  - path: /etc/modules-load.d/dummy.conf
-    content: |
-      dummy
-
-  - path: /etc/systemd/network/50-tenant0.netdev
-    content: |
-      [NetDev]
-      Name=tenant0
-      Kind=dummy
-
-  - path: /etc/systemd/network/50-tenant0.network
-    content: |
-      [Match]
-      Name=tenant0
-      [Network]
-      Description=Tenant ULA addresses
-
-  - path: /etc/mysql/mysql.conf.d/server-id.cnf
+  # Staged MySQL config — the mysql Ansible role copies this into place
+  # after installing MySQL and creating the config directory.
+  - path: /usr/local/etc/mysql/server-id.cnf
     content: |
       [mysqld]
       server-id = ${server_id}
       bind-address = *
       event_scheduler = ON
-
-runcmd:
-  - modprobe dummy
-  - systemctl restart systemd-networkd
-  - systemctl restart mysql
-  - |
-    mysql -u root -e "
-      CREATE USER IF NOT EXISTS 'repl'@'%' IDENTIFIED BY '${repl_password}';
-      GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'repl'@'%';
-      FLUSH PRIVILEGES;
-    "
-  - systemctl daemon-reload

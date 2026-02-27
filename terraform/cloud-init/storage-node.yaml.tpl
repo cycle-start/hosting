@@ -174,6 +174,3 @@ write_files:
       SERVICE_NAME=node-agent
       METRICS_ADDR=:9100
 
-runcmd:
-  - /opt/hosting/setup-ceph.sh
-  - systemctl daemon-reload
