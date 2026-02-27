@@ -197,6 +197,19 @@ variable "stalwart_admin_password" {
 
 # --- Storage nodes (Ceph: S3/RGW + CephFS/MDS) ---
 
+variable "ceph_fsid" {
+  description = "Ceph cluster FSID (UUID). Generate with: just gen-ceph-keys"
+  type        = string
+  default     = "481a00a9-12b6-4bf9-9d00-67861af03e06"
+}
+
+variable "ceph_web_key" {
+  description = "Pre-generated CephX key for the web client (full CryptoKey with header). Generate with: just gen-ceph-keys"
+  type        = string
+  default     = "AQAAAAAAAAAAABAAt2/TZjzN7KpLOvQT0y8dfA=="
+  sensitive   = true
+}
+
 variable "storage_nodes" {
   description = "Storage node definitions (runs Ceph mon+mgr+osd+rgw+mds + node-agent)"
   type = list(object({

@@ -1,3 +1,6 @@
+node_role: dns
+shard_name: dns-1
+
 powerdns_db_host: "10.10.10.2"
 powerdns_db_port: "5433"
 powerdns_db_name: "hosting_powerdns"

@@ -12,17 +12,11 @@
   args:
     creates: /etc/mysql/mysql.conf.d/replication.cnf
 
-- name: Check for cloud-init staged server-id config
-  stat:
-    path: /usr/local/etc/mysql/server-id.cnf
-  register: staged_server_id
-
-- name: Deploy staged server-id config
-  copy:
-    src: /usr/local/etc/mysql/server-id.cnf
+- name: Deploy server-id config
+  template:
+    src: server-id.cnf.j2
     dest: /etc/mysql/mysql.conf.d/server-id.cnf
-    remote_src: true
-  when: staged_server_id.stat.exists
+  when: mysql_server_id is defined
   notify: restart mysql
 
 - name: Deploy GTID replication config

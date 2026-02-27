@@ -21,14 +21,35 @@ frontend stats
     stats uri /stats
     stats refresh 10s
 
-# Main HTTP/HTTPS frontend (tenant traffic)
+# Main HTTP/HTTPS frontend (tenant traffic only)
 frontend http
     bind *:80
     bind *:443 ssl crt /etc/haproxy/certs/hosting.pem alpn http/1.1
-    # Tenant routing via dynamic FQDN map; unmapped hosts go to the default web shard
-    use_backend %[req.hdr(host),lower,map(/var/lib/haproxy/maps/fqdn-to-shard.map)]
-    default_backend shard-web-1
+    # Tenant routing via dynamic map
+    use_backend %[req.hdr(host),lower,map(/var/lib/haproxy/maps/fqdn-to-shard.map,shard-default)]
 
-# Shard backends — populated by cloud-init with real IPs.
-# Ansible deploys a minimal config so HAProxy can start;
-# cloud-init rerun overwrites this with the full shard list.
+# Default backend (returns 503 for unmapped FQDNs)
+backend shard-default
+    mode http
+    http-request deny deny_status 503
+
+# Shard backends with real VM IPs
+{# Build shard map from web group inventory #}
+{% set shard_map = {} %}
+{% for host in groups.get('web', []) %}
+{%   set hv = hostvars[host] %}
+{%   set sname = hv.shard_name | default('web-1') %}
+{%   if sname not in shard_map %}
+{%     set _ = shard_map.update({sname: []}) %}
+{%   endif %}
+{%   set _ = shard_map[sname].append({'name': host, 'ip': hv.ansible_host}) %}
+{% endfor %}
+{% for sname, members in shard_map.items() %}
+backend shard-{{ sname }}
+    balance hdr(Host)
+    hash-type consistent
+{% for server in members %}
+    server {{ server.name }} {{ server.ip }}:80 check
+{% endfor %}
+
+{% endfor %}

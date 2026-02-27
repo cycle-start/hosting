@@ -14,6 +14,75 @@ ssh_opts := "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogL
 default:
     @just --list
 
+# --- Init ---
+
+# One-time setup for a fresh clone: generate .env, SSH CA, and Ceph keys.
+init:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    CHANGED=0
+
+    # 1. Generate .env from .env.example with dev defaults
+    if [ -f .env ]; then
+        echo "✓ .env already exists"
+    else
+        echo "Creating .env with dev defaults..."
+        SECRET_KEY=$(openssl rand -hex 32)
+        sed \
+            -e "s|^HOSTING_API_KEY=.*|HOSTING_API_KEY=hst_dev_e2e_test_key_00000000|" \
+            -e "s|^CORE_DATABASE_URL=.*|CORE_DATABASE_URL=postgres://hosting:hosting@10.10.10.2:5432/hosting_core?sslmode=disable|" \
+            -e "s|^POWERDNS_DATABASE_URL=.*|POWERDNS_DATABASE_URL=postgres://hosting:hosting@10.10.10.2:5433/hosting_powerdns?sslmode=disable|" \
+            -e "s|^STALWART_ADMIN_TOKEN=.*|STALWART_ADMIN_TOKEN=dev-token|" \
+            -e "s|^SECRET_ENCRYPTION_KEY=.*|SECRET_ENCRYPTION_KEY=${SECRET_KEY}|" \
+            -e "s|^CONTROLPANEL_DATABASE_URL=.*|CONTROLPANEL_DATABASE_URL=postgres://controlpanel:controlpanel@10.10.10.2:5432/controlpanel?sslmode=disable|" \
+            -e "s|^CONTROLPANEL_JWT_SECRET=.*|CONTROLPANEL_JWT_SECRET=controlpanel-dev-jwt-secret-change-me-in-prod|" \
+            .env.example > .env
+        echo "  Created .env (SECRET_ENCRYPTION_KEY generated)"
+        CHANGED=1
+    fi
+
+    # 2. Generate SSH CA key pair
+    if [ -f ssh_ca ]; then
+        echo "✓ SSH CA key already exists"
+    else
+        echo "Generating SSH CA key pair..."
+        ssh-keygen -t ed25519 -f ssh_ca -C "hosting-platform-ca" -N "" -q
+        echo "  Created ssh_ca + ssh_ca.pub"
+        CHANGED=1
+    fi
+
+    # 3. Generate Ceph keys (write to both Terraform and Ansible)
+    if [ -f terraform/terraform.tfvars ] && grep -q ceph_fsid terraform/terraform.tfvars 2>/dev/null; then
+        echo "✓ Ceph keys already in terraform.tfvars"
+    else
+        echo "Generating Ceph FSID and web client key..."
+        FSID=$(uuidgen)
+        RAW_KEY=$(python3 -c "import os,base64; print(base64.b64encode(os.urandom(16)).decode())")
+        WEB_KEY="AQAAAAAAAAAAABAA${RAW_KEY}"
+
+        # Write to terraform.tfvars (append or create)
+        echo "" >> terraform/terraform.tfvars 2>/dev/null || true
+        echo "ceph_fsid    = \"${FSID}\"" >> terraform/terraform.tfvars
+        echo "ceph_web_key = \"${WEB_KEY}\"" >> terraform/terraform.tfvars
+        echo "  Written to terraform/terraform.tfvars"
+
+        # Update ansible group_vars/all.yml in-place
+        sed -i "s|^ceph_fsid:.*|ceph_fsid: \"${FSID}\"|" ansible/inventory/group_vars/all.yml
+        sed -i "s|^ceph_web_key:.*|ceph_web_key: \"${WEB_KEY}\"|" ansible/inventory/group_vars/all.yml
+        echo "  Updated ansible/inventory/group_vars/all.yml"
+        CHANGED=1
+    fi
+
+    # 4. Summary
+    echo ""
+    if [ $CHANGED -eq 0 ]; then
+        echo "Everything already initialized. Next steps:"
+    else
+        echo "Initialization complete. Next steps:"
+    fi
+    echo "  1. Build the base VM image:  just packer-base"
+    echo "  2. Bring up the platform:    just vm-up"
+
 # --- Build ---
 
 # Build all Go binaries
@@ -188,6 +257,21 @@ wait-db:
 gen-certs:
     bash scripts/gen-temporal-certs.sh
 
+# Generate Ceph FSID and web client key (for fresh deployments)
+gen-ceph-keys:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    FSID=$(uuidgen)
+    RAW_KEY=$(python3 -c "import os,base64; print(base64.b64encode(os.urandom(16)).decode())")
+    WEB_KEY="AQAAAAAAAAAAABAA${RAW_KEY}"
+    echo "Add these to terraform/terraform.tfvars:"
+    echo "  ceph_fsid    = \"${FSID}\""
+    echo "  ceph_web_key = \"${WEB_KEY}\""
+    echo ""
+    echo "And to ansible/inventory/group_vars/all.yml:"
+    echo "  ceph_fsid: \"${FSID}\""
+    echo "  ceph_web_key: \"${WEB_KEY}\""
+
 # Generate SSH CA key pair for web terminal certificate signing
 generate-ssh-ca:
     #!/usr/bin/env bash
@@ -326,7 +410,6 @@ vm-up:
     cd terraform && terraform apply -auto-approve
     just _wait-ssh
     just ansible-bootstrap
-    just _rerun-cloudinit
     just _wait-k3s
     just vm-kubeconfig
     just vm-deploy
@@ -411,44 +494,6 @@ _wait-ssh:
         done
     done
     echo "All VMs accepting SSH."
-
-# Re-run cloud-init on all VMs (installs software first via Ansible, then runcmd succeeds)
-[private]
-_rerun-cloudinit:
-    #!/usr/bin/env bash
-    echo "Re-running cloud-init on all VMs (clean + reboot)..."
-    ALL_IPS="10.10.10.2 10.10.10.10 10.10.10.11 10.10.10.20 10.10.10.30 10.10.10.40 10.10.10.50 10.10.10.60 10.10.10.70 10.10.10.80 10.10.10.90"
-    for ip in $ALL_IPS; do
-        echo "  Rebooting $ip..."
-        ssh {{ssh_opts}} ubuntu@$ip "sudo cloud-init clean --logs && sudo reboot" 2>/dev/null || true
-    done
-    echo "Waiting 15s for VMs to go down..."
-    sleep 15
-    for ip in $ALL_IPS; do
-        printf "  %s: " "$ip"
-        for i in $(seq 1 90); do
-            if ssh {{ssh_opts}} -o ConnectTimeout=2 ubuntu@$ip "true" 2>/dev/null; then
-                echo "up"
-                break
-            fi
-            if [ $i -eq 90 ]; then
-                echo "TIMEOUT"
-                echo "ERROR: VM $ip did not come back after reboot."
-                exit 1
-            fi
-            sleep 5
-        done
-    done
-    echo "All VMs back up. Waiting for cloud-init to finish..."
-    for ip in $ALL_IPS; do
-        printf "  %s cloud-init: " "$ip"
-        if ssh {{ssh_opts}} ubuntu@$ip "sudo cloud-init status --wait" 2>/dev/null; then
-            echo "done"
-        else
-            echo "warning (may be OK)"
-        fi
-    done
-    echo "Cloud-init complete on all VMs."
 
 # Destroy VMs
 vm-down:

@@ -1,57 +1,3 @@
-# --- Random UUIDs for node IDs ---
-
-resource "random_uuid" "web_node_id" {
-  count = length(var.web_nodes)
-}
-
-resource "random_uuid" "db_node_id" {
-  count = length(var.db_nodes)
-}
-
-resource "random_uuid" "dns_node_id" {
-  count = length(var.dns_nodes)
-}
-
-resource "random_uuid" "valkey_node_id" {
-  count = length(var.valkey_nodes)
-}
-
-resource "random_uuid" "email_node_id" {
-  count = length(var.email_nodes)
-}
-
-resource "random_uuid" "storage_node_id" {
-  count = length(var.storage_nodes)
-}
-
-resource "random_uuid" "dbadmin_node_id" {
-  count = length(var.dbadmin_nodes)
-}
-
-resource "random_uuid" "lb_node_id" {
-  count = length(var.lb_nodes)
-}
-
-resource "random_uuid" "gateway_node_id" {
-  count = length(var.gateway_nodes)
-}
-
-resource "random_uuid" "ceph_fsid" {}
-
-# Pre-generated CephFS client key material — injected into both storage and web
-# nodes so web nodes don't need to SCP the keyring from the storage node.
-# Ceph expects a full CryptoKey structure (type + created + len + key), so we
-# prepend the fixed 12-byte header to the random key material.
-resource "random_id" "ceph_web_key" {
-  byte_length = 16
-}
-
-locals {
-  # CryptoKey header (12 bytes, base64): type=1 (CephX, u16le) + created=0 (8 bytes) + len=16 (u16le)
-  # Since the header is exactly 12 bytes (multiple of 3), base64 concatenation is safe.
-  ceph_web_key = "AQAAAAAAAAAAABAA${random_id.ceph_web_key.b64_std}"
-}
-
 # --- Volumes (backed by golden images) ---
 
 resource "libvirt_volume" "web_node" {
@@ -144,19 +90,9 @@ resource "libvirt_cloudinit_disk" "web_node" {
     instance-id    = "i-${var.web_nodes[count.index].name}"
     local-hostname = var.web_nodes[count.index].name
   })
-  user_data = templatefile("${path.module}/cloud-init/web-node.yaml.tpl", {
-    hostname         = var.web_nodes[count.index].name
-    node_id          = random_uuid.web_node_id[count.index].result
-    shard_name       = var.web_shard_name
-    temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
-    ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
-    storage_node_ip  = var.storage_nodes[0].ip
-    region_id        = var.region_id
-    cluster_id       = var.cluster_id
-    ceph_fsid        = random_uuid.ceph_fsid.result
-    ceph_web_key     = local.ceph_web_key
-    core_api_url     = "http://${var.controlplane_ip}:8090/api/v1"
-    core_api_token   = var.core_api_token
+  user_data = templatefile("${path.module}/cloud-init/node.yaml.tpl", {
+    hostname       = var.web_nodes[count.index].name
+    ssh_public_key = file(pathexpand(var.ssh_public_key_path))
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.web_nodes[count.index].ip
@@ -184,16 +120,9 @@ resource "libvirt_cloudinit_disk" "db_node" {
     instance-id    = "i-${var.db_nodes[count.index].name}"
     local-hostname = var.db_nodes[count.index].name
   })
-  user_data = templatefile("${path.module}/cloud-init/db-node.yaml.tpl", {
-    hostname         = var.db_nodes[count.index].name
-    node_id          = random_uuid.db_node_id[count.index].result
-    shard_name       = var.db_shard_name
-    temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
-    ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
-    region_id        = var.region_id
-    cluster_id       = var.cluster_id
-    server_id        = count.index + 1
-    repl_password    = var.db_repl_password
+  user_data = templatefile("${path.module}/cloud-init/node.yaml.tpl", {
+    hostname       = var.db_nodes[count.index].name
+    ssh_public_key = file(pathexpand(var.ssh_public_key_path))
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.db_nodes[count.index].ip
@@ -221,15 +150,9 @@ resource "libvirt_cloudinit_disk" "dns_node" {
     instance-id    = "i-${var.dns_nodes[count.index].name}"
     local-hostname = var.dns_nodes[count.index].name
   })
-  user_data = templatefile("${path.module}/cloud-init/dns-node.yaml.tpl", {
-    hostname         = var.dns_nodes[count.index].name
-    node_id          = random_uuid.dns_node_id[count.index].result
-    shard_name       = var.dns_shard_name
-    temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
-    ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
-    region_id        = var.region_id
-    cluster_id       = var.cluster_id
-    controlplane_ip  = var.controlplane_ip
+  user_data = templatefile("${path.module}/cloud-init/node.yaml.tpl", {
+    hostname       = var.dns_nodes[count.index].name
+    ssh_public_key = file(pathexpand(var.ssh_public_key_path))
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.dns_nodes[count.index].ip
@@ -257,14 +180,9 @@ resource "libvirt_cloudinit_disk" "valkey_node" {
     instance-id    = "i-${var.valkey_nodes[count.index].name}"
     local-hostname = var.valkey_nodes[count.index].name
   })
-  user_data = templatefile("${path.module}/cloud-init/valkey-node.yaml.tpl", {
-    hostname         = var.valkey_nodes[count.index].name
-    node_id          = random_uuid.valkey_node_id[count.index].result
-    shard_name       = var.valkey_shard_name
-    temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
-    ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
-    region_id        = var.region_id
-    cluster_id       = var.cluster_id
+  user_data = templatefile("${path.module}/cloud-init/node.yaml.tpl", {
+    hostname       = var.valkey_nodes[count.index].name
+    ssh_public_key = file(pathexpand(var.ssh_public_key_path))
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.valkey_nodes[count.index].ip
@@ -292,16 +210,9 @@ resource "libvirt_cloudinit_disk" "email_node" {
     instance-id    = "i-${var.email_nodes[count.index].name}"
     local-hostname = var.email_nodes[count.index].name
   })
-  user_data = templatefile("${path.module}/cloud-init/email-node.yaml.tpl", {
-    hostname                = var.email_nodes[count.index].name
-    node_id                 = random_uuid.email_node_id[count.index].result
-    shard_name              = var.email_shard_name
-    temporal_address        = "${var.controlplane_ip}:${var.temporal_port}"
-    ssh_public_key          = file(pathexpand(var.ssh_public_key_path))
-    region_id               = var.region_id
-    cluster_id              = var.cluster_id
-    mail_hostname           = "mail.${var.base_domain}"
-    stalwart_admin_password = var.stalwart_admin_password
+  user_data = templatefile("${path.module}/cloud-init/node.yaml.tpl", {
+    hostname       = var.email_nodes[count.index].name
+    ssh_public_key = file(pathexpand(var.ssh_public_key_path))
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.email_nodes[count.index].ip
@@ -329,19 +240,9 @@ resource "libvirt_cloudinit_disk" "storage_node" {
     instance-id    = "i-${var.storage_nodes[count.index].name}"
     local-hostname = var.storage_nodes[count.index].name
   })
-  user_data = templatefile("${path.module}/cloud-init/storage-node.yaml.tpl", {
-    hostname           = var.storage_nodes[count.index].name
-    node_id            = random_uuid.storage_node_id[count.index].result
-    shard_name         = var.storage_shard_name
-    temporal_address   = "${var.controlplane_ip}:${var.temporal_port}"
-    ssh_public_key     = file(pathexpand(var.ssh_public_key_path))
-    ip_address         = var.storage_nodes[count.index].ip
-    s3_enabled         = true
-    filestore_enabled  = true
-    region_id          = var.region_id
-    cluster_id         = var.cluster_id
-    ceph_fsid          = random_uuid.ceph_fsid.result
-    ceph_web_key       = local.ceph_web_key
+  user_data = templatefile("${path.module}/cloud-init/node.yaml.tpl", {
+    hostname       = var.storage_nodes[count.index].name
+    ssh_public_key = file(pathexpand(var.ssh_public_key_path))
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.storage_nodes[count.index].ip
@@ -381,17 +282,9 @@ resource "libvirt_cloudinit_disk" "dbadmin_node" {
     instance-id    = "i-${var.dbadmin_nodes[count.index].name}"
     local-hostname = var.dbadmin_nodes[count.index].name
   })
-  user_data = templatefile("${path.module}/cloud-init/dbadmin-node.yaml.tpl", {
-    hostname         = var.dbadmin_nodes[count.index].name
-    node_id          = random_uuid.dbadmin_node_id[count.index].result
-    shard_name       = var.dbadmin_shard_name
-    temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
-    ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
-    region_id        = var.region_id
-    cluster_id       = var.cluster_id
-    base_domain      = var.base_domain
-    controlplane_ip  = var.controlplane_ip
-    core_api_token   = var.core_api_token
+  user_data = templatefile("${path.module}/cloud-init/node.yaml.tpl", {
+    hostname       = var.dbadmin_nodes[count.index].name
+    ssh_public_key = file(pathexpand(var.ssh_public_key_path))
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.dbadmin_nodes[count.index].ip
@@ -786,16 +679,9 @@ resource "libvirt_cloudinit_disk" "lb_node" {
     instance-id    = "i-${var.lb_nodes[count.index].name}"
     local-hostname = var.lb_nodes[count.index].name
   })
-  user_data = templatefile("${path.module}/cloud-init/lb-node.yaml.tpl", {
-    hostname         = var.lb_nodes[count.index].name
-    node_id          = random_uuid.lb_node_id[count.index].result
-    shard_name       = var.lb_shard_name
-    temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
-    ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
-    region_id        = var.region_id
-    cluster_id       = var.cluster_id
-    shard_backends   = local.shard_backends
-    base_domain      = var.base_domain
+  user_data = templatefile("${path.module}/cloud-init/node.yaml.tpl", {
+    hostname       = var.lb_nodes[count.index].name
+    ssh_public_key = file(pathexpand(var.ssh_public_key_path))
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.lb_nodes[count.index].ip
@@ -884,14 +770,9 @@ resource "libvirt_cloudinit_disk" "gateway_node" {
     instance-id    = "i-${var.gateway_nodes[count.index].name}"
     local-hostname = var.gateway_nodes[count.index].name
   })
-  user_data = templatefile("${path.module}/cloud-init/gateway-node.yaml.tpl", {
-    hostname         = var.gateway_nodes[count.index].name
-    node_id          = random_uuid.gateway_node_id[count.index].result
-    shard_name       = var.gateway_shard_name
-    temporal_address = "${var.controlplane_ip}:${var.temporal_port}"
-    ssh_public_key   = file(pathexpand(var.ssh_public_key_path))
-    region_id        = var.region_id
-    cluster_id       = var.cluster_id
+  user_data = templatefile("${path.module}/cloud-init/node.yaml.tpl", {
+    hostname       = var.gateway_nodes[count.index].name
+    ssh_public_key = file(pathexpand(var.ssh_public_key_path))
   })
   network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
     ip_address = var.gateway_nodes[count.index].ip
@@ -982,7 +863,7 @@ resource "libvirt_cloudinit_disk" "controlplane_node" {
     instance-id    = "i-${var.controlplane_nodes[count.index].name}"
     local-hostname = var.controlplane_nodes[count.index].name
   })
-  user_data = templatefile("${path.module}/cloud-init/controlplane-node.yaml.tpl", {
+  user_data = templatefile("${path.module}/cloud-init/node.yaml.tpl", {
     hostname       = var.controlplane_nodes[count.index].name
     ssh_public_key = file(pathexpand(var.ssh_public_key_path))
   })
@@ -1059,63 +940,63 @@ resource "libvirt_domain" "controlplane_node" {
 locals {
   all_nodes = concat(
     [for i, n in var.web_nodes : {
-      id         = random_uuid.web_node_id[i].result
+      id         = n.name
       name       = n.name
       ip         = n.ip
       shard_name = var.web_shard_name
       role       = "web"
     }],
     [for i, n in var.db_nodes : {
-      id         = random_uuid.db_node_id[i].result
+      id         = n.name
       name       = n.name
       ip         = n.ip
       shard_name = var.db_shard_name
       role       = "database"
     }],
     [for i, n in var.dns_nodes : {
-      id         = random_uuid.dns_node_id[i].result
+      id         = n.name
       name       = n.name
       ip         = n.ip
       shard_name = var.dns_shard_name
       role       = "dns"
     }],
     [for i, n in var.valkey_nodes : {
-      id         = random_uuid.valkey_node_id[i].result
+      id         = n.name
       name       = n.name
       ip         = n.ip
       shard_name = var.valkey_shard_name
       role       = "valkey"
     }],
     [for i, n in var.email_nodes : {
-      id         = random_uuid.email_node_id[i].result
+      id         = n.name
       name       = n.name
       ip         = n.ip
       shard_name = var.email_shard_name
       role       = "email"
     }],
     [for i, n in var.storage_nodes : {
-      id         = random_uuid.storage_node_id[i].result
+      id         = n.name
       name       = n.name
       ip         = n.ip
       shard_name = var.storage_shard_name
       role       = "storage"
     }],
     [for i, n in var.dbadmin_nodes : {
-      id         = random_uuid.dbadmin_node_id[i].result
+      id         = n.name
       name       = n.name
       ip         = n.ip
       shard_name = var.dbadmin_shard_name
       role       = "dbadmin"
     }],
     [for i, n in var.lb_nodes : {
-      id         = random_uuid.lb_node_id[i].result
+      id         = n.name
       name       = n.name
       ip         = n.ip
       shard_name = var.lb_shard_name
       role       = "lb"
     }],
     [for i, n in var.gateway_nodes : {
-      id         = random_uuid.gateway_node_id[i].result
+      id         = n.name
       name       = n.name
       ip         = n.ip
       shard_name = var.gateway_shard_name

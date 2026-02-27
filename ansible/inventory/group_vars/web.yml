@@ -1,3 +1,11 @@
+node_role: web
+shard_name: web-1
+
+node_agent_nginx_config_dir: /etc/nginx
+node_agent_web_storage_dir: /var/www/storage
+node_agent_cert_dir: /etc/ssl/hosting
+node_agent_ssh_config_dir: /etc/ssh/sshd_config.d
+
 php_versions:
   - "8.3"
   - "8.5"

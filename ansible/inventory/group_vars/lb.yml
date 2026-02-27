@@ -1,0 +1,2 @@
+node_role: lb
+shard_name: lb-1

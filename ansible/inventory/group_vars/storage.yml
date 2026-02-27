@@ -1,0 +1,7 @@
+node_role: storage
+shard_name: storage-1
+
+ceph_s3_enabled: true
+ceph_filestore_enabled: true
+
+node_agent_rgw_endpoint: "http://localhost:7480"

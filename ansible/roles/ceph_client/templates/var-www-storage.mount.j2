@@ -1,0 +1,14 @@
+[Unit]
+Description=CephFS Web Storage
+After=network-online.target
+Wants=network-online.target
+
+[Mount]
+What=web@{{ ceph_fsid }}.cephfs=/
+Where=/var/www/storage
+Type=ceph
+Options=secretfile=/etc/ceph/ceph.client.web.secret,noatime,_netdev
+TimeoutSec=30
+
+[Install]
+WantedBy=multi-user.target

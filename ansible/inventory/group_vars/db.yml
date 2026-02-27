@@ -1,1 +1,6 @@
+node_role: database
+shard_name: db-1
+
+node_agent_mysql_dsn: "root@tcp(127.0.0.1:3306)/"
+
 mysql_repl_password: "repl_pass"

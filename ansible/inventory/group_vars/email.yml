@@ -1,2 +1,5 @@
+node_role: email
+shard_name: email-1
+
 stalwart_hostname: "mail.massive-hosting.com"
 stalwart_admin_password: "dev-token"

@@ -12,6 +12,18 @@
     state: present
     update_cache: true
 
+- name: Create hosting directory
+  file:
+    path: /opt/hosting
+    state: directory
+    mode: "0755"
+
+- name: Deploy Ceph setup script
+  template:
+    src: setup-ceph.sh.j2
+    dest: /opt/hosting/setup-ceph.sh
+    mode: "0755"
+
 - name: Check if Ceph is initialized
   stat:
     path: /etc/ceph/ceph.client.admin.keyring

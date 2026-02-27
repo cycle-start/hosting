@@ -22,8 +22,15 @@
     src: node-agent.env.j2
     dest: /etc/default/node-agent
     mode: "0640"
-  when: node_id is defined
+  when: node_role is defined
   notify: restart node-agent
+
+- name: Deploy cron-outcome script
+  copy:
+    src: cron-outcome
+    dest: /usr/local/bin/cron-outcome
+    mode: "0755"
+  when: node_role is defined and node_role == 'web'
 
 - name: Enable node-agent
   systemd:

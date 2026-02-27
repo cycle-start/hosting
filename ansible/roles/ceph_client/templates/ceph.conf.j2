@@ -1,0 +1,6 @@
+[global]
+fsid = {{ ceph_fsid }}
+mon host = {{ storage_node_ip }}
+auth cluster required = cephx
+auth service required = cephx
+auth client required = cephx

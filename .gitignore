@@ -25,6 +25,9 @@
 .env
 .env.local
 
+# Terraform local overrides
+terraform/terraform.tfvars
+
 # OS
 .DS_Store
 Thumbs.db

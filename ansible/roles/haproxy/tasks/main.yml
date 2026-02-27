@@ -59,23 +59,7 @@
   args:
     creates: /etc/haproxy/certs/hosting.pem
 
-- name: Check for cloud-init staged HAProxy config
-  stat:
-    path: /usr/local/etc/haproxy/haproxy.cfg
-  register: staged_haproxy_cfg
-
-- name: Deploy staged HAProxy config (from Terraform/cloud-init)
-  copy:
-    src: /usr/local/etc/haproxy/haproxy.cfg
-    dest: /etc/haproxy/haproxy.cfg
-    remote_src: true
-    owner: root
-    group: root
-    mode: "0644"
-    validate: haproxy -c -f %s
-  when: staged_haproxy_cfg.stat.exists
-
-- name: Deploy minimal HAProxy config (no staged config)
+- name: Deploy HAProxy config
   template:
     src: haproxy.cfg.j2
     dest: /etc/haproxy/haproxy.cfg
@@ -83,7 +67,6 @@
     group: root
     mode: "0644"
     validate: haproxy -c -f %s
-  when: not staged_haproxy_cfg.stat.exists
 
 - name: Set HAProxy directory ownership
   file:

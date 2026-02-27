@@ -1,0 +1,5 @@
+node_role: valkey
+shard_name: valkey-1
+
+node_agent_valkey_config_dir: /etc/valkey
+node_agent_valkey_data_dir: /var/lib/valkey

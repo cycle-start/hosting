@@ -8,4 +8,3 @@ users:
     shell: /bin/bash
     ssh_authorized_keys:
       - ${ssh_public_key}
-
