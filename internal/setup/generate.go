@@ -1,8 +1,6 @@
 package setup
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -51,11 +49,13 @@ func Generate(cfg *Config, outputDir string, progress ProgressFunc) (*GenerateRe
 		Content: string(manifestData),
 	})
 
-	// Generate Ceph keys
+	// Generate Ceph keys and web client keyring via Docker
 	cephFSID := uuid.New().String()
-	cephWebKey, err := generateCephKey()
+
+	progress("Generating Ceph web client keyring (docker)...")
+	cephKeyring, cephWebKey, err := generateCephKeyring()
 	if err != nil {
-		return nil, fmt.Errorf("generate ceph key: %w", err)
+		return nil, fmt.Errorf("generate ceph keyring: %w", err)
 	}
 
 	// Determine the controlplane IP
@@ -121,16 +121,10 @@ func Generate(cfg *Config, outputDir string, progress ProgressFunc) (*GenerateRe
 		Content: seedYml,
 	})
 
-	progress("Generating Ceph web client keyring (docker)...")
-
-	// 6. Generate Ceph web client keyring via docker
-	keyring, err := generateCephKeyring(cephWebKey)
-	if err != nil {
-		return nil, fmt.Errorf("generate ceph keyring: %w", err)
-	}
+	// 6. Include the pre-generated Ceph web client keyring
 	result.Files = append(result.Files, GeneratedFile{
 		Path:    "generated/ceph.client.web.keyring",
-		Content: keyring,
+		Content: cephKeyring,
 	})
 
 	progress("Writing files to disk...")
@@ -626,28 +620,36 @@ func nodeShardNames(roles []NodeRole) []string {
 	return names
 }
 
-func generateCephKey() (string, error) {
-	key := make([]byte, 16)
-	if _, err := rand.Read(key); err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(key), nil
-}
-
 // generateCephKeyring uses docker + ceph-authtool to produce a properly
-// formatted keyring file.  Returns the file content.
-func generateCephKeyring(key string) (string, error) {
+// formatted keyring file with a Ceph-native key (which includes a type/timestamp
+// header, unlike raw base64). Returns the keyring content and the key string.
+func generateCephKeyring() (keyring string, key string, err error) {
 	cmd := exec.Command("docker", "run", "--rm", "quay.io/ceph/ceph:v19",
 		"ceph-authtool", "--create-keyring", "/dev/stdout",
-		"-n", "client.web", "--add-key", key,
+		"-n", "client.web", "--gen-key",
 		"--cap", "mon", "allow r",
 		"--cap", "osd", "allow rw pool=cephfs_data",
 		"--cap", "mds", "allow rw",
 	)
 	out, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("ceph-authtool via docker: %w", err)
+		return "", "", fmt.Errorf("ceph-authtool via docker: %w", err)
 	}
-	return string(out), nil
+
+	keyring = string(out)
+
+	// Extract key from output: line like "\tkey = AQ..."
+	for _, line := range strings.Split(keyring, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "key = ") {
+			key = strings.TrimPrefix(line, "key = ")
+			break
+		}
+	}
+	if key == "" {
+		return "", "", fmt.Errorf("could not extract key from ceph-authtool output")
+	}
+
+	return keyring, key, nil
 }
 
