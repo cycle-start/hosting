@@ -43,9 +43,51 @@
     - "ceph-mgr@{{ ansible_hostname }}"
   when: ceph_admin_keyring.stat.exists
 
+# MDS setup — idempotent tasks so re-runs recover from partial first runs
+
+- name: Check if MDS keyring exists
+  stat:
+    path: "/var/lib/ceph/mds/ceph-{{ ansible_hostname }}/keyring"
+  register: ceph_mds_keyring
+  when: ceph_filestore_enabled | default(false)
+
+- name: Create MDS keyring
+  shell: |
+    mkdir -p /var/lib/ceph/mds/ceph-{{ ansible_hostname }}
+    ceph auth get-or-create mds.{{ ansible_hostname }} \
+      osd 'allow rwx' mds 'allow *' mon 'allow profile mds' \
+      > /var/lib/ceph/mds/ceph-{{ ansible_hostname }}/keyring
+    chown -R ceph:ceph /var/lib/ceph/mds/ceph-{{ ansible_hostname }}
+  when:
+    - ceph_filestore_enabled | default(false)
+    - ceph_admin_keyring.stat.exists
+    - not ceph_mds_keyring.stat.exists
+
+- name: Create CephFS pools and filesystem
+  shell: |
+    ceph osd pool create cephfs_data 32 2>/dev/null || true
+    ceph osd pool create cephfs_metadata 16 2>/dev/null || true
+    ceph fs new cephfs cephfs_metadata cephfs_data 2>/dev/null || true
+  changed_when: false
+  when:
+    - ceph_filestore_enabled | default(false)
+    - ceph_admin_keyring.stat.exists
+
+- name: Import CephFS web client key
+  shell: |
+    printf '[client.web]\n\tkey = %s\n\tcaps mon = "allow r"\n\tcaps osd = "allow rw pool=cephfs_data"\n\tcaps mds = "allow rw"\n' \
+      '{{ ceph_web_key }}' > /etc/ceph/ceph.client.web.keyring
+    ceph auth import -i /etc/ceph/ceph.client.web.keyring
+  changed_when: false
+  when:
+    - ceph_filestore_enabled | default(false)
+    - ceph_admin_keyring.stat.exists
+
 - name: Start Ceph MDS
   systemd:
     name: "ceph-mds@{{ ansible_hostname }}"
     enabled: true
     state: started
-  when: ceph_admin_keyring.stat.exists and (ceph_filestore_enabled | default(false))
+  when:
+    - ceph_filestore_enabled | default(false)
+    - ceph_admin_keyring.stat.exists
