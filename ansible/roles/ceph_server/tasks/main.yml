@@ -33,7 +33,7 @@
   command: /opt/hosting/setup-ceph.sh
   when: not ceph_admin_keyring.stat.exists
 
-- name: Start Ceph services
+- name: Start Ceph core services
   systemd:
     name: "{{ item }}"
     enabled: true
@@ -41,5 +41,11 @@
   loop:
     - "ceph-mon@{{ ansible_hostname }}"
     - "ceph-mgr@{{ ansible_hostname }}"
-    - "ceph-mds@{{ ansible_hostname }}"
   when: ceph_admin_keyring.stat.exists
+
+- name: Start Ceph MDS
+  systemd:
+    name: "ceph-mds@{{ ansible_hostname }}"
+    enabled: true
+    state: started
+  when: ceph_admin_keyring.stat.exists and (ceph_filestore_enabled | default(false))
