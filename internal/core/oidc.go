@@ -185,8 +185,9 @@ func (s *OIDCService) ValidateLoginSession(ctx context.Context, sessionID string
 	return &sess, nil
 }
 
-// DatabaseConnectionInfo holds the info needed to create a CloudBeaver connection.
+// DatabaseConnectionInfo holds the info needed to connect to a tenant database.
 type DatabaseConnectionInfo struct {
+	ID           string `json:"id"`
 	DatabaseName string `json:"database_name"`
 	Host         string `json:"host"`
 	Port         int    `json:"port"`
@@ -196,16 +197,26 @@ type DatabaseConnectionInfo struct {
 func (s *OIDCService) GetDatabaseConnectionInfo(ctx context.Context, databaseID string) (*DatabaseConnectionInfo, error) {
 	var info DatabaseConnectionInfo
 	err := s.db.QueryRow(ctx, `
-		SELECT d.id, COALESCE(host(n.ip_address), ''), 3306
+		SELECT d.id, d.id, COALESCE(host(n.ip_address), ''), 3306
 		FROM databases d
 		LEFT JOIN node_shard_assignments ns ON ns.shard_id = d.shard_id AND ns.shard_index = 1
 		LEFT JOIN nodes n ON n.id = ns.node_id
 		WHERE d.id = $1
-	`, databaseID).Scan(&info.DatabaseName, &info.Host, &info.Port)
+	`, databaseID).Scan(&info.ID, &info.DatabaseName, &info.Host, &info.Port)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: get database connection info: %w", err)
 	}
 	return &info, nil
+}
+
+// GetDatabaseShardID returns the shard ID for a database.
+func (s *OIDCService) GetDatabaseShardID(ctx context.Context, databaseID string) (string, error) {
+	var shardID string
+	err := s.db.QueryRow(ctx, `SELECT shard_id FROM databases WHERE id = $1`, databaseID).Scan(&shardID)
+	if err != nil {
+		return "", fmt.Errorf("oidc: get database shard_id: %w", err)
+	}
+	return shardID, nil
 }
 
 // ValidateClient validates an OIDC client's credentials and redirect URI.

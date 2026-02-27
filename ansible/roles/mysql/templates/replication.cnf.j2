@@ -1,4 +1,7 @@
 [mysqld]
+# Event scheduler (required for temp user auto-cleanup)
+event_scheduler          = ON
+
 # --- GTID Replication ---
 gtid_mode                = ON
 enforce_gtid_consistency = ON

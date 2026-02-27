@@ -1,21 +1,28 @@
 package handler
 
 import (
+	"crypto/rand"
+	"fmt"
+	"math/big"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	temporalclient "go.temporal.io/sdk/client"
 
 	"github.com/edvin/hosting/internal/api/request"
 	"github.com/edvin/hosting/internal/api/response"
 	"github.com/edvin/hosting/internal/core"
+	"github.com/edvin/hosting/internal/crypto"
+	"github.com/edvin/hosting/internal/workflow"
 )
 
 type OIDCLogin struct {
-	oidcSvc *core.OIDCService
+	oidcSvc        *core.OIDCService
+	temporalClient temporalclient.Client
 }
 
-func NewOIDCLogin(oidcSvc *core.OIDCService) *OIDCLogin {
-	return &OIDCLogin{oidcSvc: oidcSvc}
+func NewOIDCLogin(oidcSvc *core.OIDCService, temporalClient temporalclient.Client) *OIDCLogin {
+	return &OIDCLogin{oidcSvc: oidcSvc, temporalClient: temporalClient}
 }
 
 // CreateLoginSession godoc
@@ -95,4 +102,82 @@ func (h *OIDCLogin) ValidateLoginSession(w http.ResponseWriter, r *http.Request)
 	}
 
 	response.WriteJSON(w, http.StatusOK, result)
+}
+
+// CreateTempAccess godoc
+//
+//	@Summary		Create temporary MySQL access
+//	@Description	Creates a temporary MySQL user with access to a specific database. The user auto-expires after 2 hours. Internal endpoint used by the dbadmin proxy.
+//	@Tags			Internal
+//	@Security		ApiKeyAuth
+//	@Param			id path string true "Database ID"
+//	@Success		200 {object} map[string]any
+//	@Failure		400 {object} response.ErrorResponse
+//	@Failure		500 {object} response.ErrorResponse
+//	@Router			/internal/v1/databases/{id}/temp-access [post]
+func (h *OIDCLogin) CreateTempAccess(w http.ResponseWriter, r *http.Request) {
+	dbID, err := request.RequireID(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Look up database connection info (includes primary node IP).
+	dbInfo, err := h.oidcSvc.GetDatabaseConnectionInfo(r.Context(), dbID)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, "database not found")
+		return
+	}
+
+	// Look up shard ID for the database.
+	shardID, err := h.oidcSvc.GetDatabaseShardID(r.Context(), dbID)
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "failed to look up database shard")
+		return
+	}
+
+	// Generate temporary credentials.
+	username := "tmp_" + randomAlphanumeric(8)
+	password := randomAlphanumeric(32)
+	passwordHash := crypto.MysqlNativePasswordHash(password)
+
+	// Start workflow and wait for completion.
+	workflowID := fmt.Sprintf("temp-access-%s-%s", dbID, username)
+	run, err := h.temporalClient.ExecuteWorkflow(r.Context(), temporalclient.StartWorkflowOptions{
+		ID:        workflowID,
+		TaskQueue: "hosting-tasks",
+	}, workflow.CreateTempMySQLAccessWorkflow, workflow.CreateTempMySQLAccessArgs{
+		DatabaseName: dbInfo.DatabaseName,
+		ShardID:      shardID,
+		Username:     username,
+		PasswordHash: passwordHash,
+	})
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "failed to start temp access workflow")
+		return
+	}
+
+	if err := run.Get(r.Context(), nil); err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "temp access workflow failed: "+err.Error())
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, map[string]any{
+		"username":      username,
+		"password":      password,
+		"host":          dbInfo.Host,
+		"port":          dbInfo.Port,
+		"database_name": dbInfo.DatabaseName,
+	})
+}
+
+// randomAlphanumeric generates a random alphanumeric string of the given length.
+func randomAlphanumeric(n int) string {
+	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, n)
+	for i := range b {
+		idx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
+		b[i] = chars[idx.Int64()]
+	}
+	return string(b)
 }

@@ -193,6 +193,7 @@ func main() {
 	w.RegisterWorkflow(workflow.CollectResourceUsageWorkflow)
 	w.RegisterWorkflow(workflow.CreateWireGuardPeerWorkflow)
 	w.RegisterWorkflow(workflow.DeleteWireGuardPeerWorkflow)
+	w.RegisterWorkflow(workflow.CreateTempMySQLAccessWorkflow)
 
 	if cfg.MetricsAddr != "" {
 		metricsSrv := metrics.NewServer(cfg.MetricsAddr)

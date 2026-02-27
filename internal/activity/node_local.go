@@ -448,6 +448,12 @@ func (a *NodeLocal) DeleteDatabaseUser(ctx context.Context, dbName, username str
 	return asNonRetryable(a.database.DeleteUser(ctx, dbName, username))
 }
 
+// CreateTempMySQLUser creates a temporary MySQL user that auto-expires after 2 hours.
+func (a *NodeLocal) CreateTempMySQLUser(ctx context.Context, params CreateTempMySQLUserParams) error {
+	a.logger.Info().Str("username", params.Username).Str("database", params.DatabaseName).Msg("CreateTempMySQLUser")
+	return asNonRetryable(a.database.CreateTempUser(ctx, params.DatabaseName, params.Username, params.PasswordHash))
+}
+
 // ConfigureReplication sets up this node as a replica of the given primary.
 func (a *NodeLocal) ConfigureReplication(ctx context.Context, params ConfigureReplicationParams) error {
 	a.logger.Info().Str("primary", params.PrimaryHost).Msg("ConfigureReplication")

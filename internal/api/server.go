@@ -119,7 +119,7 @@ func (s *Server) setupRoutes() {
 		shard := handler.NewShard(s.services.Shard)
 		node := handler.NewNode(s.services.Node)
 		tenant := handler.NewTenant(s.services)
-		oidcLogin := handler.NewOIDCLogin(s.services.OIDC)
+		oidcLogin := handler.NewOIDCLogin(s.services.OIDC, s.temporalClient)
 		oidcClient := handler.NewOIDCClient(s.services.OIDC)
 		webroot := handler.NewWebroot(s.services)
 		fqdn := handler.NewFQDN(s.services)
@@ -293,6 +293,7 @@ func (s *Server) setupRoutes() {
 				r.Post("/internal/v1/nodes/{nodeID}/drift-events", internalNode.ReportDriftEvents)
 				r.Post("/internal/v1/cron-jobs/{cronJobID}/outcome", internalNode.ReportCronOutcome)
 				r.Post("/internal/v1/login-sessions/validate", oidcLogin.ValidateLoginSession)
+				r.Post("/internal/v1/databases/{id}/temp-access", oidcLogin.CreateTempAccess)
 			})
 		})
 

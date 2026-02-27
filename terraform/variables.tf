@@ -219,7 +219,7 @@ variable "storage_shard_name" {
 # --- DB Admin nodes ---
 
 variable "dbadmin_nodes" {
-  description = "DB Admin node definitions (runs CloudBeaver + node-agent)"
+  description = "DB Admin node definitions (runs phpMyAdmin + node-agent)"
   type = list(object({
     name   = string
     ip     = string

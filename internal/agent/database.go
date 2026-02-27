@@ -452,6 +452,52 @@ func parseReplicaStatus(output string) *ReplicationStatus {
 	return status
 }
 
+// CreateTempUser creates a temporary MySQL user with ALL privileges on a database.
+// The user auto-expires after 2 hours via a MySQL EVENT.
+func (m *DatabaseManager) CreateTempUser(ctx context.Context, dbName, username, passwordHash string) error {
+	if err := validateName(dbName); err != nil {
+		return err
+	}
+	if err := validateName(username); err != nil {
+		return err
+	}
+
+	m.logger.Info().
+		Str("database", dbName).
+		Str("username", username).
+		Msg("creating temporary database user")
+
+	// Drop user if it already exists (idempotent).
+	dropSQL := fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%'", username)
+	if err := m.execMySQL(ctx, dropSQL); err != nil {
+		m.logger.Warn().Err(err).Str("username", username).Msg("drop existing temp user failed, continuing")
+	}
+
+	// Create the user with mysql_native_password using the pre-computed hash.
+	createSQL := fmt.Sprintf("CREATE USER '%s'@'%%' IDENTIFIED WITH mysql_native_password AS '%s'", username, passwordHash)
+	if err := m.execMySQL(ctx, createSQL); err != nil {
+		return err
+	}
+
+	// Grant ALL privileges on the specific database.
+	grantSQL := fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%%'", dbName, username)
+	if err := m.execMySQL(ctx, grantSQL); err != nil {
+		return err
+	}
+
+	// Create a MySQL EVENT to auto-drop the user after 2 hours.
+	eventSQL := fmt.Sprintf(
+		"CREATE EVENT `tmp_cleanup_%s` ON SCHEDULE AT CURRENT_TIMESTAMP + INTERVAL 2 HOUR DO DROP USER IF EXISTS '%s'@'%%'",
+		username, username,
+	)
+	if err := m.execMySQL(ctx, eventSQL); err != nil {
+		m.logger.Warn().Err(err).Str("username", username).Msg("create cleanup event failed")
+		// Non-fatal: user was created, just won't auto-expire.
+	}
+
+	return m.execMySQL(ctx, "FLUSH PRIVILEGES")
+}
+
 // DeleteUser drops a MySQL user.
 func (m *DatabaseManager) DeleteUser(ctx context.Context, dbName, username string) error {
 	if err := validateName(username); err != nil {

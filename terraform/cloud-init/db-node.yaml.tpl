@@ -45,6 +45,7 @@ write_files:
       [mysqld]
       server-id = ${server_id}
       bind-address = *
+      event_scheduler = ON
 
 runcmd:
   - modprobe dummy

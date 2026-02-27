@@ -346,6 +346,13 @@ type BackupResult struct {
 	SizeBytes   int64
 }
 
+// CreateTempMySQLUserParams holds parameters for creating a temporary MySQL user on a node.
+type CreateTempMySQLUserParams struct {
+	DatabaseName string
+	Username     string
+	PasswordHash string
+}
+
 // ConfigureReplicationParams holds parameters for configuring MySQL replication.
 type ConfigureReplicationParams struct {
 	PrimaryHost  string

@@ -10,88 +10,12 @@ users:
       - ${ssh_public_key}
 
 write_files:
-  - path: /opt/cloudbeaver/conf/cloudbeaver.conf
-    permissions: '0644'
-    content: |
-      {
-          "server": {
-              "serverPort": 8978,
-              "serverName": "CloudBeaver DB Admin",
-              "contentRoot": "web",
-              "driversLocation": "drivers",
-              "rootURI": "/",
-              "serviceURI": "/api/",
-              "expireSessionAfterPeriod": 1800000,
-              "develMode": false,
-              "enableSecurityManager": false,
-              "forwardProxy": true,
-              "database": {
-                  "driver": "h2_embedded_v2",
-                  "url": "jdbc:h2:$${workspace}/.data/cb.h2v2.dat",
-                  "initialDataConfiguration": "conf/initial-data.conf",
-                  "pool": {
-                      "minIdleConnections": 4,
-                      "maxIdleConnections": 10,
-                      "maxConnections": 100,
-                      "validationQuery": "SELECT 1"
-                  },
-                  "backupEnabled": true
-              }
-          },
-          "app": {
-              "anonymousAccessEnabled": true,
-              "supportsCustomConnections": true,
-              "forwardProxy": true,
-              "publicCredentialsSaveEnabled": false,
-              "adminCredentialsSaveEnabled": true,
-              "resourceManagerEnabled": true,
-              "showReadOnlyConnectionInfo": false,
-              "grantConnectionsAccessToAnonymousTeam": false,
-              "resourceQuotas": {
-                  "dataExportFileSizeLimit": 10000000,
-                  "resourceManagerFileSizeLimit": 500000,
-                  "sqlMaxRunningQueries": 100,
-                  "sqlResultSetRowsLimit": 100000,
-                  "sqlResultSetMemoryLimit": 2000000,
-                  "sqlTextPreviewMaxLength": 4096,
-                  "sqlBinaryPreviewMaxLength": 261120
-              },
-              "enabledAuthProviders": [
-                  "local"
-              ],
-              "disabledDrivers": []
-          }
-      }
-
-  - path: /opt/cloudbeaver/conf/initial-data.conf
-    permissions: '0644'
-    content: |
-      {
-          "adminName": "cbadmin",
-          "adminPassword": "cbadmin-dev",
-          "teams": [
-              {
-                  "subjectId": "admin",
-                  "teamName": "Admin",
-                  "description": "Administrative access. Has all permissions.",
-                  "permissions": ["admin"]
-              },
-              {
-                  "subjectId": "user",
-                  "teamName": "User",
-                  "description": "All users, including anonymous.",
-                  "permissions": []
-              }
-          ]
-      }
-
   - path: /etc/default/node-agent
     content: |
       TEMPORAL_ADDRESS=${temporal_address}
       NODE_ID=${node_id}
       SHARD_NAME=${shard_name}
       INIT_SYSTEM=systemd
-      CLOUDBEAVER_ENDPOINT=http://localhost:8978
       REGION_ID=${region_id}
       CLUSTER_ID=${cluster_id}
       NODE_ROLE=dbadmin
@@ -102,9 +26,47 @@ write_files:
     content: |
       CORE_API_URL=http://${controlplane_ip}:8090/api/v1
       CORE_API_TOKEN=${core_api_token}
-      CLOUDBEAVER_URL=http://127.0.0.1:8978
       LISTEN_ADDR=127.0.0.1:4180
       COOKIE_SECRET=CHANGE_ME_generate_with_openssl_rand_base64_24
+      SESSION_DIR=/tmp/dbadmin-sessions
+
+  - path: /opt/phpmyadmin/config.inc.php
+    permissions: '0644'
+    content: |
+      <?php
+      $cfg['blowfish_secret'] = 'a2d4e6f8a12345678901234567890abc';
+      $cfg['Servers'][1]['auth_type'] = 'signon';
+      $cfg['Servers'][1]['SignonSession'] = 'SignonSession';
+      $cfg['Servers'][1]['SignonURL'] = '/auth/unauthorized';
+      $cfg['Servers'][1]['host'] = '';
+      $cfg['Servers'][1]['port'] = '';
+      $cfg['TempDir'] = '/tmp/phpmyadmin';
+
+  - path: /opt/phpmyadmin/signon.php
+    permissions: '0644'
+    content: |
+      <?php
+      $token = $_COOKIE['dbadmin_token'] ?? '';
+      if (!$token || !preg_match('/^[a-zA-Z0-9]+$/', $token)) {
+          die('Invalid session. Please use the control panel to access DB Admin.');
+      }
+      $file = '/tmp/dbadmin-sessions/' . $token . '.json';
+      $data = @file_get_contents($file);
+      if (!$data) {
+          die('Session expired. Please use the control panel to access DB Admin.');
+      }
+      @unlink($file);
+      $creds = json_decode($data, true);
+      session_name('SignonSession');
+      session_start();
+      $_SESSION['PMA_single_signon_user'] = $creds['username'];
+      $_SESSION['PMA_single_signon_password'] = $creds['password'];
+      $_SESSION['PMA_single_signon_host'] = $creds['host'];
+      $_SESSION['PMA_single_signon_port'] = (string)$creds['port'];
+      $_SESSION['PMA_single_signon_DBNAME'] = $creds['database'];
+      setcookie('dbadmin_token', '', time() - 3600, '/', '', true, true);
+      header('Location: /index.php');
+      exit;
 
   - path: /etc/nginx/sites-available/dbadmin
     permissions: '0644'
@@ -114,15 +76,31 @@ write_files:
           listen [::]:80;
           server_name _;
 
-          location / {
+          root /opt/phpmyadmin;
+          index index.php;
+
+          location /auth/ {
               proxy_pass http://127.0.0.1:4180;
               proxy_set_header Host $host;
               proxy_set_header X-Real-IP $remote_addr;
               proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
               proxy_set_header X-Forwarded-Proto $scheme;
-              proxy_http_version 1.1;
-              proxy_set_header Upgrade $http_upgrade;
-              proxy_set_header Connection "upgrade";
+          }
+
+          location = /signon.php {
+              fastcgi_pass unix:/run/php/php-fpm.sock;
+              include fastcgi_params;
+              fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+          }
+
+          location ~ \.php$ {
+              fastcgi_pass unix:/run/php/php-fpm.sock;
+              include fastcgi_params;
+              fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+          }
+
+          location / {
+              try_files $uri $uri/ =404;
           }
       }
 
@@ -134,15 +112,31 @@ write_files:
           ssl_certificate /etc/nginx/certs/dbadmin.pem;
           ssl_certificate_key /etc/nginx/certs/dbadmin-key.pem;
 
-          location / {
+          root /opt/phpmyadmin;
+          index index.php;
+
+          location /auth/ {
               proxy_pass http://127.0.0.1:4180;
               proxy_set_header Host $host;
               proxy_set_header X-Real-IP $remote_addr;
               proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
               proxy_set_header X-Forwarded-Proto $scheme;
-              proxy_http_version 1.1;
-              proxy_set_header Upgrade $http_upgrade;
-              proxy_set_header Connection "upgrade";
+          }
+
+          location = /signon.php {
+              fastcgi_pass unix:/run/php/php-fpm.sock;
+              include fastcgi_params;
+              fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+          }
+
+          location ~ \.php$ {
+              fastcgi_pass unix:/run/php/php-fpm.sock;
+              include fastcgi_params;
+              fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+          }
+
+          location / {
+              try_files $uri $uri/ =404;
           }
       }
 
@@ -154,10 +148,13 @@ runcmd:
       -keyout /etc/nginx/certs/dbadmin-key.pem -out /etc/nginx/certs/dbadmin.pem \
       -days 365 -nodes -subj '/CN=dbadmin.${base_domain}' \
       -addext 'subjectAltName=DNS:dbadmin.${base_domain}' 2>/dev/null
+  # Create session directories.
+  - mkdir -p /tmp/dbadmin-sessions /tmp/phpmyadmin
+  - chmod 777 /tmp/phpmyadmin
   # Enable nginx site.
   - rm -f /etc/nginx/sites-enabled/default
   - ln -sf /etc/nginx/sites-available/dbadmin /etc/nginx/sites-enabled/dbadmin
   - systemctl daemon-reload
-  - systemctl start cloudbeaver
+  - systemctl start php8.3-fpm || systemctl start php-fpm || true
   - systemctl start dbadmin-proxy
   - systemctl restart nginx
