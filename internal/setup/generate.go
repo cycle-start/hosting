@@ -238,7 +238,7 @@ func generateAllGroupVars(cfg *Config, controlplaneIP, storageNodeIP, cephFSID, 
 	b.WriteString("# Ceph\n")
 	b.WriteString(fmt.Sprintf("ceph_fsid: \"%s\"\n", cephFSID))
 	b.WriteString(fmt.Sprintf("ceph_web_key: \"%s\"\n", cephWebKey))
-	b.WriteString("ceph_web_keyring_file: \"{{ playbook_dir }}/../generated/ceph.client.web.keyring\"\n")
+	b.WriteString("ceph_web_keyring_file: \"{{ inventory_dir }}/../../ceph.client.web.keyring\"\n")
 	b.WriteString(fmt.Sprintf("storage_node_ip: \"%s\"\n\n", storageNodeIP))
 
 	b.WriteString("# Stalwart\n")
