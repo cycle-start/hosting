@@ -17,6 +17,14 @@
     dest: /etc/systemd/system/node-agent.service
   notify: restart node-agent
 
+- name: Write node-agent environment config
+  template:
+    src: node-agent.env.j2
+    dest: /etc/default/node-agent
+    mode: "0640"
+  when: node_id is defined
+  notify: restart node-agent
+
 - name: Enable node-agent
   systemd:
     name: node-agent

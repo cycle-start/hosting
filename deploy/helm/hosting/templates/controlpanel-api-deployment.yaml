@@ -22,6 +22,10 @@ spec:
         {{- include "hosting.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: controlpanel-api
     spec:
+      {{- if .Values.image.pullSecret }}
+      imagePullSecrets:
+        - name: {{ .Values.image.pullSecret }}
+      {{- end }}
       {{- if .Values.controlpanelApi.hostNetwork }}
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet

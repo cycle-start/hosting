@@ -234,6 +234,45 @@ lb-del fqdn:
 lb-show:
     echo "show map /var/lib/haproxy/maps/fqdn-to-shard.map" | nc {{lb}} 9999
 
+# --- Container Images (ghcr.io) ---
+
+# Registry prefix for all images
+registry := "ghcr.io/cycle-start"
+
+# Build all Docker images with registry-qualified names
+images:
+    just docs
+    docker build -t {{registry}}/hosting-core-api:latest -f docker/core-api.Dockerfile .
+    docker build -t {{registry}}/hosting-worker:latest -f docker/worker.Dockerfile .
+    docker build -t {{registry}}/hosting-admin-ui:latest -f docker/admin-ui.Dockerfile .
+    docker build -t {{registry}}/hosting-mcp-server:latest -f docker/mcp-server.Dockerfile .
+    docker build -t {{registry}}/controlpanel-api:latest -f docker/controlpanel-api.Dockerfile ../controlpanel-api
+    docker build -t {{registry}}/controlpanel-ui:latest ../controlpanel
+
+# Push all images to ghcr.io
+images-push:
+    docker push {{registry}}/hosting-core-api:latest
+    docker push {{registry}}/hosting-worker:latest
+    docker push {{registry}}/hosting-admin-ui:latest
+    docker push {{registry}}/hosting-mcp-server:latest
+    docker push {{registry}}/controlpanel-api:latest
+    docker push {{registry}}/controlpanel-ui:latest
+
+# Tag all images with a specific version and push (e.g. just images-tag v0.1.0)
+images-tag tag:
+    docker tag {{registry}}/hosting-core-api:latest {{registry}}/hosting-core-api:{{tag}}
+    docker tag {{registry}}/hosting-worker:latest {{registry}}/hosting-worker:{{tag}}
+    docker tag {{registry}}/hosting-admin-ui:latest {{registry}}/hosting-admin-ui:{{tag}}
+    docker tag {{registry}}/hosting-mcp-server:latest {{registry}}/hosting-mcp-server:{{tag}}
+    docker tag {{registry}}/controlpanel-api:latest {{registry}}/controlpanel-api:{{tag}}
+    docker tag {{registry}}/controlpanel-ui:latest {{registry}}/controlpanel-ui:{{tag}}
+    docker push {{registry}}/hosting-core-api:{{tag}}
+    docker push {{registry}}/hosting-worker:{{tag}}
+    docker push {{registry}}/hosting-admin-ui:{{tag}}
+    docker push {{registry}}/hosting-mcp-server:{{tag}}
+    docker push {{registry}}/controlpanel-api:{{tag}}
+    docker push {{registry}}/controlpanel-ui:{{tag}}
+
 # --- Packer (Base Image) ---
 
 # Build the node-agent binary for Linux (for VM deployment)
@@ -449,20 +488,31 @@ vm-deploy-one name:
     docker save hosting-{{name}}:latest | ssh {{ssh_opts}} ubuntu@{{cp}} "sudo k3s ctr images import -"
     kubectl --context hosting rollout restart deployment/hosting-{{name}}
 
-# Build all Docker images and deploy to k3s VM
+# Build all Docker images and deploy to k3s VM (all-in-one dev command)
 vm-deploy:
-    # Generate OpenAPI docs (needed by Go embed)
     just docs
-    # Build Docker images
+    just vm-build-images
+    just vm-import-images
+    just vm-apply-infra
+    just vm-helm
+    just vm-restart
+
+# Build Docker images with local names (for k3s import, no registry prefix)
+vm-build-images:
     docker build -t hosting-core-api:latest -f docker/core-api.Dockerfile .
     docker build -t hosting-worker:latest -f docker/worker.Dockerfile .
     docker build -t hosting-admin-ui:latest -f docker/admin-ui.Dockerfile .
     docker build -t hosting-mcp-server:latest -f docker/mcp-server.Dockerfile .
     docker build -t controlpanel-api:latest -f docker/controlpanel-api.Dockerfile ../controlpanel-api
     docker build -t controlpanel-ui:latest ../controlpanel
-    # Import into k3s containerd
+
+# Import locally built images into k3s containerd via SSH
+vm-import-images:
     docker save hosting-core-api:latest hosting-worker:latest hosting-admin-ui:latest hosting-mcp-server:latest controlpanel-api:latest controlpanel-ui:latest | \
       ssh {{ssh_opts}} ubuntu@{{cp}} "sudo k3s ctr images import -"
+
+# Apply k3s infrastructure manifests, SSL certs, and Grafana dashboards
+vm-apply-infra:
     # Apply infra manifests (Traefik config, Grafana, etc.) with domain substitution
     for f in deploy/k3s/*.yaml; do envsubst '$BASE_DOMAIN' < "$f" | kubectl --context hosting apply -f -; done
     # Deploy SSL certs (mkcert if available, otherwise self-signed)
@@ -483,7 +533,9 @@ vm-deploy:
       --from-file=contact-points.yaml=docker/grafana/provisioning/alerting/contact-points.yaml \
       --from-file=notification-policies.yaml=docker/grafana/provisioning/alerting/notification-policies.yaml \
       --from-file=alert-rules.yaml=docker/grafana/provisioning/alerting/alert-rules.yaml
-    # Install/upgrade Helm chart (secrets from .env, SSH CA key from file)
+
+# Run Helm upgrade with dev values and secrets from .env
+vm-helm:
     helm repo add bitnami https://charts.bitnami.com/bitnami 2>/dev/null || true
     helm repo add temporal https://go.temporal.io/helm-charts 2>/dev/null || true
     @if [ ! -f deploy/helm/hosting/charts/postgresql-*.tgz ]; then helm dependency build deploy/helm/hosting; fi
@@ -499,8 +551,37 @@ vm-deploy:
       --set secrets.controlpanelDatabaseUrl="$CONTROLPANEL_DATABASE_URL" \
       --set secrets.controlpanelJwtSecret="$CONTROLPANEL_JWT_SECRET" \
       {{ if path_exists("ssh_ca") == "true" { "--set-file secrets.sshCaPrivateKey=ssh_ca" } else { "" } }}
-    # Restart app pods to pick up new images (tag is always `latest`)
+
+# Restart all app deployments to pick up new images
+vm-restart:
     kubectl --context hosting rollout restart deployment/hosting-core-api deployment/hosting-worker deployment/hosting-admin-ui deployment/hosting-mcp-server deployment/hosting-controlpanel-api deployment/hosting-controlpanel-ui
+
+# Deploy to k3s using images from ghcr.io (tests registry-based deployment)
+vm-deploy-registry:
+    just vm-apply-infra
+    helm repo add bitnami https://charts.bitnami.com/bitnami 2>/dev/null || true
+    helm repo add temporal https://go.temporal.io/helm-charts 2>/dev/null || true
+    @if [ ! -f deploy/helm/hosting/charts/postgresql-*.tgz ]; then helm dependency build deploy/helm/hosting; fi
+    helm --kube-context hosting upgrade --install hosting \
+      deploy/helm/hosting -f deploy/helm/hosting/values-dev.yaml \
+      --set image.pullPolicy=Always \
+      --set image.coreApi.repository={{registry}}/hosting-core-api \
+      --set image.worker.repository={{registry}}/hosting-worker \
+      --set image.adminUi.repository={{registry}}/hosting-admin-ui \
+      --set image.mcpServer.repository={{registry}}/hosting-mcp-server \
+      --set image.controlpanelApi.repository={{registry}}/controlpanel-api \
+      --set image.controlpanelUi.repository={{registry}}/controlpanel-ui \
+      --set config.baseDomain="$BASE_DOMAIN" \
+      --set secrets.coreDatabaseUrl="$CORE_DATABASE_URL" \
+      --set secrets.powerdnsDatabaseUrl="$POWERDNS_DATABASE_URL" \
+      --set secrets.stalwartAdminToken="$STALWART_ADMIN_TOKEN" \
+      --set secrets.secretEncryptionKey="$SECRET_ENCRYPTION_KEY" \
+      --set secrets.llmApiKey="$LLM_API_KEY" \
+      --set secrets.agentApiKey="$AGENT_API_KEY" \
+      --set secrets.controlpanelDatabaseUrl="$CONTROLPANEL_DATABASE_URL" \
+      --set secrets.controlpanelJwtSecret="$CONTROLPANEL_JWT_SECRET" \
+      {{ if path_exists("ssh_ca") == "true" { "--set-file secrets.sshCaPrivateKey=ssh_ca" } else { "" } }}
+    just vm-restart
 
 # Fetch kubeconfig from controlplane VM and merge into ~/.kube/config
 vm-kubeconfig:

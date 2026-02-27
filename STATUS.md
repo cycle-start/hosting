@@ -207,7 +207,9 @@ Userspace WireGuard tunnel client for accessing tenant MySQL and Valkey services
 - **VM provisioning:** Terraform + libvirt with single Packer base image (Ubuntu + HWE kernel), Ansible for role-specific software
 - **Ansible configuration management:** Dynamic API-backed inventory, 17 roles covering all VM types, tag-based selective deployment (`just deploy-node-agent`, `just ansible-role web --tags php`)
 - **k3s control plane:** Helm chart deploys core-api, worker, admin-ui, MCP server; k3s manifests for Temporal, PostgreSQL, Loki, Grafana, Prometheus, Alloy, Traefik ingress
-- **Image delivery:** `docker build` -> `docker save` -> SSH pipe -> `k3s ctr images import`
+- **Image delivery:** GitHub Container Registry (`ghcr.io/cycle-start/*`) with `just images` / `just images-push` / `just images-tag`; dev fast path still uses `docker save` -> SSH pipe -> `k3s ctr images import` via `just vm-deploy`
+- **Deployment pipeline:** Build → push → deploy stages; `vm-deploy` split into composable sub-recipes (`vm-build-images`, `vm-import-images`, `vm-apply-infra`, `vm-helm`, `vm-restart`); `vm-deploy-registry` for registry-based deployment
+- **Production deployment:** Helm values template, Ansible inventory template, cluster topology template, production deployment guide (`docs/production-deployment.md`)
 - **Networking:** `*.massive-hosting.com` domain via Traefik ingress, WSL2 -> libvirt routing via `just forward`
 
 ### Resource Naming

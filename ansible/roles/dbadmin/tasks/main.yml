@@ -54,6 +54,14 @@
     dest: /etc/systemd/system/dbadmin-proxy.service
   notify: restart dbadmin-proxy
 
+- name: Write dbadmin-proxy environment config
+  template:
+    src: dbadmin-proxy.env.j2
+    dest: /etc/default/dbadmin-proxy
+    mode: "0640"
+  when: core_api_url is defined
+  notify: restart dbadmin-proxy
+
 - name: Enable dbadmin-proxy
   systemd:
     name: dbadmin-proxy

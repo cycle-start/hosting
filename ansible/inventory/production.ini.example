@@ -1,0 +1,45 @@
+# Production inventory template.
+# Copy to production.ini and fill in your node IPs and vars.
+#
+# Usage:
+#   cd ansible && ansible-playbook site.yml -i inventory/production.ini
+
+[web]
+web-0 ansible_host=203.0.113.10 node_id=web-0 shard_name=shard-web-1 node_role=web
+web-1 ansible_host=203.0.113.11 node_id=web-1 shard_name=shard-web-1 node_role=web
+
+[db]
+db-0 ansible_host=203.0.113.20 node_id=db-0 shard_name=shard-db-1 node_role=database mysql_dsn=root@tcp(127.0.0.1:3306)/
+db-1 ansible_host=203.0.113.21 node_id=db-1 shard_name=shard-db-1 node_role=database mysql_dsn=root@tcp(127.0.0.1:3306)/
+
+[dns]
+dns-0 ansible_host=203.0.113.30 node_id=dns-0 shard_name=shard-dns-1 node_role=dns
+
+[valkey]
+valkey-0 ansible_host=203.0.113.40 node_id=valkey-0 shard_name=shard-valkey-1 node_role=valkey
+
+[storage]
+storage-0 ansible_host=203.0.113.50 node_id=storage-0 shard_name=shard-storage-1 node_role=storage
+
+[dbadmin]
+dbadmin-0 ansible_host=203.0.113.60 node_id=dbadmin-0 shard_name=shard-dbadmin-1 node_role=dbadmin
+
+[lb]
+lb-0 ansible_host=203.0.113.70 node_id=lb-0 shard_name=shard-lb-1 node_role=lb
+
+[email]
+email-0 ansible_host=203.0.113.80 node_id=email-0 shard_name=shard-email-1 node_role=email
+
+[gateway]
+gateway-0 ansible_host=203.0.113.90 node_id=gateway-0 shard_name=shard-gateway-1 node_role=gateway
+
+[controlplane]
+cp-0 ansible_host=203.0.113.2
+
+[all:vars]
+ansible_user=ubuntu
+temporal_address=203.0.113.2:7233
+region_id=us-east-1
+cluster_id=prod-cluster-1
+core_api_url=http://203.0.113.2:8090/api/v1
+core_api_token=hst_...

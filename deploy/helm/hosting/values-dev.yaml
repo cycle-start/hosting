@@ -2,22 +2,16 @@ image:
   pullPolicy: Never
   coreApi:
     repository: hosting-core-api
-    tag: latest
   worker:
     repository: hosting-worker
-    tag: latest
   adminUi:
     repository: hosting-admin-ui
-    tag: latest
   mcpServer:
     repository: hosting-mcp-server
-    tag: latest
   controlpanelApi:
     repository: controlpanel-api
-    tag: latest
   controlpanelUi:
     repository: controlpanel-ui
-    tag: latest
 
 coreApi:
   replicas: 1

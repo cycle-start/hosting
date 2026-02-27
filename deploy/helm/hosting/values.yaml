@@ -1,23 +1,25 @@
 image:
   coreApi:
-    repository: hosting-core-api
+    repository: ghcr.io/cycle-start/hosting-core-api
     tag: latest
   worker:
-    repository: hosting-worker
+    repository: ghcr.io/cycle-start/hosting-worker
     tag: latest
   adminUi:
-    repository: hosting-admin-ui
+    repository: ghcr.io/cycle-start/hosting-admin-ui
     tag: latest
   mcpServer:
-    repository: hosting-mcp-server
+    repository: ghcr.io/cycle-start/hosting-mcp-server
     tag: latest
   controlpanelApi:
-    repository: controlpanel-api
+    repository: ghcr.io/cycle-start/controlpanel-api
     tag: latest
   controlpanelUi:
-    repository: controlpanel-ui
+    repository: ghcr.io/cycle-start/controlpanel-ui
     tag: latest
   pullPolicy: IfNotPresent
+  # Name of an existing imagePullSecret for private registries (e.g. ghcr.io with a PAT)
+  pullSecret: ""
 
 coreApi:
   replicas: 1

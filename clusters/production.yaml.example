@@ -1,0 +1,92 @@
+# Production cluster topology template.
+# Mirrors your Ansible inventory. Used by: hostctl cluster apply -f clusters/production.yaml
+#
+# Copy to clusters/production.yaml and fill in your node IPs.
+
+regions:
+  - id: us-east-1
+    name: US East
+
+clusters:
+  - id: prod-cluster-1
+    region_id: us-east-1
+    name: Production
+
+shards:
+  - name: shard-web-1
+    cluster_id: prod-cluster-1
+    role: web
+    nodes:
+      - id: web-0
+        hostname: web-0
+        ip_address: 203.0.113.10
+      - id: web-1
+        hostname: web-1
+        ip_address: 203.0.113.11
+
+  - name: shard-db-1
+    cluster_id: prod-cluster-1
+    role: database
+    nodes:
+      - id: db-0
+        hostname: db-0
+        ip_address: 203.0.113.20
+      - id: db-1
+        hostname: db-1
+        ip_address: 203.0.113.21
+
+  - name: shard-dns-1
+    cluster_id: prod-cluster-1
+    role: dns
+    nodes:
+      - id: dns-0
+        hostname: dns-0
+        ip_address: 203.0.113.30
+
+  - name: shard-valkey-1
+    cluster_id: prod-cluster-1
+    role: valkey
+    nodes:
+      - id: valkey-0
+        hostname: valkey-0
+        ip_address: 203.0.113.40
+
+  - name: shard-storage-1
+    cluster_id: prod-cluster-1
+    role: storage
+    nodes:
+      - id: storage-0
+        hostname: storage-0
+        ip_address: 203.0.113.50
+
+  - name: shard-dbadmin-1
+    cluster_id: prod-cluster-1
+    role: dbadmin
+    nodes:
+      - id: dbadmin-0
+        hostname: dbadmin-0
+        ip_address: 203.0.113.60
+
+  - name: shard-lb-1
+    cluster_id: prod-cluster-1
+    role: lb
+    nodes:
+      - id: lb-0
+        hostname: lb-0
+        ip_address: 203.0.113.70
+
+  - name: shard-email-1
+    cluster_id: prod-cluster-1
+    role: email
+    nodes:
+      - id: email-0
+        hostname: email-0
+        ip_address: 203.0.113.80
+
+  - name: shard-gateway-1
+    cluster_id: prod-cluster-1
+    role: gateway
+    nodes:
+      - id: gateway-0
+        hostname: gateway-0
+        ip_address: 203.0.113.90

@@ -1,0 +1,105 @@
+# Production values template.
+# Copy to values-production.yaml and fill in your environment-specific values.
+#
+# Usage:
+#   helm install hosting deploy/helm/hosting -f deploy/helm/hosting/values-production.yaml
+
+image:
+  pullPolicy: Always
+  # Create with: kubectl create secret docker-registry ghcr-pull-secret \
+  #   --docker-server=ghcr.io --docker-username=<github-user> --docker-password=<PAT>
+  pullSecret: "ghcr-pull-secret"
+  coreApi:
+    tag: "latest"    # Pin to a specific version in production (e.g. "v0.1.0" or a git SHA)
+  worker:
+    tag: "latest"
+  adminUi:
+    tag: "latest"
+  mcpServer:
+    tag: "latest"
+  controlpanelApi:
+    tag: "latest"
+  controlpanelUi:
+    tag: "latest"
+
+coreApi:
+  replicas: 2
+  hostNetwork: false
+  migrate: true
+
+worker:
+  replicas: 2
+  hostNetwork: false
+
+adminUi:
+  replicas: 1
+  hostNetwork: false
+
+mcpServer:
+  enabled: false
+  hostNetwork: false
+
+controlpanelApi:
+  enabled: true
+  replicas: 1
+  hostNetwork: false
+  migrate: true
+  hostingApiKey: "hst_..."       # API key for controlpanel → core-api communication
+  devMode: "false"
+
+controlpanelUi:
+  enabled: true
+  replicas: 1
+  hostNetwork: false
+
+config:
+  baseDomain: "example.com"
+  logLevel: info
+  registryUrl: ""
+  acmeEmail: "ssl@example.com"
+  acmeDirectoryUrl: "https://acme-v02.api.letsencrypt.org/directory"
+  regionId: "us-east-1"
+  clusterId: "prod-cluster-1"
+  lokiUrl: "http://loki:3100"
+  tenantLokiUrl: "http://loki:3101"
+  internalNetworkCidr: "10.0.0.0/8"
+  wireguardEndpoint: ""
+
+# Use an existing K8s secret for all sensitive values.
+# Create with:
+#   kubectl create secret generic hosting-secrets \
+#     --from-literal=CORE_DATABASE_URL='postgres://...' \
+#     --from-literal=POWERDNS_DATABASE_URL='postgres://...' \
+#     --from-literal=SECRET_ENCRYPTION_KEY='...' \
+#     --from-literal=CONTROLPANEL_DATABASE_URL='postgres://...' \
+#     --from-literal=CONTROLPANEL_JWT_SECRET='...'
+secrets:
+  existingSecret: "hosting-secrets"
+
+temporal:
+  address: "temporal.temporal:7233"
+
+ingress:
+  enabled: true
+  className: "nginx"
+  hosts:
+    - host: api.example.com
+      paths:
+        - path: /
+          service: core-api
+    - host: admin.example.com
+      paths:
+        - path: /
+          service: admin-ui
+    - host: home.example.com
+      paths:
+        - path: /api
+          service: controlpanel-api
+        - path: /
+          service: controlpanel-ui
+  tls:
+    - secretName: hosting-tls
+      hosts:
+        - api.example.com
+        - admin.example.com
+        - home.example.com
