@@ -141,7 +141,20 @@ func (s *OIDCService) Discovery() map[string]any {
 }
 
 // CreateLoginSession creates a short-lived login session for a tenant.
+// If a databaseID is provided, it must belong to the specified tenant.
 func (s *OIDCService) CreateLoginSession(ctx context.Context, tenantID string, databaseID *string) (*model.OIDCLoginSession, error) {
+	// Verify database belongs to this tenant if specified.
+	if databaseID != nil {
+		var ownerID string
+		err := s.db.QueryRow(ctx, `SELECT tenant_id FROM databases WHERE id = $1`, *databaseID).Scan(&ownerID)
+		if err != nil {
+			return nil, fmt.Errorf("oidc: database not found")
+		}
+		if ownerID != tenantID {
+			return nil, fmt.Errorf("oidc: database does not belong to this tenant")
+		}
+	}
+
 	session := &model.OIDCLoginSession{
 		ID:         platform.NewID(),
 		TenantID:   tenantID,
@@ -194,15 +207,21 @@ type DatabaseConnectionInfo struct {
 }
 
 // GetDatabaseConnectionInfo looks up the database name and its primary node IP.
-func (s *OIDCService) GetDatabaseConnectionInfo(ctx context.Context, databaseID string) (*DatabaseConnectionInfo, error) {
+// If tenantID is non-empty, the database must belong to that tenant.
+func (s *OIDCService) GetDatabaseConnectionInfo(ctx context.Context, databaseID, tenantID string) (*DatabaseConnectionInfo, error) {
 	var info DatabaseConnectionInfo
-	err := s.db.QueryRow(ctx, `
+	query := `
 		SELECT d.id, d.id, COALESCE(host(n.ip_address), ''), 3306
 		FROM databases d
 		LEFT JOIN node_shard_assignments ns ON ns.shard_id = d.shard_id AND ns.shard_index = 1
 		LEFT JOIN nodes n ON n.id = ns.node_id
-		WHERE d.id = $1
-	`, databaseID).Scan(&info.ID, &info.DatabaseName, &info.Host, &info.Port)
+		WHERE d.id = $1`
+	args := []any{databaseID}
+	if tenantID != "" {
+		query += ` AND d.tenant_id = $2`
+		args = append(args, tenantID)
+	}
+	err := s.db.QueryRow(ctx, query, args...).Scan(&info.ID, &info.DatabaseName, &info.Host, &info.Port)
 	if err != nil {
 		return nil, fmt.Errorf("oidc: get database connection info: %w", err)
 	}

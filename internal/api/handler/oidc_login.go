@@ -93,9 +93,9 @@ func (h *OIDCLogin) ValidateLoginSession(w http.ResponseWriter, r *http.Request)
 		"tenant_id": session.TenantID,
 	}
 
-	// If a database_id is attached, look up connection info.
+	// If a database_id is attached, look up connection info (verified against session's tenant).
 	if session.DatabaseID != nil {
-		dbInfo, err := h.oidcSvc.GetDatabaseConnectionInfo(r.Context(), *session.DatabaseID)
+		dbInfo, err := h.oidcSvc.GetDatabaseConnectionInfo(r.Context(), *session.DatabaseID, session.TenantID)
 		if err == nil {
 			result["database"] = dbInfo
 		}
@@ -123,7 +123,9 @@ func (h *OIDCLogin) CreateTempAccess(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Look up database connection info (includes primary node IP).
-	dbInfo, err := h.oidcSvc.GetDatabaseConnectionInfo(r.Context(), dbID)
+	// No tenant filter here — this is an internal endpoint called by dbadmin-proxy
+	// after the session has already been validated with tenant ownership checks.
+	dbInfo, err := h.oidcSvc.GetDatabaseConnectionInfo(r.Context(), dbID, "")
 	if err != nil {
 		response.WriteError(w, http.StatusNotFound, "database not found")
 		return
