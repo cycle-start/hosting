@@ -1,7 +1,14 @@
+- name: Add Vector GPG key
+  get_url:
+    url: https://repositories.timber.io/public/vector/gpg.3543DB2D0A2BC4B8.key
+    dest: /usr/share/keyrings/vector-archive-keyring.asc
+    mode: "0644"
+
 - name: Add Vector APT repository
-  shell: curl -1sLf https://setup.vector.dev | bash
-  args:
-    creates: /etc/apt/sources.list.d/timber-vector.list
+  apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/vector-archive-keyring.asc] https://repositories.timber.io/public/vector/deb/ubuntu {{ ansible_distribution_release }} main"
+    filename: vector
+    state: present
 
 - name: Install Vector
   apt:
