@@ -139,8 +139,13 @@ ceph osd pool create cephfs_metadata 16
 ceph fs new cephfs cephfs_metadata cephfs_data
 
 # Import the pre-generated web client key (shared with web nodes via Ansible).
-printf '[client.web]\n\tkey = %s\n\tcaps mon = "allow r"\n\tcaps osd = "allow rw pool=cephfs_data"\n\tcaps mds = "allow rw"\n' \
-  '{{ ceph_web_key }}' > /etc/ceph/ceph.client.web.keyring
+cat > /etc/ceph/ceph.client.web.keyring << KEYEOF
+[client.web]
+	key = {{ ceph_web_key }}
+	caps mon = "allow r"
+	caps osd = "allow rw pool=cephfs_data"
+	caps mds = "allow rw"
+KEYEOF
 ceph auth import -i /etc/ceph/ceph.client.web.keyring
 
 echo "CephFS setup complete."

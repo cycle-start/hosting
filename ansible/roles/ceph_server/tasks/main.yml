@@ -73,11 +73,17 @@
     - ceph_filestore_enabled | default(false)
     - ceph_admin_keyring.stat.exists
 
+- name: Write CephFS web client keyring
+  template:
+    src: ceph.client.web.keyring.j2
+    dest: /etc/ceph/ceph.client.web.keyring
+    mode: "0600"
+  when:
+    - ceph_filestore_enabled | default(false)
+    - ceph_admin_keyring.stat.exists
+
 - name: Import CephFS web client key
-  shell: |
-    printf '[client.web]\n\tkey = %s\n\tcaps mon = "allow r"\n\tcaps osd = "allow rw pool=cephfs_data"\n\tcaps mds = "allow rw"\n' \
-      '{{ ceph_web_key }}' > /etc/ceph/ceph.client.web.keyring
-    ceph auth import -i /etc/ceph/ceph.client.web.keyring
+  command: ceph auth import -i /etc/ceph/ceph.client.web.keyring
   changed_when: false
   when:
     - ceph_filestore_enabled | default(false)

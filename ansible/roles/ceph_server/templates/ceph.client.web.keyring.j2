@@ -1,0 +1,5 @@
+[client.web]
+	key = {{ ceph_web_key }}
+	caps mon = "allow r"
+	caps osd = "allow rw pool=cephfs_data"
+	caps mds = "allow rw"
