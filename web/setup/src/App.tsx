@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Loader2, Download, Check, AlertCircle, Terminal, FileText, ArrowRight, Copy } from 'lucide-react'
 import type { Config, RoleInfo, ValidationError, GeneratedFile, StepID } from '@/lib/types'
@@ -13,6 +13,7 @@ import { ControlPlaneStep } from '@/steps/ControlPlaneStep'
 import { NodesStep } from '@/steps/NodesStep'
 import { TLSStep } from '@/steps/TLSStep'
 import { ReviewStep } from '@/steps/ReviewStep'
+import { DeploySteps } from '@/steps/DeploySteps'
 
 interface Step {
   id: StepID
@@ -28,6 +29,7 @@ const STEPS: Step[] = [
   { id: 'nodes', label: 'Machines', visible: (c) => c.deploy_mode === 'multi' },
   { id: 'tls', label: 'TLS', visible: () => true },
   { id: 'review', label: 'Review', visible: () => true },
+  { id: 'install', label: 'Install', visible: () => true },
 ]
 
 export default function App() {
@@ -36,13 +38,15 @@ export default function App() {
   const [currentStep, setCurrentStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<ValidationError[]>([])
-  const [generated, setGenerated] = useState<GeneratedFile[] | null>(null)
+  const [generated, setGenerated] = useState<{ outputDir: string; files: GeneratedFile[] } | null>(null)
   const [generating, setGenerating] = useState(false)
   const [visitedSteps, setVisitedSteps] = useState<Set<StepID>>(new Set(['deploy_mode']))
+  const [outputDir, setOutputDir] = useState('')
 
   useEffect(() => {
     api.getConfig().then(setConfig)
     api.getRoles().then(setRoles)
+    api.getInfo().then((info) => setOutputDir(info.output_dir))
   }, [])
 
   if (!config) {
@@ -122,7 +126,7 @@ export default function App() {
       if (errs.length > 0) return
 
       const result = await api.generate()
-      setGenerated(result.files)
+      setGenerated({ outputDir: result.output_dir, files: result.files })
     } catch (err: any) {
       setErrors([{ field: 'general', message: err.message }])
     } finally {
@@ -179,83 +183,70 @@ export default function App() {
         </nav>
 
         {/* Main content */}
-        <main className="flex-1 p-8 max-w-3xl">
-          {generated ? (
-            <GeneratedView files={generated} config={config} onBack={() => setGenerated(null)} />
-          ) : (
-            <>
-              {step.id === 'deploy_mode' && (
-                <DeployModeStep config={config} onChange={handleChange} />
-              )}
-              {step.id === 'region' && (
-                <RegionStep config={config} onChange={handleChange} errors={stepErrors} />
-              )}
-              {step.id === 'brand' && (
-                <BrandStep config={config} onChange={handleChange} errors={stepErrors} />
-              )}
-              {step.id === 'control_plane' && (
-                <ControlPlaneStep config={config} onChange={handleChange} errors={stepErrors} />
-              )}
-              {step.id === 'nodes' && (
-                <NodesStep config={config} onChange={handleChange} roles={roles} errors={stepErrors} />
-              )}
-              {step.id === 'tls' && (
-                <TLSStep config={config} onChange={handleChange} errors={stepErrors} />
-              )}
-              {step.id === 'review' && (
-                <ReviewStep config={config} roles={roles} errors={errors} onGoToStep={(stepId) => {
-                  const idx = visibleSteps.findIndex((s) => s.id === stepId)
-                  if (idx >= 0) goToStep(idx)
-                }} />
-              )}
-            </>
+        <main className={cn('flex-1 p-8', step.id !== 'install' && 'max-w-3xl')}>
+          {step.id === 'deploy_mode' && (
+            <DeployModeStep config={config} onChange={handleChange} outputDir={outputDir} />
+          )}
+          {step.id === 'region' && (
+            <RegionStep config={config} onChange={handleChange} errors={stepErrors} />
+          )}
+          {step.id === 'brand' && (
+            <BrandStep config={config} onChange={handleChange} errors={stepErrors} />
+          )}
+          {step.id === 'control_plane' && (
+            <ControlPlaneStep config={config} onChange={handleChange} errors={stepErrors} />
+          )}
+          {step.id === 'nodes' && (
+            <NodesStep config={config} onChange={handleChange} roles={roles} errors={stepErrors} />
+          )}
+          {step.id === 'tls' && (
+            <TLSStep config={config} onChange={handleChange} errors={stepErrors} />
+          )}
+          {step.id === 'review' && (
+            <ReviewStep config={config} roles={roles} errors={errors} onGoToStep={(stepId) => {
+              const idx = visibleSteps.findIndex((s) => s.id === stepId)
+              if (idx >= 0) goToStep(idx)
+            }} />
+          )}
+          {step.id === 'install' && (
+            <InstallStep
+              config={config}
+              outputDir={outputDir}
+              generated={generated}
+              generating={generating}
+              onGenerate={handleGenerate}
+            />
           )}
         </main>
       </div>
 
       {/* Footer navigation */}
-      {!generated && (
-        <footer className="border-t px-6 py-4 flex items-center justify-between">
-          <Button
-            variant="outline"
-            onClick={goPrev}
-            disabled={isFirst}
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Back
-          </Button>
+      <footer className="border-t px-6 py-4 flex items-center justify-between">
+        <Button
+          variant="outline"
+          onClick={goPrev}
+          disabled={isFirst}
+        >
+          <ChevronLeft className="h-4 w-4 mr-1" />
+          Back
+        </Button>
 
-          <div className="flex items-center gap-3">
-            {saving && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Saving...
-              </span>
-            )}
+        <div className="flex items-center gap-3">
+          {saving && (
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Saving...
+            </span>
+          )}
 
-            {isLast ? (
-              <Button onClick={handleGenerate} disabled={generating}>
-                {generating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-4 w-4 mr-2" />
-                    Generate Files
-                  </>
-                )}
-              </Button>
-            ) : (
-              <Button onClick={goNext}>
-                Next
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            )}
-          </div>
-        </footer>
-      )}
+          {!isLast && (
+            <Button onClick={goNext}>
+              Next
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          )}
+        </div>
+      </footer>
     </div>
   )
 }
@@ -289,22 +280,51 @@ function StepIndicator({ status, index }: { status: 'valid' | 'error' | 'current
   )
 }
 
-function GeneratedView({
-  files,
+function InstallStep({
   config,
-  onBack,
+  outputDir,
+  generated,
+  generating,
+  onGenerate,
 }: {
-  files: GeneratedFile[]
   config: Config
-  onBack: () => void
+  outputDir: string
+  generated: { outputDir: string; files: GeneratedFile[] } | null
+  generating: boolean
+  onGenerate: () => void
 }) {
   const [selected, setSelected] = useState(0)
   const [copied, setCopied] = useState(false)
 
   const copyContent = () => {
-    navigator.clipboard.writeText(files[selected]?.content || '')
+    if (!generated) return
+    navigator.clipboard.writeText(generated.files[selected]?.content || '')
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  if (!generated) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Install</h2>
+        <p className="text-sm text-muted-foreground">
+          Generate the configuration files, then run the deploy steps to set up your hosting platform.
+        </p>
+        <Button onClick={onGenerate} disabled={generating}>
+          {generating ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            <>
+              <Download className="h-4 w-4 mr-2" />
+              Generate Files
+            </>
+          )}
+        </Button>
+      </div>
+    )
   }
 
   return (
@@ -317,72 +337,35 @@ function GeneratedView({
             </div>
             Configuration Generated
           </h2>
-          <p className="text-muted-foreground mt-1">
-            {files.length} files written to disk, including <code className="text-xs font-mono bg-muted px-1 py-0.5 rounded">setup.yaml</code> manifest.
-            Edit the manifest by hand or re-run the wizard to modify, then <code className="text-xs font-mono bg-muted px-1 py-0.5 rounded">setup generate</code> to regenerate.
+          <p className="text-sm text-muted-foreground mt-1">
+            Files written to <code className="text-xs font-mono bg-muted px-1 py-0.5 rounded">{generated.outputDir}/</code>.
           </p>
         </div>
-        <Button variant="outline" onClick={onBack}>
-          Back to Review
+        <Button variant="outline" onClick={onGenerate} disabled={generating}>
+          {generating ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Regenerating...
+            </>
+          ) : (
+            <>
+              <Download className="h-4 w-4 mr-2" />
+              Regenerate Files
+            </>
+          )}
         </Button>
       </div>
 
-      {/* Next steps */}
+      {/* Deploy */}
       <div className="rounded-lg border bg-card p-5 space-y-4">
         <h3 className="text-sm font-medium flex items-center gap-2">
           <ArrowRight className="h-4 w-4 text-primary" />
-          Next Steps
+          Deploy
         </h3>
         <p className="text-sm text-muted-foreground">
-          You can close this wizard now (Ctrl+C in the terminal). The generated files are saved to disk.
-          Continue in a new terminal:
+          Run each step in order. You can also close this wizard (Ctrl+C) and run the commands manually — the generated files are saved to disk.
         </p>
-        <ol className="text-sm text-muted-foreground space-y-4 ml-6 list-decimal">
-          {config.deploy_mode === 'multi' && (
-            <>
-              <li>
-                <span className="text-foreground font-medium">Ensure SSH access to all machines.</span>
-                {' '}Ansible will connect via SSH to install and configure services on each node.
-                Verify you can reach them with your SSH key.
-              </li>
-              <li>
-                <span className="text-foreground font-medium">Generate an SSH CA keypair</span>
-                {' '}(if you haven't already). The platform uses this to issue short-lived SSH certificates for node-to-node communication.
-                <code className="block mt-1.5 rounded bg-muted px-3 py-2 text-xs font-mono text-foreground">
-                  ssh-keygen -t ed25519 -f ssh_ca -N ""
-                </code>
-              </li>
-            </>
-          )}
-          <li>
-            <span className="text-foreground font-medium">Provision {config.deploy_mode === 'single' ? 'this machine' : 'all machines'} with Ansible.</span>
-            {' '}This installs packages, configures services, and deploys agents{config.deploy_mode === 'multi' ? ' across all nodes' : ''}.
-            <code className="block mt-1.5 rounded bg-muted px-3 py-2 text-xs font-mono text-foreground">
-              ansible-playbook ansible/site.yml -i ansible/inventory/static.ini
-            </code>
-          </li>
-          <li>
-            <span className="text-foreground font-medium">Register the API key.</span>
-            {' '}This creates the authentication key that all components use to communicate with the control plane API.
-            <code className="block mt-1.5 rounded bg-muted px-3 py-2 text-xs font-mono text-foreground">
-              ./bin/core-api create-api-key --name setup --raw-key {config.api_key}
-            </code>
-          </li>
-          <li>
-            <span className="text-foreground font-medium">Register the cluster topology.</span>
-            {' '}This tells the control plane about the region, cluster, nodes, shards, and available runtimes.
-            <code className="block mt-1.5 rounded bg-muted px-3 py-2 text-xs font-mono text-foreground">
-              ./bin/hostctl cluster apply -f cluster.yaml
-            </code>
-          </li>
-          <li>
-            <span className="text-foreground font-medium">Seed the initial brand.</span>
-            {' '}Creates the first brand with its domains, nameservers, and mail configuration.
-            <code className="block mt-1.5 rounded bg-muted px-3 py-2 text-xs font-mono text-foreground">
-              ./bin/hostctl seed -f seed.yaml
-            </code>
-          </li>
-        </ol>
+        <DeploySteps config={config} outputDir={outputDir} />
       </div>
 
       {/* File browser */}
@@ -392,19 +375,19 @@ function GeneratedView({
           Generated Files
         </h3>
         <div className="rounded-lg border bg-card overflow-hidden min-h-[400px]">
-          <div className="flex border-b bg-muted/50 overflow-x-auto">
-            {files.map((f, i) => (
+          <div className="flex flex-wrap border-b bg-muted/50">
+            {generated.files.map((f, i) => (
               <button
                 key={f.path}
                 onClick={() => setSelected(i)}
                 className={cn(
-                  'px-4 py-2 text-xs font-mono whitespace-nowrap border-b-2 transition-colors',
+                  'px-3 py-2 text-xs font-mono border-b-2 transition-colors',
                   i === selected
                     ? 'border-primary text-foreground bg-card'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 )}
               >
-                {f.path}
+                {f.path.replace(/^generated\//, '')}
               </button>
             ))}
           </div>
@@ -417,7 +400,7 @@ function GeneratedView({
               {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
             </button>
             <pre className="p-4 text-xs font-mono overflow-auto whitespace-pre">
-              {files[selected]?.content}
+              {generated.files[selected]?.content}
             </pre>
           </div>
         </div>

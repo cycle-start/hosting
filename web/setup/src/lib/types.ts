@@ -55,6 +55,8 @@ export interface EmailConfig {
 
 export interface Config {
   deploy_mode: DeployMode
+  target_host: string
+  ssh_user: string
   region_name: string
   cluster_name: string
   brand: BrandConfig
@@ -87,6 +89,7 @@ export interface GeneratedFile {
 }
 
 export interface GenerateResponse {
+  output_dir: string
   files: GeneratedFile[]
 }
 
@@ -98,3 +101,22 @@ export type StepID =
   | 'nodes'
   | 'tls'
   | 'review'
+  | 'install'
+
+export type DeployStepID = 'ssh_ca' | 'ansible' | 'register_api_key' | 'cluster_apply' | 'seed'
+
+export interface DeployStepDef {
+  id: DeployStepID
+  label: string
+  description: string
+  multi_only: boolean
+}
+
+export interface ExecEvent {
+  type: 'output' | 'done' | 'error'
+  data?: string
+  stream?: 'stdout' | 'stderr'
+  exit_code?: number
+}
+
+export type StepStatus = 'pending' | 'running' | 'success' | 'failed'
