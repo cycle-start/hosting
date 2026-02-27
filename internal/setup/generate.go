@@ -625,11 +625,9 @@ func nodeShardNames(roles []NodeRole) []string {
 // header, unlike raw base64). Returns the keyring content and the key string.
 func generateCephKeyring() (keyring string, key string, err error) {
 	cmd := exec.Command("docker", "run", "--rm", "quay.io/ceph/ceph:v19",
-		"ceph-authtool", "--create-keyring", "/dev/stdout",
-		"-n", "client.web", "--gen-key",
-		"--cap", "mon", "allow r",
-		"--cap", "osd", "allow rw pool=cephfs_data",
-		"--cap", "mds", "allow rw",
+		"sh", "-c",
+		"ceph-authtool --create-keyring /tmp/kr -n client.web --gen-key "+
+			"--cap mon 'allow r' --cap osd 'allow rw pool=cephfs_data' --cap mds 'allow rw' >&2 && cat /tmp/kr",
 	)
 	out, err := cmd.Output()
 	if err != nil {
