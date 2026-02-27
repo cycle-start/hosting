@@ -4,7 +4,7 @@ import type { ValidationError, StepID } from './types'
  * Maps a validation error field path to the step it belongs to.
  */
 export function fieldToStep(field: string): StepID {
-  if (field === 'deploy_mode') return 'deploy_mode'
+  if (field === 'deploy_mode' || field === 'target_host') return 'deploy_mode'
   if (field === 'region_name' || field === 'cluster_name') return 'region'
   if (field.startsWith('brand.')) return 'brand'
   if (field.startsWith('email.')) return 'brand'

@@ -47,6 +47,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/validate", s.handleValidate)
 	mux.HandleFunc("POST /api/generate", s.handleGenerate)
 	mux.HandleFunc("GET /api/roles", s.handleGetRoles)
+	mux.HandleFunc("GET /api/info", s.handleGetInfo)
+	mux.HandleFunc("GET /api/steps", s.handleGetSteps)
+	mux.HandleFunc("POST /api/execute", s.handleExecute)
 
 	// SPA: serve static files, fall back to index.html
 	mux.Handle("/", s.spaHandler())
@@ -130,6 +133,59 @@ func (s *Server) handleGetRoles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, roles)
+}
+
+func (s *Server) handleGetInfo(w http.ResponseWriter, r *http.Request) {
+	absDir, err := filepath.Abs(s.outputDir)
+	if err != nil {
+		absDir = s.outputDir
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
+		"output_dir": absDir,
+	})
+}
+
+func (s *Server) handleGetSteps(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	mode := s.config.DeployMode
+	s.mu.Unlock()
+
+	all := AllSteps()
+	steps := make([]StepDef, 0, len(all))
+	for _, step := range all {
+		if step.MultiOnly && mode != DeployModeMulti {
+			continue
+		}
+		steps = append(steps, step)
+	}
+	writeJSON(w, http.StatusOK, steps)
+}
+
+func (s *Server) handleExecute(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Step StepID `json:"step"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON: " + err.Error()})
+		return
+	}
+
+	if !validStepIDs()[req.Step] {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Unknown step: " + string(req.Step)})
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Streaming not supported"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+
+	s.executeStep(w, r, flusher, req.Step)
 }
 
 func (s *Server) spaHandler() http.Handler {

@@ -294,3 +294,18 @@ variable "gateway_shard_name" {
   type        = string
   default     = "gateway-1"
 }
+
+# --- Single-node (all-in-one) ---
+
+variable "single_nodes" {
+  description = "Single-node VM definitions (all roles on one machine)"
+  type = list(object({
+    name   = string
+    ip     = string
+    memory = optional(number, 16384)
+    vcpus  = optional(number, 8)
+  }))
+  default = [
+    { name = "single-0", ip = "10.10.10.200" },
+  ]
+}

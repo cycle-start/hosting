@@ -1,4 +1,4 @@
-import type { Config, ValidateResponse, GenerateResponse, RoleInfo } from './types'
+import type { Config, ValidateResponse, GenerateResponse, RoleInfo, DeployStepDef, DeployStepID, ExecEvent } from './types'
 
 const BASE = '/api'
 
@@ -35,4 +35,67 @@ export async function generate(): Promise<GenerateResponse> {
 
 export async function getRoles(): Promise<RoleInfo[]> {
   return request<RoleInfo[]>('/roles')
+}
+
+export async function getInfo(): Promise<{ output_dir: string }> {
+  return request<{ output_dir: string }>('/info')
+}
+
+export async function getSteps(): Promise<DeployStepDef[]> {
+  return request<DeployStepDef[]>('/steps')
+}
+
+export function executeStep(
+  stepId: DeployStepID,
+  onEvent: (event: ExecEvent) => void,
+): { abort: () => void; done: Promise<void> } {
+  const controller = new AbortController()
+
+  const done = (async () => {
+    const res = await fetch(`${BASE}/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ step: stepId }),
+      signal: controller.signal,
+    })
+
+    if (!res.ok) {
+      const body = await res.text()
+      onEvent({ type: 'error', data: `${res.status}: ${body}` })
+      return
+    }
+
+    const reader = res.body!.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop()! // keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (!line.trim()) continue
+        try {
+          onEvent(JSON.parse(line) as ExecEvent)
+        } catch {
+          // skip malformed lines
+        }
+      }
+    }
+
+    // process remaining buffer
+    if (buffer.trim()) {
+      try {
+        onEvent(JSON.parse(buffer) as ExecEvent)
+      } catch {
+        // skip
+      }
+    }
+  })()
+
+  return { abort: () => controller.abort(), done }
 }

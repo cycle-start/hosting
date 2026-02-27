@@ -58,6 +58,9 @@ func runWizard(args []string) {
 	} else {
 		fmt.Printf("Setup wizard running at http://%s:%d\n", displayHost, listenPort)
 	}
+	fmt.Printf("\n  Tip: To access from another machine, use SSH port forwarding:\n")
+	fmt.Printf("    ssh -L %d:localhost:%d <user>@<this-host>\n", listenPort, listenPort)
+	fmt.Printf("  Then open http://localhost:%d in your browser.\n\n", listenPort)
 
 	if !*noBrowser && (*host == "localhost" || *host == "127.0.0.1") {
 		openBrowser(fmt.Sprintf("http://localhost:%d", listenPort))

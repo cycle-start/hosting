@@ -26,6 +26,11 @@ func Validate(cfg *Config) []ValidationError {
 		add("deploy_mode", "Must be single or multi")
 	}
 
+	// Target host (all-in-one mode)
+	if cfg.DeployMode == DeployModeSingle && cfg.TargetHost != "" && cfg.TargetHost != "localhost" && !isValidIP(cfg.TargetHost) {
+		add("target_host", "Must be a valid IP address")
+	}
+
 	// Region & cluster
 	if cfg.RegionName == "" {
 		add("region_name", "Region name is required")

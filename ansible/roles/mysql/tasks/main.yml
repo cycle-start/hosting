@@ -1,6 +1,8 @@
-- name: Install MySQL server
+- name: Install MySQL server and Python MySQL bindings
   apt:
-    name: mysql-server
+    name:
+      - mysql-server
+      - python3-pymysql
     state: present
     update_cache: true
 

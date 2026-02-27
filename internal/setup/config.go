@@ -19,6 +19,12 @@ const (
 type Config struct {
 	DeployMode DeployMode `json:"deploy_mode" yaml:"deploy_mode"`
 
+	// Target host for all-in-one mode (default: 127.0.0.1)
+	TargetHost string `json:"target_host,omitempty" yaml:"target_host,omitempty"`
+
+	// SSH user for Ansible connections (default: ubuntu)
+	SSHUser string `json:"ssh_user,omitempty" yaml:"ssh_user,omitempty"`
+
 	// Region & cluster
 	RegionName  string `json:"region_name" yaml:"region_name"`
 	ClusterName string `json:"cluster_name" yaml:"cluster_name"`
@@ -123,6 +129,8 @@ type TLSConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		DeployMode:  DeployModeSingle,
+		TargetHost:  "127.0.0.1",
+		SSHUser:     "ubuntu",
 		RegionName:  "default",
 		ClusterName: "cluster-1",
 		Brand: BrandConfig{
@@ -145,6 +153,14 @@ func DefaultConfig() *Config {
 		},
 		APIKey: generateAPIKey(),
 	}
+}
+
+// singleNodeIP returns the target host IP for all-in-one mode, defaulting to 127.0.0.1.
+func (c *Config) singleNodeIP() string {
+	if c.TargetHost != "" {
+		return c.TargetHost
+	}
+	return "127.0.0.1"
 }
 
 // generateRandomToken returns 32 random hex characters.

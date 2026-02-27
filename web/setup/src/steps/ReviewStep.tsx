@@ -45,8 +45,8 @@ export function ReviewStep({ config, roles, errors, onGoToStep }: Props) {
             label="Mode"
             value={
               config.deploy_mode === 'single'
-                ? 'This Machine'
-                : 'Multiple Machines'
+                ? 'All-in-One'
+                : 'Custom'
             }
           />
         </Section>

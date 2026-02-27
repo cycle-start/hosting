@@ -935,6 +935,117 @@ resource "libvirt_domain" "controlplane_node" {
   }
 }
 
+# --- Single-node (all-in-one) VM ---
+
+resource "libvirt_volume" "single_node" {
+  count    = length(var.single_nodes)
+  name     = "${var.single_nodes[count.index].name}.qcow2"
+  pool     = libvirt_pool.hosting.name
+  capacity = 21474836480 # 20 GB
+  target   = { format = { type = "qcow2" } }
+  backing_store = {
+    path   = libvirt_volume.image_base.path
+    format = { type = "qcow2" }
+  }
+}
+
+resource "libvirt_volume" "single_node_osd" {
+  count    = length(var.single_nodes)
+  name     = "${var.single_nodes[count.index].name}-osd.raw"
+  pool     = libvirt_pool.hosting.name
+  capacity = 10737418240 # 10 GB
+  target   = { format = { type = "raw" } }
+}
+
+resource "libvirt_cloudinit_disk" "single_node" {
+  count = length(var.single_nodes)
+  name  = "${var.single_nodes[count.index].name}-cloudinit.iso"
+  meta_data = yamlencode({
+    instance-id    = "i-${var.single_nodes[count.index].name}"
+    local-hostname = var.single_nodes[count.index].name
+  })
+  user_data = templatefile("${path.module}/cloud-init/node.yaml.tpl", {
+    hostname       = var.single_nodes[count.index].name
+    ssh_public_key = file(pathexpand(var.ssh_public_key_path))
+  })
+  network_config = templatefile("${path.module}/cloud-init/network.yaml.tpl", {
+    ip_address = var.single_nodes[count.index].ip
+    gateway    = var.gateway_ip
+  })
+}
+
+resource "libvirt_volume" "single_node_seed" {
+  count = length(var.single_nodes)
+  name  = "${var.single_nodes[count.index].name}-seed.iso"
+  pool  = libvirt_pool.hosting.name
+  create = {
+    content = { url = libvirt_cloudinit_disk.single_node[count.index].path }
+  }
+  lifecycle {
+    replace_triggered_by = [libvirt_cloudinit_disk.single_node[count.index]]
+    ignore_changes       = [create]
+  }
+}
+
+resource "libvirt_domain" "single_node" {
+  count       = length(var.single_nodes)
+  name        = var.single_nodes[count.index].name
+  memory      = var.single_nodes[count.index].memory
+  memory_unit = "MiB"
+  vcpu        = var.single_nodes[count.index].vcpus
+  type        = "kvm"
+  running     = true
+  autostart   = true
+
+  os = { type = "hvm" }
+
+  devices = {
+    disks = [
+      {
+        source = {
+          volume = {
+            pool   = libvirt_pool.hosting.name
+            volume = libvirt_volume.single_node[count.index].name
+          }
+        }
+        driver = { type = "qcow2" }
+        target = { dev = "vda", bus = "virtio" }
+      },
+      {
+        source = {
+          volume = {
+            pool   = libvirt_pool.hosting.name
+            volume = libvirt_volume.single_node_seed[count.index].name
+          }
+        }
+        driver = { type = "raw" }
+        target = { dev = "vdb", bus = "virtio" }
+      },
+      {
+        source = {
+          volume = {
+            pool   = libvirt_pool.hosting.name
+            volume = libvirt_volume.single_node_osd[count.index].name
+          }
+        }
+        driver = { type = "raw" }
+        target = { dev = "vdc", bus = "virtio" }
+      },
+    ]
+
+    interfaces = [{
+      type   = "network"
+      source = { network = { network = libvirt_network.hosting.name } }
+      model  = { type = "virtio" }
+    }]
+
+    consoles = [{
+      type   = "pty"
+      target = { type = "serial", port = "0" }
+    }]
+  }
+}
+
 # --- Cluster YAML generation ---
 
 locals {

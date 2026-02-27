@@ -43,6 +43,11 @@ output "gateway_node_ips" {
   value       = { for k, v in var.gateway_nodes : v.name => v.ip }
 }
 
+output "single_node_ips" {
+  description = "IP addresses of single-node (all-in-one) VMs"
+  value       = { for k, v in var.single_nodes : v.name => v.ip }
+}
+
 output "controlplane_ip" {
   description = "IP address of the k3s control plane VM"
   value       = var.controlplane_ip
