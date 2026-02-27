@@ -59,6 +59,9 @@ __pycache__/
 # Ansible
 /tmp/ansible_facts_cache/
 
+# Release archives
+dist/
+
 # Test/build artifacts
 coverage.out
 *.prof

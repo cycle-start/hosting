@@ -83,6 +83,91 @@ init:
     echo "  1. Build the base VM image:  just packer-base"
     echo "  2. Bring up the platform:    just vm-up"
 
+# --- Release ---
+
+# Build a self-contained release archive for deployment without source code.
+# Usage: just release           (uses git tag or "dev")
+#        just release v1.2.0    (explicit version)
+release version="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Determine version from arg, git tag, or "dev"
+    if [ -n "{{version}}" ]; then
+        VERSION="{{version}}"
+    elif git describe --tags --exact-match HEAD 2>/dev/null; then
+        VERSION=$(git describe --tags --exact-match HEAD)
+    else
+        VERSION="dev-$(git rev-parse --short HEAD)"
+    fi
+
+    ARCHIVE="hosting-platform-${VERSION}-linux-amd64"
+    DIST="dist/${ARCHIVE}"
+    rm -rf "$DIST"
+
+    echo "Building release ${VERSION}..."
+
+    # 1. Build Linux binaries
+    echo "  Compiling binaries..."
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o "${DIST}/bin/node-agent" ./cmd/node-agent
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o "${DIST}/bin/dbadmin-proxy" ./cmd/dbadmin-proxy
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o "${DIST}/bin/hostctl" ./cmd/hostctl
+
+    # 2. Copy Ansible
+    echo "  Packaging Ansible..."
+    cp -r ansible "${DIST}/ansible"
+    # Remove dynamic inventory (customers use static.ini)
+    rm -f "${DIST}/ansible/inventory/hosting.py"
+
+    # 3. Copy Terraform
+    echo "  Packaging Terraform..."
+    mkdir -p "${DIST}/terraform"
+    cp terraform/*.tf "${DIST}/terraform/"
+    cp -r terraform/cloud-init "${DIST}/terraform/cloud-init"
+    cp -r terraform/templates "${DIST}/terraform/templates"
+    cp terraform/cluster.yaml.tpl "${DIST}/terraform/"
+
+    # 4. Copy Helm chart
+    echo "  Packaging Helm chart..."
+    cp -r deploy/helm/hosting "${DIST}/helm"
+    rm -rf "${DIST}/helm/charts" "${DIST}/helm/Chart.lock"
+
+    # 5. Copy k3s manifests
+    cp -r deploy/k3s "${DIST}/k3s"
+
+    # 6. Copy Packer
+    echo "  Packaging Packer..."
+    cp -r packer "${DIST}/packer"
+    rm -rf "${DIST}/packer/output"
+
+    # 7. Copy seeds and scripts
+    cp -r seeds "${DIST}/seeds"
+    cp -r scripts "${DIST}/scripts"
+
+    # 8. Copy top-level files
+    cp .env.example "${DIST}/"
+    cp justfile "${DIST}/"
+
+    # 9. Write version file
+    echo "${VERSION}" > "${DIST}/VERSION"
+
+    # 10. Create tarball
+    echo "  Creating archive..."
+    tar -czf "dist/${ARCHIVE}.tar.gz" -C dist "${ARCHIVE}"
+    rm -rf "$DIST"
+
+    SIZE=$(du -h "dist/${ARCHIVE}.tar.gz" | cut -f1)
+    echo ""
+    echo "Release archive: dist/${ARCHIVE}.tar.gz (${SIZE})"
+    echo ""
+    echo "Customer usage:"
+    echo "  tar xf ${ARCHIVE}.tar.gz"
+    echo "  cd ${ARCHIVE}"
+    echo "  just init"
+    echo "  # edit .env and ansible/inventory/static.ini"
+    echo "  just packer-base"
+    echo "  just vm-up"
+
 # --- Build ---
 
 # Build all Go binaries
