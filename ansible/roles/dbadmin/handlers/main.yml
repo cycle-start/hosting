@@ -3,3 +3,8 @@
     name: dbadmin-proxy
     daemon_reload: true
     state: restarted
+
+- name: restart nginx
+  systemd:
+    name: nginx
+    state: restarted

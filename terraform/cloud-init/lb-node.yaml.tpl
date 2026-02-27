@@ -22,6 +22,9 @@ write_files:
       SERVICE_NAME=node-agent
       METRICS_ADDR=:9100
 
+  # HAProxy config with shard backends from Terraform.
+  # Written to a staging path; the Ansible haproxy role copies it into place
+  # after installing HAProxy and setting up directories/certs.
   - path: /usr/local/etc/haproxy/haproxy.cfg
     permissions: '0644'
     content: |
@@ -70,26 +73,3 @@ write_files:
 %{ endfor ~}
 
 %{ endfor ~}
-
-  - path: /etc/haproxy/certs/hosting.pem
-    permissions: '0600'
-    content: |
-      # Self-signed placeholder — replaced by `just ssl-init` for trusted certs.
-
-runcmd:
-  # Generate a self-signed cert if placeholder is still empty.
-  - |
-    if [ "$(wc -l < /etc/haproxy/certs/hosting.pem)" -lt 5 ]; then
-      openssl req -x509 -newkey rsa:2048 \
-        -keyout /tmp/haproxy-key.pem -out /tmp/haproxy-cert.pem \
-        -days 365 -nodes -subj '/CN=*.${base_domain}' \
-        -addext 'subjectAltName=DNS:*.${base_domain},DNS:${base_domain}' 2>/dev/null
-      cat /tmp/haproxy-cert.pem /tmp/haproxy-key.pem > /etc/haproxy/certs/hosting.pem
-      rm -f /tmp/haproxy-cert.pem /tmp/haproxy-key.pem
-    fi
-  # Copy HAProxy config to the expected location.
-  - cp /usr/local/etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg
-  - mkdir -p /var/run/haproxy
-  - chown haproxy:haproxy /var/run/haproxy
-  - systemctl daemon-reload
-  - systemctl restart haproxy

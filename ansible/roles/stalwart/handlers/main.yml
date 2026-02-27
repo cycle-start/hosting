@@ -1,3 +1,8 @@
 - name: reload systemd for stalwart
   systemd:
     daemon_reload: true
+
+- name: restart stalwart
+  systemd:
+    name: stalwart-mail
+    state: restarted

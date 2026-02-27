@@ -1,0 +1,7 @@
+launch+=gpgsql
+gpgsql-host={{ powerdns_db_host }}
+gpgsql-port={{ powerdns_db_port | default('5433') }}
+gpgsql-dbname={{ powerdns_db_name | default('hosting_powerdns') }}
+gpgsql-user={{ powerdns_db_user | default('hosting') }}
+gpgsql-password={{ powerdns_db_password | default('hosting') }}
+gpgsql-dnssec=no

@@ -1,0 +1,22 @@
+<?php
+$token = $_COOKIE['dbadmin_token'] ?? '';
+if (!$token || !preg_match('/^[a-zA-Z0-9]+$/', $token)) {
+    die('Invalid session. Please use the control panel to access DB Admin.');
+}
+$file = '/tmp/dbadmin-sessions/' . $token . '.json';
+$data = @file_get_contents($file);
+if (!$data) {
+    die('Session expired. Please use the control panel to access DB Admin.');
+}
+@unlink($file);
+$creds = json_decode($data, true);
+session_name('SignonSession');
+session_start();
+$_SESSION['PMA_single_signon_user'] = $creds['username'];
+$_SESSION['PMA_single_signon_password'] = $creds['password'];
+$_SESSION['PMA_single_signon_host'] = $creds['host'];
+$_SESSION['PMA_single_signon_port'] = (string)$creds['port'];
+$_SESSION['PMA_single_signon_DBNAME'] = $creds['database'];
+setcookie('dbadmin_token', '', time() - 3600, '/', '', true, true);
+header('Location: /index.php');
+exit;

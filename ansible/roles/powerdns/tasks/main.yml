@@ -6,6 +6,21 @@
     state: present
     update_cache: true
 
+- name: Remove default BIND backend config
+  file:
+    path: /etc/powerdns/pdns.d/bind.conf
+    state: absent
+  notify: restart powerdns
+
+- name: Deploy PostgreSQL backend config
+  template:
+    src: gpgsql.conf.j2
+    dest: /etc/powerdns/pdns.d/gpgsql.conf
+    owner: pdns
+    group: pdns
+    mode: "0640"
+  notify: restart powerdns
+
 - name: Enable and start PowerDNS
   systemd:
     name: pdns

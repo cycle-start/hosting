@@ -62,8 +62,67 @@
   when: core_api_url is defined
   notify: restart dbadmin-proxy
 
+- name: Deploy phpMyAdmin config
+  template:
+    src: config.inc.php.j2
+    dest: /opt/phpmyadmin/config.inc.php
+    mode: "0644"
+
+- name: Deploy phpMyAdmin signon script
+  template:
+    src: signon.php.j2
+    dest: /opt/phpmyadmin/signon.php
+    mode: "0644"
+
+- name: Create nginx certs directory
+  file:
+    path: /etc/nginx/certs
+    state: directory
+    mode: "0755"
+
+- name: Generate self-signed SSL cert for dbadmin
+  command:
+    cmd: >
+      openssl req -x509 -newkey rsa:2048
+      -keyout /etc/nginx/certs/dbadmin-key.pem -out /etc/nginx/certs/dbadmin.pem
+      -days 365 -nodes -subj '/CN=dbadmin'
+    creates: /etc/nginx/certs/dbadmin.pem
+
+- name: Deploy nginx site config
+  template:
+    src: dbadmin-nginx.conf.j2
+    dest: /etc/nginx/sites-available/dbadmin
+    mode: "0644"
+  notify: restart nginx
+
+- name: Disable default nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: restart nginx
+
+- name: Enable dbadmin nginx site
+  file:
+    src: /etc/nginx/sites-available/dbadmin
+    dest: /etc/nginx/sites-enabled/dbadmin
+    state: link
+  notify: restart nginx
+
+- name: Enable and start PHP-FPM
+  systemd:
+    name: "php{{ php_version | default('8.3') }}-fpm"
+    enabled: true
+    state: started
+
+- name: Enable and start nginx
+  systemd:
+    name: nginx
+    enabled: true
+    state: started
+
 - name: Enable dbadmin-proxy
   systemd:
     name: dbadmin-proxy
     daemon_reload: true
     enabled: true
+    state: started

@@ -5,6 +5,10 @@
     - name: Wait for cloud-init to finish
       ansible.builtin.command: cloud-init status --wait
       changed_when: false
+      # Cloud-init may report errors for write_files/runcmd that depend on
+      # packages not yet installed (e.g. pdns, stalwart-mail, haproxy users).
+      # Ansible roles handle this configuration after installing packages.
+      failed_when: false
 
 - name: Storage nodes
   hosts: storage

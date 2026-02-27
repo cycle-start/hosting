@@ -33,6 +33,15 @@
     path: /opt/stalwart-mail/bin/stalwart-mail
     mode: "0755"
 
+- name: Deploy Stalwart config
+  template:
+    src: config.toml.j2
+    dest: /opt/stalwart-mail/etc/config.toml
+    owner: stalwart-mail
+    group: stalwart-mail
+    mode: "0640"
+  notify: restart stalwart
+
 - name: Set Stalwart directory ownership
   file:
     path: /opt/stalwart-mail
