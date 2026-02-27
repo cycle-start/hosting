@@ -73,11 +73,15 @@
     - ceph_filestore_enabled | default(false)
     - ceph_admin_keyring.stat.exists
 
-- name: Write CephFS web client keyring
-  template:
-    src: ceph.client.web.keyring.j2
-    dest: /etc/ceph/ceph.client.web.keyring
-    mode: "0600"
+- name: Create CephFS web client keyring
+  command: >
+    ceph-authtool --create-keyring /etc/ceph/ceph.client.web.keyring
+    -n client.web --add-key '{{ ceph_web_key }}'
+    --cap mon 'allow r'
+    --cap osd 'allow rw pool=cephfs_data'
+    --cap mds 'allow rw'
+  args:
+    creates: /etc/ceph/ceph.client.web.keyring
   when:
     - ceph_filestore_enabled | default(false)
     - ceph_admin_keyring.stat.exists
