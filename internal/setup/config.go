@@ -1,5 +1,11 @@
 package setup
 
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+)
+
 // DeployMode describes how the platform will be deployed.
 type DeployMode string
 
@@ -28,6 +34,17 @@ type Config struct {
 
 	// TLS
 	TLS TLSConfig `json:"tls" yaml:"tls"`
+
+	// Email
+	Email EmailConfig `json:"email" yaml:"email"`
+
+	// API key for core-api authentication
+	APIKey string `json:"api_key" yaml:"api_key"`
+}
+
+// EmailConfig holds email/Stalwart mail server configuration.
+type EmailConfig struct {
+	StalwartAdminToken string `json:"stalwart_admin_token" yaml:"stalwart_admin_token"`
 }
 
 // BrandConfig holds brand/domain configuration.
@@ -123,5 +140,27 @@ func DefaultConfig() *Config {
 		TLS: TLSConfig{
 			Mode: "letsencrypt",
 		},
+		Email: EmailConfig{
+			StalwartAdminToken: generateRandomToken(),
+		},
+		APIKey: generateAPIKey(),
 	}
+}
+
+// generateRandomToken returns 32 random hex characters.
+func generateRandomToken() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		panic(fmt.Sprintf("crypto/rand failed: %v", err))
+	}
+	return hex.EncodeToString(b)
+}
+
+// generateAPIKey returns an API key in the format "hst_" + 32 random hex bytes.
+func generateAPIKey() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		panic(fmt.Sprintf("crypto/rand failed: %v", err))
+	}
+	return "hst_" + hex.EncodeToString(b)
 }

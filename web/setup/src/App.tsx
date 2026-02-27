@@ -340,6 +340,12 @@ function GeneratedView({
             </code>
           </li>
           <li>
+            Register the API key (after DB migration, before cluster apply):
+            <code className="block mt-1.5 rounded bg-muted px-3 py-2 text-xs font-mono text-foreground">
+              ./bin/core-api create-api-key --name setup --raw-key {config.api_key}
+            </code>
+          </li>
+          <li>
             Apply the cluster configuration:
             <code className="block mt-1.5 rounded bg-muted px-3 py-2 text-xs font-mono text-foreground">
               ./bin/hostctl cluster apply -f cluster.yaml

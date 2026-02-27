@@ -7,6 +7,8 @@ export function fieldToStep(field: string): StepID {
   if (field === 'deploy_mode') return 'deploy_mode'
   if (field === 'region_name' || field === 'cluster_name') return 'region'
   if (field.startsWith('brand.')) return 'brand'
+  if (field.startsWith('email.')) return 'brand'
+  if (field === 'api_key') return 'review'
   if (field.startsWith('control_plane.')) return 'control_plane'
   if (field.startsWith('nodes')) return 'nodes'
   if (field.startsWith('tls.') || field === 'tls') return 'tls'

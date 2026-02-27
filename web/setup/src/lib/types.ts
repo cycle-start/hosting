@@ -49,6 +49,10 @@ export interface TLSConfig {
   email: string
 }
 
+export interface EmailConfig {
+  stalwart_admin_token: string
+}
+
 export interface Config {
   deploy_mode: DeployMode
   region_name: string
@@ -57,6 +61,8 @@ export interface Config {
   control_plane: ControlPlaneConfig
   nodes: NodeConfig[]
   tls: TLSConfig
+  email: EmailConfig
+  api_key: string
 }
 
 export interface RoleInfo {

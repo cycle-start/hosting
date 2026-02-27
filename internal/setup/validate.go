@@ -137,6 +137,16 @@ func Validate(cfg *Config) []ValidationError {
 		add("tls.email", "Email is required for Let's Encrypt")
 	}
 
+	// Email
+	if cfg.Email.StalwartAdminToken == "" {
+		add("email.stalwart_admin_token", "Stalwart admin token is required")
+	}
+
+	// API key
+	if cfg.APIKey == "" {
+		add("api_key", "API key is required")
+	}
+
 	return errs
 }
 

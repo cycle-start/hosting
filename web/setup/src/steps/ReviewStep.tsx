@@ -72,6 +72,7 @@ export function ReviewStep({ config, roles, errors, onGoToStep }: Props) {
           <Value label="Secondary NS" value={config.brand.secondary_ns ? `${config.brand.secondary_ns}${config.brand.secondary_ns_ip ? ` (${config.brand.secondary_ns_ip})` : ''}` : ''} />
           <Value label="Mail Hostname" value={config.brand.mail_hostname} />
           <Value label="Hostmaster" value={config.brand.hostmaster_email} />
+          <Value label="Stalwart Token" value={config.email.stalwart_admin_token ? 'Configured' : '---'} />
         </Section>
 
         <Section
@@ -120,6 +121,17 @@ export function ReviewStep({ config, roles, errors, onGoToStep }: Props) {
                 ? `Let's Encrypt (${config.tls.email || '—'})`
                 : 'Manual certificates'
             }
+          />
+        </Section>
+
+        <Section
+          title="API Key"
+          errors={sectionErrors('review')}
+          onEdit={() => onGoToStep('review')}
+        >
+          <Value
+            label="Key"
+            value={config.api_key ? `${config.api_key.slice(0, 12)}...` : '---'}
           />
         </Section>
 

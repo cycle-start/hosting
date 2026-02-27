@@ -12,9 +12,14 @@ interface Props {
 
 export function BrandStep({ config, onChange, errors }: Props) {
   const brand = config.brand
+  const email = config.email
 
   const updateBrand = (updates: Partial<typeof brand>) => {
     onChange({ ...config, brand: { ...brand, ...updates } })
+  }
+
+  const updateEmail = (updates: Partial<typeof email>) => {
+    onChange({ ...config, email: { ...email, ...updates } })
   }
 
   const fe = (field: string) => fieldError(errors, field)
@@ -171,6 +176,22 @@ export function BrandStep({ config, onChange, errors }: Props) {
               {!fe('brand.hostmaster_email') && (
                 <p className="text-xs text-muted-foreground">
                   Used in DNS SOA records as the responsible party contact.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="stalwart_admin_token">Stalwart Admin Token</Label>
+              <Input
+                id="stalwart_admin_token"
+                value={email.stalwart_admin_token}
+                onChange={(e) => updateEmail({ stalwart_admin_token: e.target.value })}
+                className={fe('email.stalwart_admin_token') ? 'border-destructive' : ''}
+              />
+              <FieldError error={fe('email.stalwart_admin_token')} />
+              {!fe('email.stalwart_admin_token') && (
+                <p className="text-xs text-muted-foreground">
+                  Authentication token for the Stalwart mail server admin API.
                 </p>
               )}
             </div>
