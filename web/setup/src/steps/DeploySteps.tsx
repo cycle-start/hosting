@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { Check, AlertCircle, Loader2, Play, Square, RotateCcw } from 'lucide-react'
+import { Check, AlertCircle, Loader2, Play, Square, RotateCcw, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import * as api from '@/lib/api'
 import type { Config, DeployStepDef, DeployStepID, ExecEvent, StepStatus } from '@/lib/types'
@@ -162,7 +162,10 @@ function StepCard({
           <div className="text-sm font-medium">{step.label}</div>
           <div className="text-xs text-muted-foreground">{step.description}</div>
         </div>
-        <div className="shrink-0">
+        <div className="shrink-0 flex items-center gap-2">
+          {step.command && (
+            <CopyCommandButton command={step.command} />
+          )}
           {state.status === 'running' ? (
             <Button variant="outline" size="sm" onClick={onCancel}>
               <Square className="h-3 w-3 mr-1.5" />
@@ -316,5 +319,25 @@ function TerminalOutput({ lines }: { lines: string[] }) {
         <AnsiLine key={i} line={line} />
       ))}
     </div>
+  )
+}
+
+function CopyCommandButton({ command }: { command: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const copy = () => {
+    navigator.clipboard.writeText(command)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <button
+      onClick={copy}
+      className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+      title={command}
+    >
+      {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+    </button>
   )
 }

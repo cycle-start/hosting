@@ -147,15 +147,16 @@ func (s *Server) handleGetInfo(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGetSteps(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
-	mode := s.config.DeployMode
+	cfg := *s.config
 	s.mu.Unlock()
 
 	all := AllSteps()
 	steps := make([]StepDef, 0, len(all))
 	for _, step := range all {
-		if step.MultiOnly && mode != DeployModeMulti {
+		if step.MultiOnly && cfg.DeployMode != DeployModeMulti {
 			continue
 		}
+		step.Command = FormatCommand(step.ID, &cfg, s.outputDir)
 		steps = append(steps, step)
 	}
 	writeJSON(w, http.StatusOK, steps)

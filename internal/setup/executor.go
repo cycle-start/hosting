@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/creack/pty"
 )
@@ -30,16 +31,17 @@ type StepDef struct {
 	Label       string `json:"label"`
 	Description string `json:"description"`
 	MultiOnly   bool   `json:"multi_only"`
+	Command     string `json:"command,omitempty"`
 }
 
 // AllSteps returns the ordered list of deployment steps.
 func AllSteps() []StepDef {
 	return []StepDef{
-		{StepSSHCA, "Generate SSH CA keypair", "Generate an ed25519 SSH Certificate Authority keypair for node-to-node communication.", true},
-		{StepAnsible, "Run Ansible provisioning", "Install packages, configure services, and deploy agents on all hosts.", false},
-		{StepRegisterKey, "Register API key", "Create the authentication key used by all components to communicate with the control plane.", false},
-		{StepClusterApply, "Register cluster topology", "Tell the control plane about the region, cluster, nodes, shards, and runtimes.", false},
-		{StepSeed, "Seed initial brand", "Create the first brand with its domains, nameservers, and mail configuration.", false},
+		{ID: StepSSHCA, Label: "Generate SSH CA keypair", Description: "Generate an ed25519 SSH Certificate Authority keypair for node-to-node communication.", MultiOnly: true},
+		{ID: StepAnsible, Label: "Run Ansible provisioning", Description: "Install packages, configure services, and deploy agents on all hosts."},
+		{ID: StepRegisterKey, Label: "Register API key", Description: "Create the authentication key used by all components to communicate with the control plane."},
+		{ID: StepClusterApply, Label: "Register cluster topology", Description: "Tell the control plane about the region, cluster, nodes, shards, and runtimes."},
+		{ID: StepSeed, Label: "Seed initial brand", Description: "Create the first brand with its domains, nameservers, and mail configuration."},
 	}
 }
 
@@ -58,6 +60,20 @@ type ExecEvent struct {
 	Data     string `json:"data,omitempty"`      // line text or error message
 	Stream   string `json:"stream,omitempty"`    // "stdout" or "stderr"
 	ExitCode *int   `json:"exit_code,omitempty"` // only for "done"
+}
+
+// FormatCommand returns a shell-friendly string for a step command.
+func FormatCommand(id StepID, cfg *Config, outputDir string) string {
+	dir, name, args, err := stepCommand(id, cfg, outputDir)
+	if err != nil {
+		return ""
+	}
+	parts := append([]string{name}, args...)
+	cmd := strings.Join(parts, " ")
+	if dir != "" && dir != "." {
+		cmd = fmt.Sprintf("cd %s && %s", dir, cmd)
+	}
+	return cmd
 }
 
 // stepCommand returns the working directory, command name, and arguments for a step.

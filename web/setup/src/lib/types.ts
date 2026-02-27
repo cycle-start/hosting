@@ -110,6 +110,7 @@ export interface DeployStepDef {
   label: string
   description: string
   multi_only: boolean
+  command?: string
 }
 
 export interface ExecEvent {
