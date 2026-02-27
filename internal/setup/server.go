@@ -103,13 +103,29 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := Generate(cfg, s.outputDir)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Streaming not supported"})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+
+	progress := func(msg string) {
+		writeEvent(w, flusher, ExecEvent{Type: "output", Data: msg, Stream: "stdout"})
+	}
+
+	result, err := Generate(cfg, s.outputDir, progress)
+	if err != nil {
+		writeEvent(w, flusher, ExecEvent{Type: "error", Data: err.Error()})
+		return
+	}
+
+	// Send the result as a special "result" event with the JSON payload.
+	resultJSON, _ := json.Marshal(result)
+	writeEvent(w, flusher, ExecEvent{Type: "done", Data: string(resultJSON)})
 }
 
 func (s *Server) handleGetRoles(w http.ResponseWriter, r *http.Request) {
@@ -233,7 +249,9 @@ func GenerateFromManifest(manifestPath, outputDir string) error {
 		return fmt.Errorf("%d validation errors", len(errs))
 	}
 
-	result, err := Generate(cfg, outputDir)
+	result, err := Generate(cfg, outputDir, func(msg string) {
+		fmt.Println(msg)
+	})
 	if err != nil {
 		return err
 	}

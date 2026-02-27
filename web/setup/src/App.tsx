@@ -40,6 +40,8 @@ export default function App() {
   const [errors, setErrors] = useState<ValidationError[]>([])
   const [generated, setGenerated] = useState<{ outputDir: string; files: GeneratedFile[] } | null>(null)
   const [generating, setGenerating] = useState(false)
+  const [generateLog, setGenerateLog] = useState<string[]>([])
+  const [generateError, setGenerateError] = useState<string | null>(null)
   const [visitedSteps, setVisitedSteps] = useState<Set<StepID>>(new Set(['deploy_mode']))
   const [outputDir, setOutputDir] = useState('')
 
@@ -121,14 +123,18 @@ export default function App() {
 
   const handleGenerate = async () => {
     setGenerating(true)
+    setGenerateLog([])
+    setGenerateError(null)
     try {
       const errs = await doValidate()
       if (errs.length > 0) return
 
-      const result = await api.generate()
+      const result = await api.generate((msg) => {
+        setGenerateLog((prev) => [...prev, msg])
+      })
       setGenerated({ outputDir: result.output_dir, files: result.files })
     } catch (err: any) {
-      setErrors([{ field: 'general', message: err.message }])
+      setGenerateError(err.message)
     } finally {
       setGenerating(false)
     }
@@ -214,6 +220,8 @@ export default function App() {
               outputDir={outputDir}
               generated={generated}
               generating={generating}
+              generateLog={generateLog}
+              generateError={generateError}
               onGenerate={handleGenerate}
             />
           )}
@@ -285,12 +293,16 @@ function InstallStep({
   outputDir,
   generated,
   generating,
+  generateLog,
+  generateError,
   onGenerate,
 }: {
   config: Config
   outputDir: string
   generated: { outputDir: string; files: GeneratedFile[] } | null
   generating: boolean
+  generateLog: string[]
+  generateError: string | null
   onGenerate: () => void
 }) {
   const [selected, setSelected] = useState(0)
@@ -323,6 +335,29 @@ function InstallStep({
             </>
           )}
         </Button>
+        {generateLog.length > 0 && (
+          <div className="rounded-lg border bg-card overflow-hidden">
+            <div className="bg-[#0d1117] text-[#c9d1d9] text-xs font-mono px-4 py-3 space-y-0.5">
+              {generateLog.map((line, i) => (
+                <div key={i}>{line}</div>
+              ))}
+              {generating && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {generateError && (
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 space-y-2">
+            <p className="text-sm font-medium text-destructive flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              Generation failed
+            </p>
+            <p className="text-xs font-mono text-destructive/80">{generateError}</p>
+          </div>
+        )}
       </div>
     )
   }

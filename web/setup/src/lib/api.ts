@@ -29,8 +29,68 @@ export async function validate(): Promise<ValidateResponse> {
   return request<ValidateResponse>('/validate', { method: 'POST' })
 }
 
-export async function generate(): Promise<GenerateResponse> {
-  return request<GenerateResponse>('/generate', { method: 'POST' })
+export async function generate(
+  onProgress: (msg: string) => void,
+): Promise<GenerateResponse> {
+  const res = await fetch(`${BASE}/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`${res.status}: ${body}`)
+  }
+
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let result: GenerateResponse | null = null
+  let error: string | null = null
+
+  const processEvent = (event: ExecEvent) => {
+    if (event.type === 'output' && event.data) {
+      onProgress(event.data)
+    } else if (event.type === 'done' && event.data) {
+      result = JSON.parse(event.data) as GenerateResponse
+    } else if (event.type === 'error') {
+      error = event.data || 'Generation failed'
+    }
+  }
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop()!
+
+    for (const line of lines) {
+      if (!line.trim()) continue
+      try {
+        processEvent(JSON.parse(line) as ExecEvent)
+      } catch {
+        // skip malformed JSON lines
+      }
+    }
+  }
+
+  if (buffer.trim()) {
+    try {
+      processEvent(JSON.parse(buffer) as ExecEvent)
+    } catch {
+      // skip
+    }
+  }
+
+  if (error) {
+    throw new Error(error)
+  }
+  if (!result) {
+    throw new Error('No result received from generate')
+  }
+  return result
 }
 
 export async function getRoles(): Promise<RoleInfo[]> {

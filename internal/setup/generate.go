@@ -24,13 +24,21 @@ type GeneratedFile struct {
 	Content string `json:"content"`
 }
 
+// ProgressFunc is called with status messages during generation.
+type ProgressFunc func(msg string)
+
 // Generate produces all deployment configuration files from the setup manifest.
-func Generate(cfg *Config, outputDir string) (*GenerateResult, error) {
+func Generate(cfg *Config, outputDir string, progress ProgressFunc) (*GenerateResult, error) {
+	if progress == nil {
+		progress = func(string) {}
+	}
 	absDir, err := filepath.Abs(outputDir)
 	if err != nil {
 		absDir = outputDir
 	}
 	result := &GenerateResult{OutputDir: absDir}
+
+	progress("Writing setup manifest...")
 
 	// 1. Write the setup manifest itself
 	manifestPath := filepath.Join(outputDir, ManifestFilename)
@@ -76,6 +84,8 @@ func Generate(cfg *Config, outputDir string) (*GenerateResult, error) {
 		}
 	}
 
+	progress("Generating Ansible inventory and group vars...")
+
 	// 2. Generate Ansible inventory (static.ini)
 	ini := generateInventory(cfg, controlplaneIP)
 	result.Files = append(result.Files, GeneratedFile{
@@ -95,6 +105,8 @@ func Generate(cfg *Config, outputDir string) (*GenerateResult, error) {
 		result.Files = append(result.Files, gv)
 	}
 
+	progress("Generating cluster topology and seed data...")
+
 	// 4. Generate cluster.yaml (for hostctl cluster apply)
 	clusterYml := generateClusterYAML(cfg, controlplaneIP)
 	result.Files = append(result.Files, GeneratedFile{
@@ -109,6 +121,8 @@ func Generate(cfg *Config, outputDir string) (*GenerateResult, error) {
 		Content: seedYml,
 	})
 
+	progress("Generating Ceph web client keyring (docker)...")
+
 	// 6. Generate Ceph web client keyring via docker
 	keyring, err := generateCephKeyring(cephWebKey)
 	if err != nil {
@@ -118,6 +132,8 @@ func Generate(cfg *Config, outputDir string) (*GenerateResult, error) {
 		Path:    "generated/ceph.client.web.keyring",
 		Content: keyring,
 	})
+
+	progress("Writing files to disk...")
 
 	// Write deployment files to disk (manifest already written above)
 	for _, f := range result.Files[1:] {
