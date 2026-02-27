@@ -14,10 +14,6 @@
     state: directory
     mode: "0755"
 
-- name: Remove legacy per-tenant SSH configs
-  shell: rm -f /etc/ssh/sshd_config.d/tenant-*.conf
-  changed_when: false
-
 - name: Deploy SSH hardening config
   copy:
     src: 00-hosting-base.conf
