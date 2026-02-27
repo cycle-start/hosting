@@ -1,0 +1,444 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "add": "Add",
+    "create": "Create",
+    "update": "Update",
+    "edit": "Edit",
+    "saving": "Saving...",
+    "creating": "Creating...",
+    "deleting": "Deleting...",
+    "confirm": "Confirm",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "on": "On",
+    "off": "Off",
+    "yes": "Yes",
+    "no": "No",
+    "status": "Status",
+    "actions": "Actions",
+    "name": "Name",
+    "type": "Type",
+    "created": "Created",
+    "public": "Public",
+    "private": "Private",
+    "loading": "Loading...",
+    "signOut": "Sign out",
+    "dismiss": "Dismiss",
+    "attach": "Attach",
+    "disconnect": "Disconnect",
+    "restore": "Restore",
+    "copy": "Copy",
+    "copied": "Copied",
+    "secret": "Secret",
+    "plain": "Plain",
+    "statusMessage": "Status Message",
+    "tenantId": "Tenant ID",
+    "subscriptionId": "Subscription ID",
+    "createdAt": "Created At",
+    "updatedAt": "Updated At"
+  },
+  "nav": {
+    "customers": "Customers",
+    "dashboard": "My products",
+    "webroots": "Webroots",
+    "databases": "Databases",
+    "domains": "Domains",
+    "email": "Email",
+    "valkey": "Valkey",
+    "s3Storage": "S3 Storage",
+    "sshKeys": "SSH Keys",
+    "backups": "Backups",
+    "wireguard": "WireGuard",
+    "profile": "Profile",
+    "developer": "Developer"
+  },
+  "login": {
+    "title": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "failed": "Login failed"
+  },
+  "profile": {
+    "title": "Profile",
+    "description": "Manage your account settings and language preferences.",
+    "displayName": "Display Name",
+    "displayNamePlaceholder": "Your name",
+    "emailAddress": "Email Address",
+    "language": "Language",
+    "saveChanges": "Save Changes",
+    "saved": "Profile updated successfully."
+  },
+  "customers": {
+    "title": "Customers",
+    "description": "All customers associated with your partner account.",
+    "empty": "No customers found"
+  },
+  "dashboard": {
+    "title": "My products",
+    "description": "Your active products and the services included with each.",
+    "subscriptions": "Subscriptions",
+    "emptySubscriptions": "No subscriptions",
+    "enabledModules": "Enabled Modules",
+    "emptyModules": "No modules enabled"
+  },
+  "webroots": {
+    "title": "Webroots",
+    "description": "Web applications and sites hosted on this account. Each webroot has its own runtime, environment variables, and configuration.",
+    "empty": "No webroots found",
+    "runtime": "Runtime",
+    "publicFolder": "Public folder",
+    "tenant": "Tenant"
+  },
+  "webrootDetail": {
+    "envVars": {
+      "tab": "Env Vars",
+      "title": "Environment Variables",
+      "description": "Key-value pairs injected into your application's runtime environment. Secret variables are encrypted at rest.",
+      "addVariable": "Add Variable",
+      "empty": "No environment variables set",
+      "value": "Value",
+      "valuePlaceholder": "Value",
+      "newValuePlaceholder": "Enter new value",
+      "secretLabel": "Secret (encrypted at rest)",
+      "nameRequired": "Name is required",
+      "nameInvalid": "Invalid name (letters, numbers, underscores)",
+      "nameExists": "Name already exists"
+    },
+    "vault": {
+      "tab": "Vault",
+      "title": "Vault Encrypt",
+      "description": "Encrypt sensitive values into vault tokens that can be safely committed to git.",
+      "info": "Encrypt a secret value to get a vault token. Paste the token into your <code>.env</code> file in git. Values prefixed with <code>vault:v1:</code> are encrypted and can be safely committed.",
+      "secretValue": "Secret value",
+      "secretPlaceholder": "Enter the secret value to encrypt...",
+      "encrypt": "Encrypt",
+      "encrypting": "Encrypting...",
+      "vaultToken": "Vault token"
+    },
+    "daemons": {
+      "tab": "Daemons",
+      "title": "Daemons",
+      "description": "Long-running background processes managed by the platform. Each daemon can optionally expose an HTTP proxy port.",
+      "addDaemon": "Add Daemon",
+      "empty": "No daemons configured",
+      "command": "Command",
+      "proxyPort": "Proxy Port",
+      "proxyPortHelp": "HTTP port your daemon listens on. The platform will route traffic from the webroot to this port.",
+      "processes": "Processes",
+      "deleteTitle": "Delete daemon",
+      "deleteMessage": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone."
+    },
+    "cronJobs": {
+      "tab": "Cron Jobs",
+      "title": "Cron Jobs",
+      "description": "Scheduled tasks that run at specified intervals using standard cron syntax.",
+      "addCronJob": "Add Cron Job",
+      "empty": "No cron jobs configured",
+      "schedule": "Schedule",
+      "scheduleHelp": "Standard cron expression: minute hour day month weekday (e.g. */5 * * * * for every 5 minutes).",
+      "command": "Command",
+      "deleteTitle": "Delete cron job",
+      "deleteMessage": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone."
+    },
+    "fqdns": {
+      "tab": "Hostnames",
+      "title": "Hostnames",
+      "description": "Domain names attached to this webroot. Traffic to these hostnames is routed to this application.",
+      "addHostname": "Add Hostname",
+      "empty": "No hostnames attached",
+      "availableHostnames": "Available Hostnames",
+      "noAvailable": "No available hostnames to attach",
+      "hostname": "Hostname",
+      "ssl": "SSL",
+      "detachTitle": "Disconnect hostname",
+      "detachMessage": "Are you sure you want to disconnect \"{{name}}\" from this webroot?"
+    },
+    "settings": {
+      "tab": "Settings",
+      "title": "Webroot Settings",
+      "description": "Configure the runtime, version, and public folder for this webroot.",
+      "runtime": "Runtime",
+      "version": "Version",
+      "publicFolder": "Public Folder",
+      "saveSettings": "Save Settings",
+      "saved": "Settings saved successfully."
+    },
+    "terminal": {
+      "tab": "Terminal",
+      "title": "SSH Terminal",
+      "description": "Connect to your webroot via an interactive SSH terminal session."
+    }
+  },
+  "databases": {
+    "title": "Databases",
+    "description": "PostgreSQL databases provisioned for this account. Manage users and connection settings.",
+    "empty": "No databases found",
+    "tenant": "Tenant"
+  },
+  "databaseDetail": {
+    "dbAdmin": "Open in DB Admin",
+    "users": {
+      "tab": "Users",
+      "title": "Database Users",
+      "addUser": "Add User",
+      "empty": "No database users",
+      "username": "Username",
+      "password": "Password",
+      "privileges": "Privileges",
+      "deleteTitle": "Delete user",
+      "deleteMessage": "Are you sure you want to delete user \"{{name}}\"? This action cannot be undone."
+    },
+    "info": {
+      "tab": "Info",
+      "title": "Database Information"
+    }
+  },
+  "valkey": {
+    "title": "Valkey Instances",
+    "description": "In-memory key-value stores (Valkey/Redis-compatible) for caching and real-time data.",
+    "empty": "No Valkey instances found",
+    "port": "Port",
+    "maxMemory": "Max Memory",
+    "tenant": "Tenant"
+  },
+  "valkeyDetail": {
+    "port": "Port",
+    "maxMemory": "Max Memory",
+    "users": {
+      "tab": "Users",
+      "title": "Valkey Users",
+      "addUser": "Add User",
+      "empty": "No valkey users",
+      "username": "Username",
+      "password": "Password",
+      "privileges": "Privileges (comma separated)",
+      "keyPattern": "Key Pattern",
+      "keyPatternHelp": "Redis key pattern this user can access. Use * for all keys.",
+      "deleteTitle": "Delete user",
+      "deleteMessage": "Are you sure you want to delete user \"{{name}}\"? This action cannot be undone."
+    },
+    "info": {
+      "tab": "Info",
+      "title": "Instance Information",
+      "password": "Password",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password"
+    }
+  },
+  "wireguard": {
+    "title": "WireGuard VPN",
+    "description": "Create WireGuard VPN tunnels to securely access your MySQL databases and Valkey caches from your local machine. Each peer generates a configuration file you can import into the hosting-cli tool or any WireGuard client.",
+    "empty": "No WireGuard peers configured. Create a peer to get a VPN tunnel for direct database and cache access.",
+    "name": "Name",
+    "namePlaceholder": "e.g. my-laptop, ci-server",
+    "assignedIp": "Assigned IP",
+    "endpoint": "Endpoint",
+    "publicKey": "Public Key",
+    "peerIndex": "Peer Index",
+    "create": "Add Peer",
+    "configWarning": "Save this configuration now. The private key will not be shown again. You can import this file into hosting-cli or any WireGuard client.",
+    "downloadConfig": "Download .conf",
+    "copyConfig": "Copy Config",
+    "cliHint": "Import with: hosting-cli import <file> -tenant <id>"
+  },
+  "wireguardDetail": {
+    "title": "WireGuard Peer",
+    "tabs": {
+      "info": "Info",
+      "config": "Config"
+    },
+    "info": {
+      "name": "Name",
+      "publicKey": "Public Key",
+      "assignedIp": "Assigned IP",
+      "endpoint": "Endpoint",
+      "peerIndex": "Peer Index",
+      "tenant": "Tenant ID",
+      "subscription": "Subscription ID",
+      "createdAt": "Created",
+      "updatedAt": "Updated"
+    },
+    "delete": {
+      "title": "Delete Peer",
+      "confirm": "Are you sure you want to delete this WireGuard peer? Any active tunnels using this configuration will stop working."
+    }
+  },
+  "s3Buckets": {
+    "title": "S3 Buckets",
+    "description": "S3-compatible object storage buckets for files, media, and static assets.",
+    "empty": "No S3 buckets found",
+    "access": "Access",
+    "quota": "Quota",
+    "tenant": "Tenant"
+  },
+  "s3BucketDetail": {
+    "noQuota": "No quota",
+    "quotaLabel": "Quota: {{value}} MB",
+    "accessKeys": {
+      "tab": "Access Keys",
+      "title": "Access Keys",
+      "createAccessKey": "Create Access Key",
+      "empty": "No access keys",
+      "accessKeyId": "Access Key ID",
+      "permissions": "Permissions",
+      "secretWarning": "Save your secret access key now. It will not be shown again.",
+      "deleteTitle": "Delete access key",
+      "deleteMessage": "Are you sure you want to delete the access key \"{{name}}\"? This action cannot be undone."
+    },
+    "settings": {
+      "tab": "Settings",
+      "title": "Bucket Settings",
+      "publicAccess": "Public access",
+      "publicDescription": "When enabled, objects in this bucket can be accessed without authentication.",
+      "quotaMB": "Quota (MB)",
+      "quotaUnlimited": "Set to 0 for unlimited storage.",
+      "saveSettings": "Save Settings",
+      "saved": "Settings saved successfully."
+    },
+    "info": {
+      "tab": "Info",
+      "title": "Bucket Information"
+    }
+  },
+  "emailAccounts": {
+    "title": "Email Accounts",
+    "description": "Email accounts and mailboxes. Configure aliases, forwarding, and auto-replies.",
+    "empty": "No email accounts found",
+    "displayName": "Display Name",
+    "quota": "Quota",
+    "tenant": "Tenant"
+  },
+  "emailDetail": {
+    "quota": "Quota",
+    "aliases": {
+      "tab": "Aliases",
+      "title": "Aliases",
+      "addAlias": "Add Alias",
+      "empty": "No aliases configured",
+      "address": "Address",
+      "deleteTitle": "Delete alias",
+      "deleteMessage": "Are you sure you want to delete the alias \"{{name}}\"?"
+    },
+    "forwards": {
+      "tab": "Forwards",
+      "title": "Forwards",
+      "addForward": "Add Forward",
+      "empty": "No forwards configured",
+      "destination": "Destination",
+      "keepCopy": "Keep Copy",
+      "keepCopyLabel": "Keep a copy in this mailbox",
+      "deleteTitle": "Delete forward",
+      "deleteMessage": "Are you sure you want to delete the forward to \"{{name}}\"?"
+    },
+    "autoreply": {
+      "tab": "Autoreply",
+      "title": "Autoreply",
+      "subject": "Subject",
+      "body": "Body",
+      "startDate": "Start Date",
+      "endDate": "End Date",
+      "deleteAutoreply": "Delete Autoreply",
+      "deleteTitle": "Delete autoreply",
+      "deleteMessage": "Are you sure you want to delete the autoreply configuration?",
+      "saved": "Autoreply saved successfully."
+    },
+    "info": {
+      "tab": "Info",
+      "title": "Account Information",
+      "displayName": "Display Name",
+      "quota": "Quota",
+      "fqdnId": "FQDN ID"
+    }
+  },
+  "dns": {
+    "title": "Domains",
+    "description": "DNS zones for your domains. Manage records to control where your domain names point.",
+    "empty": "No domains found",
+    "region": "Region",
+    "tenant": "Tenant"
+  },
+  "dnsDetail": {
+    "region": "Region",
+    "records": {
+      "title": "DNS Records",
+      "addRecord": "Add Record",
+      "empty": "No DNS records",
+      "recordType": "Type",
+      "content": "Content",
+      "ttl": "TTL",
+      "ttlHelp": "Time to live in seconds. Controls how long DNS resolvers cache this record.",
+      "priority": "Priority",
+      "priorityHelp": "Lower values have higher priority. Mail servers try the lowest-priority record first.",
+      "managedBy": "Managed By",
+      "deleteTitle": "Delete record",
+      "deleteMessage": "Are you sure you want to delete the {{type}} record \"{{name}}\"? This action cannot be undone."
+    }
+  },
+  "sshKeys": {
+    "title": "SSH Keys",
+    "description": "Public SSH keys for secure server access. Add your keys to enable SSH login.",
+    "empty": "No SSH keys found",
+    "fingerprint": "Fingerprint",
+    "deleteTitle": "Delete SSH key",
+    "deleteMessage": "Are you sure you want to delete the SSH key \"{{name}}\"? This action cannot be undone."
+  },
+  "backups": {
+    "title": "Backups",
+    "description": "Automatic and manual backups of your services. Restore to recover from a previous point in time.",
+    "empty": "No backups found",
+    "size": "Size",
+    "started": "Started",
+    "completed": "Completed",
+    "deleteTitle": "Delete backup",
+    "deleteMessage": "Are you sure you want to delete the backup \"{{name}}\"?",
+    "restoreTitle": "Restore backup",
+    "restoreMessage": "Are you sure you want to restore the backup \"{{name}}\"?"
+  },
+  "developer": {
+    "title": "Developer",
+    "description": "API documentation and integration tools for building with the Control Panel API.",
+    "apiDocs": {
+      "title": "API Documentation",
+      "description": "The Control Panel API follows REST conventions. All endpoints require JWT authentication unless noted otherwise.",
+      "viewSpec": "View OpenAPI Spec"
+    },
+    "mcp": {
+      "title": "MCP Integration",
+      "description": "Connect AI assistants like Claude Code to manage your hosting resources using the Model Context Protocol (MCP).",
+      "setup": {
+        "title": "Setup Guide",
+        "step1": "1. Get your API token",
+        "step1Detail": "Sign in to the control panel and use the same JWT token your browser session uses. Pass it as the Authorization header.",
+        "step2": "2. Configure your MCP client",
+        "step2Detail": "Add the following to your .mcp.json file (e.g. in your project root for Claude Code):",
+        "step3": "3. Start using tools",
+        "step3Detail": "Your AI assistant will now have access to all control panel operations: managing webroots, databases, DNS, email, and more."
+      },
+      "groups": {
+        "title": "Available Tool Groups",
+        "endpoint": "Endpoint",
+        "description": "Description"
+      }
+    }
+  },
+  "topBar": {
+    "selectCustomer": "Select customer",
+    "searchCustomers": "Search customers...",
+    "viewAllCustomers": "View all customers",
+    "noCustomersFound": "No customers found"
+  },
+  "confirmDialog": {
+    "cancel": "Cancel"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "description": "We're having trouble loading this page. This is usually temporary — try again in a moment.",
+    "tryAgain": "Try again",
+    "contactSupport": "Contact support",
+    "details": "Error details"
+  }
+}

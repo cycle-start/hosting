@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+:root {
+  --brand-hue: 264;
+}
+
+@theme {
+  --color-brand-50: oklch(0.97 0.02 var(--brand-hue));
+  --color-brand-100: oklch(0.93 0.04 var(--brand-hue));
+  --color-brand-200: oklch(0.87 0.07 var(--brand-hue));
+  --color-brand-300: oklch(0.78 0.11 var(--brand-hue));
+  --color-brand-400: oklch(0.68 0.15 var(--brand-hue));
+  --color-brand-500: oklch(0.59 0.18 var(--brand-hue));
+  --color-brand-600: oklch(0.52 0.19 var(--brand-hue));
+  --color-brand-700: oklch(0.45 0.17 var(--brand-hue));
+  --color-brand-800: oklch(0.39 0.14 var(--brand-hue));
+  --color-brand-900: oklch(0.33 0.11 var(--brand-hue));
+  --color-brand-950: oklch(0.25 0.09 var(--brand-hue));
+
+  --color-sidebar: #0f172a;
+  --color-sidebar-hover: #1e293b;
+  --color-sidebar-active: #334155;
+  --color-sidebar-text: #94a3b8;
+  --color-sidebar-text-active: #f8fafc;
+}
+
+body {
+  @apply bg-gray-50 text-gray-900 antialiased;
+}

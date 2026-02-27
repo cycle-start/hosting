@@ -7,6 +7,9 @@
 /hostctl
 /hosting-cli
 /mcp-server
+/setup
+/controlpanel-api
+/controlpanel-ui
 *.exe
 
 # Local cluster state
@@ -46,6 +49,11 @@ ssh_ca.pub
 web/admin/node_modules/
 web/admin/dist/
 
+# Setup wizard
+web/setup/node_modules/
+web/setup/dist/
+cmd/setup/dist/
+
 # Generated API docs
 internal/api/docs/
 
@@ -66,3 +74,7 @@ dist/
 coverage.out
 *.prof
 .build/
+
+# Control Panel UI
+web/controlpanel/node_modules/
+web/controlpanel/dist/

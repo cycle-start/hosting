@@ -1,0 +1,444 @@
+{
+  "common": {
+    "save": "Lagre",
+    "cancel": "Avbryt",
+    "delete": "Slett",
+    "add": "Legg til",
+    "create": "Opprett",
+    "update": "Oppdater",
+    "edit": "Rediger",
+    "saving": "Lagrer...",
+    "creating": "Oppretter...",
+    "deleting": "Sletter...",
+    "confirm": "Bekreft",
+    "enabled": "Aktivert",
+    "disabled": "Deaktivert",
+    "on": "På",
+    "off": "Av",
+    "yes": "Ja",
+    "no": "Nei",
+    "status": "Status",
+    "actions": "Handlinger",
+    "name": "Navn",
+    "type": "Type",
+    "created": "Opprettet",
+    "public": "Offentlig",
+    "private": "Privat",
+    "loading": "Laster...",
+    "signOut": "Logg ut",
+    "dismiss": "Lukk",
+    "attach": "Tilknytt",
+    "disconnect": "Koble fra",
+    "restore": "Gjenopprett",
+    "copy": "Kopier",
+    "copied": "Kopiert",
+    "secret": "Hemmelig",
+    "plain": "Klartekst",
+    "statusMessage": "Statusmelding",
+    "tenantId": "Leietaker-ID",
+    "subscriptionId": "Abonnement-ID",
+    "createdAt": "Opprettet",
+    "updatedAt": "Oppdatert"
+  },
+  "nav": {
+    "customers": "Kunder",
+    "dashboard": "Mine produkter",
+    "webroots": "Webroots",
+    "databases": "Databaser",
+    "domains": "Domener",
+    "email": "E-post",
+    "valkey": "Valkey",
+    "s3Storage": "S3-lagring",
+    "sshKeys": "SSH-nøkler",
+    "backups": "Sikkerhetskopier",
+    "wireguard": "WireGuard",
+    "profile": "Profil",
+    "developer": "Utvikler"
+  },
+  "login": {
+    "title": "Logg inn",
+    "email": "E-post",
+    "password": "Passord",
+    "submit": "Logg inn",
+    "failed": "Innlogging mislyktes"
+  },
+  "profile": {
+    "title": "Profil",
+    "description": "Administrer kontoinnstillinger og språkpreferanser.",
+    "displayName": "Visningsnavn",
+    "displayNamePlaceholder": "Ditt navn",
+    "emailAddress": "E-postadresse",
+    "language": "Språk",
+    "saveChanges": "Lagre endringer",
+    "saved": "Profil oppdatert."
+  },
+  "customers": {
+    "title": "Kunder",
+    "description": "Alle kunder tilknyttet partnerkontoen din.",
+    "empty": "Ingen kunder funnet"
+  },
+  "dashboard": {
+    "title": "Mine produkter",
+    "description": "Dine aktive produkter og tjenestene som er inkludert i hvert.",
+    "subscriptions": "Abonnementer",
+    "emptySubscriptions": "Ingen abonnementer",
+    "enabledModules": "Aktiverte moduler",
+    "emptyModules": "Ingen moduler aktivert"
+  },
+  "webroots": {
+    "title": "Webroots",
+    "description": "Webapplikasjoner og nettsteder på denne kontoen. Hvert webroot har egen runtime, miljøvariabler og konfigurasjon.",
+    "empty": "Ingen webroots funnet",
+    "runtime": "Runtime",
+    "publicFolder": "Offentlig mappe",
+    "tenant": "Leietaker"
+  },
+  "webrootDetail": {
+    "envVars": {
+      "tab": "Miljøvariabler",
+      "title": "Miljøvariabler",
+      "description": "Nøkkel-verdi-par som injiseres i applikasjonens runtime-miljø. Hemmelige variabler krypteres ved lagring.",
+      "addVariable": "Legg til variabel",
+      "empty": "Ingen miljøvariabler satt",
+      "value": "Verdi",
+      "valuePlaceholder": "Verdi",
+      "newValuePlaceholder": "Skriv inn ny verdi",
+      "secretLabel": "Hemmelig (kryptert ved lagring)",
+      "nameRequired": "Navn er påkrevd",
+      "nameInvalid": "Ugyldig navn (bokstaver, tall, understrek)",
+      "nameExists": "Navnet finnes allerede"
+    },
+    "vault": {
+      "tab": "Vault",
+      "title": "Vault-kryptering",
+      "description": "Krypter sensitive verdier til vault-tokens som trygt kan legges inn i git.",
+      "info": "Krypter en hemmelig verdi for å få et vault-token. Lim inn tokenet i <code>.env</code>-filen i git. Verdier med prefikset <code>vault:v1:</code> er krypterte og kan trygt committes.",
+      "secretValue": "Hemmelig verdi",
+      "secretPlaceholder": "Skriv inn verdien som skal krypteres...",
+      "encrypt": "Krypter",
+      "encrypting": "Krypterer...",
+      "vaultToken": "Vault-token"
+    },
+    "daemons": {
+      "tab": "Daemoner",
+      "title": "Daemoner",
+      "description": "Langkjørende bakgrunnsprosesser administrert av plattformen. Hver daemon kan valgfritt eksponere en HTTP-proxy-port.",
+      "addDaemon": "Legg til daemon",
+      "empty": "Ingen daemoner konfigurert",
+      "command": "Kommando",
+      "proxyPort": "Proxy-port",
+      "proxyPortHelp": "HTTP-port daemonen din lytter på. Plattformen ruter trafikk fra webrooten til denne porten.",
+      "processes": "Prosesser",
+      "deleteTitle": "Slett daemon",
+      "deleteMessage": "Er du sikker på at du vil slette \"{{name}}\"? Denne handlingen kan ikke angres."
+    },
+    "cronJobs": {
+      "tab": "Cron-jobber",
+      "title": "Cron-jobber",
+      "description": "Planlagte oppgaver som kjøres med angitte intervaller ved hjelp av standard cron-syntaks.",
+      "addCronJob": "Legg til cron-jobb",
+      "empty": "Ingen cron-jobber konfigurert",
+      "schedule": "Tidsplan",
+      "scheduleHelp": "Standard cron-uttrykk: minutt time dag måned ukedag (f.eks. */5 * * * * for hvert 5. minutt).",
+      "command": "Kommando",
+      "deleteTitle": "Slett cron-jobb",
+      "deleteMessage": "Er du sikker på at du vil slette \"{{name}}\"? Denne handlingen kan ikke angres."
+    },
+    "fqdns": {
+      "tab": "Vertsnavn",
+      "title": "Vertsnavn",
+      "description": "Domenenavn tilknyttet dette webrooten. Trafikk til disse vertsnavnene rutes til denne applikasjonen.",
+      "addHostname": "Legg til vertsnavn",
+      "empty": "Ingen vertsnavn tilknyttet",
+      "availableHostnames": "Tilgjengelige vertsnavn",
+      "noAvailable": "Ingen tilgjengelige vertsnavn å tilknytte",
+      "hostname": "Vertsnavn",
+      "ssl": "SSL",
+      "detachTitle": "Koble fra vertsnavn",
+      "detachMessage": "Er du sikker på at du vil koble fra \"{{name}}\" fra dette webrooten?"
+    },
+    "settings": {
+      "tab": "Innstillinger",
+      "title": "Webroot-innstillinger",
+      "description": "Konfigurer runtime, versjon og offentlig mappe for dette webrooten.",
+      "runtime": "Runtime",
+      "version": "Versjon",
+      "publicFolder": "Offentlig mappe",
+      "saveSettings": "Lagre innstillinger",
+      "saved": "Innstillinger lagret."
+    },
+    "terminal": {
+      "tab": "Terminal",
+      "title": "SSH-terminal",
+      "description": "Koble til webrooten din via en interaktiv SSH-terminalsesjon."
+    }
+  },
+  "databases": {
+    "title": "Databaser",
+    "description": "PostgreSQL-databaser klargjort for denne kontoen. Administrer brukere og tilkoblingsinnstillinger.",
+    "empty": "Ingen databaser funnet",
+    "tenant": "Leietaker"
+  },
+  "databaseDetail": {
+    "dbAdmin": "Åpne i DB Admin",
+    "users": {
+      "tab": "Brukere",
+      "title": "Databasebrukere",
+      "addUser": "Legg til bruker",
+      "empty": "Ingen databasebrukere",
+      "username": "Brukernavn",
+      "password": "Passord",
+      "privileges": "Rettigheter",
+      "deleteTitle": "Slett bruker",
+      "deleteMessage": "Er du sikker på at du vil slette brukeren \"{{name}}\"? Denne handlingen kan ikke angres."
+    },
+    "info": {
+      "tab": "Info",
+      "title": "Databaseinformasjon"
+    }
+  },
+  "valkey": {
+    "title": "Valkey-instanser",
+    "description": "Nøkkel-verdi-lagre i minnet (Valkey/Redis-kompatibel) for hurtigbuffer og sanntidsdata.",
+    "empty": "Ingen Valkey-instanser funnet",
+    "port": "Port",
+    "maxMemory": "Maks minne",
+    "tenant": "Leietaker"
+  },
+  "valkeyDetail": {
+    "port": "Port",
+    "maxMemory": "Maks minne",
+    "users": {
+      "tab": "Brukere",
+      "title": "Valkey-brukere",
+      "addUser": "Legg til bruker",
+      "empty": "Ingen Valkey-brukere",
+      "username": "Brukernavn",
+      "password": "Passord",
+      "privileges": "Rettigheter (kommaseparert)",
+      "keyPattern": "Nøkkelmønster",
+      "keyPatternHelp": "Redis-nøkkelmønster denne brukeren har tilgang til. Bruk * for alle nøkler.",
+      "deleteTitle": "Slett bruker",
+      "deleteMessage": "Er du sikker på at du vil slette brukeren \"{{name}}\"? Denne handlingen kan ikke angres."
+    },
+    "info": {
+      "tab": "Info",
+      "title": "Instansinformasjon",
+      "password": "Passord",
+      "showPassword": "Vis passord",
+      "hidePassword": "Skjul passord"
+    }
+  },
+  "wireguard": {
+    "title": "WireGuard VPN",
+    "description": "Opprett WireGuard VPN-tunneler for sikker tilgang til MySQL-databaser og Valkey-cacher fra din lokale maskin. Hver peer genererer en konfigurasjonsfil du kan importere i hosting-cli eller en annen WireGuard-klient.",
+    "empty": "Ingen WireGuard-tilkoblinger konfigurert. Opprett en peer for \u00e5 f\u00e5 en VPN-tunnel for direkte database- og cache-tilgang.",
+    "name": "Navn",
+    "namePlaceholder": "f.eks. min-laptop, ci-server",
+    "assignedIp": "Tildelt IP",
+    "endpoint": "Endepunkt",
+    "publicKey": "Offentlig n\u00f8kkel",
+    "peerIndex": "Peer-indeks",
+    "create": "Legg til peer",
+    "configWarning": "Lagre denne konfigurasjonen n\u00e5. Den private n\u00f8kkelen vises ikke igjen. Du kan importere filen i hosting-cli eller en annen WireGuard-klient.",
+    "downloadConfig": "Last ned .conf",
+    "copyConfig": "Kopier konfigurasjon",
+    "cliHint": "Importer med: hosting-cli import <fil> -tenant <id>"
+  },
+  "wireguardDetail": {
+    "title": "WireGuard-peer",
+    "tabs": {
+      "info": "Info",
+      "config": "Konfigurasjon"
+    },
+    "info": {
+      "name": "Navn",
+      "publicKey": "Offentlig n\u00f8kkel",
+      "assignedIp": "Tildelt IP",
+      "endpoint": "Endepunkt",
+      "peerIndex": "Peer-indeks",
+      "tenant": "Leietaker-ID",
+      "subscription": "Abonnement-ID",
+      "createdAt": "Opprettet",
+      "updatedAt": "Oppdatert"
+    },
+    "delete": {
+      "title": "Slett peer",
+      "confirm": "Er du sikker p\u00e5 at du vil slette denne WireGuard-peeren? Aktive tunneler med denne konfigurasjonen vil slutte \u00e5 fungere."
+    }
+  },
+  "s3Buckets": {
+    "title": "S3-bøtter",
+    "description": "S3-kompatible objektlagringsbøtter for filer, medier og statiske ressurser.",
+    "empty": "Ingen S3-bøtter funnet",
+    "access": "Tilgang",
+    "quota": "Kvote",
+    "tenant": "Leietaker"
+  },
+  "s3BucketDetail": {
+    "noQuota": "Ingen kvote",
+    "quotaLabel": "Kvote: {{value}} MB",
+    "accessKeys": {
+      "tab": "Tilgangsnøkler",
+      "title": "Tilgangsnøkler",
+      "createAccessKey": "Opprett tilgangsnøkkel",
+      "empty": "Ingen tilgangsnøkler",
+      "accessKeyId": "Tilgangsnøkkel-ID",
+      "permissions": "Tillatelser",
+      "secretWarning": "Lagre den hemmelige tilgangsnøkkelen nå. Den vises ikke igjen.",
+      "deleteTitle": "Slett tilgangsnøkkel",
+      "deleteMessage": "Er du sikker på at du vil slette tilgangsnøkkelen \"{{name}}\"? Denne handlingen kan ikke angres."
+    },
+    "settings": {
+      "tab": "Innstillinger",
+      "title": "Bøtteinnstillinger",
+      "publicAccess": "Offentlig tilgang",
+      "publicDescription": "Når aktivert, kan objekter i denne bøtten nås uten autentisering.",
+      "quotaMB": "Kvote (MB)",
+      "quotaUnlimited": "Sett til 0 for ubegrenset lagring.",
+      "saveSettings": "Lagre innstillinger",
+      "saved": "Innstillinger lagret."
+    },
+    "info": {
+      "tab": "Info",
+      "title": "Bøtteinformasjon"
+    }
+  },
+  "emailAccounts": {
+    "title": "E-postkontoer",
+    "description": "E-postkontoer og postbokser. Konfigurer aliaser, videresending og autosvar.",
+    "empty": "Ingen e-postkontoer funnet",
+    "displayName": "Visningsnavn",
+    "quota": "Kvote",
+    "tenant": "Leietaker"
+  },
+  "emailDetail": {
+    "quota": "Kvote",
+    "aliases": {
+      "tab": "Aliaser",
+      "title": "Aliaser",
+      "addAlias": "Legg til alias",
+      "empty": "Ingen aliaser konfigurert",
+      "address": "Adresse",
+      "deleteTitle": "Slett alias",
+      "deleteMessage": "Er du sikker på at du vil slette aliaset \"{{name}}\"?"
+    },
+    "forwards": {
+      "tab": "Videresendinger",
+      "title": "Videresendinger",
+      "addForward": "Legg til videresending",
+      "empty": "Ingen videresendinger konfigurert",
+      "destination": "Mål",
+      "keepCopy": "Behold kopi",
+      "keepCopyLabel": "Behold en kopi i denne postboksen",
+      "deleteTitle": "Slett videresending",
+      "deleteMessage": "Er du sikker på at du vil slette videresendingen til \"{{name}}\"?"
+    },
+    "autoreply": {
+      "tab": "Autosvar",
+      "title": "Autosvar",
+      "subject": "Emne",
+      "body": "Tekst",
+      "startDate": "Startdato",
+      "endDate": "Sluttdato",
+      "deleteAutoreply": "Slett autosvar",
+      "deleteTitle": "Slett autosvar",
+      "deleteMessage": "Er du sikker på at du vil slette autosvar-konfigurasjonen?",
+      "saved": "Autosvar lagret."
+    },
+    "info": {
+      "tab": "Info",
+      "title": "Kontoinformasjon",
+      "displayName": "Visningsnavn",
+      "quota": "Kvote",
+      "fqdnId": "FQDN-ID"
+    }
+  },
+  "dns": {
+    "title": "Domener",
+    "description": "DNS-soner for domenene dine. Administrer poster for å kontrollere hvor domenenavnene peker.",
+    "empty": "Ingen domener funnet",
+    "region": "Region",
+    "tenant": "Leietaker"
+  },
+  "dnsDetail": {
+    "region": "Region",
+    "records": {
+      "title": "DNS-poster",
+      "addRecord": "Legg til post",
+      "empty": "Ingen DNS-poster",
+      "recordType": "Type",
+      "content": "Innhold",
+      "ttl": "TTL",
+      "ttlHelp": "Levetid i sekunder. Styrer hvor lenge DNS-resolvere cacher denne posten.",
+      "priority": "Prioritet",
+      "priorityHelp": "Lavere verdier har høyere prioritet. E-postservere prøver posten med lavest prioritet først.",
+      "managedBy": "Administrert av",
+      "deleteTitle": "Slett post",
+      "deleteMessage": "Er du sikker på at du vil slette {{type}}-posten \"{{name}}\"? Denne handlingen kan ikke angres."
+    }
+  },
+  "sshKeys": {
+    "title": "SSH-nøkler",
+    "description": "Offentlige SSH-nøkler for sikker servertilgang. Legg til nøklene dine for å aktivere SSH-innlogging.",
+    "empty": "Ingen SSH-nøkler funnet",
+    "fingerprint": "Fingeravtrykk",
+    "deleteTitle": "Slett SSH-nøkkel",
+    "deleteMessage": "Er du sikker på at du vil slette SSH-nøkkelen \"{{name}}\"? Denne handlingen kan ikke angres."
+  },
+  "backups": {
+    "title": "Sikkerhetskopier",
+    "description": "Automatiske og manuelle sikkerhetskopier av tjenestene dine. Gjenopprett for å gå tilbake til et tidligere tidspunkt.",
+    "empty": "Ingen sikkerhetskopier funnet",
+    "size": "Størrelse",
+    "started": "Startet",
+    "completed": "Fullført",
+    "deleteTitle": "Slett sikkerhetskopi",
+    "deleteMessage": "Er du sikker på at du vil slette sikkerhetskopien \"{{name}}\"?",
+    "restoreTitle": "Gjenopprett sikkerhetskopi",
+    "restoreMessage": "Er du sikker på at du vil gjenopprette sikkerhetskopien \"{{name}}\"?"
+  },
+  "developer": {
+    "title": "Utvikler",
+    "description": "API-dokumentasjon og integrasjonsverktøy for utvikling med Control Panel API-et.",
+    "apiDocs": {
+      "title": "API-dokumentasjon",
+      "description": "Control Panel API-et følger REST-konvensjoner. Alle endepunkter krever JWT-autentisering med mindre annet er oppgitt.",
+      "viewSpec": "Vis OpenAPI-spesifikasjon"
+    },
+    "mcp": {
+      "title": "MCP-integrasjon",
+      "description": "Koble til AI-assistenter som Claude Code for å administrere hosting-ressursene dine via Model Context Protocol (MCP).",
+      "setup": {
+        "title": "Oppsettguide",
+        "step1": "1. Skaff API-token",
+        "step1Detail": "Logg inn i kontrollpanelet og bruk samme JWT-token som nettleserøkten din bruker. Send det som Authorization-header.",
+        "step2": "2. Konfigurer MCP-klienten",
+        "step2Detail": "Legg til følgende i .mcp.json-filen din (f.eks. i prosjektets rotmappe for Claude Code):",
+        "step3": "3. Begynn å bruke verktøy",
+        "step3Detail": "AI-assistenten din har nå tilgang til alle kontrollpaneloperasjoner: administrere webroots, databaser, DNS, e-post og mer."
+      },
+      "groups": {
+        "title": "Tilgjengelige verktøygrupper",
+        "endpoint": "Endepunkt",
+        "description": "Beskrivelse"
+      }
+    }
+  },
+  "topBar": {
+    "selectCustomer": "Velg kunde",
+    "searchCustomers": "Søk etter kunder...",
+    "viewAllCustomers": "Vis alle kunder",
+    "noCustomersFound": "Ingen kunder funnet"
+  },
+  "confirmDialog": {
+    "cancel": "Avbryt"
+  },
+  "error": {
+    "title": "Noe gikk galt",
+    "description": "Vi har problemer med å laste denne siden. Dette er vanligvis midlertidig — prøv igjen om et øyeblikk.",
+    "tryAgain": "Prøv igjen",
+    "contactSupport": "Kontakt support",
+    "details": "Feildetaljer"
+  }
+}

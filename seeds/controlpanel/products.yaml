@@ -1,0 +1,13 @@
+products:
+  - id: "prod_webhosting_001"
+    brand_id: "brand_acme_dev_000000000001"
+    name: "Web Hosting"
+    description: "Full web hosting with databases, email, and DNS"
+    modules: [webroots, databases, dns, email, valkey, s3, ssh_keys, backups, wireguard]
+    status: "active"
+  - id: "prod_dns_only_001"
+    brand_id: "brand_acme_dev_000000000001"
+    name: "DNS Only"
+    description: "DNS zone management"
+    modules: [dns]
+    status: "active"

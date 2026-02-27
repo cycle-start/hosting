@@ -107,11 +107,18 @@ release version="":
 
     echo "Building release ${VERSION}..."
 
-    # 1. Build Linux binaries
+    # 1. Build setup wizard frontend
+    echo "  Building setup wizard frontend..."
+    cd web/setup && npm run build && cd ../..
+    rm -rf cmd/setup/dist && cp -r web/setup/dist cmd/setup/dist
+
+    # 2. Build Linux binaries
     echo "  Compiling binaries..."
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o "${DIST}/bin/node-agent" ./cmd/node-agent
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o "${DIST}/bin/dbadmin-proxy" ./cmd/dbadmin-proxy
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o "${DIST}/bin/hostctl" ./cmd/hostctl
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o "${DIST}/bin/setup" ./cmd/setup
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o "${DIST}/bin/controlpanel-api" ./cmd/controlpanel-api
 
     # 2. Copy Ansible
     echo "  Packaging Ansible..."
@@ -140,9 +147,10 @@ release version="":
     cp -r packer "${DIST}/packer"
     rm -rf "${DIST}/packer/output"
 
-    # 7. Copy seeds and scripts
+    # 7. Copy seeds, scripts, and migrations
     cp -r seeds "${DIST}/seeds"
     cp -r scripts "${DIST}/scripts"
+    cp -r migrations "${DIST}/migrations"
 
     # 8. Copy top-level files
     cp .env.example "${DIST}/"
@@ -163,16 +171,21 @@ release version="":
     echo "Customer usage:"
     echo "  tar xf ${ARCHIVE}.tar.gz"
     echo "  cd ${ARCHIVE}"
-    echo "  just init"
-    echo "  # edit .env and ansible/inventory/static.ini"
-    echo "  just packer-base"
-    echo "  just vm-up"
+    echo "  ./bin/setup              # interactive setup wizard"
+    echo "  just packer-base         # build base VM image"
+    echo "  just vm-up               # bring up the platform"
 
 # --- Build ---
 
 # Build all Go binaries
 build:
     go build ./cmd/...
+
+# Build the setup wizard (frontend + Go binary)
+build-setup:
+    cd web/setup && npm run build
+    rm -rf cmd/setup/dist && cp -r web/setup/dist cmd/setup/dist
+    go build -o bin/setup ./cmd/setup
 
 # Generate protobuf code
 proto:
@@ -188,6 +201,14 @@ build-admin:
 # Start admin UI dev server (with API proxy to api.$BASE_DOMAIN)
 dev-admin:
     cd web/admin && npm run dev
+
+# Build control panel UI
+build-controlpanel:
+    cd web/controlpanel && npm run build
+
+# Start control panel UI dev server
+dev-controlpanel:
+    cd web/controlpanel && npm run dev
 
 # Generate OpenAPI docs from swag annotations
 docs:
@@ -322,8 +343,8 @@ wait-api:
 # Bootstrap the control panel database (create DB, run migrations, seed data)
 bootstrap-controlpanel:
     just create-controlpanel-db
-    goose -dir ../controlpanel-api/migrations postgres "postgres://controlpanel:controlpanel@{{cp}}:5432/controlpanel?sslmode=disable" up
-    DATABASE_URL="postgres://controlpanel:controlpanel@{{cp}}:5432/controlpanel?sslmode=disable" HOSTING_API_URL="http://{{cp}}:8090/api/v1" HOSTING_API_KEY="$HOSTING_API_KEY" go run ../controlpanel-api/seeds/dev.go
+    goose -dir migrations/controlpanel postgres "postgres://controlpanel:controlpanel@{{cp}}:5432/controlpanel?sslmode=disable" up
+    DATABASE_URL="postgres://controlpanel:controlpanel@{{cp}}:5432/controlpanel?sslmode=disable" HOSTING_API_URL="http://{{cp}}:8090/api/v1" HOSTING_API_KEY="$HOSTING_API_KEY" go run seeds/controlpanel/dev.go
 
 # Full bootstrap: wipe DBs, migrate, create keys, register cluster, seed tenants
 bootstrap: wait-db reset-db migrate docs create-dev-key create-agent-key wait-api cluster-apply seed bootstrap-controlpanel
@@ -415,8 +436,8 @@ images:
     docker build -t {{registry}}/hosting-worker:latest -f docker/worker.Dockerfile .
     docker build -t {{registry}}/hosting-admin-ui:latest -f docker/admin-ui.Dockerfile .
     docker build -t {{registry}}/hosting-mcp-server:latest -f docker/mcp-server.Dockerfile .
-    docker build -t {{registry}}/controlpanel-api:latest -f docker/controlpanel-api.Dockerfile ../controlpanel-api
-    docker build -t {{registry}}/controlpanel-ui:latest ../controlpanel
+    docker build -t {{registry}}/controlpanel-api:latest -f docker/controlpanel-api.Dockerfile .
+    docker build -t {{registry}}/controlpanel-ui:latest -f docker/controlpanel-ui.Dockerfile .
 
 # Push all images to ghcr.io
 images-push:
@@ -633,8 +654,8 @@ vm-build-images:
     docker build -t hosting-worker:latest -f docker/worker.Dockerfile .
     docker build -t hosting-admin-ui:latest -f docker/admin-ui.Dockerfile .
     docker build -t hosting-mcp-server:latest -f docker/mcp-server.Dockerfile .
-    docker build -t controlpanel-api:latest -f docker/controlpanel-api.Dockerfile ../controlpanel-api
-    docker build -t controlpanel-ui:latest ../controlpanel
+    docker build -t controlpanel-api:latest -f docker/controlpanel-api.Dockerfile .
+    docker build -t controlpanel-ui:latest -f docker/controlpanel-ui.Dockerfile .
 
 # Import locally built images into k3s containerd via SSH
 vm-import-images:

@@ -1,0 +1,444 @@
+{
+  "common": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "add": "Hinzufügen",
+    "create": "Erstellen",
+    "update": "Aktualisieren",
+    "edit": "Bearbeiten",
+    "saving": "Speichern...",
+    "creating": "Erstellen...",
+    "deleting": "Löschen...",
+    "confirm": "Bestätigen",
+    "enabled": "Aktiviert",
+    "disabled": "Deaktiviert",
+    "on": "An",
+    "off": "Aus",
+    "yes": "Ja",
+    "no": "Nein",
+    "status": "Status",
+    "actions": "Aktionen",
+    "name": "Name",
+    "type": "Typ",
+    "created": "Erstellt",
+    "public": "Öffentlich",
+    "private": "Privat",
+    "loading": "Laden...",
+    "signOut": "Abmelden",
+    "dismiss": "Schließen",
+    "attach": "Anhängen",
+    "disconnect": "Trennen",
+    "restore": "Wiederherstellen",
+    "copy": "Kopieren",
+    "copied": "Kopiert",
+    "secret": "Geheim",
+    "plain": "Klartext",
+    "statusMessage": "Statusmeldung",
+    "tenantId": "Mandanten-ID",
+    "subscriptionId": "Abonnement-ID",
+    "createdAt": "Erstellt am",
+    "updatedAt": "Aktualisiert am"
+  },
+  "nav": {
+    "customers": "Kunden",
+    "dashboard": "Meine Produkte",
+    "webroots": "Webroots",
+    "databases": "Datenbanken",
+    "domains": "Domains",
+    "email": "E-Mail",
+    "valkey": "Valkey",
+    "s3Storage": "S3-Speicher",
+    "sshKeys": "SSH-Schlüssel",
+    "backups": "Backups",
+    "wireguard": "WireGuard",
+    "profile": "Profil",
+    "developer": "Entwickler"
+  },
+  "login": {
+    "title": "Anmelden",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "submit": "Anmelden",
+    "failed": "Anmeldung fehlgeschlagen"
+  },
+  "profile": {
+    "title": "Profil",
+    "description": "Verwalten Sie Ihre Kontoeinstellungen und Spracheinstellungen.",
+    "displayName": "Anzeigename",
+    "displayNamePlaceholder": "Ihr Name",
+    "emailAddress": "E-Mail-Adresse",
+    "language": "Sprache",
+    "saveChanges": "Änderungen speichern",
+    "saved": "Profil erfolgreich aktualisiert."
+  },
+  "customers": {
+    "title": "Kunden",
+    "description": "Alle Kunden, die Ihrem Partnerkonto zugeordnet sind.",
+    "empty": "Keine Kunden gefunden"
+  },
+  "dashboard": {
+    "title": "Meine Produkte",
+    "description": "Ihre aktiven Produkte und die jeweils enthaltenen Dienste.",
+    "subscriptions": "Abonnements",
+    "emptySubscriptions": "Keine Abonnements",
+    "enabledModules": "Aktivierte Module",
+    "emptyModules": "Keine Module aktiviert"
+  },
+  "webroots": {
+    "title": "Webroots",
+    "description": "Webanwendungen und Websites auf diesem Konto. Jedes Webroot hat eigene Laufzeit, Umgebungsvariablen und Konfiguration.",
+    "empty": "Keine Webroots gefunden",
+    "runtime": "Laufzeit",
+    "publicFolder": "Öffentlicher Ordner",
+    "tenant": "Mandant"
+  },
+  "webrootDetail": {
+    "envVars": {
+      "tab": "Umgebungsvariablen",
+      "title": "Umgebungsvariablen",
+      "description": "Schlüssel-Wert-Paare, die in die Laufzeitumgebung Ihrer Anwendung eingefügt werden. Geheime Variablen werden verschlüsselt gespeichert.",
+      "addVariable": "Variable hinzufügen",
+      "empty": "Keine Umgebungsvariablen gesetzt",
+      "value": "Wert",
+      "valuePlaceholder": "Wert",
+      "newValuePlaceholder": "Neuen Wert eingeben",
+      "secretLabel": "Geheim (verschlüsselt gespeichert)",
+      "nameRequired": "Name ist erforderlich",
+      "nameInvalid": "Ungültiger Name (Buchstaben, Zahlen, Unterstriche)",
+      "nameExists": "Name existiert bereits"
+    },
+    "vault": {
+      "tab": "Vault",
+      "title": "Vault-Verschlüsselung",
+      "description": "Verschlüsseln Sie sensible Werte zu Vault-Tokens, die sicher in Git eingecheckt werden können.",
+      "info": "Verschlüsseln Sie einen geheimen Wert, um ein Vault-Token zu erhalten. Fügen Sie das Token in Ihre <code>.env</code>-Datei in Git ein. Werte mit dem Präfix <code>vault:v1:</code> sind verschlüsselt und können sicher eingecheckt werden.",
+      "secretValue": "Geheimer Wert",
+      "secretPlaceholder": "Geben Sie den zu verschlüsselnden Wert ein...",
+      "encrypt": "Verschlüsseln",
+      "encrypting": "Verschlüsseln...",
+      "vaultToken": "Vault-Token"
+    },
+    "daemons": {
+      "tab": "Daemons",
+      "title": "Daemons",
+      "description": "Langlebige Hintergrundprozesse, die von der Plattform verwaltet werden. Jeder Daemon kann optional einen HTTP-Proxy-Port bereitstellen.",
+      "addDaemon": "Daemon hinzufügen",
+      "empty": "Keine Daemons konfiguriert",
+      "command": "Befehl",
+      "proxyPort": "Proxy-Port",
+      "proxyPortHelp": "HTTP-Port, auf dem Ihr Daemon lauscht. Die Plattform leitet Traffic vom Webroot an diesen Port weiter.",
+      "processes": "Prozesse",
+      "deleteTitle": "Daemon löschen",
+      "deleteMessage": "Sind Sie sicher, dass Sie \"{{name}}\" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "cronJobs": {
+      "tab": "Cron-Jobs",
+      "title": "Cron-Jobs",
+      "description": "Geplante Aufgaben, die in festgelegten Intervallen mit Standard-Cron-Syntax ausgeführt werden.",
+      "addCronJob": "Cron-Job hinzufügen",
+      "empty": "Keine Cron-Jobs konfiguriert",
+      "schedule": "Zeitplan",
+      "scheduleHelp": "Standard-Cron-Ausdruck: Minute Stunde Tag Monat Wochentag (z.B. */5 * * * * für alle 5 Minuten).",
+      "command": "Befehl",
+      "deleteTitle": "Cron-Job löschen",
+      "deleteMessage": "Sind Sie sicher, dass Sie \"{{name}}\" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "fqdns": {
+      "tab": "Hostnamen",
+      "title": "Hostnamen",
+      "description": "Domainnamen, die diesem Webroot zugeordnet sind. Traffic zu diesen Hostnamen wird an diese Anwendung weitergeleitet.",
+      "addHostname": "Hostname hinzufügen",
+      "empty": "Keine Hostnamen verknüpft",
+      "availableHostnames": "Verfügbare Hostnamen",
+      "noAvailable": "Keine verfügbaren Hostnamen zum Anhängen",
+      "hostname": "Hostname",
+      "ssl": "SSL",
+      "detachTitle": "Hostname trennen",
+      "detachMessage": "Sind Sie sicher, dass Sie \"{{name}}\" von diesem Webroot trennen möchten?"
+    },
+    "settings": {
+      "tab": "Einstellungen",
+      "title": "Webroot-Einstellungen",
+      "description": "Konfigurieren Sie Runtime, Version und öffentlichen Ordner für dieses Webroot.",
+      "runtime": "Runtime",
+      "version": "Version",
+      "publicFolder": "Öffentlicher Ordner",
+      "saveSettings": "Einstellungen speichern",
+      "saved": "Einstellungen erfolgreich gespeichert."
+    },
+    "terminal": {
+      "tab": "Terminal",
+      "title": "SSH-Terminal",
+      "description": "Verbinden Sie sich über eine interaktive SSH-Terminalsitzung mit Ihrem Webroot."
+    }
+  },
+  "databases": {
+    "title": "Datenbanken",
+    "description": "PostgreSQL-Datenbanken für dieses Konto. Verwalten Sie Benutzer und Verbindungseinstellungen.",
+    "empty": "Keine Datenbanken gefunden",
+    "tenant": "Mandant"
+  },
+  "databaseDetail": {
+    "dbAdmin": "In DB Admin öffnen",
+    "users": {
+      "tab": "Benutzer",
+      "title": "Datenbankbenutzer",
+      "addUser": "Benutzer hinzufügen",
+      "empty": "Keine Datenbankbenutzer",
+      "username": "Benutzername",
+      "password": "Passwort",
+      "privileges": "Berechtigungen",
+      "deleteTitle": "Benutzer löschen",
+      "deleteMessage": "Sind Sie sicher, dass Sie den Benutzer \"{{name}}\" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "info": {
+      "tab": "Info",
+      "title": "Datenbankinformationen"
+    }
+  },
+  "valkey": {
+    "title": "Valkey-Instanzen",
+    "description": "In-Memory-Schlüssel-Wert-Speicher (Valkey/Redis-kompatibel) für Caching und Echtzeitdaten.",
+    "empty": "Keine Valkey-Instanzen gefunden",
+    "port": "Port",
+    "maxMemory": "Max. Speicher",
+    "tenant": "Mandant"
+  },
+  "valkeyDetail": {
+    "port": "Port",
+    "maxMemory": "Max. Speicher",
+    "users": {
+      "tab": "Benutzer",
+      "title": "Valkey-Benutzer",
+      "addUser": "Benutzer hinzufügen",
+      "empty": "Keine Valkey-Benutzer",
+      "username": "Benutzername",
+      "password": "Passwort",
+      "privileges": "Berechtigungen (kommagetrennt)",
+      "keyPattern": "Schlüsselmuster",
+      "keyPatternHelp": "Redis-Schlüsselmuster, auf das dieser Benutzer zugreifen kann. Verwenden Sie * für alle Schlüssel.",
+      "deleteTitle": "Benutzer löschen",
+      "deleteMessage": "Sind Sie sicher, dass Sie den Benutzer \"{{name}}\" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "info": {
+      "tab": "Info",
+      "title": "Instanzinformationen",
+      "password": "Passwort",
+      "showPassword": "Passwort anzeigen",
+      "hidePassword": "Passwort verbergen"
+    }
+  },
+  "wireguard": {
+    "title": "WireGuard VPN",
+    "description": "Erstellen Sie WireGuard-VPN-Tunnel f\u00fcr sicheren Zugriff auf Ihre MySQL-Datenbanken und Valkey-Caches von Ihrem lokalen Rechner. Jeder Peer generiert eine Konfigurationsdatei, die Sie in hosting-cli oder einen anderen WireGuard-Client importieren k\u00f6nnen.",
+    "empty": "Keine WireGuard-Verbindungen konfiguriert. Erstellen Sie einen Peer f\u00fcr einen VPN-Tunnel mit direktem Datenbank- und Cache-Zugriff.",
+    "name": "Name",
+    "namePlaceholder": "z.B. mein-laptop, ci-server",
+    "assignedIp": "Zugewiesene IP",
+    "endpoint": "Endpunkt",
+    "publicKey": "\u00d6ffentlicher Schl\u00fcssel",
+    "peerIndex": "Peer-Index",
+    "create": "Peer hinzuf\u00fcgen",
+    "configWarning": "Speichern Sie diese Konfiguration jetzt. Der private Schl\u00fcssel wird nicht erneut angezeigt. Sie k\u00f6nnen die Datei in hosting-cli oder einen anderen WireGuard-Client importieren.",
+    "downloadConfig": ".conf herunterladen",
+    "copyConfig": "Konfiguration kopieren",
+    "cliHint": "Importieren mit: hosting-cli import <Datei> -tenant <ID>"
+  },
+  "wireguardDetail": {
+    "title": "WireGuard-Peer",
+    "tabs": {
+      "info": "Info",
+      "config": "Konfiguration"
+    },
+    "info": {
+      "name": "Name",
+      "publicKey": "\u00d6ffentlicher Schl\u00fcssel",
+      "assignedIp": "Zugewiesene IP",
+      "endpoint": "Endpunkt",
+      "peerIndex": "Peer-Index",
+      "tenant": "Mandanten-ID",
+      "subscription": "Abonnement-ID",
+      "createdAt": "Erstellt",
+      "updatedAt": "Aktualisiert"
+    },
+    "delete": {
+      "title": "Peer l\u00f6schen",
+      "confirm": "Sind Sie sicher, dass Sie diesen WireGuard-Peer l\u00f6schen m\u00f6chten? Aktive Tunnel mit dieser Konfiguration werden nicht mehr funktionieren."
+    }
+  },
+  "s3Buckets": {
+    "title": "S3-Buckets",
+    "description": "S3-kompatible Objektspeicher-Buckets für Dateien, Medien und statische Inhalte.",
+    "empty": "Keine S3-Buckets gefunden",
+    "access": "Zugriff",
+    "quota": "Kontingent",
+    "tenant": "Mandant"
+  },
+  "s3BucketDetail": {
+    "noQuota": "Kein Kontingent",
+    "quotaLabel": "Kontingent: {{value}} MB",
+    "accessKeys": {
+      "tab": "Zugriffsschlüssel",
+      "title": "Zugriffsschlüssel",
+      "createAccessKey": "Zugriffsschlüssel erstellen",
+      "empty": "Keine Zugriffsschlüssel",
+      "accessKeyId": "Zugriffsschlüssel-ID",
+      "permissions": "Berechtigungen",
+      "secretWarning": "Speichern Sie Ihren geheimen Zugriffsschlüssel jetzt. Er wird nicht erneut angezeigt.",
+      "deleteTitle": "Zugriffsschlüssel löschen",
+      "deleteMessage": "Sind Sie sicher, dass Sie den Zugriffsschlüssel \"{{name}}\" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "settings": {
+      "tab": "Einstellungen",
+      "title": "Bucket-Einstellungen",
+      "publicAccess": "Öffentlicher Zugriff",
+      "publicDescription": "Wenn aktiviert, können Objekte in diesem Bucket ohne Authentifizierung abgerufen werden.",
+      "quotaMB": "Kontingent (MB)",
+      "quotaUnlimited": "Auf 0 setzen für unbegrenzten Speicher.",
+      "saveSettings": "Einstellungen speichern",
+      "saved": "Einstellungen erfolgreich gespeichert."
+    },
+    "info": {
+      "tab": "Info",
+      "title": "Bucket-Informationen"
+    }
+  },
+  "emailAccounts": {
+    "title": "E-Mail-Konten",
+    "description": "E-Mail-Konten und Postfächer. Konfigurieren Sie Aliase, Weiterleitung und automatische Antworten.",
+    "empty": "Keine E-Mail-Konten gefunden",
+    "displayName": "Anzeigename",
+    "quota": "Kontingent",
+    "tenant": "Mandant"
+  },
+  "emailDetail": {
+    "quota": "Kontingent",
+    "aliases": {
+      "tab": "Aliase",
+      "title": "Aliase",
+      "addAlias": "Alias hinzufügen",
+      "empty": "Keine Aliase konfiguriert",
+      "address": "Adresse",
+      "deleteTitle": "Alias löschen",
+      "deleteMessage": "Sind Sie sicher, dass Sie den Alias \"{{name}}\" löschen möchten?"
+    },
+    "forwards": {
+      "tab": "Weiterleitungen",
+      "title": "Weiterleitungen",
+      "addForward": "Weiterleitung hinzufügen",
+      "empty": "Keine Weiterleitungen konfiguriert",
+      "destination": "Ziel",
+      "keepCopy": "Kopie behalten",
+      "keepCopyLabel": "Kopie in diesem Postfach behalten",
+      "deleteTitle": "Weiterleitung löschen",
+      "deleteMessage": "Sind Sie sicher, dass Sie die Weiterleitung an \"{{name}}\" löschen möchten?"
+    },
+    "autoreply": {
+      "tab": "Automatische Antwort",
+      "title": "Automatische Antwort",
+      "subject": "Betreff",
+      "body": "Text",
+      "startDate": "Startdatum",
+      "endDate": "Enddatum",
+      "deleteAutoreply": "Automatische Antwort löschen",
+      "deleteTitle": "Automatische Antwort löschen",
+      "deleteMessage": "Sind Sie sicher, dass Sie die automatische Antwort löschen möchten?",
+      "saved": "Automatische Antwort erfolgreich gespeichert."
+    },
+    "info": {
+      "tab": "Info",
+      "title": "Kontoinformationen",
+      "displayName": "Anzeigename",
+      "quota": "Kontingent",
+      "fqdnId": "FQDN-ID"
+    }
+  },
+  "dns": {
+    "title": "Domains",
+    "description": "DNS-Zonen für Ihre Domains. Verwalten Sie Einträge, um zu steuern, wohin Ihre Domainnamen zeigen.",
+    "empty": "Keine Domains gefunden",
+    "region": "Region",
+    "tenant": "Mandant"
+  },
+  "dnsDetail": {
+    "region": "Region",
+    "records": {
+      "title": "DNS-Einträge",
+      "addRecord": "Eintrag hinzufügen",
+      "empty": "Keine DNS-Einträge",
+      "recordType": "Typ",
+      "content": "Inhalt",
+      "ttl": "TTL",
+      "ttlHelp": "Lebensdauer in Sekunden. Steuert, wie lange DNS-Resolver diesen Eintrag zwischenspeichern.",
+      "priority": "Priorität",
+      "priorityHelp": "Niedrigere Werte haben höhere Priorität. Mailserver versuchen zuerst den Eintrag mit der niedrigsten Priorität.",
+      "managedBy": "Verwaltet von",
+      "deleteTitle": "Eintrag löschen",
+      "deleteMessage": "Sind Sie sicher, dass Sie den {{type}}-Eintrag \"{{name}}\" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
+    }
+  },
+  "sshKeys": {
+    "title": "SSH-Schlüssel",
+    "description": "Öffentliche SSH-Schlüssel für sicheren Serverzugriff. Fügen Sie Ihre Schlüssel hinzu, um SSH-Anmeldung zu ermöglichen.",
+    "empty": "Keine SSH-Schlüssel gefunden",
+    "fingerprint": "Fingerabdruck",
+    "deleteTitle": "SSH-Schlüssel löschen",
+    "deleteMessage": "Sind Sie sicher, dass Sie den SSH-Schlüssel \"{{name}}\" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
+  },
+  "backups": {
+    "title": "Backups",
+    "description": "Automatische und manuelle Backups Ihrer Dienste. Wiederherstellen, um zu einem früheren Zeitpunkt zurückzukehren.",
+    "empty": "Keine Backups gefunden",
+    "size": "Größe",
+    "started": "Gestartet",
+    "completed": "Abgeschlossen",
+    "deleteTitle": "Backup löschen",
+    "deleteMessage": "Sind Sie sicher, dass Sie das Backup \"{{name}}\" löschen möchten?",
+    "restoreTitle": "Backup wiederherstellen",
+    "restoreMessage": "Sind Sie sicher, dass Sie das Backup \"{{name}}\" wiederherstellen möchten?"
+  },
+  "developer": {
+    "title": "Entwickler",
+    "description": "API-Dokumentation und Integrationstools für die Entwicklung mit der Control Panel API.",
+    "apiDocs": {
+      "title": "API-Dokumentation",
+      "description": "Die Control Panel API folgt REST-Konventionen. Alle Endpunkte erfordern JWT-Authentifizierung, sofern nicht anders angegeben.",
+      "viewSpec": "OpenAPI-Spezifikation anzeigen"
+    },
+    "mcp": {
+      "title": "MCP-Integration",
+      "description": "Verbinden Sie KI-Assistenten wie Claude Code, um Ihre Hosting-Ressourcen über das Model Context Protocol (MCP) zu verwalten.",
+      "setup": {
+        "title": "Einrichtungsanleitung",
+        "step1": "1. API-Token erhalten",
+        "step1Detail": "Melden Sie sich im Control Panel an und verwenden Sie das gleiche JWT-Token, das Ihre Browser-Sitzung nutzt. Übergeben Sie es als Authorization-Header.",
+        "step2": "2. MCP-Client konfigurieren",
+        "step2Detail": "Fügen Sie Folgendes in Ihre .mcp.json-Datei ein (z.B. im Projektstammverzeichnis für Claude Code):",
+        "step3": "3. Tools verwenden",
+        "step3Detail": "Ihr KI-Assistent hat nun Zugriff auf alle Control Panel-Operationen: Webroots, Datenbanken, DNS, E-Mail und mehr verwalten."
+      },
+      "groups": {
+        "title": "Verfügbare Tool-Gruppen",
+        "endpoint": "Endpunkt",
+        "description": "Beschreibung"
+      }
+    }
+  },
+  "topBar": {
+    "selectCustomer": "Kunde auswählen",
+    "searchCustomers": "Kunden suchen...",
+    "viewAllCustomers": "Alle Kunden anzeigen",
+    "noCustomersFound": "Keine Kunden gefunden"
+  },
+  "confirmDialog": {
+    "cancel": "Abbrechen"
+  },
+  "error": {
+    "title": "Etwas ist schiefgelaufen",
+    "description": "Beim Laden dieser Seite ist ein Problem aufgetreten. Dies ist in der Regel vorübergehend — versuchen Sie es in einem Moment erneut.",
+    "tryAgain": "Erneut versuchen",
+    "contactSupport": "Support kontaktieren",
+    "details": "Fehlerdetails"
+  }
+}

@@ -1,0 +1,159 @@
+package setup
+
+import (
+	"encoding/json"
+	"fmt"
+	"io/fs"
+	"net/http"
+	"strings"
+	"sync"
+)
+
+// Server is the setup wizard HTTP server.
+type Server struct {
+	mu        sync.Mutex
+	config    *Config
+	outputDir string
+	staticFS  fs.FS // embedded frontend assets
+}
+
+// NewServer creates a new setup wizard server.
+func NewServer(outputDir string, staticFS fs.FS) *Server {
+	return &Server{
+		config:    DefaultConfig(),
+		outputDir: outputDir,
+		staticFS:  staticFS,
+	}
+}
+
+// Handler returns the HTTP handler for the setup wizard.
+func (s *Server) Handler() http.Handler {
+	mux := http.NewServeMux()
+
+	// API routes
+	mux.HandleFunc("GET /api/config", s.handleGetConfig)
+	mux.HandleFunc("PUT /api/config", s.handlePutConfig)
+	mux.HandleFunc("POST /api/validate", s.handleValidate)
+	mux.HandleFunc("POST /api/generate", s.handleGenerate)
+	mux.HandleFunc("GET /api/roles", s.handleGetRoles)
+
+	// SPA: serve static files, fall back to index.html
+	mux.Handle("/", s.spaHandler())
+
+	return mux
+}
+
+func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	writeJSON(w, http.StatusOK, s.config)
+}
+
+func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
+	var cfg Config
+	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON: " + err.Error()})
+		return
+	}
+
+	s.mu.Lock()
+	s.config = &cfg
+	s.mu.Unlock()
+
+	writeJSON(w, http.StatusOK, cfg)
+}
+
+func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	cfg := s.config
+	s.mu.Unlock()
+
+	errs := Validate(cfg)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"valid":  len(errs) == 0,
+		"errors": errs,
+	})
+}
+
+func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	cfg := s.config
+	s.mu.Unlock()
+
+	errs := Validate(cfg)
+	if len(errs) > 0 {
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
+			"valid":  false,
+			"errors": errs,
+		})
+		return
+	}
+
+	result, err := Generate(cfg, s.outputDir)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGetRoles(w http.ResponseWriter, r *http.Request) {
+	type roleInfo struct {
+		ID          NodeRole `json:"id"`
+		Label       string   `json:"label"`
+		Description string   `json:"description"`
+	}
+
+	roles := []roleInfo{
+		{RoleControlPlane, "Control Plane", "API server, Temporal, admin UI, PostgreSQL"},
+		{RoleWeb, "Web", "Nginx, PHP/Node runtimes, web hosting"},
+		{RoleDatabase, "Database", "MySQL/MariaDB for tenant databases"},
+		{RoleDNS, "DNS", "PowerDNS authoritative nameserver"},
+		{RoleValkey, "Valkey", "Valkey (Redis-compatible) key-value store"},
+		{RoleEmail, "Email", "Stalwart mail server (IMAP/SMTP)"},
+		{RoleStorage, "Storage", "Ceph object/file storage (S3 + CephFS)"},
+		{RoleLB, "Load Balancer", "HAProxy reverse proxy and TLS termination"},
+		{RoleGateway, "Gateway", "WireGuard VPN gateway for tenant access"},
+		{RoleDBAdmin, "DB Admin", "phpMyAdmin database management UI"},
+	}
+
+	writeJSON(w, http.StatusOK, roles)
+}
+
+func (s *Server) spaHandler() http.Handler {
+	fileServer := http.FileServer(http.FS(s.staticFS))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Try to serve the exact file
+		path := r.URL.Path
+		if path == "/" {
+			path = "/index.html"
+		}
+
+		// Check if file exists
+		f, err := s.staticFS.Open(strings.TrimPrefix(path, "/"))
+		if err == nil {
+			f.Close()
+			// Cache static assets aggressively
+			if strings.Contains(path, "/assets/") {
+				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			}
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+
+		// SPA fallback: serve index.html
+		r.URL.Path = "/"
+		fileServer.ServeHTTP(w, r)
+	})
+}
+
+func writeJSON(w http.ResponseWriter, status int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(data); err != nil {
+		fmt.Fprintf(w, `{"error": "encode: %s"}`, err.Error())
+	}
+}
