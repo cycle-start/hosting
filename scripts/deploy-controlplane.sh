@@ -12,12 +12,15 @@ SSH_USER="${2:-ubuntu}"
 OUTPUT_DIR="${3:-.}"
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
 
-# Source .env from project root if it exists
-if [ -f .env ]; then
-    set -a
-    source .env
-    set +a
-fi
+# Source .env (from output dir first, then project root)
+for envfile in "${OUTPUT_DIR}/.env" ".env"; do
+    if [ -f "$envfile" ]; then
+        set -a
+        source "$envfile"
+        set +a
+        break
+    fi
+done
 
 is_local() {
     [[ "$TARGET_HOST" == "127.0.0.1" || "$TARGET_HOST" == "localhost" ]]
@@ -77,11 +80,11 @@ echo "==> Applying k3s infrastructure manifests..."
 ENVSUBST_VARS='$BASE_DOMAIN $OIDC_ISSUER_URL $OIDC_AUTH_URL $OIDC_TOKEN_URL $OIDC_USERINFO_URL $OIDC_PROVIDER_NAME $OIDC_CLIENT_SECRET $OAUTH2_PROXY_COOKIE_SECRET $GRAFANA_CLIENT_ID $HEADLAMP_CLIENT_ID $TEMPORAL_CLIENT_ID $PROMETHEUS_CLIENT_ID $ADMIN_CLIENT_ID'
 
 # Create authelia-config secret from generated files (internal SSO only)
-if [[ -f "generated/authelia/configuration.yml" ]]; then
+if [[ -f "${OUTPUT_DIR}/generated/authelia/configuration.yml" ]]; then
     echo "    Creating authelia-config secret..."
     kubectl create secret generic authelia-config \
-        --from-file=configuration.yml=generated/authelia/configuration.yml \
-        --from-file=users_database.yml=generated/authelia/users_database.yml \
+        --from-file=configuration.yml="${OUTPUT_DIR}/generated/authelia/configuration.yml" \
+        --from-file=users_database.yml="${OUTPUT_DIR}/generated/authelia/users_database.yml" \
         --dry-run=client -o yaml | kubectl apply -f -
 fi
 
@@ -107,23 +110,14 @@ if [ ! -f deploy/helm/hosting/charts/postgresql-*.tgz ] 2>/dev/null; then
     helm dependency build deploy/helm/hosting 2>/dev/null || true
 fi
 
-# Build Helm --set flags from environment variables (if present)
-HELM_SETS=""
-[ -n "${BASE_DOMAIN:-}" ] && HELM_SETS="$HELM_SETS --set config.baseDomain=$BASE_DOMAIN"
-[ -n "${CORE_DATABASE_URL:-}" ] && HELM_SETS="$HELM_SETS --set secrets.coreDatabaseUrl=$CORE_DATABASE_URL"
-[ -n "${POWERDNS_DATABASE_URL:-}" ] && HELM_SETS="$HELM_SETS --set secrets.powerdnsDatabaseUrl=$POWERDNS_DATABASE_URL"
-[ -n "${STALWART_ADMIN_TOKEN:-}" ] && HELM_SETS="$HELM_SETS --set secrets.stalwartAdminToken=$STALWART_ADMIN_TOKEN"
-[ -n "${SECRET_ENCRYPTION_KEY:-}" ] && HELM_SETS="$HELM_SETS --set secrets.secretEncryptionKey=$SECRET_ENCRYPTION_KEY"
-[ -n "${LLM_API_KEY:-}" ] && HELM_SETS="$HELM_SETS --set secrets.llmApiKey=$LLM_API_KEY"
-[ -n "${AGENT_API_KEY:-}" ] && HELM_SETS="$HELM_SETS --set secrets.agentApiKey=$AGENT_API_KEY"
-[ -n "${CONTROLPANEL_DATABASE_URL:-}" ] && HELM_SETS="$HELM_SETS --set secrets.controlpanelDatabaseUrl=$CONTROLPANEL_DATABASE_URL"
-[ -n "${CONTROLPANEL_JWT_SECRET:-}" ] && HELM_SETS="$HELM_SETS --set secrets.controlpanelJwtSecret=$CONTROLPANEL_JWT_SECRET"
-[ -n "${HOSTING_API_KEY:-}" ] && HELM_SETS="$HELM_SETS --set secrets.hostingApiKey=$HOSTING_API_KEY"
-[ -f ssh_ca ] && HELM_SETS="$HELM_SETS --set-file secrets.sshCaPrivateKey=ssh_ca"
+HELM_VALUES="${OUTPUT_DIR}/generated/helm-values.yaml"
+if [ ! -f "$HELM_VALUES" ]; then
+    echo "ERROR: ${HELM_VALUES} not found. Run the setup wizard's Generate step first."
+    exit 1
+fi
 
-helm upgrade --install hosting \
-    deploy/helm/hosting -f deploy/helm/hosting/values-dev.yaml \
-    $HELM_SETS
+helm upgrade --install hosting deploy/helm/hosting \
+    -f "$HELM_VALUES"
 
 echo "==> Restarting deployments..."
 kubectl rollout restart deployment/hosting-core-api deployment/hosting-worker deployment/hosting-admin-ui deployment/hosting-mcp-server deployment/hosting-controlpanel-api deployment/hosting-controlpanel-ui 2>/dev/null || true

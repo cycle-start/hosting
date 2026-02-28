@@ -41,7 +41,7 @@ func AllSteps() []StepDef {
 		{ID: StepSSHCA, Label: "Generate SSH CA keypair", Description: "Generate an ed25519 SSH Certificate Authority keypair for node-to-node communication.", MultiOnly: true},
 		{ID: StepAnsible, Label: "Run Ansible provisioning", Description: "Install packages, configure services, and deploy agents on all hosts."},
 		{ID: StepDeployControlplane, Label: "Deploy control plane", Description: "Build Docker images, import into k3s, and deploy the control plane via Helm."},
-		{ID: StepRegisterKey, Label: "Register API key", Description: "Create the authentication key used by all components to communicate with the control plane."},
+		{ID: StepRegisterKey, Label: "Register API key", Description: "Register the API key in the control plane database. The key is already saved in your .env file — no action needed with the output."},
 		{ID: StepClusterApply, Label: "Register cluster topology", Description: "Tell the control plane about the region, cluster, nodes, shards, and runtimes."},
 		{ID: StepSeed, Label: "Seed initial brand", Description: "Create the first brand with its domains, nameservers, and mail configuration."},
 	}
@@ -140,6 +140,12 @@ func (s *Server) executeStep(w http.ResponseWriter, r *http.Request, flusher htt
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+
+	// Load generated .env so steps like core-api get CORE_DATABASE_URL
+	envFile := filepath.Join(outputDir, ".env")
+	for k, v := range parseEnvFile(envFile) {
+		cmd.Env = append(cmd.Env, k+"="+v)
+	}
 
 	ptmx, err := pty.Start(cmd)
 	if err != nil {

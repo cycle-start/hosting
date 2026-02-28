@@ -33,14 +33,11 @@ export function DeploySteps({ config }: { config: Config; outputDir: string }) {
   }, [])
 
   const canRun = useCallback(
-    (index: number) => {
+    (_index: number) => {
       if (activeStep) return false
-      for (let i = 0; i < index; i++) {
-        if (states[steps[i].id]?.status !== 'success') return false
-      }
       return true
     },
-    [activeStep, states, steps],
+    [activeStep],
   )
 
   const runStep = useCallback(
@@ -176,7 +173,12 @@ function StepCard({
               <RotateCcw className="h-3 w-3 mr-1.5" />
               Retry
             </Button>
-          ) : state.status === 'success' ? null : (
+          ) : state.status === 'success' ? (
+            <Button variant="outline" size="sm" onClick={onRun} disabled={!canRun}>
+              <RotateCcw className="h-3 w-3 mr-1.5" />
+              Re-run
+            </Button>
+          ) : (
             <Button size="sm" onClick={onRun} disabled={!canRun}>
               <Play className="h-3 w-3 mr-1.5" />
               Run

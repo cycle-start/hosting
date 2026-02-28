@@ -1,0 +1,31 @@
+# Secrets — NEVER commit
+.env
+.env.local
+ssh_ca
+ssh_ca.pub
+
+# Kubeconfig contains cluster credentials
+generated/kubeconfig.yaml
+
+# Ceph keyring contains storage credentials
+generated/ceph.client.web.keyring
+
+# Compiled binaries (downloaded or built from release)
+bin/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Node modules (if running setup wizard from source)
+node_modules/
+dist/
+
+# Build artifacts
+*.exe
+coverage.out
+*.prof

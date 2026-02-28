@@ -134,14 +134,12 @@ func createAPIKey(args []string) {
 	svc := core.NewAPIKeyService(pool)
 
 	if *rawKey != "" {
-		key, err := svc.CreateWithRawKey(ctx, *name, *rawKey, nil, nil)
+		_, err := svc.CreateWithRawKey(ctx, *name, *rawKey, nil, nil)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: failed to create API key: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("API key created successfully.\n\n")
-		fmt.Printf("  Name:   %s\n", key.Name)
-		fmt.Printf("  Key:    %s\n\n", *rawKey)
+		fmt.Printf("API key registered successfully.\n")
 	} else {
 		key, generatedKey, err := svc.Create(ctx, *name, nil, nil)
 		if err != nil {
