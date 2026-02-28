@@ -74,13 +74,13 @@ backend bk_dbadmin
 {% endfor %}
 
 backend bk_temporal
-    server temporal {{ controlplane_ip | default('127.0.0.1') }}:8080 check
+    server temporal {{ controlplane_ip | default('127.0.0.1') }}:8233 check
 
 backend bk_grafana
     server grafana {{ controlplane_ip | default('127.0.0.1') }}:3000 check
 
 backend bk_prometheus
-    server prometheus {{ controlplane_ip | default('127.0.0.1') }}:9090 check
+    server prometheus {{ controlplane_ip | default('127.0.0.1') }}:{{ prometheus_backend_port | default('9090') }} check
 
 backend bk_mcp
     server mcp {{ controlplane_ip | default('127.0.0.1') }}:8091 check

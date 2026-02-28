@@ -67,8 +67,17 @@ export KUBECONFIG="$KUBECONFIG_OUT"
 echo "    Saved to ${KUBECONFIG_OUT}"
 
 echo "==> Applying k3s infrastructure manifests..."
+ENVSUBST_VARS='$BASE_DOMAIN $OIDC_TENANT_ID $OIDC_CLIENT_ID $OIDC_CLIENT_SECRET $OAUTH2_PROXY_COOKIE_SECRET'
 for f in deploy/k3s/*.yaml; do
-    envsubst '$BASE_DOMAIN' < "$f" | kubectl apply -f - 2>/dev/null || true
+    # Skip oauth2-proxy if OIDC is not configured
+    if [[ "$(basename "$f")" == "oauth2-proxy.yaml" ]] && [[ -z "${OIDC_CLIENT_ID:-}" ]]; then
+        continue
+    fi
+    # Skip oidc-secret if OIDC is not configured
+    if [[ "$(basename "$f")" == "oidc-secret.yaml" ]] && [[ -z "${OIDC_CLIENT_ID:-}" ]]; then
+        continue
+    fi
+    envsubst "$ENVSUBST_VARS" < "$f" | kubectl apply -f - 2>/dev/null || true
 done
 
 echo "==> Running Helm deployment..."
@@ -90,6 +99,7 @@ HELM_SETS=""
 [ -n "${AGENT_API_KEY:-}" ] && HELM_SETS="$HELM_SETS --set secrets.agentApiKey=$AGENT_API_KEY"
 [ -n "${CONTROLPANEL_DATABASE_URL:-}" ] && HELM_SETS="$HELM_SETS --set secrets.controlpanelDatabaseUrl=$CONTROLPANEL_DATABASE_URL"
 [ -n "${CONTROLPANEL_JWT_SECRET:-}" ] && HELM_SETS="$HELM_SETS --set secrets.controlpanelJwtSecret=$CONTROLPANEL_JWT_SECRET"
+[ -n "${HOSTING_API_KEY:-}" ] && HELM_SETS="$HELM_SETS --set secrets.hostingApiKey=$HOSTING_API_KEY"
 [ -f ssh_ca ] && HELM_SETS="$HELM_SETS --set-file secrets.sshCaPrivateKey=ssh_ca"
 
 helm upgrade --install hosting \

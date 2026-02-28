@@ -111,17 +111,21 @@ export function ReviewStep({ config, roles, errors, onGoToStep }: Props) {
         )}
 
         <Section
-          title="TLS"
+          title="TLS & Security"
           errors={sectionErrors('tls')}
           onEdit={() => onGoToStep('tls')}
         >
           <Value
-            label="Mode"
+            label="TLS"
             value={
               config.tls.mode === 'letsencrypt'
                 ? `Let's Encrypt (${config.tls.email || '—'})`
                 : 'Manual certificates'
             }
+          />
+          <Value
+            label="SSO"
+            value={config.sso?.enabled ? 'Azure AD' : 'Disabled'}
           />
         </Section>
 

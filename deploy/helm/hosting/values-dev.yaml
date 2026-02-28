@@ -26,6 +26,33 @@ worker:
 adminUi:
   replicas: 1
   hostNetwork: true
+  extraEnv:
+    - name: OIDC_CLIENT_ID
+      valueFrom:
+        secretKeyRef:
+          name: oidc-credentials
+          key: OIDC_CLIENT_ID
+          optional: true
+    - name: OIDC_CLIENT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: oidc-credentials
+          key: OIDC_CLIENT_SECRET
+          optional: true
+    - name: OIDC_TENANT_ID
+      valueFrom:
+        secretKeyRef:
+          name: oidc-credentials
+          key: OIDC_TENANT_ID
+          optional: true
+    - name: ADMIN_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: hosting
+          key: HOSTING_API_KEY
+          optional: true
+    - name: BASE_DOMAIN
+      value: "massive-hosting.com"
 
 mcpServer:
   enabled: true

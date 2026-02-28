@@ -53,6 +53,13 @@ export interface EmailConfig {
   stalwart_admin_token: string
 }
 
+export interface SSOConfig {
+  enabled: boolean
+  tenant_id: string
+  client_id: string
+  client_secret: string
+}
+
 export interface Config {
   deploy_mode: DeployMode
   target_host: string
@@ -64,6 +71,7 @@ export interface Config {
   nodes: NodeConfig[]
   tls: TLSConfig
   email: EmailConfig
+  sso: SSOConfig
   php_versions: string[]
   api_key: string
 }

@@ -44,6 +44,9 @@ type Config struct {
 	// Email
 	Email EmailConfig `json:"email" yaml:"email"`
 
+	// SSO (Azure AD / Entra ID)
+	SSO SSOConfig `json:"sso" yaml:"sso"`
+
 	// PHP versions to install on web nodes
 	PHPVersions []string `json:"php_versions,omitempty" yaml:"php_versions,omitempty"`
 
@@ -54,6 +57,14 @@ type Config struct {
 // EmailConfig holds email/Stalwart mail server configuration.
 type EmailConfig struct {
 	StalwartAdminToken string `json:"stalwart_admin_token" yaml:"stalwart_admin_token"`
+}
+
+// SSOConfig holds SSO / Azure AD configuration.
+type SSOConfig struct {
+	Enabled      bool   `json:"enabled" yaml:"enabled"`
+	TenantID     string `json:"tenant_id" yaml:"tenant_id"`
+	ClientID     string `json:"client_id" yaml:"client_id"`
+	ClientSecret string `json:"client_secret" yaml:"client_secret"`
 }
 
 // BrandConfig holds brand/domain configuration.

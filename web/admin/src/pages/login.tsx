@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Server, KeyRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,14 @@ export function LoginPage() {
   const [key, setKey] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [ssoEnabled, setSsoEnabled] = useState(false)
+
+  useEffect(() => {
+    fetch('/auth/sso-enabled')
+      .then((r) => r.json())
+      .then((data) => setSsoEnabled(data.enabled))
+      .catch(() => {})
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,6 +51,25 @@ export function LoginPage() {
           <CardDescription>Enter your API key to continue</CardDescription>
         </CardHeader>
         <CardContent>
+          {ssoEnabled && (
+            <>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => { window.location.href = '/auth/login' }}
+              >
+                Sign in with Azure AD
+              </Button>
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">or</span>
+                </div>
+              </div>
+            </>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="api-key">API Key</Label>

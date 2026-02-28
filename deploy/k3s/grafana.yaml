@@ -87,20 +87,40 @@ spec:
           ports:
             - containerPort: 3000
           env:
-            - name: GF_AUTH_ANONYMOUS_ENABLED
-              value: "true"
-            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
-              value: Viewer
             - name: GF_SECURITY_ADMIN_USER
               value: admin
             - name: GF_SECURITY_ADMIN_PASSWORD
               value: admin
             - name: GF_SERVER_ROOT_URL
-              value: "http://grafana.${BASE_DOMAIN}"
+              value: "https://grafana.${BASE_DOMAIN}"
             - name: GF_UNIFIED_ALERTING_ENABLED
               value: "true"
             - name: GF_ALERTING_ENABLED
               value: "false"
+            - name: GF_AUTH_GENERIC_OAUTH_ENABLED
+              value: "true"
+            - name: GF_AUTH_GENERIC_OAUTH_NAME
+              value: "Azure AD"
+            - name: GF_AUTH_GENERIC_OAUTH_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-credentials
+                  key: OIDC_CLIENT_ID
+            - name: GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-credentials
+                  key: OIDC_CLIENT_SECRET
+            - name: GF_AUTH_GENERIC_OAUTH_SCOPES
+              value: "openid email profile"
+            - name: GF_AUTH_GENERIC_OAUTH_AUTH_URL
+              value: "https://login.microsoftonline.com/${OIDC_TENANT_ID}/oauth2/v2.0/authorize"
+            - name: GF_AUTH_GENERIC_OAUTH_TOKEN_URL
+              value: "https://login.microsoftonline.com/${OIDC_TENANT_ID}/oauth2/v2.0/token"
+            - name: GF_AUTH_GENERIC_OAUTH_API_URL
+              value: "https://graph.microsoft.com/oidc/userinfo"
+            - name: GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH
+              value: "Admin"
           volumeMounts:
             - name: config
               mountPath: /etc/grafana/provisioning/datasources/datasources.yaml
