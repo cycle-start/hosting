@@ -137,6 +137,11 @@ func Validate(cfg *Config) []ValidationError {
 		}
 	}
 
+	// PHP versions
+	if len(cfg.PHPVersions) == 0 {
+		add("php_versions", "At least one PHP version must be selected")
+	}
+
 	// TLS
 	if cfg.TLS.Mode == "letsencrypt" && cfg.TLS.Email == "" {
 		add("tls.email", "Email is required for Let's Encrypt")

@@ -5,7 +5,7 @@ import type { ValidationError, StepID } from './types'
  */
 export function fieldToStep(field: string): StepID {
   if (field === 'deploy_mode' || field === 'target_host') return 'deploy_mode'
-  if (field === 'region_name' || field === 'cluster_name') return 'region'
+  if (field === 'region_name' || field === 'cluster_name' || field === 'php_versions') return 'region'
   if (field.startsWith('brand.')) return 'brand'
   if (field.startsWith('email.')) return 'brand'
   if (field === 'api_key') return 'review'

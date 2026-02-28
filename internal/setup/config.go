@@ -44,6 +44,9 @@ type Config struct {
 	// Email
 	Email EmailConfig `json:"email" yaml:"email"`
 
+	// PHP versions to install on web nodes
+	PHPVersions []string `json:"php_versions,omitempty" yaml:"php_versions,omitempty"`
+
 	// API key for core-api authentication
 	APIKey string `json:"api_key" yaml:"api_key"`
 }
@@ -151,7 +154,8 @@ func DefaultConfig() *Config {
 		Email: EmailConfig{
 			StalwartAdminToken: generateRandomToken(),
 		},
-		APIKey: generateAPIKey(),
+		PHPVersions: []string{"8.3", "8.5"},
+		APIKey:      generateAPIKey(),
 	}
 }
 

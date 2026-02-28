@@ -58,6 +58,7 @@ export function ReviewStep({ config, roles, errors, onGoToStep }: Props) {
         >
           <Value label="Region" value={config.region_name} />
           <Value label="Cluster" value={config.cluster_name} />
+          <Value label="PHP versions" value={(config.php_versions || []).map(v => `PHP ${v}`).join(', ') || '—'} />
         </Section>
 
         <Section

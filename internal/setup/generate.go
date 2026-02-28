@@ -261,27 +261,26 @@ func generateRoleGroupVars(cfg *Config, controlplaneIP string) []GeneratedFile {
 	// listen on a non-standard port to avoid conflicting with HAProxy on 80/443.
 	isSingleNode := cfg.DeployMode == DeployModeSingle
 
-	webYml := `node_role: web
-shard_name: web-1
-
-node_agent_nginx_config_dir: /etc/nginx
-node_agent_web_storage_dir: /var/www/storage
-node_agent_cert_dir: /etc/ssl/hosting
-node_agent_ssh_config_dir: /etc/ssh/sshd_config.d
-
-php_versions:
-  - "8.3"
-  - "8.5"
-
-php_extensions:
-  - fpm
-  - cli
-  - mysql
-  - curl
-  - mbstring
-  - xml
-  - zip
-`
+	var webBuf strings.Builder
+	webBuf.WriteString("node_role: web\n")
+	webBuf.WriteString("shard_name: web-1\n\n")
+	webBuf.WriteString("node_agent_nginx_config_dir: /etc/nginx\n")
+	webBuf.WriteString("node_agent_web_storage_dir: /var/www/storage\n")
+	webBuf.WriteString("node_agent_cert_dir: /etc/ssl/hosting\n")
+	webBuf.WriteString("node_agent_ssh_config_dir: /etc/ssh/sshd_config.d\n\n")
+	webBuf.WriteString("php_versions:\n")
+	for _, v := range cfg.PHPVersions {
+		webBuf.WriteString(fmt.Sprintf("  - \"%s\"\n", v))
+	}
+	webBuf.WriteString("\nphp_extensions:\n")
+	webBuf.WriteString("  - fpm\n")
+	webBuf.WriteString("  - cli\n")
+	webBuf.WriteString("  - mysql\n")
+	webBuf.WriteString("  - curl\n")
+	webBuf.WriteString("  - mbstring\n")
+	webBuf.WriteString("  - xml\n")
+	webBuf.WriteString("  - zip\n")
+	webYml := webBuf.String()
 	if isSingleNode {
 		webYml += "\n# Single-node: nginx listens on 8080 to avoid conflicting with HAProxy on 80\n"
 		webYml += "nginx_listen_port: \"8080\"\n"
@@ -564,10 +563,9 @@ func generateClusterYAML(cfg *Config, controlplaneIP string) string {
 
 	// Cluster runtimes
 	b.WriteString("\ncluster_runtimes:\n")
-	b.WriteString("  - runtime: php\n")
-	b.WriteString("    version: \"8.5\"\n")
-	b.WriteString("  - runtime: php\n")
-	b.WriteString("    version: \"8.3\"\n")
+	for _, v := range cfg.PHPVersions {
+		b.WriteString(fmt.Sprintf("  - runtime: php\n    version: \"%s\"\n", v))
+	}
 	b.WriteString("  - runtime: node\n")
 	b.WriteString("    version: \"22\"\n")
 	b.WriteString("  - runtime: python\n")

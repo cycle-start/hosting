@@ -64,6 +64,7 @@ export interface Config {
   nodes: NodeConfig[]
   tls: TLSConfig
   email: EmailConfig
+  php_versions: string[]
   api_key: string
 }
 
