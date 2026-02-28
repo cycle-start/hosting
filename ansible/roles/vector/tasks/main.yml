@@ -1,8 +1,3 @@
-- name: Remove old timber.io Vector repo
-  file:
-    path: /etc/apt/sources.list.d/vector.list
-    state: absent
-
 - name: Add Datadog GPG keys for Vector
   get_url:
     url: "https://keys.datadoghq.com/{{ item }}"
@@ -74,12 +69,6 @@
     dest: /etc/vector/config.d/base.toml
   when: "'controlplane' not in group_names"
   notify: restart vector
-
-- name: Remove old base config from default path
-  file:
-    path: /etc/vector/vector.toml
-    state: absent
-  when: "'controlplane' not in group_names"
 
 - name: Configure Vector environment
   copy:
