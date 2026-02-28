@@ -12,6 +12,13 @@ SSH_USER="${2:-ubuntu}"
 OUTPUT_DIR="${3:-.}"
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
 
+# Source .env from project root if it exists
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+fi
+
 is_local() {
     [[ "$TARGET_HOST" == "127.0.0.1" || "$TARGET_HOST" == "localhost" ]]
 }
