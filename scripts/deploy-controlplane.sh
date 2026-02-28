@@ -67,7 +67,7 @@ for f in deploy/k3s/*.yaml; do
         esac
     fi
     # Skip authelia.yaml for external SSO mode (no generated config)
-    if [[ "$(basename "$f")" == "authelia.yaml" ]] && [[ ! -f "generated/authelia/configuration.yml" ]]; then
+    if [[ "$(basename "$f")" == "authelia.yaml" ]] && [[ ! -f "${OUTPUT_DIR}/generated/authelia/configuration.yml" ]]; then
         continue
     fi
     envsubst "$ENVSUBST_VARS" < "$f" | kubectl apply -f - 2>/dev/null || true
