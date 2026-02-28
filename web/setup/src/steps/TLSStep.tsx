@@ -12,9 +12,12 @@ interface Props {
   errors: ValidationError[]
 }
 
+const defaultSSO = { enabled: false, tenant_id: '', client_id: '', client_secret: '' }
+
 export function TLSStep({ config, onChange, errors }: Props) {
   const tls = config.tls
-  const sso = config.sso
+  const sso = config.sso ?? defaultSSO
+  const domain = config.brand?.platform_domain || 'your-domain.com'
 
   const updateTLS = (updates: Partial<typeof tls>) => {
     onChange({ ...config, tls: { ...tls, ...updates } })
@@ -155,16 +158,24 @@ export function TLSStep({ config, onChange, errors }: Props) {
                 <FieldError error={fe('sso.client_secret')} />
               </div>
 
-              <p className="text-xs text-muted-foreground">
-                Register an app in Azure AD (Entra ID) and add these redirect URIs:
-              </p>
-              <ul className="text-xs font-mono text-muted-foreground space-y-0.5 list-disc list-inside">
-                <li>https://admin.{'{'}domain{'}'}/auth/callback</li>
-                <li>https://grafana.{'{'}domain{'}'}/login/generic_oauth</li>
-                <li>https://headlamp.{'{'}domain{'}'}/oidc-callback</li>
-                <li>https://temporal.{'{'}domain{'}'}/auth/sso/callback</li>
-                <li>https://prometheus.{'{'}domain{'}'}/oauth2/callback</li>
-              </ul>
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Register an app in Azure AD (Entra ID) and add these redirect URIs:
+                </p>
+                <div className="text-xs font-mono space-y-1">
+                  {[
+                    `https://admin.${domain}/auth/callback`,
+                    `https://grafana.${domain}/login/generic_oauth`,
+                    `https://headlamp.${domain}/oidc-callback`,
+                    `https://temporal.${domain}/auth/sso/callback`,
+                    `https://prometheus.${domain}/oauth2/callback`,
+                  ].map((uri) => (
+                    <div key={uri} className="flex items-center gap-2">
+                      <span className="text-muted-foreground select-all break-all">{uri}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>
