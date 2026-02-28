@@ -52,7 +52,14 @@
     dest: /etc/systemd/system/node-agent.service.d/cephfs.conf
   notify: reload systemd
 
-- name: Mount CephFS
+- name: Wait for Ceph monitor to be reachable
+  wait_for:
+    host: "{{ storage_node_ip }}"
+    port: 6789
+    timeout: 300
+    msg: "Waiting for Ceph monitor on {{ storage_node_ip }}:6789 (this can take a few minutes on first deploy)..."
+
+- name: Mount CephFS (retries are normal while Ceph MDS initializes)
   systemd:
     name: var-www-storage.mount
     daemon_reload: true
