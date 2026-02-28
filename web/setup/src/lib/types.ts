@@ -117,7 +117,7 @@ export type StepID =
   | 'review'
   | 'install'
 
-export type DeployStepID = 'ssh_ca' | 'ansible' | 'register_api_key' | 'cluster_apply' | 'seed'
+export type DeployStepID = 'ssh_ca' | 'ansible' | 'deploy_controlplane' | 'register_api_key' | 'cluster_apply' | 'seed'
 
 export interface DeployStepDef {
   id: DeployStepID

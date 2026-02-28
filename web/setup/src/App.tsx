@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as Tabs from '@radix-ui/react-tabs'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Loader2, Download, Check, AlertCircle, Terminal, FileText, ArrowRight, Copy } from 'lucide-react'
-import type { Config, RoleInfo, ValidationError, GeneratedFile, StepID } from '@/lib/types'
+import type { Config, RoleInfo, ValidationError, GeneratedFile, StepID, DeployStepID, StepStatus } from '@/lib/types'
 import { errorsForStep } from '@/lib/validation'
 import * as api from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -419,6 +419,13 @@ function InstallStep({
   generateError: string | null
   onGenerate: () => void
 }) {
+  const [cpDeployStarted, setCpDeployStarted] = useState(false)
+
+  const handleStepChange = (stepId: DeployStepID, _status: StepStatus) => {
+    if (stepId === 'deploy_controlplane') {
+      setCpDeployStarted(true)
+    }
+  }
   if (!generated) {
     return (
       <div className="space-y-4">
@@ -504,10 +511,10 @@ function InstallStep({
         <p className="text-sm text-muted-foreground">
           Run each step in order. You can also close this wizard (Ctrl+C) and run the commands manually — the generated files are saved to disk.
         </p>
-        <DeploySteps config={config} outputDir={outputDir} />
+        <DeploySteps config={config} outputDir={outputDir} onStepChange={handleStepChange} />
       </div>
 
-      <ControlPlaneStatus outputDir={outputDir} />
+      {cpDeployStarted && <ControlPlaneStatus outputDir={outputDir} />}
     </div>
   )
 }

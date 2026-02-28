@@ -25,7 +25,7 @@ function formatElapsed(ms: number): string {
   return sec > 0 ? `${min}m${sec}s` : `${min}m`
 }
 
-export function DeploySteps({ config }: { config: Config; outputDir: string }) {
+export function DeploySteps({ config, onStepChange }: { config: Config; outputDir: string; onStepChange?: (stepId: DeployStepID, status: StepStatus) => void }) {
   const [steps, setSteps] = useState<DeployStepDef[]>([])
   const [states, setStates] = useState<Record<string, StepState>>({})
   const [activeStep, setActiveStep] = useState<DeployStepID | null>(null)
@@ -62,6 +62,7 @@ export function DeploySteps({ config }: { config: Config; outputDir: string }) {
           ...prev,
           [id]: { status: 'running', output: [], startedAt: Date.now() },
         }))
+        onStepChange?.(id, 'running')
 
         const { abort, done } = api.executeStep(id, (event: ExecEvent) => {
           if (event.type === 'output' && event.data != null) {
@@ -74,15 +75,17 @@ export function DeploySteps({ config }: { config: Config; outputDir: string }) {
             }))
           } else if (event.type === 'done') {
             const ok = event.exit_code === 0
+            const status = ok ? 'success' : 'failed' as StepStatus
             setStates((prev) => ({
               ...prev,
               [id]: {
                 ...prev[id],
-                status: ok ? 'success' : 'failed',
+                status,
                 exitCode: event.exit_code,
                 finishedAt: Date.now(),
               },
             }))
+            onStepChange?.(id, status)
             setActiveStep(null)
             resolve(event.exit_code ?? 1)
           } else if (event.type === 'error') {
@@ -95,6 +98,7 @@ export function DeploySteps({ config }: { config: Config; outputDir: string }) {
                 finishedAt: Date.now(),
               },
             }))
+            onStepChange?.(id, 'failed')
             setActiveStep(null)
             resolve(1)
           }
