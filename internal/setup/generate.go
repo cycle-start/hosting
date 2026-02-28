@@ -12,6 +12,42 @@ import (
 	"github.com/google/uuid"
 )
 
+// opsGitignore is the default .gitignore for the operations root.
+// It excludes secrets and ephemeral artifacts while allowing
+// configuration and generated infrastructure files to be tracked.
+const opsGitignore = `# Secrets — NEVER commit
+.env
+.env.local
+ssh_ca
+ssh_ca.pub
+
+# Kubeconfig contains cluster credentials
+generated/kubeconfig.yaml
+
+# Ceph keyring contains storage credentials
+generated/ceph.client.web.keyring
+
+# Compiled binaries (downloaded or built from release)
+bin/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Node modules (if running setup wizard from source)
+node_modules/
+dist/
+
+# Build artifacts
+*.exe
+coverage.out
+*.prof
+`
+
 // GenerateResult describes the files that were generated.
 type GenerateResult struct {
 	OutputDir string          `json:"output_dir"`
@@ -141,7 +177,20 @@ func Generate(cfg *Config, outputDir string, progress ProgressFunc) (*GenerateRe
 		})
 	}
 
-	// 8. Write .env file at project root (merge with existing)
+	// 8. Write .gitignore if one doesn't exist
+	gitignorePath := filepath.Join(outputDir, ".gitignore")
+	if _, err := os.Stat(gitignorePath); os.IsNotExist(err) {
+		progress("Writing .gitignore...")
+		if err := os.WriteFile(gitignorePath, []byte(opsGitignore), 0o644); err != nil {
+			return nil, fmt.Errorf("write .gitignore: %w", err)
+		}
+		result.Files = append(result.Files, GeneratedFile{
+			Path:    ".gitignore",
+			Content: opsGitignore,
+		})
+	}
+
+	// 9. Write .env file at project root (merge with existing)
 	progress("Updating .env file...")
 	envPath := filepath.Join(outputDir, ".env")
 	dotEnv, err := generateDotEnv(cfg, envPath)
