@@ -967,6 +967,7 @@ func generateHelmValues(cfg *Config, controlplaneIP, outputDir string) string {
 
 	b.WriteString("controlpanelApi:\n")
 	b.WriteString("  enabled: true\n")
+	b.WriteString("  port: 8092\n")
 	b.WriteString("  hostNetwork: true\n")
 	b.WriteString("  migrate: true\n")
 	b.WriteString(fmt.Sprintf("  hostingApiKey: %q\n\n", cfg.APIKey))
