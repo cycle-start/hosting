@@ -134,3 +134,25 @@ export interface ExecEvent {
 }
 
 export type StepStatus = 'pending' | 'running' | 'success' | 'failed'
+
+export interface PodInfo {
+  name: string
+  namespace: string
+  ready: string
+  status: string
+  restarts: number
+  age: string
+}
+
+export interface PodsResponse {
+  available: boolean
+  kubeconfig_path?: string
+  error?: string
+  pods?: PodInfo[]
+}
+
+export interface PodDebugResponse {
+  logs: string
+  describe: string
+  error?: string
+}

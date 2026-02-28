@@ -1,4 +1,4 @@
-import type { Config, ValidateResponse, GenerateResponse, RoleInfo, DeployStepDef, DeployStepID, ExecEvent } from './types'
+import type { Config, ValidateResponse, GenerateResponse, RoleInfo, DeployStepDef, DeployStepID, ExecEvent, PodsResponse, PodDebugResponse } from './types'
 
 const BASE = '/api'
 
@@ -103,6 +103,14 @@ export async function getInfo(): Promise<{ output_dir: string }> {
 
 export async function getSteps(): Promise<DeployStepDef[]> {
   return request<DeployStepDef[]>('/steps')
+}
+
+export async function getPods(): Promise<PodsResponse> {
+  return request<PodsResponse>('/pods')
+}
+
+export async function getPodDebug(namespace: string, name: string): Promise<PodDebugResponse> {
+  return request<PodDebugResponse>(`/pod-debug?namespace=${encodeURIComponent(namespace)}&name=${encodeURIComponent(name)}`)
 }
 
 export function executeStep(
