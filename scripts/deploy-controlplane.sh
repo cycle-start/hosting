@@ -24,12 +24,12 @@ remote_cmd() {
 }
 
 echo "==> Building Docker images..."
-docker build -t hosting-core-api:latest -f docker/core-api.Dockerfile .
-docker build -t hosting-worker:latest -f docker/worker.Dockerfile .
-docker build -t hosting-admin-ui:latest -f docker/admin-ui.Dockerfile .
-docker build -t hosting-mcp-server:latest -f docker/mcp-server.Dockerfile .
-docker build -t controlpanel-api:latest -f docker/controlpanel-api.Dockerfile .
-docker build -t controlpanel-ui:latest -f docker/controlpanel-ui.Dockerfile .
+docker build --progress=plain -t hosting-core-api:latest -f docker/core-api.Dockerfile .
+docker build --progress=plain -t hosting-worker:latest -f docker/worker.Dockerfile .
+docker build --progress=plain -t hosting-admin-ui:latest -f docker/admin-ui.Dockerfile .
+docker build --progress=plain -t hosting-mcp-server:latest -f docker/mcp-server.Dockerfile .
+docker build --progress=plain -t controlpanel-api:latest -f docker/controlpanel-api.Dockerfile .
+docker build --progress=plain -t controlpanel-ui:latest -f docker/controlpanel-ui.Dockerfile .
 
 echo "==> Importing images into k3s..."
 if is_local; then
