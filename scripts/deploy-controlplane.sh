@@ -34,35 +34,6 @@ remote_cmd() {
     fi
 }
 
-echo "==> Building Docker images..."
-docker build --progress=plain -t hosting-core-api:latest -f docker/core-api.Dockerfile .
-docker build --progress=plain -t hosting-worker:latest -f docker/worker.Dockerfile .
-docker build --progress=plain -t hosting-admin-ui:latest -f docker/admin-ui.Dockerfile .
-docker build --progress=plain -t hosting-mcp-server:latest -f docker/mcp-server.Dockerfile .
-docker build --progress=plain -t controlpanel-api:latest -f docker/controlpanel-api.Dockerfile .
-docker build --progress=plain -t controlpanel-ui:latest -f docker/controlpanel-ui.Dockerfile .
-
-echo "==> Importing images into k3s..."
-if is_local; then
-    docker save \
-        hosting-core-api:latest \
-        hosting-worker:latest \
-        hosting-admin-ui:latest \
-        hosting-mcp-server:latest \
-        controlpanel-api:latest \
-        controlpanel-ui:latest \
-        | sudo k3s ctr images import -
-else
-    docker save \
-        hosting-core-api:latest \
-        hosting-worker:latest \
-        hosting-admin-ui:latest \
-        hosting-mcp-server:latest \
-        controlpanel-api:latest \
-        controlpanel-ui:latest \
-        | ssh $SSH_OPTS "${SSH_USER}@${TARGET_HOST}" "sudo k3s ctr images import -"
-fi
-
 echo "==> Fetching kubeconfig..."
 KUBECONFIG_OUT="${OUTPUT_DIR}/generated/kubeconfig.yaml"
 if is_local; then
