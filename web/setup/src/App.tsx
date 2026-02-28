@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import * as Tabs from '@radix-ui/react-tabs'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Loader2, Download, Check, AlertCircle, Terminal, FileText, ArrowRight, Copy } from 'lucide-react'
 import type { Config, RoleInfo, ValidationError, GeneratedFile, StepID } from '@/lib/types'
@@ -14,6 +15,7 @@ import { NodesStep } from '@/steps/NodesStep'
 import { TLSStep } from '@/steps/TLSStep'
 import { ReviewStep } from '@/steps/ReviewStep'
 import { DeploySteps } from '@/steps/DeploySteps'
+import { OverviewTab } from '@/steps/OverviewTab'
 
 interface Step {
   id: StepID
@@ -32,6 +34,8 @@ const STEPS: Step[] = [
   { id: 'install', label: 'Install', visible: () => true },
 ]
 
+type TopTab = 'setup' | 'files' | 'overview'
+
 export default function App() {
   const [config, setConfig] = useState<Config | null>(null)
   const [roles, setRoles] = useState<RoleInfo[]>([])
@@ -44,6 +48,7 @@ export default function App() {
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [visitedSteps, setVisitedSteps] = useState<Set<StepID>>(new Set(['deploy_mode']))
   const [outputDir, setOutputDir] = useState('')
+  const [activeTab, setActiveTab] = useState<TopTab>('setup')
 
   useEffect(() => {
     api.getConfig().then(setConfig)
@@ -150,8 +155,16 @@ export default function App() {
 
   const stepErrors = errorsForStep(errors, step.id)
 
+  const goToInstallStep = () => {
+    const idx = visibleSteps.findIndex((s) => s.id === 'install')
+    if (idx >= 0) {
+      goToStep(idx)
+      setActiveTab('setup')
+    }
+  }
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <Tabs.Root value={activeTab} onValueChange={(v) => setActiveTab(v as TopTab)} className="min-h-screen flex flex-col">
       {/* Header */}
       <header className="border-b px-6 py-4 flex items-center gap-3">
         <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-primary/10">
@@ -163,6 +176,22 @@ export default function App() {
             Configure your deployment in a few steps
           </p>
         </div>
+        <div className="flex-1" />
+        <Tabs.List className="flex items-center gap-1">
+          {(['setup', 'files', 'overview'] as const).map((tab) => (
+            <Tabs.Trigger
+              key={tab}
+              value={tab}
+              className={cn(
+                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                'data-[state=active]:bg-accent data-[state=active]:text-accent-foreground',
+                'data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-accent/50'
+              )}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </Tabs.Trigger>
+          ))}
+        </Tabs.List>
       </header>
 
       <div className="flex flex-1">
@@ -173,10 +202,13 @@ export default function App() {
             return (
               <button
                 key={s.id}
-                onClick={() => goToStep(i)}
+                onClick={() => {
+                  goToStep(i)
+                  setActiveTab('setup')
+                }}
                 className={cn(
                   'w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors text-left',
-                  status === 'current'
+                  activeTab === 'setup' && status === 'current'
                     ? 'bg-accent text-accent-foreground font-medium'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
                 )}
@@ -189,73 +221,101 @@ export default function App() {
         </nav>
 
         {/* Main content */}
-        <main className={cn('flex-1 p-8', step.id !== 'install' && 'max-w-3xl')}>
-          {step.id === 'deploy_mode' && (
-            <DeployModeStep config={config} onChange={handleChange} outputDir={outputDir} />
-          )}
-          {step.id === 'region' && (
-            <RegionStep config={config} onChange={handleChange} errors={stepErrors} />
-          )}
-          {step.id === 'brand' && (
-            <BrandStep config={config} onChange={handleChange} errors={stepErrors} />
-          )}
-          {step.id === 'control_plane' && (
-            <ControlPlaneStep config={config} onChange={handleChange} errors={stepErrors} />
-          )}
-          {step.id === 'nodes' && (
-            <NodesStep config={config} onChange={handleChange} roles={roles} errors={stepErrors} />
-          )}
-          {step.id === 'tls' && (
-            <TLSStep config={config} onChange={handleChange} errors={stepErrors} />
-          )}
-          {step.id === 'review' && (
-            <ReviewStep config={config} roles={roles} errors={errors} onGoToStep={(stepId) => {
-              const idx = visibleSteps.findIndex((s) => s.id === stepId)
-              if (idx >= 0) goToStep(idx)
-            }} />
-          )}
-          {step.id === 'install' && (
-            <InstallStep
-              config={config}
-              outputDir={outputDir}
-              generated={generated}
-              generating={generating}
-              generateLog={generateLog}
-              generateError={generateError}
-              onGenerate={handleGenerate}
-            />
-          )}
-        </main>
-      </div>
+        <div className="flex-1 flex flex-col">
+          {/* Setup tab — forceMount keeps deploy step state alive when switching tabs */}
+          <Tabs.Content value="setup" forceMount className={cn('flex-1 flex flex-col', activeTab !== 'setup' && 'hidden')}>
+            <main className={cn('flex-1 p-8', step.id !== 'install' && 'max-w-3xl')}>
+              {step.id === 'deploy_mode' && (
+                <DeployModeStep config={config} onChange={handleChange} outputDir={outputDir} />
+              )}
+              {step.id === 'region' && (
+                <RegionStep config={config} onChange={handleChange} errors={stepErrors} />
+              )}
+              {step.id === 'brand' && (
+                <BrandStep config={config} onChange={handleChange} errors={stepErrors} />
+              )}
+              {step.id === 'control_plane' && (
+                <ControlPlaneStep config={config} onChange={handleChange} errors={stepErrors} />
+              )}
+              {step.id === 'nodes' && (
+                <NodesStep config={config} onChange={handleChange} roles={roles} errors={stepErrors} />
+              )}
+              {step.id === 'tls' && (
+                <TLSStep config={config} onChange={handleChange} errors={stepErrors} />
+              )}
+              {step.id === 'review' && (
+                <ReviewStep config={config} roles={roles} errors={errors} onGoToStep={(stepId) => {
+                  const idx = visibleSteps.findIndex((s) => s.id === stepId)
+                  if (idx >= 0) goToStep(idx)
+                }} />
+              )}
+              {step.id === 'install' && (
+                <InstallStep
+                  config={config}
+                  outputDir={outputDir}
+                  generated={generated}
+                  generating={generating}
+                  generateLog={generateLog}
+                  generateError={generateError}
+                  onGenerate={handleGenerate}
+                />
+              )}
+            </main>
 
-      {/* Footer navigation */}
-      <footer className="border-t px-6 py-4 flex items-center justify-between">
-        <Button
-          variant="outline"
-          onClick={goPrev}
-          disabled={isFirst}
-        >
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Back
-        </Button>
+            {/* Footer navigation */}
+            <footer className="border-t px-6 py-4 flex items-center justify-between">
+              <Button
+                variant="outline"
+                onClick={goPrev}
+                disabled={isFirst}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
 
-        <div className="flex items-center gap-3">
-          {saving && (
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Saving...
-            </span>
-          )}
+              <div className="flex items-center gap-3">
+                {saving && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Saving...
+                  </span>
+                )}
 
-          {!isLast && (
-            <Button onClick={goNext}>
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          )}
+                {!isLast && (
+                  <Button onClick={goNext}>
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                )}
+              </div>
+            </footer>
+          </Tabs.Content>
+
+          {/* Files tab */}
+          <Tabs.Content value="files" className="flex-1">
+            {generated ? (
+              <FileBrowser files={generated.files} />
+            ) : (
+              <div className="p-8 max-w-3xl">
+                <h2 className="text-xl font-semibold mb-2">Generated Files</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  No files generated yet. Complete the setup and generate files first.
+                </p>
+                <Button variant="outline" onClick={goToInstallStep}>
+                  Go to Install Step
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            )}
+          </Tabs.Content>
+
+          {/* Overview tab */}
+          <Tabs.Content value="overview" className="flex-1">
+            <OverviewTab config={config} />
+          </Tabs.Content>
         </div>
-      </footer>
-    </div>
+      </div>
+    </Tabs.Root>
   )
 }
 
@@ -288,6 +348,53 @@ function StepIndicator({ status, index }: { status: 'valid' | 'error' | 'current
   )
 }
 
+function FileBrowser({ files }: { files: GeneratedFile[] }) {
+  const [selected, setSelected] = useState(0)
+  const [copied, setCopied] = useState(false)
+
+  const copyContent = () => {
+    navigator.clipboard.writeText(files[selected]?.content || '')
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="p-8 max-w-5xl">
+      <h2 className="text-xl font-semibold mb-4">Generated Files</h2>
+      <div className="rounded-lg border bg-card overflow-hidden min-h-[400px]">
+        <div className="flex flex-wrap border-b bg-muted/50">
+          {files.map((f, i) => (
+            <button
+              key={f.path}
+              onClick={() => setSelected(i)}
+              className={cn(
+                'px-3 py-2 text-xs font-mono border-b-2 transition-colors',
+                i === selected
+                  ? 'border-primary text-foreground bg-card'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {f.path.replace(/^generated\//, '')}
+            </button>
+          ))}
+        </div>
+        <div className="relative">
+          <button
+            onClick={copyContent}
+            className="absolute top-2 right-2 rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors z-10"
+            title="Copy to clipboard"
+          >
+            {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+          </button>
+          <pre className="p-4 text-xs font-mono overflow-auto whitespace-pre">
+            {files[selected]?.content}
+          </pre>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function InstallStep({
   config,
   outputDir,
@@ -305,16 +412,6 @@ function InstallStep({
   generateError: string | null
   onGenerate: () => void
 }) {
-  const [selected, setSelected] = useState(0)
-  const [copied, setCopied] = useState(false)
-
-  const copyContent = () => {
-    if (!generated) return
-    navigator.clipboard.writeText(generated.files[selected]?.content || '')
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
   if (!generated) {
     return (
       <div className="space-y-4">
@@ -401,44 +498,6 @@ function InstallStep({
           Run each step in order. You can also close this wizard (Ctrl+C) and run the commands manually — the generated files are saved to disk.
         </p>
         <DeploySteps config={config} outputDir={outputDir} />
-      </div>
-
-      {/* File browser */}
-      <div>
-        <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-          <FileText className="h-4 w-4 text-muted-foreground" />
-          Generated Files
-        </h3>
-        <div className="rounded-lg border bg-card overflow-hidden min-h-[400px]">
-          <div className="flex flex-wrap border-b bg-muted/50">
-            {generated.files.map((f, i) => (
-              <button
-                key={f.path}
-                onClick={() => setSelected(i)}
-                className={cn(
-                  'px-3 py-2 text-xs font-mono border-b-2 transition-colors',
-                  i === selected
-                    ? 'border-primary text-foreground bg-card'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {f.path.replace(/^generated\//, '')}
-              </button>
-            ))}
-          </div>
-          <div className="relative">
-            <button
-              onClick={copyContent}
-              className="absolute top-2 right-2 rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors z-10"
-              title="Copy to clipboard"
-            >
-              {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
-            </button>
-            <pre className="p-4 text-xs font-mono overflow-auto whitespace-pre">
-              {generated.files[selected]?.content}
-            </pre>
-          </div>
-        </div>
       </div>
     </div>
   )

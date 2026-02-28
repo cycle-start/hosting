@@ -61,7 +61,7 @@ ingress:
   extraHosts:
     - host: temporal.massive-hosting.com
       service: temporal-ui
-      port: 8080
+      port: 8233
     - host: grafana.massive-hosting.com
       service: grafana
       port: 3000

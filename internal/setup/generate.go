@@ -127,6 +127,18 @@ func Generate(cfg *Config, outputDir string, progress ProgressFunc) (*GenerateRe
 		Content: cephKeyring,
 	})
 
+	// 7. Fetch kubeconfig from the controlplane node
+	progress("Fetching kubeconfig from controlplane...")
+	kubeconfig, err := fetchKubeconfig(cfg, controlplaneIP)
+	if err != nil {
+		progress(fmt.Sprintf("Warning: could not fetch kubeconfig: %v", err))
+	} else {
+		result.Files = append(result.Files, GeneratedFile{
+			Path:    "generated/kubeconfig.yaml",
+			Content: kubeconfig,
+		})
+	}
+
 	progress("Writing files to disk...")
 
 	// Write deployment files to disk (manifest already written above)
@@ -682,5 +694,42 @@ func generateCephKeyring() (keyring string, key string, err error) {
 	}
 
 	return keyring, key, nil
+}
+
+// fetchKubeconfig fetches the k3s kubeconfig from the controlplane node via SSH
+// and rewrites the server URL to use the controlplane IP instead of 127.0.0.1.
+func fetchKubeconfig(cfg *Config, controlplaneIP string) (string, error) {
+	isLocal := controlplaneIP == "127.0.0.1" || controlplaneIP == "localhost"
+
+	var out []byte
+	var err error
+	if isLocal {
+		out, err = exec.Command("sudo", "cat", "/etc/rancher/k3s/k3s.yaml").Output()
+	} else {
+		sshUser := cfg.SSHUser
+		if sshUser == "" {
+			sshUser = "ubuntu"
+		}
+		out, err = exec.Command("ssh",
+			"-o", "StrictHostKeyChecking=no",
+			"-o", "UserKnownHostsFile=/dev/null",
+			"-o", "LogLevel=ERROR",
+			fmt.Sprintf("%s@%s", sshUser, controlplaneIP),
+			"sudo cat /etc/rancher/k3s/k3s.yaml",
+		).Output()
+	}
+	if err != nil {
+		return "", fmt.Errorf("fetch k3s kubeconfig: %w", err)
+	}
+
+	kubeconfig := string(out)
+	if !isLocal {
+		kubeconfig = strings.ReplaceAll(kubeconfig,
+			"https://127.0.0.1:6443",
+			fmt.Sprintf("https://%s:6443", controlplaneIP),
+		)
+	}
+
+	return kubeconfig, nil
 }
 

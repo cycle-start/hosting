@@ -5,8 +5,8 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - port: 8080
-      targetPort: 8080
+    - port: 8233
+      targetPort: 8233
       protocol: TCP
       name: http
   selector:
@@ -33,9 +33,11 @@ spec:
         - name: temporal-ui
           image: temporalio/ui:latest
           ports:
-            - containerPort: 8080
+            - containerPort: 8233
           env:
             - name: TEMPORAL_ADDRESS
               value: "127.0.0.1:7233"
+            - name: TEMPORAL_UI_PORT
+              value: "8233"
             - name: TEMPORAL_CSRF_COOKIE_INSECURE
               value: "true"
