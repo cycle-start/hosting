@@ -67,41 +67,6 @@ export function ControlPlaneStep({ config, onChange, errors }: Props) {
           })}
         </div>
 
-        <div className="border-t pt-4 mt-2">
-          <h3 className="text-lg font-semibold mb-1">Storage Backend</h3>
-          <p className="text-muted-foreground text-sm mb-3">
-            Ceph provides S3 object storage and a shared CephFS filesystem for web nodes.
-            Single-node deployments can use local storage instead.
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            {([false, true] as const).map((enabled) => {
-              const selected = config.storage_enabled === enabled
-              return (
-                <button
-                  key={String(enabled)}
-                  onClick={() => onChange({ ...config, storage_enabled: enabled })}
-                  className={cn(
-                    'flex items-center gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-accent/50',
-                    selected && 'border-primary bg-accent/50 ring-1 ring-primary'
-                  )}
-                >
-                  <HardDrive className="h-5 w-5 shrink-0" />
-                  <div>
-                    <div className="font-medium text-sm">
-                      {enabled ? 'Ceph (S3 + CephFS)' : 'Local storage'}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {enabled
-                        ? 'S3 buckets & shared filesystem'
-                        : 'Simple /var/www/storage directory'}
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
         {db.mode === 'external' && (
           <div className="space-y-4 border-t pt-4">
             <div className="grid grid-cols-2 gap-3">
@@ -164,6 +129,41 @@ export function ControlPlaneStep({ config, onChange, errors }: Props) {
             </div>
           </div>
         )}
+
+        <div className="border-t pt-4 mt-2">
+          <h3 className="text-lg font-semibold mb-1">Storage Backend</h3>
+          <p className="text-muted-foreground text-sm mb-3">
+            Ceph provides S3 object storage and a shared CephFS filesystem for web nodes.
+            Single-node deployments can use local storage instead.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {([false, true] as const).map((enabled) => {
+              const selected = config.storage_enabled === enabled
+              return (
+                <button
+                  key={String(enabled)}
+                  onClick={() => onChange({ ...config, storage_enabled: enabled })}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-accent/50',
+                    selected && 'border-primary bg-accent/50 ring-1 ring-primary'
+                  )}
+                >
+                  <HardDrive className="h-5 w-5 shrink-0" />
+                  <div>
+                    <div className="font-medium text-sm">
+                      {enabled ? 'Ceph (S3 + CephFS)' : 'Local storage'}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {enabled
+                        ? 'S3 buckets & shared filesystem'
+                        : 'Simple /var/www/storage directory'}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
       </div>
     </div>
   )
