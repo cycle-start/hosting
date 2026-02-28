@@ -59,6 +59,11 @@ __pycache__/
 
 # Ansible
 /tmp/ansible_facts_cache/
+ansible/credentials/
+
+# Seeds — generated directories contain secrets (helm values, authelia config, ceph keys, etc.)
+seeds/*/generated/
+
 
 # Release archives
 dist/
