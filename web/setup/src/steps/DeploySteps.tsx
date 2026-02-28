@@ -9,17 +9,31 @@ interface StepState {
   status: StepStatus
   output: string[]
   exitCode?: number
+  startedAt?: number
+  finishedAt?: number
 }
 
 function makeInitialState(): StepState {
   return { status: 'pending', output: [] }
 }
 
+function formatElapsed(ms: number): string {
+  const totalSec = Math.floor(ms / 1000)
+  if (totalSec < 60) return `${totalSec}s`
+  const min = Math.floor(totalSec / 60)
+  const sec = totalSec % 60
+  return sec > 0 ? `${min}m${sec}s` : `${min}m`
+}
+
 export function DeploySteps({ config }: { config: Config; outputDir: string }) {
   const [steps, setSteps] = useState<DeployStepDef[]>([])
   const [states, setStates] = useState<Record<string, StepState>>({})
   const [activeStep, setActiveStep] = useState<DeployStepID | null>(null)
+  const [runAllActive, setRunAllActive] = useState(false)
   const abortRef = useRef<(() => void) | null>(null)
+  const runAllAbortRef = useRef(false)
+  const statesRef = useRef(states)
+  statesRef.current = states
 
   useEffect(() => {
     api.getSteps().then((s) => {
@@ -40,65 +54,101 @@ export function DeploySteps({ config }: { config: Config; outputDir: string }) {
     [activeStep],
   )
 
-  const runStep = useCallback(
-    (id: DeployStepID) => {
-      setActiveStep(id)
-      setStates((prev) => ({
-        ...prev,
-        [id]: { status: 'running', output: [] },
-      }))
-
-      const { abort, done } = api.executeStep(id, (event: ExecEvent) => {
-        if (event.type === 'output' && event.data != null) {
-          setStates((prev) => ({
-            ...prev,
-            [id]: {
-              ...prev[id],
-              output: [...prev[id].output, event.data!],
-            },
-          }))
-        } else if (event.type === 'done') {
-          const ok = event.exit_code === 0
-          setStates((prev) => ({
-            ...prev,
-            [id]: {
-              ...prev[id],
-              status: ok ? 'success' : 'failed',
-              exitCode: event.exit_code,
-            },
-          }))
-          setActiveStep(null)
-        } else if (event.type === 'error') {
-          setStates((prev) => ({
-            ...prev,
-            [id]: {
-              ...prev[id],
-              status: 'failed',
-              output: [...prev[id].output, event.data || 'Unknown error'],
-            },
-          }))
-          setActiveStep(null)
-        }
-      })
-
-      abortRef.current = abort
-
-      done.catch(() => {
-        // AbortError or network error
+  const executeStepAsync = useCallback(
+    (id: DeployStepID): Promise<number> => {
+      return new Promise((resolve) => {
+        setActiveStep(id)
         setStates((prev) => ({
           ...prev,
-          [id]: {
-            ...prev[id],
-            status: prev[id].status === 'running' ? 'failed' : prev[id].status,
-          },
+          [id]: { status: 'running', output: [], startedAt: Date.now() },
         }))
-        setActiveStep(null)
+
+        const { abort, done } = api.executeStep(id, (event: ExecEvent) => {
+          if (event.type === 'output' && event.data != null) {
+            setStates((prev) => ({
+              ...prev,
+              [id]: {
+                ...prev[id],
+                output: [...prev[id].output, event.data!],
+              },
+            }))
+          } else if (event.type === 'done') {
+            const ok = event.exit_code === 0
+            setStates((prev) => ({
+              ...prev,
+              [id]: {
+                ...prev[id],
+                status: ok ? 'success' : 'failed',
+                exitCode: event.exit_code,
+                finishedAt: Date.now(),
+              },
+            }))
+            setActiveStep(null)
+            resolve(event.exit_code ?? 1)
+          } else if (event.type === 'error') {
+            setStates((prev) => ({
+              ...prev,
+              [id]: {
+                ...prev[id],
+                status: 'failed',
+                output: [...prev[id].output, event.data || 'Unknown error'],
+                finishedAt: Date.now(),
+              },
+            }))
+            setActiveStep(null)
+            resolve(1)
+          }
+        })
+
+        abortRef.current = abort
+
+        done.catch(() => {
+          setStates((prev) => ({
+            ...prev,
+            [id]: {
+              ...prev[id],
+              status: prev[id].status === 'running' ? 'failed' : prev[id].status,
+            },
+          }))
+          setActiveStep(null)
+          resolve(1)
+        })
       })
     },
     [],
   )
 
+  const runStep = useCallback(
+    (id: DeployStepID) => {
+      executeStepAsync(id)
+    },
+    [executeStepAsync],
+  )
+
   const cancelStep = useCallback(() => {
+    abortRef.current?.()
+  }, [])
+
+  const runAllSteps = useCallback(async () => {
+    setRunAllActive(true)
+    runAllAbortRef.current = false
+
+    for (const step of steps) {
+      if (runAllAbortRef.current) break
+
+      // Skip already-succeeded steps
+      const current = statesRef.current[step.id]
+      if (current?.status === 'success') continue
+
+      const exitCode = await executeStepAsync(step.id)
+      if (exitCode !== 0 || runAllAbortRef.current) break
+    }
+
+    setRunAllActive(false)
+  }, [steps, executeStepAsync])
+
+  const cancelAll = useCallback(() => {
+    runAllAbortRef.current = true
     abortRef.current?.()
   }, [])
 
@@ -111,8 +161,24 @@ export function DeploySteps({ config }: { config: Config; outputDir: string }) {
     )
   }
 
+  const allSucceeded = steps.length > 0 && steps.every((s) => states[s.id]?.status === 'success')
+
   return (
     <div className="space-y-3">
+      <div>
+        {runAllActive ? (
+          <Button variant="outline" className="w-full" onClick={cancelAll}>
+            <Square className="h-3.5 w-3.5 mr-2" />
+            Cancel All
+          </Button>
+        ) : (
+          <Button className="w-full" onClick={runAllSteps} disabled={!!activeStep || allSucceeded}>
+            <Play className="h-3.5 w-3.5 mr-2" />
+            {allSucceeded ? 'All Steps Complete' : 'Install All'}
+          </Button>
+        )}
+      </div>
+
       {steps.map((step, i) => (
         <StepCard
           key={step.id}
@@ -156,7 +222,10 @@ function StepCard({
       <div className="flex items-center gap-3 px-4 py-3">
         <StepStatusIcon status={state.status} index={index} />
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium">{step.label}</div>
+          <div className="text-sm font-medium flex items-center gap-2">
+            {step.label}
+            <StepTimer state={state} />
+          </div>
           <div className="text-xs text-muted-foreground">{step.description}</div>
         </div>
         <div className="shrink-0 flex items-center gap-2">
@@ -198,6 +267,27 @@ function StepCard({
         </div>
       )}
     </div>
+  )
+}
+
+function StepTimer({ state }: { state: StepState }) {
+  const [now, setNow] = useState(Date.now())
+
+  useEffect(() => {
+    if (state.status !== 'running' || !state.startedAt) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [state.status, state.startedAt])
+
+  if (!state.startedAt) return null
+
+  const elapsed = (state.finishedAt || now) - state.startedAt
+  if (elapsed < 1000) return null
+
+  return (
+    <span className="text-[10px] font-normal text-muted-foreground tabular-nums">
+      {formatElapsed(elapsed)}
+    </span>
   )
 }
 
