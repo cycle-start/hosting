@@ -119,7 +119,7 @@ func main() {
 	// Temporal worker from accepting tasks that will immediately fail because
 	// the storage filesystem isn't ready. Retries every 5s for up to 2 minutes;
 	// if CephFS still isn't available, fatal out and let systemd restart us.
-	if cfg.NodeRole == "web" && os.Getenv("SKIP_CEPHFS_CHECK") != "1" {
+	if cfg.NodeRole == "web" && os.Getenv("CEPHFS_ENABLED") != "false" {
 		webStorageDir := agentCfg.WebStorageDir
 		const (
 			retryInterval = 5 * time.Second

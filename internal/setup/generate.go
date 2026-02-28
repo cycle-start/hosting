@@ -93,13 +93,17 @@ func Generate(cfg *Config, outputDir string, progress ProgressFunc) (*GenerateRe
 		Content: string(manifestData),
 	})
 
-	// Generate Ceph keys and web client keyring via Docker
-	cephFSID := uuid.New().String()
+	// Generate Ceph keys and web client keyring via Docker (only when storage is enabled)
+	var cephFSID, cephKeyring, cephWebKey string
+	if cfg.StorageEnabled {
+		cephFSID = uuid.New().String()
 
-	progress("Generating Ceph web client keyring (docker)...")
-	cephKeyring, cephWebKey, err := generateCephKeyring()
-	if err != nil {
-		return nil, fmt.Errorf("generate ceph keyring: %w", err)
+		progress("Generating Ceph web client keyring (docker)...")
+		var err error
+		cephKeyring, cephWebKey, err = generateCephKeyring()
+		if err != nil {
+			return nil, fmt.Errorf("generate ceph keyring: %w", err)
+		}
 	}
 
 	// Determine the controlplane IP
@@ -115,14 +119,17 @@ func Generate(cfg *Config, outputDir string, progress ProgressFunc) (*GenerateRe
 		}
 	}
 
-	// Determine storage node IP
-	storageNodeIP := controlplaneIP
-	if cfg.DeployMode == DeployModeMulti {
-		for _, n := range cfg.Nodes {
-			for _, r := range n.Roles {
-				if r == RoleStorage {
-					storageNodeIP = n.IP
-					break
+	// Determine storage node IP (only relevant when Ceph is enabled)
+	var storageNodeIP string
+	if cfg.StorageEnabled {
+		storageNodeIP = controlplaneIP
+		if cfg.DeployMode == DeployModeMulti {
+			for _, n := range cfg.Nodes {
+				for _, r := range n.Roles {
+					if r == RoleStorage {
+						storageNodeIP = n.IP
+						break
+					}
 				}
 			}
 		}
@@ -165,11 +172,13 @@ func Generate(cfg *Config, outputDir string, progress ProgressFunc) (*GenerateRe
 		Content: seedYml,
 	})
 
-	// 6. Include the pre-generated Ceph web client keyring
-	result.Files = append(result.Files, GeneratedFile{
-		Path:    "generated/ceph.client.web.keyring",
-		Content: cephKeyring,
-	})
+	// 6. Include the pre-generated Ceph web client keyring (only when storage is enabled)
+	if cfg.StorageEnabled {
+		result.Files = append(result.Files, GeneratedFile{
+			Path:    "generated/ceph.client.web.keyring",
+			Content: cephKeyring,
+		})
+	}
 
 	// 7. Fetch kubeconfig from the controlplane node (only if reachable)
 	if isReachable(controlplaneIP, "6443", 2*time.Second) {
@@ -455,6 +464,9 @@ func generateInventory(cfg *Config, controlplaneIP string) string {
 		b.WriteString("[controlplane]\n")
 		b.WriteString(hostEntry + "\n\n")
 		for _, role := range []string{"web", "db", "dns", "valkey", "email", "storage", "lb", "gateway", "dbadmin"} {
+			if role == "storage" && !cfg.StorageEnabled {
+				continue
+			}
 			b.WriteString(fmt.Sprintf("[%s]\n", role))
 			extra := ""
 			if role == "db" {
@@ -532,11 +544,13 @@ func generateAllGroupVars(cfg *Config, controlplaneIP, storageNodeIP, cephFSID, 
 	b.WriteString(fmt.Sprintf("core_api_token: \"{{ lookup('env', 'CORE_API_TOKEN') | default('%s', true) }}\"\n", cfg.APIKey))
 	b.WriteString("node_id: \"{{ inventory_hostname }}\"\n\n")
 
-	b.WriteString("# Ceph\n")
-	b.WriteString(fmt.Sprintf("ceph_fsid: \"%s\"\n", cephFSID))
-	b.WriteString(fmt.Sprintf("ceph_web_key: \"%s\"\n", cephWebKey))
-	b.WriteString("ceph_web_keyring_file: \"{{ inventory_dir }}/../../ceph.client.web.keyring\"\n")
-	b.WriteString(fmt.Sprintf("storage_node_ip: \"%s\"\n\n", storageNodeIP))
+	if cfg.StorageEnabled {
+		b.WriteString("# Ceph\n")
+		b.WriteString(fmt.Sprintf("ceph_fsid: \"%s\"\n", cephFSID))
+		b.WriteString(fmt.Sprintf("ceph_web_key: \"%s\"\n", cephWebKey))
+		b.WriteString("ceph_web_keyring_file: \"{{ inventory_dir }}/../../ceph.client.web.keyring\"\n")
+		b.WriteString(fmt.Sprintf("storage_node_ip: \"%s\"\n\n", storageNodeIP))
+	}
 
 	b.WriteString("# Stalwart\n")
 	b.WriteString(fmt.Sprintf("stalwart_hostname: \"%s\"\n", cfg.Brand.MailHostname))
@@ -578,6 +592,10 @@ func generateRoleGroupVars(cfg *Config, controlplaneIP string) []GeneratedFile {
 	webBuf.WriteString("  - xml\n")
 	webBuf.WriteString("  - zip\n")
 	webYml := webBuf.String()
+	if !cfg.StorageEnabled {
+		webYml += "\n# Ceph disabled: skip CephFS client setup on web nodes\n"
+		webYml += "skip_ceph_client: true\n"
+	}
 	if isSingleNode {
 		webYml += "\n# Single-node: nginx listens on 8080 to avoid conflicting with HAProxy on 80\n"
 		webYml += "nginx_listen_port: \"8080\"\n"
@@ -647,10 +665,11 @@ stalwart_admin_password: "%s"
 `, cfg.Brand.MailHostname, cfg.Email.StalwartAdminToken),
 	})
 
-	// storage.yml
-	files = append(files, GeneratedFile{
-		Path: base + "/storage.yml",
-		Content: `node_role: storage
+	// storage.yml (only when Ceph storage is enabled)
+	if cfg.StorageEnabled {
+		files = append(files, GeneratedFile{
+			Path: base + "/storage.yml",
+			Content: `node_role: storage
 shard_name: storage-1
 
 ceph_s3_enabled: true
@@ -658,7 +677,8 @@ ceph_filestore_enabled: true
 
 node_agent_rgw_endpoint: "http://localhost:7480"
 `,
-	})
+		})
+	}
 
 	// lb.yml
 	lbYml := `node_role: lb
@@ -777,11 +797,15 @@ func generateClusterYAML(cfg *Config, controlplaneIP string) string {
 			{"dns-1", "dns", "", 1},
 			{"valkey-1", "valkey", "", 1},
 			{"email-1", "email", "", 1},
-			{"storage-1", "storage", "", 1},
-			{"lb-1", "lb", "", 1},
-			{"gateway-1", "gateway", "", 1},
-			{"dbadmin-1", "dbadmin", "", 1},
 		}
+		if cfg.StorageEnabled {
+			shards = append(shards, shardInfo{"storage-1", "storage", "", 1})
+		}
+		shards = append(shards,
+			shardInfo{"lb-1", "lb", "", 1},
+			shardInfo{"gateway-1", "gateway", "", 1},
+			shardInfo{"dbadmin-1", "dbadmin", "", 1},
+		)
 	} else {
 		// Count nodes per role
 		roleCounts := map[NodeRole]int{}

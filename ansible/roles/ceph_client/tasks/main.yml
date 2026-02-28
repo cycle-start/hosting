@@ -1,3 +1,7 @@
+- name: Skip Ceph client setup (storage disabled)
+  meta: end_role
+  when: skip_ceph_client is defined and skip_ceph_client
+
 - name: Install CephFS client packages
   apt:
     name:
@@ -58,6 +62,7 @@
     port: 6789
     timeout: 300
     msg: "Waiting for Ceph monitor on {{ storage_node_ip }}:6789 (this can take a few minutes on first deploy)..."
+  tags: [ceph-mount]
 
 - name: Mount CephFS (retries are normal while Ceph MDS initializes)
   systemd:
@@ -66,6 +71,7 @@
     enabled: true
     state: started
   retries: 30
-  delay: 10
+  delay: 20
   register: cephfs_mount
   until: cephfs_mount is success
+  tags: [ceph-mount]

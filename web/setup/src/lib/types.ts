@@ -76,6 +76,7 @@ export interface Config {
   tls: TLSConfig
   email: EmailConfig
   sso: SSOConfig
+  storage_enabled: boolean
   php_versions: string[]
   api_key: string
 }

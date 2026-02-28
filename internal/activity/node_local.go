@@ -1112,7 +1112,7 @@ func (a *NodeLocal) CheckCephFSMount(ctx context.Context) (*CephFSStatus, error)
 	path := "/var/www/storage"
 	status := &CephFSStatus{Path: path}
 
-	if os.Getenv("SKIP_CEPHFS_CHECK") == "1" {
+	if os.Getenv("CEPHFS_ENABLED") == "false" {
 		status.Mounted = true
 		return status, nil
 	}

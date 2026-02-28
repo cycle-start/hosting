@@ -128,6 +128,10 @@ func Validate(cfg *Config) []ValidationError {
 			RoleDBAdmin: "DB Admin",
 		}
 		for _, role := range AllRoles {
+			// Storage role is only required when Ceph is enabled
+			if role == RoleStorage && !cfg.StorageEnabled {
+				continue
+			}
 			if !assignedRoles[role] {
 				missing = append(missing, roleLabels[role])
 			}

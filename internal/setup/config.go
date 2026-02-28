@@ -47,6 +47,9 @@ type Config struct {
 	// SSO (Authelia)
 	SSO SSOConfig `json:"sso" yaml:"sso"`
 
+	// Storage (Ceph) — opt-in; when false, web nodes use local /var/www/storage
+	StorageEnabled bool `json:"storage_enabled" yaml:"storage_enabled"`
+
 	// PHP versions to install on web nodes
 	PHPVersions []string `json:"php_versions,omitempty" yaml:"php_versions,omitempty"`
 

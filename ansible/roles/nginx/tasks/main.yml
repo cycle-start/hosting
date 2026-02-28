@@ -55,6 +55,12 @@
       }
     dest: /etc/logrotate.d/hosting-tenant-logs
 
+- name: Ensure web storage directory exists
+  file:
+    path: /var/www/storage
+    state: directory
+    mode: "0755"
+
 - name: Enable nginx
   systemd:
     name: nginx

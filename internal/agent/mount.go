@@ -16,9 +16,9 @@ const cephFSMagic = 0x00C36400
 // This is called before any mutating webroot/tenant operation to guard against
 // operating on an unmounted or wrong filesystem. It is also used as a startup
 // readiness gate for web node agents.
-// Set SKIP_CEPHFS_CHECK=1 to bypass (for development without CephFS).
+// Set CEPHFS_ENABLED=false to bypass (for deployments without CephFS).
 func CheckMount(path string) error {
-	if os.Getenv("SKIP_CEPHFS_CHECK") == "1" {
+	if os.Getenv("CEPHFS_ENABLED") == "false" {
 		return nil
 	}
 	var stat syscall.Statfs_t
