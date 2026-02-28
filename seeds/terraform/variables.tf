@@ -115,7 +115,7 @@ variable "db_nodes" {
 variable "db_repl_password" {
   description = "MySQL replication user password"
   type        = string
-  default     = "repl"
+  default     = "repl_pass"
   sensitive   = true
 }
 

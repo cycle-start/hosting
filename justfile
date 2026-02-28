@@ -55,7 +55,7 @@ init:
     fi
 
     # 3. Generate Ceph keys (write to both Terraform and Ansible)
-    if [ -f terraform/terraform.tfvars ] && grep -q ceph_fsid terraform/terraform.tfvars 2>/dev/null; then
+    if [ -f seeds/terraform/terraform.tfvars ] && grep -q ceph_fsid seeds/terraform/terraform.tfvars 2>/dev/null; then
         echo "✓ Ceph keys already in terraform.tfvars"
     else
         echo "Generating Ceph FSID and web client key..."
@@ -64,10 +64,10 @@ init:
         WEB_KEY="AQAAAAAAAAAAABAA${RAW_KEY}"
 
         # Write to terraform.tfvars (append or create)
-        echo "" >> terraform/terraform.tfvars 2>/dev/null || true
-        echo "ceph_fsid    = \"${FSID}\"" >> terraform/terraform.tfvars
-        echo "ceph_web_key = \"${WEB_KEY}\"" >> terraform/terraform.tfvars
-        echo "  Written to terraform/terraform.tfvars"
+        echo "" >> seeds/terraform/terraform.tfvars 2>/dev/null || true
+        echo "ceph_fsid    = \"${FSID}\"" >> seeds/terraform/terraform.tfvars
+        echo "ceph_web_key = \"${WEB_KEY}\"" >> seeds/terraform/terraform.tfvars
+        echo "  Written to seeds/terraform/terraform.tfvars"
 
         # Update ansible group_vars/all.yml in-place
         sed -i "s|^ceph_fsid:.*|ceph_fsid: \"${FSID}\"|" ansible/inventory/group_vars/all.yml
@@ -131,11 +131,11 @@ release version="":
 
     # 3. Copy Terraform
     echo "  Packaging Terraform..."
-    mkdir -p "${DIST}/terraform"
-    cp terraform/*.tf "${DIST}/terraform/"
-    cp -r terraform/cloud-init "${DIST}/terraform/cloud-init"
-    cp -r terraform/templates "${DIST}/terraform/templates"
-    cp terraform/cluster.yaml.tpl "${DIST}/terraform/"
+    mkdir -p "${DIST}/seeds/terraform"
+    cp seeds/terraform/*.tf "${DIST}/seeds/terraform/"
+    cp -r seeds/terraform/cloud-init "${DIST}/seeds/terraform/cloud-init"
+    cp -r seeds/terraform/templates "${DIST}/seeds/terraform/templates"
+    cp seeds/terraform/cluster.yaml.tpl "${DIST}/seeds/terraform/"
 
     # 4. Copy Helm chart
     echo "  Packaging Helm chart..."
@@ -378,7 +378,7 @@ gen-ceph-keys:
     FSID=$(uuidgen)
     RAW_KEY=$(python3 -c "import os,base64; print(base64.b64encode(os.urandom(16)).decode())")
     WEB_KEY="AQAAAAAAAAAAABAA${RAW_KEY}"
-    echo "Add these to terraform/terraform.tfvars:"
+    echo "Add these to seeds/terraform/terraform.tfvars:"
     echo "  ceph_fsid    = \"${FSID}\""
     echo "  ceph_web_key = \"${WEB_KEY}\""
     echo ""
@@ -517,7 +517,7 @@ vm-up:
         echo "Starting libvirt network 'hosting'..."; \
         sudo virsh net-start hosting; \
     fi
-    cd terraform && terraform apply -auto-approve
+    cd seeds/terraform && terraform apply -auto-approve
     just _wait-ssh
     just ansible-bootstrap
     just _wait-k3s
@@ -582,7 +582,7 @@ _wait-api:
     echo "  Check logs: kubectl --context hosting logs deploy/hosting-core-api --tail=50"; \
     exit 1
 
-# Wait for SSH on all VMs (after terraform creates them)
+# Wait for SSH on all VMs (after Terraform creates them)
 [private]
 _wait-ssh:
     #!/usr/bin/env bash
@@ -607,12 +607,12 @@ _wait-ssh:
 
 # Destroy VMs
 vm-down:
-    -cd terraform && terraform destroy -auto-approve
+    -cd seeds/terraform && terraform destroy -auto-approve
     @# Clean up leftover files that prevent pool deletion
     @if [ -d /var/lib/libvirt/hosting-pool ]; then \
         sudo rm -rf /var/lib/libvirt/hosting-pool; \
     fi
-    @# Ensure pool is undefined if terraform couldn't delete it
+    @# Ensure pool is undefined if Terraform couldn't delete it
     @if sudo virsh pool-info hosting >/dev/null 2>&1; then \
         sudo virsh pool-destroy hosting 2>/dev/null || true; \
         sudo virsh pool-undefine hosting 2>/dev/null || true; \
@@ -630,7 +630,7 @@ single-wipe:
     sudo virsh destroy single-0 2>/dev/null || true
     sudo virsh undefine single-0 --remove-all-storage 2>/dev/null || true
     @echo "Recreating single-node VM..."
-    cd terraform && terraform apply -auto-approve \
+    cd seeds/terraform && terraform apply -auto-approve \
         -target=libvirt_volume.single_node \
         -target=libvirt_volume.single_node_osd \
         -target=libvirt_cloudinit_disk.single_node \
@@ -657,7 +657,7 @@ single-setup:
 
 # Resolve VM name to IP (includes controlplane)
 _vm-ip name:
-    @cd terraform && terraform output -json 2>/dev/null | python3 -c "import sys,json; o=json.load(sys.stdin); d={'controlplane-0': o.get('controlplane_ip',{}).get('value','')}; [d.update(v['value']) for k,v in o.items() if k.endswith('_ips')]; print(d['{{name}}'])"
+    @cd seeds/terraform && terraform output -json 2>/dev/null | python3 -c "import sys,json; o=json.load(sys.stdin); d={'controlplane-0': o.get('controlplane_ip',{}).get('value','')}; [d.update(v['value']) for k,v in o.items() if k.endswith('_ips')]; print(d['{{name}}'])"
 
 # SSH into a VM (e.g. just vm-ssh controlplane-0, just vm-ssh web-1-node-0)
 vm-ssh name:

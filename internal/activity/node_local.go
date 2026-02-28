@@ -457,7 +457,7 @@ func (a *NodeLocal) CreateTempMySQLUser(ctx context.Context, params CreateTempMy
 // ConfigureReplication sets up this node as a replica of the given primary.
 func (a *NodeLocal) ConfigureReplication(ctx context.Context, params ConfigureReplicationParams) error {
 	a.logger.Info().Str("primary", params.PrimaryHost).Msg("ConfigureReplication")
-	return asNonRetryable(a.database.ConfigureReplication(ctx, params.PrimaryHost, params.ReplUser, params.ReplPassword))
+	return asNonRetryable(a.database.ConfigureReplication(ctx, params.PrimaryHost, params.ReplUser))
 }
 
 // SetReadOnly makes this MySQL instance read-only or read-write.

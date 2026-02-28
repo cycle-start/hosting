@@ -2,8 +2,8 @@
 packer/output/
 
 # Terraform state and providers
-terraform/.terraform/
-terraform/terraform.tfstate*
+seeds/terraform/.terraform/
+seeds/terraform/terraform.tfstate*
 
 # Built binaries
 bin/

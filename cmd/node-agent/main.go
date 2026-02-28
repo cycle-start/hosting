@@ -34,8 +34,9 @@ func main() {
 	logger := logging.NewLogger(cfg)
 
 	agentCfg := agent.Config{
-		MySQLDSN:        cfg.MySQLDSN,
-		NginxConfigDir:  getEnv("NGINX_CONFIG_DIR", "/etc/nginx"),
+		MySQLDSN:          cfg.MySQLDSN,
+		MySQLReplPassword: getEnv("MYSQL_REPL_PASSWORD", ""),
+		NginxConfigDir:    getEnv("NGINX_CONFIG_DIR", "/etc/nginx"),
 		NginxListenPort: getEnv("NGINX_LISTEN_PORT", "80"),
 		WebStorageDir:   getEnv("WEB_STORAGE_DIR", "/var/www/storage"),
 		CertDir:         getEnv("CERT_DIR", "/etc/ssl/hosting"),

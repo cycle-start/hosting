@@ -23,15 +23,17 @@ var validNameRe = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 
 // DatabaseManager handles MySQL database and user operations via the mysql CLI.
 type DatabaseManager struct {
-	logger zerolog.Logger
-	dsn    string
+	logger       zerolog.Logger
+	dsn          string
+	replPassword string
 }
 
 // NewDatabaseManager creates a new DatabaseManager.
 func NewDatabaseManager(logger zerolog.Logger, cfg Config) *DatabaseManager {
 	return &DatabaseManager{
-		logger: logger.With().Str("component", "database-manager").Logger(),
-		dsn:    cfg.MySQLDSN,
+		logger:       logger.With().Str("component", "database-manager").Logger(),
+		dsn:          cfg.MySQLDSN,
+		replPassword: cfg.MySQLReplPassword,
 	}
 }
 
@@ -364,7 +366,12 @@ type ReplicationStatus struct {
 }
 
 // ConfigureReplication sets up this node as a replica of the given primary.
-func (m *DatabaseManager) ConfigureReplication(ctx context.Context, primaryHost, replUser, replPassword string) error {
+// The replication password is read from the node-agent's local config
+// (MYSQL_REPL_PASSWORD env var), not passed through the workflow.
+func (m *DatabaseManager) ConfigureReplication(ctx context.Context, primaryHost, replUser string) error {
+	if m.replPassword == "" {
+		return fmt.Errorf("MYSQL_REPL_PASSWORD not configured on this node")
+	}
 	m.logger.Info().Str("primary", primaryHost).Msg("configuring replication")
 	_ = m.execMySQL(ctx, "STOP REPLICA")
 	if err := m.execMySQL(ctx, "RESET REPLICA ALL"); err != nil {
@@ -372,7 +379,7 @@ func (m *DatabaseManager) ConfigureReplication(ctx context.Context, primaryHost,
 	}
 	sql := fmt.Sprintf(
 		`CHANGE REPLICATION SOURCE TO SOURCE_HOST='%s', SOURCE_PORT=3306, SOURCE_USER='%s', SOURCE_PASSWORD='%s', SOURCE_AUTO_POSITION=1, SOURCE_CONNECT_RETRY=10, SOURCE_RETRY_COUNT=86400, GET_SOURCE_PUBLIC_KEY=1`,
-		primaryHost, replUser, replPassword,
+		primaryHost, replUser, m.replPassword,
 	)
 	if err := m.execMySQL(ctx, sql); err != nil {
 		return fmt.Errorf("change replication source: %w", err)

@@ -330,7 +330,7 @@ func (s *ConvergeShardWorkflowTestSuite) TestPartialFailureContinues() {
 
 	// ConfigureReplication on replica - fails.
 	s.env.OnActivity("ConfigureReplication", mock.Anything, activity.ConfigureReplicationParams{
-		PrimaryHost: primaryIP, ReplUser: "repl", ReplPassword: "repl_pass",
+		PrimaryHost: primaryIP, ReplUser: "repl",
 	}).Return(fmt.Errorf("node unreachable"))
 
 	// Should end in failed state with error message.

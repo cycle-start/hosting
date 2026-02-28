@@ -19,7 +19,7 @@
 .env.local
 
 # Terraform local overrides
-terraform/terraform.tfvars
+seeds/terraform/terraform.tfvars
 
 # OS
 .DS_Store

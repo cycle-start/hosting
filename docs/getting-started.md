@@ -187,9 +187,11 @@ internal/
   model/             Domain models
   platform/          Shared utilities
 
-terraform/           Terraform configs for VM provisioning
+seeds/
+  terraform/         Terraform configs for dev VM provisioning
+  single/            Single-node dev setup
+  multi/             Multi-node dev setup
 packer/              Packer configs for golden images
-seeds/               Test data seed YAML files
 migrations/
   core/              Core database migrations
   powerdns/          PowerDNS database migrations

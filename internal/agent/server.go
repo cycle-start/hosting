@@ -8,14 +8,15 @@ import (
 
 // Config holds the configuration for the node agent server.
 type Config struct {
-	MySQLDSN        string
-	NginxConfigDir  string
-	NginxLogDir     string
-	NginxListenPort string // Port for nginx listen directives (default "80")
-	WebStorageDir   string
-	CertDir         string
-	ValkeyConfigDir string
-	ValkeyDataDir   string
+	MySQLDSN           string
+	MySQLReplPassword  string // MYSQL_REPL_PASSWORD — replication user password, read from local env
+	NginxConfigDir     string
+	NginxLogDir        string
+	NginxListenPort    string // Port for nginx listen directives (default "80")
+	WebStorageDir      string
+	CertDir            string
+	ValkeyConfigDir    string
+	ValkeyDataDir      string
 	// InitSystem selects the service manager implementation.
 	// "systemd" for production (VMs/bare metal), "direct" for Docker dev.
 	InitSystem string

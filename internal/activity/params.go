@@ -354,10 +354,11 @@ type CreateTempMySQLUserParams struct {
 }
 
 // ConfigureReplicationParams holds parameters for configuring MySQL replication.
+// The replication password is read from the node-agent's local environment
+// (MYSQL_REPL_PASSWORD), not passed through the workflow.
 type ConfigureReplicationParams struct {
-	PrimaryHost  string
-	ReplUser     string
-	ReplPassword string
+	PrimaryHost string
+	ReplUser    string
 }
 
 // ConfigureTenantAddressesParams holds parameters for configuring tenant ULA addresses on a node.
