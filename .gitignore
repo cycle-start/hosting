@@ -47,6 +47,8 @@ setup.yaml
 
 # Generated API docs
 internal/api/docs/
+internal/controlpanel/docs/swagger.*
+internal/controlpanel/docs/docs.go
 
 # Packer output images
 packer/output/

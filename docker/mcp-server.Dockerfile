@@ -4,7 +4,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN swag init -g internal/api/doc.go -o internal/api/docs --parseDependency --parseInternal
+RUN swag init -g internal/api/doc.go -o internal/api/docs --parseDependency --parseInternal --exclude internal/controlpanel
 RUN CGO_ENABLED=0 go build -o /bin/mcp-server ./cmd/mcp-server
 
 FROM ubuntu:24.04
