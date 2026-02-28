@@ -1,77 +1,75 @@
-- name: Skip Ceph client setup (storage disabled)
-  meta: end_role
-  when: skip_ceph_client is defined and skip_ceph_client
+- when: skip_ceph_client is not defined or not skip_ceph_client
+  block:
+    - name: Install CephFS client packages
+      apt:
+        name:
+          - ceph-common
+          - openssh-server
+        state: present
+        update_cache: true
 
-- name: Install CephFS client packages
-  apt:
-    name:
-      - ceph-common
-      - openssh-server
-    state: present
-    update_cache: true
+    - name: Create required directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - /var/www/storage
+        - /etc/ssl/hosting
+        - /etc/ceph
 
-- name: Create required directories
-  file:
-    path: "{{ item }}"
-    state: directory
-    mode: "0755"
-  loop:
-    - /var/www/storage
-    - /etc/ssl/hosting
-    - /etc/ceph
+    - name: Deploy Ceph client config
+      template:
+        src: ceph.conf.j2
+        dest: /etc/ceph/ceph.conf
 
-- name: Deploy Ceph client config
-  template:
-    src: ceph.conf.j2
-    dest: /etc/ceph/ceph.conf
+    - name: Deploy Ceph web client secret
+      copy:
+        content: "{{ ceph_web_key }}"
+        dest: /etc/ceph/ceph.client.web.secret
+        mode: "0600"
 
-- name: Deploy Ceph web client secret
-  copy:
-    content: "{{ ceph_web_key }}"
-    dest: /etc/ceph/ceph.client.web.secret
-    mode: "0600"
+    - name: Deploy CephFS mount unit
+      template:
+        src: var-www-storage.mount.j2
+        dest: /etc/systemd/system/var-www-storage.mount
+      notify: reload systemd
 
-- name: Deploy CephFS mount unit
-  template:
-    src: var-www-storage.mount.j2
-    dest: /etc/systemd/system/var-www-storage.mount
-  notify: reload systemd
+    - name: Hide other users' processes (hidepid=2)
+      lineinfile:
+        path: /etc/fstab
+        line: "proc /proc proc defaults,hidepid=2 0 0"
+        regexp: "^proc /proc"
+        state: present
 
-- name: Hide other users' processes (hidepid=2)
-  lineinfile:
-    path: /etc/fstab
-    line: "proc /proc proc defaults,hidepid=2 0 0"
-    regexp: "^proc /proc"
-    state: present
+    - name: Create node-agent CephFS mount ordering drop-in directory
+      file:
+        path: /etc/systemd/system/node-agent.service.d
+        state: directory
+        mode: "0755"
 
-- name: Create node-agent CephFS mount ordering drop-in directory
-  file:
-    path: /etc/systemd/system/node-agent.service.d
-    state: directory
-    mode: "0755"
+    - name: Deploy CephFS mount ordering drop-in
+      template:
+        src: cephfs-drop-in.conf.j2
+        dest: /etc/systemd/system/node-agent.service.d/cephfs.conf
+      notify: reload systemd
 
-- name: Deploy CephFS mount ordering drop-in
-  template:
-    src: cephfs-drop-in.conf.j2
-    dest: /etc/systemd/system/node-agent.service.d/cephfs.conf
-  notify: reload systemd
+    - name: Wait for Ceph monitor to be reachable
+      wait_for:
+        host: "{{ storage_node_ip }}"
+        port: 6789
+        timeout: 300
+        msg: "Waiting for Ceph monitor on {{ storage_node_ip }}:6789 (this can take a few minutes on first deploy)..."
+      tags: [ceph-mount]
 
-- name: Wait for Ceph monitor to be reachable
-  wait_for:
-    host: "{{ storage_node_ip }}"
-    port: 6789
-    timeout: 300
-    msg: "Waiting for Ceph monitor on {{ storage_node_ip }}:6789 (this can take a few minutes on first deploy)..."
-  tags: [ceph-mount]
-
-- name: Mount CephFS (retries are normal while Ceph MDS initializes)
-  systemd:
-    name: var-www-storage.mount
-    daemon_reload: true
-    enabled: true
-    state: started
-  retries: 30
-  delay: 20
-  register: cephfs_mount
-  until: cephfs_mount is success
-  tags: [ceph-mount]
+    - name: Mount CephFS (retries are normal while Ceph MDS initializes)
+      systemd:
+        name: var-www-storage.mount
+        daemon_reload: true
+        enabled: true
+        state: started
+      retries: 30
+      delay: 20
+      register: cephfs_mount
+      until: cephfs_mount is success
+      tags: [ceph-mount]
