@@ -11,6 +11,7 @@ type Config struct {
 	MySQLDSN        string
 	NginxConfigDir  string
 	NginxLogDir     string
+	NginxListenPort string // Port for nginx listen directives (default "80")
 	WebStorageDir   string
 	CertDir         string
 	ValkeyConfigDir string

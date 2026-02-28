@@ -5,13 +5,15 @@
       - socat
     state: present
     update_cache: true
+  register: haproxy_install
 
 # HAProxy auto-starts on install with the default config. Stop it so we can
 # configure directories and certs before starting with our custom config.
-- name: Stop HAProxy after install
+- name: Stop HAProxy after fresh install
   systemd:
     name: haproxy
     state: stopped
+  when: haproxy_install.changed
   failed_when: false
 
 - name: Create HAProxy map directory
@@ -67,6 +69,7 @@
     group: root
     mode: "0644"
     validate: haproxy -c -f %s
+  notify: restart haproxy
 
 - name: Set HAProxy directory ownership
   file:
@@ -87,4 +90,4 @@
   systemd:
     name: haproxy
     enabled: true
-    state: restarted
+    state: started

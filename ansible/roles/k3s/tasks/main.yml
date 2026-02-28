@@ -3,8 +3,12 @@
     path: /usr/local/bin/k3s
   register: k3s_binary
 
+- name: Build k3s install flags
+  set_fact:
+    _k3s_disable_flags: "{{ '--disable=servicelb --disable=traefik' if (k3s_disable_traefik | default(false) | bool) else '--disable=servicelb' }}"
+
 - name: Install k3s
-  shell: curl -sfL https://get.k3s.io | INSTALL_K3S_SKIP_START=true sh -s - --disable=servicelb
+  shell: curl -sfL https://get.k3s.io | INSTALL_K3S_SKIP_START=true sh -s - {{ _k3s_disable_flags }}
   when: not k3s_binary.stat.exists
 
 - name: Start k3s

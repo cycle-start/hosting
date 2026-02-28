@@ -21,17 +21,68 @@ frontend stats
     stats uri /stats
     stats refresh 10s
 
-# Main HTTP/HTTPS frontend (tenant traffic only)
+# Main HTTP/HTTPS frontend
 frontend http
     bind *:80
     bind *:443 ssl crt /etc/haproxy/certs/hosting.pem alpn http/1.1
-    # Tenant routing via dynamic map
+
+{% if base_domain is defined %}
+    # Control plane services (by exact hostname)
+    acl is_home        hdr(host) -i home.{{ base_domain }}
+    acl is_admin       hdr(host) -i admin.{{ base_domain }}
+    acl is_api         hdr(host) -i api.{{ base_domain }}
+    acl is_dbadmin     hdr(host) -i dbadmin.{{ base_domain }}
+    acl is_temporal    hdr(host) -i temporal.{{ base_domain }}
+    acl is_grafana     hdr(host) -i grafana.{{ base_domain }}
+    acl is_prometheus  hdr(host) -i prometheus.{{ base_domain }}
+    acl is_mcp         hdr(host) -i mcp.{{ base_domain }}
+
+    use_backend bk_controlpanel   if is_home
+    use_backend bk_admin          if is_admin
+    use_backend bk_core_api       if is_api
+    use_backend bk_dbadmin        if is_dbadmin
+    use_backend bk_temporal       if is_temporal
+    use_backend bk_grafana        if is_grafana
+    use_backend bk_prometheus     if is_prometheus
+    use_backend bk_mcp            if is_mcp
+{% endif %}
+
+    # Tenant routing via dynamic FQDN map (fallback)
     use_backend %[req.hdr(host),lower,map(/var/lib/haproxy/maps/fqdn-to-shard.map,shard-default)]
 
 # Default backend (returns 503 for unmapped FQDNs)
 backend shard-default
     mode http
     http-request deny deny_status 503
+
+{% if base_domain is defined %}
+# Control plane backends
+backend bk_controlpanel
+    server controlpanel {{ controlplane_ip | default('127.0.0.1') }}:3002 check
+
+backend bk_admin
+    server admin {{ controlplane_ip | default('127.0.0.1') }}:3001 check
+
+backend bk_core_api
+    server coreapi {{ controlplane_ip | default('127.0.0.1') }}:8090 check
+
+backend bk_dbadmin
+{% for host in groups.get('dbadmin', []) %}
+    server {{ host }} {{ hostvars[host].ansible_host | default('127.0.0.1') }}:{{ hostvars[host].dbadmin_listen_port | default('443') }} check ssl verify none
+{% endfor %}
+
+backend bk_temporal
+    server temporal {{ controlplane_ip | default('127.0.0.1') }}:8080 check
+
+backend bk_grafana
+    server grafana {{ controlplane_ip | default('127.0.0.1') }}:3000 check
+
+backend bk_prometheus
+    server prometheus {{ controlplane_ip | default('127.0.0.1') }}:9090 check
+
+backend bk_mcp
+    server mcp {{ controlplane_ip | default('127.0.0.1') }}:8091 check
+{% endif %}
 
 # Shard backends with real VM IPs
 {# Build shard map from web group inventory #}
@@ -49,7 +100,7 @@ backend shard-{{ sname }}
     balance hdr(Host)
     hash-type consistent
 {% for server in members %}
-    server {{ server.name }} {{ server.ip }}:80 check
+    server {{ server.name }} {{ server.ip }}:{{ web_backend_port | default('80') }} check
 {% endfor %}
 
 {% endfor %}

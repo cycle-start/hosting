@@ -2,3 +2,4 @@
   systemd:
     name: pdns
     state: restarted
+  failed_when: false

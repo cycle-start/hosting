@@ -93,3 +93,18 @@
   roles:
     - { role: vector, tags: [vector] }
     - { role: k3s, tags: [k3s] }
+  tasks:
+    - name: Wait for PowerDNS database to be ready
+      wait_for:
+        host: "{{ powerdns_db_host | default('127.0.0.1') }}"
+        port: "{{ powerdns_db_port | default('5433') }}"
+        timeout: 120
+      when: "'dns' in group_names"
+      tags: [powerdns]
+
+    - name: Start PowerDNS now that database is available
+      systemd:
+        name: pdns
+        state: restarted
+      when: "'dns' in group_names"
+      tags: [powerdns]

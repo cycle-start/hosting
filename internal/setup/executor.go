@@ -18,11 +18,12 @@ import (
 type StepID string
 
 const (
-	StepSSHCA       StepID = "ssh_ca"
-	StepAnsible     StepID = "ansible"
-	StepRegisterKey StepID = "register_api_key"
-	StepClusterApply StepID = "cluster_apply"
-	StepSeed        StepID = "seed"
+	StepSSHCA            StepID = "ssh_ca"
+	StepAnsible          StepID = "ansible"
+	StepDeployControlplane StepID = "deploy_controlplane"
+	StepRegisterKey      StepID = "register_api_key"
+	StepClusterApply     StepID = "cluster_apply"
+	StepSeed             StepID = "seed"
 )
 
 // StepDef describes a deployment step for the UI.
@@ -39,6 +40,7 @@ func AllSteps() []StepDef {
 	return []StepDef{
 		{ID: StepSSHCA, Label: "Generate SSH CA keypair", Description: "Generate an ed25519 SSH Certificate Authority keypair for node-to-node communication.", MultiOnly: true},
 		{ID: StepAnsible, Label: "Run Ansible provisioning", Description: "Install packages, configure services, and deploy agents on all hosts."},
+		{ID: StepDeployControlplane, Label: "Deploy control plane", Description: "Build Docker images, import into k3s, and deploy the control plane via Helm."},
 		{ID: StepRegisterKey, Label: "Register API key", Description: "Create the authentication key used by all components to communicate with the control plane."},
 		{ID: StepClusterApply, Label: "Register cluster topology", Description: "Tell the control plane about the region, cluster, nodes, shards, and runtimes."},
 		{ID: StepSeed, Label: "Seed initial brand", Description: "Create the first brand with its domains, nameservers, and mail configuration."},
@@ -89,6 +91,13 @@ func stepCommand(id StepID, cfg *Config, outputDir string) (dir string, name str
 	case StepAnsible:
 		inventory := filepath.Join(absOutput, "generated", "ansible", "inventory", "static.ini")
 		return "ansible", "ansible-playbook", []string{"site.yml", "-i", inventory}, nil
+	case StepDeployControlplane:
+		targetHost := cfg.singleNodeIP()
+		sshUser := cfg.SSHUser
+		if sshUser == "" {
+			sshUser = "ubuntu"
+		}
+		return ".", "scripts/deploy-controlplane.sh", []string{targetHost, sshUser}, nil
 	case StepRegisterKey:
 		return ".", "bin/core-api", []string{"create-api-key", "--name", "setup", "--raw-key", cfg.APIKey}, nil
 	case StepClusterApply:

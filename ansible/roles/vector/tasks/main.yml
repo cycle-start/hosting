@@ -1,29 +1,34 @@
-- name: Check if Vector is installed
-  command: dpkg -s vector
-  register: vector_installed
-  changed_when: false
-  failed_when: false
+- name: Remove old timber.io Vector repo
+  file:
+    path: /etc/apt/sources.list.d/vector.list
+    state: absent
 
-- name: Add Vector GPG key
+- name: Add Datadog GPG keys for Vector
   get_url:
-    url: https://repositories.timber.io/public/vector/gpg.3543DB2D0A2BC4B8.key
-    dest: /usr/share/keyrings/vector-archive-keyring.asc
+    url: "https://keys.datadoghq.com/{{ item }}"
+    dest: "/usr/share/keyrings/datadog-{{ item }}"
     mode: "0644"
-  when: vector_installed.rc != 0
+  loop:
+    - DATADOG_APT_KEY_CURRENT.public
+    - DATADOG_APT_KEY_F14F620E.public
+    - DATADOG_APT_KEY_C0962C7D.public
+
+- name: Create Datadog combined keyring
+  shell: cat /usr/share/keyrings/datadog-DATADOG_APT_KEY_*.public | gpg --dearmor -o /usr/share/keyrings/datadog-archive-keyring.gpg
+  args:
+    creates: /usr/share/keyrings/datadog-archive-keyring.gpg
 
 - name: Add Vector APT repository
   apt_repository:
-    repo: "deb [signed-by=/usr/share/keyrings/vector-archive-keyring.asc] https://repositories.timber.io/public/vector/deb/ubuntu {{ ansible_distribution_release }} main"
+    repo: "deb [signed-by=/usr/share/keyrings/datadog-archive-keyring.gpg] https://apt.vector.dev/ stable vector-0"
     filename: vector
     state: present
-  when: vector_installed.rc != 0
 
 - name: Install Vector
   apt:
     name: vector
     state: present
     update_cache: true
-  when: vector_installed.rc != 0
 
 - name: Create Vector config directories
   file:

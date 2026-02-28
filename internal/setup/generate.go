@@ -245,6 +245,11 @@ func generateAllGroupVars(cfg *Config, controlplaneIP, storageNodeIP, cephFSID, 
 	b.WriteString(fmt.Sprintf("stalwart_hostname: \"%s\"\n", cfg.Brand.MailHostname))
 	b.WriteString(fmt.Sprintf("stalwart_admin_password: \"%s\"\n", cfg.Email.StalwartAdminToken))
 
+	// Base domain for hostname-based routing (HAProxy ACLs, etc.)
+	if cfg.Brand.PlatformDomain != "" {
+		b.WriteString(fmt.Sprintf("\nbase_domain: \"%s\"\n", cfg.Brand.PlatformDomain))
+	}
+
 	return b.String()
 }
 
@@ -252,10 +257,11 @@ func generateRoleGroupVars(cfg *Config, controlplaneIP string) []GeneratedFile {
 	const base = "generated/ansible/inventory/group_vars"
 	var files []GeneratedFile
 
-	// web.yml
-	files = append(files, GeneratedFile{
-		Path: base + "/web.yml",
-		Content: `node_role: web
+	// In single-node mode, the web and lb roles share a machine so nginx must
+	// listen on a non-standard port to avoid conflicting with HAProxy on 80/443.
+	isSingleNode := cfg.DeployMode == DeployModeSingle
+
+	webYml := `node_role: web
 shard_name: web-1
 
 node_agent_nginx_config_dir: /etc/nginx
@@ -275,7 +281,26 @@ php_extensions:
   - mbstring
   - xml
   - zip
+`
+	if isSingleNode {
+		webYml += "\n# Single-node: nginx listens on 8080 to avoid conflicting with HAProxy on 80\n"
+		webYml += "nginx_listen_port: \"8080\"\n"
+	}
+
+	// controlplane.yml
+	if isSingleNode {
+		files = append(files, GeneratedFile{
+			Path: base + "/controlplane.yml",
+			Content: `# Single-node: disable Traefik since HAProxy handles all ingress
+k3s_disable_traefik: true
 `,
+		})
+	}
+
+	// web.yml
+	files = append(files, GeneratedFile{
+		Path:    base + "/web.yml",
+		Content: webYml,
 	})
 
 	// db.yml
@@ -340,11 +365,16 @@ node_agent_rgw_endpoint: "http://localhost:7480"
 	})
 
 	// lb.yml
-	files = append(files, GeneratedFile{
-		Path: base + "/lb.yml",
-		Content: `node_role: lb
+	lbYml := `node_role: lb
 shard_name: lb-1
-`,
+`
+	if isSingleNode {
+		lbYml += "\n# Single-node: web nginx listens on 8080, HAProxy backends must match\n"
+		lbYml += "web_backend_port: \"8080\"\n"
+	}
+	files = append(files, GeneratedFile{
+		Path:    base + "/lb.yml",
+		Content: lbYml,
 	})
 
 	// gateway.yml
@@ -356,11 +386,16 @@ shard_name: gateway-1
 	})
 
 	// dbadmin.yml
-	files = append(files, GeneratedFile{
-		Path: base + "/dbadmin.yml",
-		Content: `node_role: dbadmin
+	dbadminYml := `node_role: dbadmin
 shard_name: dbadmin-1
-`,
+`
+	if isSingleNode {
+		dbadminYml += "\n# Single-node: dbadmin uses HTTPS-only on 8443 to avoid conflicting with HAProxy\n"
+		dbadminYml += "dbadmin_listen_port: \"8443\"\n"
+	}
+	files = append(files, GeneratedFile{
+		Path:    base + "/dbadmin.yml",
+		Content: dbadminYml,
 	})
 
 	return files

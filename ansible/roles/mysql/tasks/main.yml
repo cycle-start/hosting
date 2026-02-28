@@ -6,14 +6,6 @@
     state: present
     update_cache: true
 
-- name: Configure MySQL root for passwordless TCP access
-  shell: |
-    systemctl start mysql
-    mysql -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY ''; FLUSH PRIVILEGES;"
-    systemctl stop mysql
-  args:
-    creates: /etc/mysql/mysql.conf.d/replication.cnf
-
 - name: Deploy server-id config
   template:
     src: server-id.cnf.j2
@@ -38,6 +30,17 @@
     enabled: true
     state: started
 
+# Flush pending restart handlers so MySQL picks up config changes
+# before we configure users
+- name: Flush handlers
+  meta: flush_handlers
+
+- name: Configure MySQL root for passwordless access
+  command: >
+    mysql --socket=/var/run/mysqld/mysqld.sock -u root
+    -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY ''; FLUSH PRIVILEGES;"
+  changed_when: false
+
 - name: Create replication user
   community.mysql.mysql_user:
     name: repl
@@ -45,5 +48,6 @@
     password: "{{ mysql_repl_password }}"
     priv: "*.*:REPLICATION SLAVE,REPLICATION CLIENT"
     state: present
+    column_case_sensitive: true
     login_unix_socket: /var/run/mysqld/mysqld.sock
   when: mysql_repl_password is defined

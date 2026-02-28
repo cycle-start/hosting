@@ -1,3 +1,5 @@
+{% set listen_port = dbadmin_listen_port | default('443') %}
+{% if listen_port | string == '443' %}
 server {
     listen 80;
     listen [::]:80;
@@ -30,10 +32,11 @@ server {
         try_files $uri $uri/ =404;
     }
 }
+{% endif %}
 
 server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
+    listen {{ listen_port }} ssl;
+    listen [::]:{{ listen_port }} ssl;
     server_name _;
 
     ssl_certificate /etc/nginx/certs/dbadmin.pem;

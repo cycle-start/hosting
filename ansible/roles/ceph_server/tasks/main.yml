@@ -99,3 +99,14 @@
   when:
     - ceph_filestore_enabled | default(false)
     - ceph_admin_keyring.stat.exists
+
+- name: Wait for MDS to become active
+  command: ceph mds stat --format=json
+  register: mds_stat
+  until: "'up:active' in mds_stat.stdout"
+  retries: 30
+  delay: 5
+  changed_when: false
+  when:
+    - ceph_filestore_enabled | default(false)
+    - ceph_admin_keyring.stat.exists

@@ -41,8 +41,9 @@
     mode: "0640"
   notify: restart powerdns
 
-- name: Enable and start PowerDNS
+- name: Enable PowerDNS
   systemd:
     name: pdns
     enabled: true
     state: started
+  failed_when: false
