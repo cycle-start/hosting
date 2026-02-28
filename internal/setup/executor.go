@@ -97,7 +97,7 @@ func stepCommand(id StepID, cfg *Config, outputDir string) (dir string, name str
 		if sshUser == "" {
 			sshUser = "ubuntu"
 		}
-		return ".", "scripts/deploy-controlplane.sh", []string{targetHost, sshUser}, nil
+		return ".", "scripts/deploy-controlplane.sh", []string{targetHost, sshUser, absOutput}, nil
 	case StepRegisterKey:
 		return ".", "bin/core-api", []string{"create-api-key", "--name", "setup", "--raw-key", cfg.APIKey}, nil
 	case StepClusterApply:

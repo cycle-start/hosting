@@ -7,8 +7,9 @@
 # It's called by the setup wizard's "Deploy control plane" step.
 set -euo pipefail
 
-TARGET_HOST="${1:?Usage: deploy-controlplane.sh <target_host> [ssh_user]}"
+TARGET_HOST="${1:?Usage: deploy-controlplane.sh <target_host> [ssh_user] [output_dir]}"
 SSH_USER="${2:-ubuntu}"
+OUTPUT_DIR="${3:-.}"
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
 
 is_local() {
@@ -53,18 +54,17 @@ else
 fi
 
 echo "==> Fetching kubeconfig..."
+KUBECONFIG_OUT="${OUTPUT_DIR}/generated/kubeconfig.yaml"
 if is_local; then
-    mkdir -p "$HOME/.kube"
-    sudo cp /etc/rancher/k3s/k3s.yaml "$HOME/.kube/config"
-    sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
-    export KUBECONFIG="$HOME/.kube/config"
+    sudo cp /etc/rancher/k3s/k3s.yaml "$KUBECONFIG_OUT"
+    sudo chown "$(id -u):$(id -g)" "$KUBECONFIG_OUT"
 else
-    remote_cmd "mkdir -p /home/${SSH_USER}/.kube && sudo cp /etc/rancher/k3s/k3s.yaml /home/${SSH_USER}/.kube/config && sudo chown ${SSH_USER}:${SSH_USER} /home/${SSH_USER}/.kube/config"
-    scp $SSH_OPTS "${SSH_USER}@${TARGET_HOST}:/home/${SSH_USER}/.kube/config" /tmp/k3s-config
-    # Rewrite the server address to point to the target host
-    sed -i "s|https://127.0.0.1:6443|https://${TARGET_HOST}:6443|g" /tmp/k3s-config
-    export KUBECONFIG=/tmp/k3s-config
+    remote_cmd "sudo cat /etc/rancher/k3s/k3s.yaml" > "$KUBECONFIG_OUT"
+    sed -i "s|https://127.0.0.1:6443|https://${TARGET_HOST}:6443|g" "$KUBECONFIG_OUT"
 fi
+chmod 600 "$KUBECONFIG_OUT"
+export KUBECONFIG="$KUBECONFIG_OUT"
+echo "    Saved to ${KUBECONFIG_OUT}"
 
 echo "==> Applying k3s infrastructure manifests..."
 for f in deploy/k3s/*.yaml; do
