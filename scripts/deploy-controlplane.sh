@@ -108,4 +108,19 @@ for i in $(seq 1 60); do
     sleep 2
 done
 
+echo "==> Waiting for PowerDNS database (port 5433)..."
+for i in $(seq 1 90); do
+    if remote_cmd "ss -tln | grep -q ':5433 '"; then
+        echo "    PowerDNS database is listening"
+        break
+    fi
+    if [ "$i" -eq 90 ]; then
+        echo "    WARNING: PowerDNS database not ready after 3 minutes, skipping pdns restart"
+    fi
+    sleep 2
+done
+
+echo "==> Restarting PowerDNS to connect to database..."
+remote_cmd "sudo systemctl restart pdns" 2>/dev/null || true
+
 echo "==> Control plane deployed successfully"
