@@ -12,6 +12,7 @@ export function fieldToStep(field: string): StepID {
   if (field.startsWith('control_plane.')) return 'control_plane'
   if (field.startsWith('nodes')) return 'nodes'
   if (field.startsWith('tls.') || field === 'tls') return 'tls'
+  if (field.startsWith('sso.') || field === 'sso') return 'tls'
   return 'review'
 }
 

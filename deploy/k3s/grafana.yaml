@@ -100,12 +100,9 @@ spec:
             - name: GF_AUTH_GENERIC_OAUTH_ENABLED
               value: "true"
             - name: GF_AUTH_GENERIC_OAUTH_NAME
-              value: "Azure AD"
+              value: "${OIDC_PROVIDER_NAME}"
             - name: GF_AUTH_GENERIC_OAUTH_CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: oidc-credentials
-                  key: OIDC_CLIENT_ID
+              value: "${GRAFANA_CLIENT_ID}"
             - name: GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -114,11 +111,11 @@ spec:
             - name: GF_AUTH_GENERIC_OAUTH_SCOPES
               value: "openid email profile"
             - name: GF_AUTH_GENERIC_OAUTH_AUTH_URL
-              value: "https://login.microsoftonline.com/${OIDC_TENANT_ID}/oauth2/v2.0/authorize"
+              value: "${OIDC_AUTH_URL}"
             - name: GF_AUTH_GENERIC_OAUTH_TOKEN_URL
-              value: "https://login.microsoftonline.com/${OIDC_TENANT_ID}/oauth2/v2.0/token"
+              value: "${OIDC_TOKEN_URL}"
             - name: GF_AUTH_GENERIC_OAUTH_API_URL
-              value: "https://graph.microsoft.com/oidc/userinfo"
+              value: "${OIDC_USERINFO_URL}"
             - name: GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH
               value: "Admin"
           volumeMounts:

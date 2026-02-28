@@ -44,12 +44,9 @@ spec:
             - name: TEMPORAL_AUTH_ENABLED
               value: "true"
             - name: TEMPORAL_AUTH_PROVIDER_URL
-              value: "https://login.microsoftonline.com/${OIDC_TENANT_ID}/v2.0"
+              value: "${OIDC_ISSUER_URL}"
             - name: TEMPORAL_AUTH_CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: oidc-credentials
-                  key: OIDC_CLIENT_ID
+              value: "${TEMPORAL_CLIENT_ID}"
             - name: TEMPORAL_AUTH_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:

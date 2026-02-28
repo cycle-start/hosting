@@ -58,7 +58,7 @@ export function LoginPage() {
                 className="w-full"
                 onClick={() => { window.location.href = '/auth/login' }}
               >
-                Sign in with Azure AD
+                Sign in with SSO
               </Button>
               <div className="relative my-4">
                 <div className="absolute inset-0 flex items-center">

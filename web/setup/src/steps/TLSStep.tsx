@@ -4,7 +4,7 @@ import { FieldError } from '@/components/field-error'
 import { fieldError } from '@/lib/validation'
 import type { Config, ValidationError } from '@/lib/types'
 import { cn } from '@/lib/utils'
-import { ShieldCheck, FileKey } from 'lucide-react'
+import { ShieldCheck, FileKey, Shield, Globe } from 'lucide-react'
 
 interface Props {
   config: Config
@@ -12,12 +12,11 @@ interface Props {
   errors: ValidationError[]
 }
 
-const defaultSSO = { enabled: false, tenant_id: '', client_id: '', client_secret: '' }
+const defaultSSO = { mode: '' as const, admin_username: '', admin_email: '', admin_password: '', issuer_url: '', client_id: '', client_secret: '' }
 
 export function TLSStep({ config, onChange, errors }: Props) {
   const tls = config.tls
   const sso = config.sso ?? defaultSSO
-  const domain = config.brand?.platform_domain || 'your-domain.com'
 
   const updateTLS = (updates: Partial<typeof tls>) => {
     onChange({ ...config, tls: { ...tls, ...updates } })
@@ -32,7 +31,7 @@ export function TLSStep({ config, onChange, errors }: Props) {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-xl font-semibold">TLS & Security</h2>
+        <h2 className="text-xl font-semibold">Security</h2>
         <p className="text-muted-foreground mt-1">
           Configure TLS certificates and single sign-on for the platform.
         </p>
@@ -104,40 +103,101 @@ export function TLSStep({ config, onChange, errors }: Props) {
       <div className="space-y-4">
         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Single Sign-On (SSO)</h3>
         <div className="grid gap-4 max-w-lg">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={sso.enabled}
-              onChange={(e) => updateSSO({ enabled: e.target.checked })}
-              className="h-4 w-4 rounded border-input"
-            />
-            <div>
-              <div className="font-medium text-sm">Enable Azure AD SSO</div>
-              <div className="text-xs text-muted-foreground">
-                Secure Grafana, Headlamp, Temporal UI, Prometheus, and Admin UI with Azure AD login.
+          <div className="grid grid-cols-3 gap-3">
+            {([
+              { mode: 'internal' as const, icon: Shield, label: 'Built-in', desc: 'Authelia (self-hosted IdP)' },
+              { mode: 'external' as const, icon: Globe, label: 'External', desc: 'Your own OIDC provider' },
+              { mode: '' as const, icon: FileKey, label: 'Disabled', desc: 'No SSO authentication' },
+            ]).map(({ mode, icon: Icon, label, desc }) => {
+              const selected = (sso.mode || '') === mode
+              return (
+                <button
+                  key={mode}
+                  onClick={() => updateSSO({ mode })}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-accent/50',
+                    selected && 'border-primary bg-accent/50 ring-1 ring-primary'
+                  )}
+                >
+                  <Icon className="h-5 w-5 shrink-0" />
+                  <div>
+                    <div className="font-medium text-sm">{label}</div>
+                    <div className="text-xs text-muted-foreground">{desc}</div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          {sso.mode === 'internal' && (
+            <div className="space-y-4 border-l-2 border-primary/30 pl-4">
+              <p className="text-xs text-muted-foreground">
+                These credentials are used to log into all control plane services (Grafana, Headlamp, Temporal UI, Prometheus, Admin UI).
+              </p>
+
+              <div className="space-y-2">
+                <Label htmlFor="sso_admin_username">Admin Username</Label>
+                <Input
+                  id="sso_admin_username"
+                  placeholder="admin"
+                  value={sso.admin_username}
+                  onChange={(e) => updateSSO({ admin_username: e.target.value })}
+                  className={fe('sso.admin_username') ? 'border-destructive' : ''}
+                />
+                <FieldError error={fe('sso.admin_username')} />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sso_admin_email">Admin Email</Label>
+                <Input
+                  id="sso_admin_email"
+                  type="email"
+                  placeholder="admin@example.com"
+                  value={sso.admin_email}
+                  onChange={(e) => updateSSO({ admin_email: e.target.value })}
+                  className={fe('sso.admin_email') ? 'border-destructive' : ''}
+                />
+                <FieldError error={fe('sso.admin_email')} />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sso_admin_password">Admin Password</Label>
+                <Input
+                  id="sso_admin_password"
+                  type="password"
+                  placeholder="Min 8 characters"
+                  value={sso.admin_password}
+                  onChange={(e) => updateSSO({ admin_password: e.target.value })}
+                  className={fe('sso.admin_password') ? 'border-destructive' : ''}
+                />
+                <FieldError error={fe('sso.admin_password')} />
               </div>
             </div>
-          </label>
+          )}
 
-          {sso.enabled && (
+          {sso.mode === 'external' && (
             <div className="space-y-4 border-l-2 border-primary/30 pl-4">
+              <p className="text-xs text-muted-foreground">
+                Provide your OIDC provider details. All control plane services will authenticate through this provider.
+              </p>
+
               <div className="space-y-2">
-                <Label htmlFor="sso_tenant_id">Azure AD Tenant ID</Label>
+                <Label htmlFor="sso_issuer_url">Issuer URL</Label>
                 <Input
-                  id="sso_tenant_id"
-                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                  value={sso.tenant_id}
-                  onChange={(e) => updateSSO({ tenant_id: e.target.value })}
-                  className={fe('sso.tenant_id') ? 'border-destructive' : ''}
+                  id="sso_issuer_url"
+                  placeholder="https://login.microsoftonline.com/<tenant>/v2.0"
+                  value={sso.issuer_url}
+                  onChange={(e) => updateSSO({ issuer_url: e.target.value })}
+                  className={fe('sso.issuer_url') ? 'border-destructive' : ''}
                 />
-                <FieldError error={fe('sso.tenant_id')} />
+                <FieldError error={fe('sso.issuer_url')} />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="sso_client_id">Application (Client) ID</Label>
+                <Label htmlFor="sso_client_id">Client ID</Label>
                 <Input
                   id="sso_client_id"
-                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  placeholder="Application (Client) ID"
                   value={sso.client_id}
                   onChange={(e) => updateSSO({ client_id: e.target.value })}
                   className={fe('sso.client_id') ? 'border-destructive' : ''}
@@ -160,15 +220,15 @@ export function TLSStep({ config, onChange, errors }: Props) {
 
               <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
                 <p className="text-xs text-muted-foreground">
-                  Register an app in Azure AD (Entra ID) and add these redirect URIs:
+                  Register an app in your OIDC provider and add these redirect URIs:
                 </p>
                 <div className="text-xs font-mono space-y-1">
                   {[
-                    `https://admin.${domain}/auth/callback`,
-                    `https://grafana.${domain}/login/generic_oauth`,
-                    `https://headlamp.${domain}/oidc-callback`,
-                    `https://temporal.${domain}/auth/sso/callback`,
-                    `https://prometheus.${domain}/oauth2/callback`,
+                    `https://admin.${config.brand?.platform_domain || 'your-domain.com'}/auth/callback`,
+                    `https://grafana.${config.brand?.platform_domain || 'your-domain.com'}/login/generic_oauth`,
+                    `https://headlamp.${config.brand?.platform_domain || 'your-domain.com'}/oidc-callback`,
+                    `https://temporal.${config.brand?.platform_domain || 'your-domain.com'}/auth/sso/callback`,
+                    `https://prometheus.${config.brand?.platform_domain || 'your-domain.com'}/oauth2/callback`,
                   ].map((uri) => (
                     <div key={uri} className="flex items-center gap-2">
                       <span className="text-muted-foreground select-all break-all">{uri}</span>

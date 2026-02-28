@@ -29,7 +29,7 @@ const STEPS: Step[] = [
   { id: 'brand', label: 'Brand', visible: () => true },
   { id: 'control_plane', label: 'Database', visible: () => true },
   { id: 'nodes', label: 'Machines', visible: (c) => c.deploy_mode === 'multi' },
-  { id: 'tls', label: 'TLS', visible: () => true },
+  { id: 'tls', label: 'Security', visible: () => true },
   { id: 'review', label: 'Review', visible: () => true },
   { id: 'install', label: 'Install', visible: () => true },
 ]

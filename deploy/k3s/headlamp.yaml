@@ -53,9 +53,9 @@ spec:
           args:
             - "-in-cluster"
             - "-plugins-dir=/headlamp/plugins"
-            - "-oidc-client-id=$(OIDC_CLIENT_ID)"
+            - "-oidc-client-id=${HEADLAMP_CLIENT_ID}"
             - "-oidc-client-secret=$(OIDC_CLIENT_SECRET)"
-            - "-oidc-idp-issuer-url=https://login.microsoftonline.com/${OIDC_TENANT_ID}/v2.0"
+            - "-oidc-idp-issuer-url=${OIDC_ISSUER_URL}"
             - "-oidc-scopes=openid,email,profile"
           envFrom:
             - secretRef:

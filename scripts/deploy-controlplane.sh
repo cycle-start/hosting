@@ -74,14 +74,26 @@ export KUBECONFIG="$KUBECONFIG_OUT"
 echo "    Saved to ${KUBECONFIG_OUT}"
 
 echo "==> Applying k3s infrastructure manifests..."
-ENVSUBST_VARS='$BASE_DOMAIN $OIDC_TENANT_ID $OIDC_CLIENT_ID $OIDC_CLIENT_SECRET $OAUTH2_PROXY_COOKIE_SECRET'
+ENVSUBST_VARS='$BASE_DOMAIN $OIDC_ISSUER_URL $OIDC_AUTH_URL $OIDC_TOKEN_URL $OIDC_USERINFO_URL $OIDC_PROVIDER_NAME $OIDC_CLIENT_SECRET $OAUTH2_PROXY_COOKIE_SECRET $GRAFANA_CLIENT_ID $HEADLAMP_CLIENT_ID $TEMPORAL_CLIENT_ID $PROMETHEUS_CLIENT_ID $ADMIN_CLIENT_ID'
+
+# Create authelia-config secret from generated files (internal SSO only)
+if [[ -f "generated/authelia/configuration.yml" ]]; then
+    echo "    Creating authelia-config secret..."
+    kubectl create secret generic authelia-config \
+        --from-file=configuration.yml=generated/authelia/configuration.yml \
+        --from-file=users_database.yml=generated/authelia/users_database.yml \
+        --dry-run=client -o yaml | kubectl apply -f -
+fi
+
 for f in deploy/k3s/*.yaml; do
-    # Skip oauth2-proxy if OIDC is not configured
-    if [[ "$(basename "$f")" == "oauth2-proxy.yaml" ]] && [[ -z "${OIDC_CLIENT_ID:-}" ]]; then
-        continue
+    # Skip SSO-related manifests if OIDC is not configured
+    if [[ -z "${OIDC_CLIENT_SECRET:-}" ]]; then
+        case "$(basename "$f")" in
+            oauth2-proxy.yaml|oidc-secret.yaml|authelia.yaml) continue ;;
+        esac
     fi
-    # Skip oidc-secret if OIDC is not configured
-    if [[ "$(basename "$f")" == "oidc-secret.yaml" ]] && [[ -z "${OIDC_CLIENT_ID:-}" ]]; then
+    # Skip authelia.yaml for external SSO mode (no generated config)
+    if [[ "$(basename "$f")" == "authelia.yaml" ]] && [[ ! -f "generated/authelia/configuration.yml" ]]; then
         continue
     fi
     envsubst "$ENVSUBST_VARS" < "$f" | kubectl apply -f - 2>/dev/null || true
@@ -115,6 +127,7 @@ helm upgrade --install hosting \
 
 echo "==> Restarting deployments..."
 kubectl rollout restart deployment/hosting-core-api deployment/hosting-worker deployment/hosting-admin-ui deployment/hosting-mcp-server deployment/hosting-controlpanel-api deployment/hosting-controlpanel-ui 2>/dev/null || true
+kubectl rollout restart deployment/authelia 2>/dev/null || true
 
 echo "==> Waiting for core-api to be ready..."
 for i in $(seq 1 60); do

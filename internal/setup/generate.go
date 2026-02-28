@@ -2,7 +2,10 @@ package setup
 
 import (
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"net"
 	"os"
@@ -12,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/argon2"
 )
 
 // opsGitignore is the default .gitignore for the operations root.
@@ -211,6 +215,16 @@ func Generate(cfg *Config, outputDir string, progress ProgressFunc) (*GenerateRe
 		Content: dotEnv,
 	})
 
+	// 10. Generate Authelia config (internal SSO mode only)
+	if cfg.SSO.Mode == "internal" {
+		progress("Generating Authelia configuration...")
+		autheliaFiles, err := generateAutheliaConfig(cfg, outputDir)
+		if err != nil {
+			return nil, fmt.Errorf("generate authelia config: %w", err)
+		}
+		result.Files = append(result.Files, autheliaFiles...)
+	}
+
 	progress("Writing files to disk...")
 
 	// Write deployment files to disk (manifest already written above)
@@ -273,11 +287,9 @@ func generateDotEnv(cfg *Config, envPath string) (string, error) {
 	}
 	vars["POWERDNS_DATABASE_URL"] = fmt.Sprintf("postgres://hosting:hosting@%s:5433/hosting_powerdns", controlplaneIP)
 
-	// SSO (Azure AD)
-	if cfg.SSO.Enabled && cfg.SSO.ClientID != "" {
-		vars["OIDC_TENANT_ID"] = cfg.SSO.TenantID
-		vars["OIDC_CLIENT_ID"] = cfg.SSO.ClientID
-		vars["OIDC_CLIENT_SECRET"] = cfg.SSO.ClientSecret
+	// SSO
+	if cfg.SSO.Mode == "internal" || cfg.SSO.Mode == "external" {
+		domain := cfg.Brand.PlatformDomain
 
 		// Preserve existing cookie secret or generate a new one
 		if existing["OAUTH2_PROXY_COOKIE_SECRET"] != "" {
@@ -286,6 +298,42 @@ func generateDotEnv(cfg *Config, envPath string) (string, error) {
 			cookieSecret := make([]byte, 32)
 			rand.Read(cookieSecret)
 			vars["OAUTH2_PROXY_COOKIE_SECRET"] = base64.StdEncoding.EncodeToString(cookieSecret)
+		}
+
+		if cfg.SSO.Mode == "internal" {
+			// Generate shared OIDC client secret (or preserve existing)
+			if existing["OIDC_CLIENT_SECRET"] != "" {
+				vars["OIDC_CLIENT_SECRET"] = existing["OIDC_CLIENT_SECRET"]
+			} else {
+				vars["OIDC_CLIENT_SECRET"] = generateRandomToken()
+			}
+			vars["OIDC_ISSUER_URL"] = fmt.Sprintf("https://auth.%s", domain)
+			vars["OIDC_AUTH_URL"] = fmt.Sprintf("https://auth.%s/api/oidc/authorization", domain)
+			vars["OIDC_TOKEN_URL"] = fmt.Sprintf("https://auth.%s/api/oidc/token", domain)
+			vars["OIDC_USERINFO_URL"] = fmt.Sprintf("https://auth.%s/api/oidc/userinfo", domain)
+			vars["OIDC_PROVIDER_NAME"] = "Authelia"
+			// Per-service client IDs
+			vars["GRAFANA_CLIENT_ID"] = "grafana"
+			vars["HEADLAMP_CLIENT_ID"] = "headlamp"
+			vars["TEMPORAL_CLIENT_ID"] = "temporal"
+			vars["PROMETHEUS_CLIENT_ID"] = "prometheus"
+			vars["ADMIN_CLIENT_ID"] = "admin"
+		} else {
+			// External OIDC provider
+			vars["OIDC_CLIENT_SECRET"] = cfg.SSO.ClientSecret
+			vars["OIDC_ISSUER_URL"] = cfg.SSO.IssuerURL
+			// Derive auth/token/userinfo from issuer URL
+			issuer := strings.TrimSuffix(cfg.SSO.IssuerURL, "/")
+			vars["OIDC_AUTH_URL"] = issuer + "/authorize"
+			vars["OIDC_TOKEN_URL"] = issuer + "/token"
+			vars["OIDC_USERINFO_URL"] = issuer + "/userinfo"
+			vars["OIDC_PROVIDER_NAME"] = "SSO"
+			// All services share the same client_id
+			vars["GRAFANA_CLIENT_ID"] = cfg.SSO.ClientID
+			vars["HEADLAMP_CLIENT_ID"] = cfg.SSO.ClientID
+			vars["TEMPORAL_CLIENT_ID"] = cfg.SSO.ClientID
+			vars["PROMETHEUS_CLIENT_ID"] = cfg.SSO.ClientID
+			vars["ADMIN_CLIENT_ID"] = cfg.SSO.ClientID
 		}
 	}
 
@@ -316,9 +364,20 @@ func generateDotEnv(cfg *Config, envPath string) (string, error) {
 	section("AES-256 key for encrypting secrets in core DB (hex-encoded, 32 bytes)",
 		"SECRET_ENCRYPTION_KEY")
 
-	if cfg.SSO.Enabled && cfg.SSO.ClientID != "" {
-		section("SSO (Azure AD / Entra ID)",
-			"OIDC_TENANT_ID", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OAUTH2_PROXY_COOKIE_SECRET")
+	if cfg.SSO.Mode == "internal" {
+		section("SSO (Authelia)",
+			"OIDC_ISSUER_URL", "OIDC_AUTH_URL", "OIDC_TOKEN_URL", "OIDC_USERINFO_URL",
+			"OIDC_PROVIDER_NAME", "OIDC_CLIENT_SECRET",
+			"GRAFANA_CLIENT_ID", "HEADLAMP_CLIENT_ID", "TEMPORAL_CLIENT_ID",
+			"PROMETHEUS_CLIENT_ID", "ADMIN_CLIENT_ID",
+			"OAUTH2_PROXY_COOKIE_SECRET")
+	} else if cfg.SSO.Mode == "external" {
+		section("SSO (External OIDC)",
+			"OIDC_ISSUER_URL", "OIDC_AUTH_URL", "OIDC_TOKEN_URL", "OIDC_USERINFO_URL",
+			"OIDC_PROVIDER_NAME", "OIDC_CLIENT_SECRET",
+			"GRAFANA_CLIENT_ID", "HEADLAMP_CLIENT_ID", "TEMPORAL_CLIENT_ID",
+			"PROMETHEUS_CLIENT_ID", "ADMIN_CLIENT_ID",
+			"OAUTH2_PROXY_COOKIE_SECRET")
 	}
 
 	// Preserve any remaining keys from the existing .env that we didn't set
@@ -581,7 +640,7 @@ shard_name: lb-1
 		lbYml += "\n# Single-node: web nginx listens on 8080, HAProxy backends must match\n"
 		lbYml += "web_backend_port: \"8080\"\n"
 	}
-	if cfg.SSO.Enabled && cfg.SSO.ClientID != "" {
+	if cfg.SSO.Mode == "internal" || cfg.SSO.Mode == "external" {
 		lbYml += "\n# SSO: route prometheus traffic through oauth2-proxy\n"
 		lbYml += "prometheus_backend_port: \"4180\"\n"
 	}
@@ -865,6 +924,147 @@ func nodeShardNames(roles []NodeRole) []string {
 		}
 	}
 	return names
+}
+
+// generateAutheliaConfig creates the Authelia configuration.yml and users_database.yml
+// files in generated/authelia/. These are mounted as a K8s Secret into the Authelia pod.
+func generateAutheliaConfig(cfg *Config, outputDir string) ([]GeneratedFile, error) {
+	domain := cfg.Brand.PlatformDomain
+
+	// Read existing .env to get the generated OIDC client secret
+	envPath := filepath.Join(outputDir, ".env")
+	existing := parseEnvFile(envPath)
+	clientSecret := existing["OIDC_CLIENT_SECRET"]
+	if clientSecret == "" {
+		clientSecret = generateRandomToken()
+	}
+
+	// Generate secrets
+	sessionSecret := generateRandomHex(64)
+	storageKey := generateRandomHex(64)
+	hmacSecret := generateRandomHex(64)
+
+	// Generate RSA 2048 key for JWKS
+	rsaKey, err := rsa.GenerateKey(randReader(), 2048)
+	if err != nil {
+		return nil, fmt.Errorf("generate RSA key: %w", err)
+	}
+	rsaPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(rsaKey),
+	})
+	// Indent PEM for YAML embedding (10 spaces for under "key: |")
+	rsaPEMIndented := indentPEM(string(rsaPEM), "          ")
+
+	// Generate argon2id hash of admin password
+	passwordHash, err := hashArgon2id(cfg.SSO.AdminPassword)
+	if err != nil {
+		return nil, fmt.Errorf("hash admin password: %w", err)
+	}
+
+	// Build configuration.yml
+	var configYml strings.Builder
+	configYml.WriteString("server:\n")
+	configYml.WriteString("  address: 'tcp://0.0.0.0:9091'\n\n")
+
+	configYml.WriteString("authentication_backend:\n")
+	configYml.WriteString("  file:\n")
+	configYml.WriteString("    path: /config/users_database.yml\n\n")
+
+	configYml.WriteString("session:\n")
+	configYml.WriteString(fmt.Sprintf("  secret: '%s'\n", sessionSecret))
+	configYml.WriteString("  cookies:\n")
+	configYml.WriteString(fmt.Sprintf("    - domain: '%s'\n", domain))
+	configYml.WriteString(fmt.Sprintf("      authelia_url: 'https://auth.%s'\n\n", domain))
+
+	configYml.WriteString("storage:\n")
+	configYml.WriteString(fmt.Sprintf("  encryption_key: '%s'\n", storageKey))
+	configYml.WriteString("  local:\n")
+	configYml.WriteString("    path: /data/db.sqlite3\n\n")
+
+	configYml.WriteString("access_control:\n")
+	configYml.WriteString("  default_policy: one_factor\n\n")
+
+	configYml.WriteString("notifier:\n")
+	configYml.WriteString("  filesystem:\n")
+	configYml.WriteString("    filename: /data/notification.txt\n\n")
+
+	configYml.WriteString("identity_providers:\n")
+	configYml.WriteString("  oidc:\n")
+	configYml.WriteString(fmt.Sprintf("    hmac_secret: '%s'\n", hmacSecret))
+	configYml.WriteString("    jwks:\n")
+	configYml.WriteString("      - key: |\n")
+	configYml.WriteString(rsaPEMIndented)
+	configYml.WriteString("    clients:\n")
+
+	// OIDC clients — one per service
+	clients := []struct {
+		id          string
+		redirectURI string
+	}{
+		{"grafana", fmt.Sprintf("https://grafana.%s/login/generic_oauth", domain)},
+		{"headlamp", fmt.Sprintf("https://headlamp.%s/oidc-callback", domain)},
+		{"temporal", fmt.Sprintf("https://temporal.%s/auth/sso/callback", domain)},
+		{"prometheus", fmt.Sprintf("https://prometheus.%s/oauth2/callback", domain)},
+		{"admin", fmt.Sprintf("https://admin.%s/auth/callback", domain)},
+	}
+	for _, c := range clients {
+		configYml.WriteString(fmt.Sprintf("      - client_id: '%s'\n", c.id))
+		configYml.WriteString(fmt.Sprintf("        client_secret: '$plaintext$%s'\n", clientSecret))
+		configYml.WriteString(fmt.Sprintf("        redirect_uris: ['%s']\n", c.redirectURI))
+		configYml.WriteString("        scopes: [openid, email, profile]\n")
+		configYml.WriteString("        authorization_policy: one_factor\n")
+	}
+
+	// Build users_database.yml
+	var usersYml strings.Builder
+	usersYml.WriteString("users:\n")
+	usersYml.WriteString(fmt.Sprintf("  %s:\n", cfg.SSO.AdminUsername))
+	usersYml.WriteString(fmt.Sprintf("    displayname: '%s'\n", cfg.SSO.AdminUsername))
+	usersYml.WriteString(fmt.Sprintf("    email: '%s'\n", cfg.SSO.AdminEmail))
+	usersYml.WriteString(fmt.Sprintf("    password: '%s'\n", passwordHash))
+
+	return []GeneratedFile{
+		{Path: "generated/authelia/configuration.yml", Content: configYml.String()},
+		{Path: "generated/authelia/users_database.yml", Content: usersYml.String()},
+	}, nil
+}
+
+// hashArgon2id hashes a password using argon2id with parameters compatible with Authelia.
+func hashArgon2id(password string) (string, error) {
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
+		return "", err
+	}
+	hash := argon2.IDKey([]byte(password), salt, 3, 65536, 4, 32)
+	return fmt.Sprintf("$argon2id$v=19$m=65536,t=3,p=4$%s$%s",
+		base64.RawStdEncoding.EncodeToString(salt),
+		base64.RawStdEncoding.EncodeToString(hash)), nil
+}
+
+// generateRandomHex returns n random hex characters.
+func generateRandomHex(n int) string {
+	b := make([]byte, n/2)
+	if _, err := rand.Read(b); err != nil {
+		panic(fmt.Sprintf("crypto/rand failed: %v", err))
+	}
+	return fmt.Sprintf("%x", b)
+}
+
+// randReader returns crypto/rand.Reader (extracted for clarity).
+func randReader() interface{ Read([]byte) (int, error) } {
+	return rand.Reader
+}
+
+// indentPEM indents each line of a PEM string with the given prefix.
+func indentPEM(pemStr, prefix string) string {
+	var b strings.Builder
+	for _, line := range strings.Split(strings.TrimRight(pemStr, "\n"), "\n") {
+		b.WriteString(prefix)
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+	return b.String()
 }
 
 // generateCephKeyring uses docker + ceph-authtool to produce a properly

@@ -33,7 +33,7 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	// OIDC SSO (Azure AD)
+	// OIDC SSO
 	oidc := newOIDCHandler(coreAPIURL)
 	if oidc != nil {
 		mux.HandleFunc("/auth/login", oidc.handleLogin)
@@ -42,7 +42,7 @@ func main() {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte(`{"enabled":true}`))
 		})
-		log.Printf("SSO enabled (Azure AD tenant: %s)", os.Getenv("OIDC_TENANT_ID"))
+		log.Printf("SSO enabled (issuer: %s)", os.Getenv("OIDC_ISSUER_URL"))
 	} else {
 		mux.HandleFunc("/auth/sso-enabled", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
@@ -117,7 +117,7 @@ func isWebSocket(r *http.Request) bool {
 	return strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
 }
 
-// oidcHandler implements the OIDC login/callback flow for Azure AD SSO.
+// oidcHandler implements the OIDC login/callback flow for SSO.
 type oidcHandler struct {
 	oauthConfig *oauth2.Config
 	coreAPIURL  string
@@ -128,12 +128,17 @@ type oidcHandler struct {
 }
 
 func newOIDCHandler(coreAPIURL string) *oidcHandler {
-	clientID := os.Getenv("OIDC_CLIENT_ID")
+	authURL := os.Getenv("OIDC_AUTH_URL")
+	tokenURL := os.Getenv("OIDC_TOKEN_URL")
 	clientSecret := os.Getenv("OIDC_CLIENT_SECRET")
-	tenantID := os.Getenv("OIDC_TENANT_ID")
 	adminAPIKey := os.Getenv("ADMIN_API_KEY")
 
-	if clientID == "" || clientSecret == "" || tenantID == "" {
+	clientID := os.Getenv("ADMIN_CLIENT_ID")
+	if clientID == "" {
+		clientID = "admin"
+	}
+
+	if authURL == "" || tokenURL == "" || clientSecret == "" {
 		return nil
 	}
 
@@ -145,8 +150,8 @@ func newOIDCHandler(coreAPIURL string) *oidcHandler {
 			ClientID:     clientID,
 			ClientSecret: clientSecret,
 			Endpoint: oauth2.Endpoint{
-				AuthURL:  fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/authorize", tenantID),
-				TokenURL: fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/token", tenantID),
+				AuthURL:  authURL,
+				TokenURL: tokenURL,
 			},
 			RedirectURL: redirectURL,
 			Scopes:      []string{"openid", "email", "profile"},

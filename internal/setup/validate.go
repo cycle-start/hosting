@@ -147,6 +147,35 @@ func Validate(cfg *Config) []ValidationError {
 		add("tls.email", "Email is required for Let's Encrypt")
 	}
 
+	// SSO
+	if cfg.SSO.Mode == "internal" {
+		if cfg.SSO.AdminUsername == "" {
+			add("sso.admin_username", "Admin username is required")
+		} else if !isAlphanumeric(cfg.SSO.AdminUsername) {
+			add("sso.admin_username", "Username must be alphanumeric")
+		}
+		if cfg.SSO.AdminEmail == "" {
+			add("sso.admin_email", "Admin email is required")
+		} else if !strings.Contains(cfg.SSO.AdminEmail, "@") {
+			add("sso.admin_email", "Must be a valid email address")
+		}
+		if cfg.SSO.AdminPassword == "" {
+			add("sso.admin_password", "Admin password is required")
+		} else if len(cfg.SSO.AdminPassword) < 8 {
+			add("sso.admin_password", "Password must be at least 8 characters")
+		}
+	} else if cfg.SSO.Mode == "external" {
+		if cfg.SSO.IssuerURL == "" {
+			add("sso.issuer_url", "Issuer URL is required")
+		}
+		if cfg.SSO.ClientID == "" {
+			add("sso.client_id", "Client ID is required")
+		}
+		if cfg.SSO.ClientSecret == "" {
+			add("sso.client_secret", "Client secret is required")
+		}
+	}
+
 	// Email
 	if cfg.Email.StalwartAdminToken == "" {
 		add("email.stalwart_admin_token", "Stalwart admin token is required")
@@ -162,4 +191,13 @@ func Validate(cfg *Config) []ValidationError {
 
 func isValidIP(s string) bool {
 	return net.ParseIP(strings.TrimSpace(s)) != nil
+}
+
+func isAlphanumeric(s string) bool {
+	for _, r := range s {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-') {
+			return false
+		}
+	}
+	return true
 }

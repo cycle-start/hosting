@@ -111,7 +111,7 @@ export function ReviewStep({ config, roles, errors, onGoToStep }: Props) {
         )}
 
         <Section
-          title="TLS & Security"
+          title="Security"
           errors={sectionErrors('tls')}
           onEdit={() => onGoToStep('tls')}
         >
@@ -125,7 +125,13 @@ export function ReviewStep({ config, roles, errors, onGoToStep }: Props) {
           />
           <Value
             label="SSO"
-            value={config.sso?.enabled ? 'Azure AD' : 'Disabled'}
+            value={
+              config.sso?.mode === 'internal'
+                ? `Authelia (admin: ${config.sso.admin_username || '—'})`
+                : config.sso?.mode === 'external'
+                  ? 'External OIDC'
+                  : 'Disabled'
+            }
           />
         </Section>
 

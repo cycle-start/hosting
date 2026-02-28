@@ -54,8 +54,13 @@ export interface EmailConfig {
 }
 
 export interface SSOConfig {
-  enabled: boolean
-  tenant_id: string
+  mode: '' | 'internal' | 'external'
+  // Internal (Authelia)
+  admin_username: string
+  admin_email: string
+  admin_password: string
+  // External OIDC
+  issuer_url: string
   client_id: string
   client_secret: string
 }

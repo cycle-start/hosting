@@ -31,7 +31,7 @@ Open the URL printed in the terminal. The wizard walks through:
 3. **Brand** — Domain names, nameservers, mail hostname
 4. **Database** — Built-in PostgreSQL or external
 5. **Machines** — Node IPs and role assignments (multi-node only)
-6. **TLS & Security** — Let's Encrypt or manual certs, optional Azure AD SSO
+6. **Security** — Let's Encrypt or manual certs, SSO (built-in Authelia or external OIDC)
 7. **Review** — Verify configuration
 8. **Install** — Generate files, then run deploy steps
 
@@ -140,9 +140,9 @@ git add .
 git commit -m "Initial platform setup"
 ```
 
-## SSO (Azure AD)
+## SSO
 
-If you enabled SSO during setup, all control plane services authenticate via Azure AD:
+All control plane services support SSO authentication:
 
 - **Grafana** — Native OIDC integration
 - **Headlamp** — Native OIDC integration
@@ -150,7 +150,13 @@ If you enabled SSO during setup, all control plane services authenticate via Azu
 - **Prometheus** — oauth2-proxy reverse proxy
 - **Admin UI** — OIDC login with auto-provisioned API key
 
-You need to register an app in Azure AD (Entra ID) with these redirect URIs:
+### Built-in SSO (Authelia)
+
+Select "Built-in" during setup. Authelia (`authelia/authelia:4.38`) is deployed as a self-hosted OIDC identity provider. You create an admin account during setup — these credentials work for all control plane services. No external provider or app registration needed.
+
+### External OIDC Provider
+
+Select "External" during setup and provide your OIDC provider's issuer URL, client ID, and client secret. Register an app in your provider with these redirect URIs:
 - `https://admin.<domain>/auth/callback`
 - `https://grafana.<domain>/login/generic_oauth`
 - `https://headlamp.<domain>/oidc-callback`
@@ -174,6 +180,8 @@ Check the output in the wizard UI. Common issues:
 - Check DNS: your `*.platform-domain` should resolve to the LB node IP
 
 ### SSO not working
-- Verify redirect URIs are registered in Azure AD
-- Check that `OIDC_CLIENT_ID` and `OIDC_TENANT_ID` are set in `.env`
+- For built-in (Authelia): check `https://auth.<domain>` loads the login page
+- For external OIDC: verify redirect URIs are registered in your provider
+- Check that `OIDC_CLIENT_SECRET` and `OIDC_ISSUER_URL` are set in `.env`
 - Check pod logs: `kubectl logs deploy/hosting-admin-ui`
+- Check Authelia logs: `kubectl logs deploy/authelia`

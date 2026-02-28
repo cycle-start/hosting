@@ -27,23 +27,19 @@ adminUi:
   replicas: 1
   hostNetwork: true
   extraEnv:
-    - name: OIDC_CLIENT_ID
-      valueFrom:
-        secretKeyRef:
-          name: oidc-credentials
-          key: OIDC_CLIENT_ID
-          optional: true
+    - name: OIDC_AUTH_URL
+      value: "https://auth.massive-hosting.com/api/oidc/authorization"
+    - name: OIDC_TOKEN_URL
+      value: "https://auth.massive-hosting.com/api/oidc/token"
+    - name: OIDC_ISSUER_URL
+      value: "https://auth.massive-hosting.com"
+    - name: ADMIN_CLIENT_ID
+      value: "admin"
     - name: OIDC_CLIENT_SECRET
       valueFrom:
         secretKeyRef:
           name: oidc-credentials
           key: OIDC_CLIENT_SECRET
-          optional: true
-    - name: OIDC_TENANT_ID
-      valueFrom:
-        secretKeyRef:
-          name: oidc-credentials
-          key: OIDC_TENANT_ID
           optional: true
     - name: ADMIN_API_KEY
       valueFrom:

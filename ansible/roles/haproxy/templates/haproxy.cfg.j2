@@ -37,6 +37,7 @@ frontend http
     acl is_prometheus  hdr(host) -i prometheus.{{ base_domain }}
     acl is_mcp         hdr(host) -i mcp.{{ base_domain }}
     acl is_headlamp    hdr(host) -i headlamp.{{ base_domain }}
+    acl is_auth        hdr(host) -i auth.{{ base_domain }}
 
     use_backend bk_controlpanel   if is_home
     use_backend bk_admin          if is_admin
@@ -47,6 +48,7 @@ frontend http
     use_backend bk_prometheus     if is_prometheus
     use_backend bk_mcp            if is_mcp
     use_backend bk_headlamp      if is_headlamp
+    use_backend bk_auth           if is_auth
 {% endif %}
 
     # Tenant routing via dynamic FQDN map (fallback)
@@ -87,6 +89,9 @@ backend bk_mcp
 
 backend bk_headlamp
     server headlamp {{ controlplane_ip | default('127.0.0.1') }}:4466 check
+
+backend bk_auth
+    server authelia {{ controlplane_ip | default('127.0.0.1') }}:9091 check
 {% endif %}
 
 # Shard backends with real VM IPs
