@@ -164,7 +164,7 @@ export default function App() {
   }
 
   return (
-    <Tabs.Root value={activeTab} onValueChange={(v) => setActiveTab(v as TopTab)} className="min-h-screen flex flex-col">
+    <Tabs.Root value={activeTab} onValueChange={(v) => setActiveTab(v as TopTab)} className="h-screen flex flex-col overflow-hidden">
       {/* Header */}
       <header className="border-b px-6 py-4 flex items-center gap-3">
         <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-primary/10">
@@ -194,9 +194,9 @@ export default function App() {
         </Tabs.List>
       </header>
 
-      <div className="flex flex-1">
+      <div className="flex flex-1 min-h-0">
         {/* Sidebar stepper */}
-        <nav className="w-56 border-r p-4 space-y-1 shrink-0">
+        <nav className="w-56 border-r p-4 space-y-1 shrink-0 overflow-y-auto">
           {visibleSteps.map((s, i) => {
             const status = getStepStatus(s, i)
             return (
@@ -221,10 +221,10 @@ export default function App() {
         </nav>
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0">
           {/* Setup tab — forceMount keeps deploy step state alive when switching tabs */}
-          <Tabs.Content value="setup" forceMount className={cn('flex-1 flex flex-col', activeTab !== 'setup' && 'hidden')}>
-            <main className={cn('flex-1 p-8', step.id !== 'install' && 'max-w-3xl')}>
+          <Tabs.Content value="setup" forceMount className={cn('flex-1 flex flex-col min-h-0', activeTab !== 'setup' && 'hidden')}>
+            <main className={cn('flex-1 overflow-y-auto p-8', step.id !== 'install' && 'max-w-3xl')}>
               {step.id === 'deploy_mode' && (
                 <DeployModeStep config={config} onChange={handleChange} outputDir={outputDir} />
               )}
