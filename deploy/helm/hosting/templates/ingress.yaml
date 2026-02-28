@@ -20,6 +20,15 @@ spec:
     - host: api.{{ .Values.config.baseDomain }}
       http:
         paths:
+          {{- if .Values.mcpServer.enabled }}
+          - path: /mcp
+            pathType: Prefix
+            backend:
+              service:
+                name: hosting-mcp-server
+                port:
+                  number: 8091
+          {{- end }}
           - path: /
             pathType: Prefix
             backend:
@@ -37,18 +46,6 @@ spec:
                 name: hosting-controlpanel-ui
                 port:
                   number: 3002
-    {{- if .Values.mcpServer.enabled }}
-    - host: mcp.{{ .Values.config.baseDomain }}
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: hosting-mcp-server
-                port:
-                  number: 8091
-    {{- end }}
     {{- range .Values.ingress.extraHosts }}
     - host: {{ .host }}
       http:

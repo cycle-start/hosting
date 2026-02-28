@@ -35,18 +35,18 @@ frontend http
     acl is_temporal    hdr(host) -i temporal.{{ base_domain }}
     acl is_grafana     hdr(host) -i grafana.{{ base_domain }}
     acl is_prometheus  hdr(host) -i prometheus.{{ base_domain }}
-    acl is_mcp         hdr(host) -i mcp.{{ base_domain }}
     acl is_headlamp    hdr(host) -i headlamp.{{ base_domain }}
     acl is_auth        hdr(host) -i auth.{{ base_domain }}
 
     use_backend bk_controlpanel   if is_home
     use_backend bk_admin          if is_admin
+    acl is_mcp_path    path_beg /mcp
+    use_backend bk_mcp            if is_api is_mcp_path
     use_backend bk_core_api       if is_api
     use_backend bk_dbadmin        if is_dbadmin
     use_backend bk_temporal       if is_temporal
     use_backend bk_grafana        if is_grafana
     use_backend bk_prometheus     if is_prometheus
-    use_backend bk_mcp            if is_mcp
     use_backend bk_headlamp      if is_headlamp
     use_backend bk_auth           if is_auth
 {% endif %}
