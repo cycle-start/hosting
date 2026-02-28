@@ -7,6 +7,9 @@ cp := "10.10.10.2"
 # LB VM IP (HAProxy for tenant traffic).
 lb := "10.10.10.70"
 
+# Single-node (all-in-one) VM IP.
+single := "10.10.10.200"
+
 # SSH options for dev VMs — skip host key checking entirely since VMs get new keys on every rebuild.
 ssh_opts := "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
 
@@ -623,6 +626,38 @@ vm-down:
         sudo virsh net-destroy hosting 2>/dev/null || true; \
         sudo virsh net-undefine hosting 2>/dev/null || true; \
     fi
+
+# --- Single-node VM ---
+
+# Destroy and recreate the single-node VM (does not touch multi-node VMs)
+single-wipe:
+    sudo virsh destroy single-0 2>/dev/null || true
+    sudo virsh undefine single-0 --remove-all-storage 2>/dev/null || true
+    @echo "Recreating single-node VM..."
+    cd terraform && terraform apply -auto-approve \
+        -target=libvirt_volume.single_node \
+        -target=libvirt_volume.single_node_osd \
+        -target=libvirt_cloudinit_disk.single_node \
+        -target=libvirt_volume.single_node_seed \
+        -target=libvirt_domain.single_node
+    @echo "Waiting for SSH on {{single}}..."
+    @for i in $(seq 1 60); do \
+        if ssh {{ssh_opts}} -o ConnectTimeout=2 ubuntu@{{single}} "true" 2>/dev/null; then \
+            echo "single-0 is ready."; \
+            exit 0; \
+        fi; \
+        sleep 5; \
+    done; \
+    echo "ERROR: single-0 did not accept SSH after 5 minutes."; \
+    exit 1
+
+# SSH into the single-node VM
+single-ssh:
+    ssh {{ssh_opts}} ubuntu@{{single}}
+
+# Run the setup wizard for single-node deployment
+single-setup:
+    go run ./cmd/setup
 
 # Resolve VM name to IP (includes controlplane)
 _vm-ip name:
