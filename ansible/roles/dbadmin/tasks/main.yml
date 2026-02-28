@@ -108,9 +108,14 @@
     state: link
   notify: restart nginx
 
+- name: Detect installed PHP-FPM version
+  shell: "dpkg -l 'php*-fpm' | awk '/^ii/ && /php[0-9]/ {print $2}' | head -1 | sed 's/-fpm//'"
+  register: php_fpm_pkg
+  changed_when: false
+
 - name: Enable and start PHP-FPM
   systemd:
-    name: "php{{ php_version | default('8.3') }}-fpm"
+    name: "{{ php_fpm_pkg.stdout }}-fpm"
     enabled: true
     state: started
 
