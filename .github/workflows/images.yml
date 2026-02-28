@@ -1,0 +1,45 @@
+name: Build and push images
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: hosting-core-api
+            dockerfile: docker/core-api.Dockerfile
+          - image: hosting-worker
+            dockerfile: docker/worker.Dockerfile
+          - image: hosting-admin-ui
+            dockerfile: docker/admin-ui.Dockerfile
+          - image: hosting-mcp-server
+            dockerfile: docker/mcp-server.Dockerfile
+          - image: controlpanel-api
+            dockerfile: docker/controlpanel-api.Dockerfile
+          - image: controlpanel-ui
+            dockerfile: docker/controlpanel-ui.Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}:latest
