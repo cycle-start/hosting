@@ -8,9 +8,6 @@ image:
   adminUi:
     repository: ghcr.io/cycle-start/hosting-admin-ui
     tag: latest
-  mcpServer:
-    repository: ghcr.io/cycle-start/hosting-mcp-server
-    tag: latest
   controlpanelApi:
     repository: ghcr.io/cycle-start/controlpanel-api
     tag: latest
@@ -40,15 +37,6 @@ adminUi:
   replicas: 1
   port: 3001
   hostNetwork: false
-  resources: {}
-  extraEnv: []
-
-mcpServer:
-  enabled: false
-  replicas: 1
-  port: 8091
-  hostNetwork: false
-  apiUrl: "http://localhost:8090"
   resources: {}
   extraEnv: []
 

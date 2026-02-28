@@ -18,11 +18,15 @@ import (
 	mw "github.com/edvin/hosting/internal/api/middleware"
 	"github.com/edvin/hosting/internal/config"
 	"github.com/edvin/hosting/internal/core"
+	"github.com/edvin/hosting/internal/mcpserver"
 	"github.com/edvin/hosting/internal/sshca"
 )
 
 //go:embed docs/swagger.json
 var swaggerJSON []byte
+
+//go:embed mcp.yaml
+var mcpYAML []byte
 
 type Server struct {
 	router         chi.Router
@@ -83,6 +87,18 @@ func (s *Server) setupRoutes() {
 		w.Header().Set("Content-Type", "text/html")
 		w.Write([]byte(scalarHTML))
 	})
+
+	// MCP server (no auth — MCP clients forward their own Authorization header)
+	mcpCfg, err := mcpserver.ParseConfig(mcpYAML)
+	if err != nil {
+		s.logger.Fatal().Err(err).Msg("failed to parse embedded mcp.yaml")
+	}
+	mcpCfg.APIURL = s.cfg.MCPApiURL
+	mcpHandler, err := mcpserver.NewHandler(mcpCfg, swaggerJSON, s.logger)
+	if err != nil {
+		s.logger.Fatal().Err(err).Msg("failed to create MCP handler")
+	}
+	s.router.Mount("/mcp", mcpHandler)
 
 	// OIDC endpoints (no auth required — public)
 	oidc := handler.NewOIDC(s.services.OIDC)

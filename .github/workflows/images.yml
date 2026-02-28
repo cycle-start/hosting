@@ -22,8 +22,6 @@ jobs:
             dockerfile: docker/worker.Dockerfile
           - image: hosting-admin-ui
             dockerfile: docker/admin-ui.Dockerfile
-          - image: hosting-mcp-server
-            dockerfile: docker/mcp-server.Dockerfile
           - image: controlpanel-api
             dockerfile: docker/controlpanel-api.Dockerfile
           - image: controlpanel-ui

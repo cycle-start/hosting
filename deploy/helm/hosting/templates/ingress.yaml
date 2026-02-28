@@ -20,15 +20,6 @@ spec:
     - host: api.{{ .Values.config.baseDomain }}
       http:
         paths:
-          {{- if .Values.mcpServer.enabled }}
-          - path: /mcp
-            pathType: Prefix
-            backend:
-              service:
-                name: hosting-mcp-server
-                port:
-                  number: 8091
-          {{- end }}
           - path: /
             pathType: Prefix
             backend:

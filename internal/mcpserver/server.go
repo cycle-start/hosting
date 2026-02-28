@@ -20,15 +20,12 @@ type Server struct {
 	cfg    *Config
 }
 
-// New creates and configures a new MCP server from the given config and swagger spec.
+// New creates and configures a new standalone MCP server from the given config and swagger spec.
 func New(cfg *Config, specData []byte, logger zerolog.Logger) (*Server, error) {
-	spec, err := ParseSpec(specData)
+	mcpRouter, err := NewHandler(cfg, specData, logger)
 	if err != nil {
 		return nil, err
 	}
-
-	proxy := NewProxyHandler(cfg.APIURL, logger)
-	groups, _ := BuildTools(spec, cfg, proxy.Handler)
 
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
@@ -42,73 +39,88 @@ func New(cfg *Config, specData []byte, logger zerolog.Logger) (*Server, error) {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// Mount each group as a separate MCP server, and collect all tools for the unified endpoint.
-	var allTools []server.ServerTool
-	router.Route("/mcp", func(r chi.Router) {
-		for groupName, tools := range groups {
-			groupDesc := cfg.Groups[groupName].Description
-			if groupDesc == "" {
-				groupDesc = "Hosting platform " + groupName + " tools"
-			}
-
-			mcpSrv := server.NewMCPServer(
-				"hosting-"+groupName,
-				"1.0.0",
-				server.WithInstructions(groupDesc),
-			)
-			mcpSrv.AddTools(tools...)
-
-			httpSrv := server.NewStreamableHTTPServer(mcpSrv,
-				server.WithEndpointPath("/"),
-			)
-
-			r.Mount("/"+groupName, httpSrv)
-			allTools = append(allTools, tools...)
-
-			logger.Info().
-				Str("group", groupName).
-				Int("tools", len(tools)).
-				Msg("mounted MCP tool group")
-		}
-
-		// Unified endpoint with all tools for agents that need full platform access.
-		allSrv := server.NewMCPServer(
-			"hosting",
-			"1.0.0",
-			server.WithInstructions("Hosting platform management — infrastructure, tenants, databases, DNS, email, storage, web, and operations tools."),
-		)
-		allSrv.AddTools(allTools...)
-		r.Mount("/all", server.NewStreamableHTTPServer(allSrv, server.WithEndpointPath("/")))
-		logger.Info().Int("tools", len(allTools)).Msg("mounted unified MCP endpoint at /mcp/all")
-
-		// Index endpoint listing available groups
-		r.Get("/", func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			var lines []string
-			// Sort group names for deterministic output
-			var names []string
-			for name := range groups {
-				names = append(names, name)
-			}
-			sort.Strings(names)
-
-			for _, name := range names {
-				tools := groups[name]
-				desc := cfg.Groups[name].Description
-				lines = append(lines, fmt.Sprintf(`{"name":%q,"endpoint":"/mcp/%s","tools":%d,"description":%q}`,
-					name, name, len(tools), desc))
-			}
-			lines = append(lines, fmt.Sprintf(`{"name":"all","endpoint":"/mcp/all","tools":%d,"description":"All tools from every group"}`, len(allTools)))
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("[" + strings.Join(lines, ",") + "]"))
-		})
-	})
+	router.Mount("/mcp", mcpRouter)
 
 	return &Server{
 		router: router,
 		logger: logger,
 		cfg:    cfg,
 	}, nil
+}
+
+// NewHandler returns a chi.Router with all MCP endpoints, suitable for mounting at /mcp.
+func NewHandler(cfg *Config, specData []byte, logger zerolog.Logger) (chi.Router, error) {
+	spec, err := ParseSpec(specData)
+	if err != nil {
+		return nil, err
+	}
+
+	proxy := NewProxyHandler(cfg.APIURL, logger)
+	groups, _ := BuildTools(spec, cfg, proxy.Handler)
+
+	r := chi.NewRouter()
+
+	// Mount each group as a separate MCP server, and collect all tools for the unified endpoint.
+	var allTools []server.ServerTool
+	for groupName, tools := range groups {
+		groupDesc := cfg.Groups[groupName].Description
+		if groupDesc == "" {
+			groupDesc = "Hosting platform " + groupName + " tools"
+		}
+
+		mcpSrv := server.NewMCPServer(
+			"hosting-"+groupName,
+			"1.0.0",
+			server.WithInstructions(groupDesc),
+		)
+		mcpSrv.AddTools(tools...)
+
+		httpSrv := server.NewStreamableHTTPServer(mcpSrv,
+			server.WithEndpointPath("/"),
+		)
+
+		r.Mount("/"+groupName, httpSrv)
+		allTools = append(allTools, tools...)
+
+		logger.Info().
+			Str("group", groupName).
+			Int("tools", len(tools)).
+			Msg("mounted MCP tool group")
+	}
+
+	// Unified endpoint with all tools for agents that need full platform access.
+	allSrv := server.NewMCPServer(
+		"hosting",
+		"1.0.0",
+		server.WithInstructions("Hosting platform management — infrastructure, tenants, databases, DNS, email, storage, web, and operations tools."),
+	)
+	allSrv.AddTools(allTools...)
+	r.Mount("/all", server.NewStreamableHTTPServer(allSrv, server.WithEndpointPath("/")))
+	logger.Info().Int("tools", len(allTools)).Msg("mounted unified MCP endpoint at /mcp/all")
+
+	// Index endpoint listing available groups
+	r.Get("/", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var lines []string
+		// Sort group names for deterministic output
+		var names []string
+		for name := range groups {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+
+		for _, name := range names {
+			tools := groups[name]
+			desc := cfg.Groups[name].Description
+			lines = append(lines, fmt.Sprintf(`{"name":%q,"endpoint":"/mcp/%s","tools":%d,"description":%q}`,
+				name, name, len(tools), desc))
+		}
+		lines = append(lines, fmt.Sprintf(`{"name":"all","endpoint":"/mcp/all","tools":%d,"description":"All tools from every group"}`, len(allTools)))
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("[" + strings.Join(lines, ",") + "]"))
+	})
+
+	return r, nil
 }
 
 // ServeHTTP implements http.Handler.

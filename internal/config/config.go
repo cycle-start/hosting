@@ -64,6 +64,8 @@ type Config struct {
 	SSHCAPrivateKey string // SSH_CA_PRIVATE_KEY — PEM-encoded SSH CA private key (for web terminal)
 
 	WireGuardEndpoint string // WIREGUARD_ENDPOINT — public endpoint for WireGuard VPN (e.g. "vpn.massive-hosting.com:51820")
+
+	MCPApiURL string // MCP_API_URL — base URL the MCP proxy uses to reach the core API (default: http://127.0.0.1:8090)
 }
 
 func Load() (*Config, error) {
@@ -113,6 +115,8 @@ func Load() (*Config, error) {
 		SSHCAPrivateKey: getEnv("SSH_CA_PRIVATE_KEY", ""),
 
 		WireGuardEndpoint: getEnv("WIREGUARD_ENDPOINT", ""),
+
+		MCPApiURL: getEnv("MCP_API_URL", "http://127.0.0.1:8090"),
 	}
 
 	return cfg, nil

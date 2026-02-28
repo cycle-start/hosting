@@ -91,7 +91,7 @@ helm upgrade --install hosting deploy/helm/hosting \
     -f "$HELM_VALUES"
 
 echo "==> Restarting deployments..."
-kubectl rollout restart deployment/hosting-core-api deployment/hosting-worker deployment/hosting-admin-ui deployment/hosting-mcp-server deployment/hosting-controlpanel-api deployment/hosting-controlpanel-ui 2>/dev/null || true
+kubectl rollout restart deployment/hosting-core-api deployment/hosting-worker deployment/hosting-admin-ui deployment/hosting-controlpanel-api deployment/hosting-controlpanel-ui 2>/dev/null || true
 kubectl rollout restart deployment/authelia 2>/dev/null || true
 
 echo "==> Waiting for core-api to be ready..."

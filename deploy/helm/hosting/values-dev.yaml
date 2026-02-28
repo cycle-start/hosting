@@ -6,8 +6,6 @@ image:
     repository: hosting-worker
   adminUi:
     repository: hosting-admin-ui
-  mcpServer:
-    repository: hosting-mcp-server
   controlpanelApi:
     repository: controlpanel-api
   controlpanelUi:
@@ -49,12 +47,6 @@ adminUi:
           optional: true
     - name: BASE_DOMAIN
       value: "massive-hosting.com"
-
-mcpServer:
-  enabled: true
-  replicas: 1
-  hostNetwork: true
-  apiUrl: "http://127.0.0.1:8090"
 
 controlpanelApi:
   enabled: true

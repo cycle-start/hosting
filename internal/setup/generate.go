@@ -944,11 +944,6 @@ func generateHelmValues(cfg *Config, controlplaneIP, outputDir string) string {
 	}
 	b.WriteString("\n")
 
-	b.WriteString("mcpServer:\n")
-	b.WriteString("  enabled: true\n")
-	b.WriteString("  hostNetwork: true\n")
-	b.WriteString("  apiUrl: \"http://127.0.0.1:8090\"\n\n")
-
 	b.WriteString("controlpanelApi:\n")
 	b.WriteString("  enabled: true\n")
 	b.WriteString("  port: 8092\n")

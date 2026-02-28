@@ -44,14 +44,18 @@ func LoadConfig(path string) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read config %s: %w", path, err)
 	}
+	return ParseConfig(data)
+}
 
+// ParseConfig parses mcp.yaml configuration from raw bytes.
+func ParseConfig(data []byte) (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("parse config %s: %w", path, err)
+		return nil, fmt.Errorf("parse mcp config: %w", err)
 	}
 
 	if cfg.APIURL == "" {
-		return nil, fmt.Errorf("api_url is required in %s", path)
+		cfg.APIURL = "http://127.0.0.1:8090"
 	}
 	if cfg.SpecPath == "" {
 		cfg.SpecPath = "/docs/openapi.json"

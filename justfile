@@ -443,7 +443,6 @@ images:
     docker build -t {{registry}}/hosting-core-api:latest -f docker/core-api.Dockerfile .
     docker build -t {{registry}}/hosting-worker:latest -f docker/worker.Dockerfile .
     docker build -t {{registry}}/hosting-admin-ui:latest -f docker/admin-ui.Dockerfile .
-    docker build -t {{registry}}/hosting-mcp-server:latest -f docker/mcp-server.Dockerfile .
     docker build -t {{registry}}/controlpanel-api:latest -f docker/controlpanel-api.Dockerfile .
     docker build -t {{registry}}/controlpanel-ui:latest -f docker/controlpanel-ui.Dockerfile .
 
@@ -452,7 +451,6 @@ images-push:
     docker push {{registry}}/hosting-core-api:latest
     docker push {{registry}}/hosting-worker:latest
     docker push {{registry}}/hosting-admin-ui:latest
-    docker push {{registry}}/hosting-mcp-server:latest
     docker push {{registry}}/controlpanel-api:latest
     docker push {{registry}}/controlpanel-ui:latest
 
@@ -461,13 +459,11 @@ images-tag tag:
     docker tag {{registry}}/hosting-core-api:latest {{registry}}/hosting-core-api:{{tag}}
     docker tag {{registry}}/hosting-worker:latest {{registry}}/hosting-worker:{{tag}}
     docker tag {{registry}}/hosting-admin-ui:latest {{registry}}/hosting-admin-ui:{{tag}}
-    docker tag {{registry}}/hosting-mcp-server:latest {{registry}}/hosting-mcp-server:{{tag}}
     docker tag {{registry}}/controlpanel-api:latest {{registry}}/controlpanel-api:{{tag}}
     docker tag {{registry}}/controlpanel-ui:latest {{registry}}/controlpanel-ui:{{tag}}
     docker push {{registry}}/hosting-core-api:{{tag}}
     docker push {{registry}}/hosting-worker:{{tag}}
     docker push {{registry}}/hosting-admin-ui:{{tag}}
-    docker push {{registry}}/hosting-mcp-server:{{tag}}
     docker push {{registry}}/controlpanel-api:{{tag}}
     docker push {{registry}}/controlpanel-ui:{{tag}}
 
@@ -693,13 +689,12 @@ vm-build-images:
     docker build -t hosting-core-api:latest -f docker/core-api.Dockerfile .
     docker build -t hosting-worker:latest -f docker/worker.Dockerfile .
     docker build -t hosting-admin-ui:latest -f docker/admin-ui.Dockerfile .
-    docker build -t hosting-mcp-server:latest -f docker/mcp-server.Dockerfile .
     docker build -t controlpanel-api:latest -f docker/controlpanel-api.Dockerfile .
     docker build -t controlpanel-ui:latest -f docker/controlpanel-ui.Dockerfile .
 
 # Import locally built images into k3s containerd via SSH
 vm-import-images:
-    docker save hosting-core-api:latest hosting-worker:latest hosting-admin-ui:latest hosting-mcp-server:latest controlpanel-api:latest controlpanel-ui:latest | \
+    docker save hosting-core-api:latest hosting-worker:latest hosting-admin-ui:latest controlpanel-api:latest controlpanel-ui:latest | \
       ssh {{ssh_opts}} ubuntu@{{cp}} "sudo k3s ctr images import -"
 
 # Apply k3s infrastructure manifests, SSL certs, and Grafana dashboards
@@ -745,7 +740,7 @@ vm-helm:
 
 # Restart all app deployments to pick up new images
 vm-restart:
-    kubectl --context hosting rollout restart deployment/hosting-core-api deployment/hosting-worker deployment/hosting-admin-ui deployment/hosting-mcp-server deployment/hosting-controlpanel-api deployment/hosting-controlpanel-ui
+    kubectl --context hosting rollout restart deployment/hosting-core-api deployment/hosting-worker deployment/hosting-admin-ui deployment/hosting-controlpanel-api deployment/hosting-controlpanel-ui
 
 # Deploy to k3s using images from ghcr.io (tests registry-based deployment)
 vm-deploy-registry:
@@ -759,7 +754,6 @@ vm-deploy-registry:
       --set image.coreApi.repository={{registry}}/hosting-core-api \
       --set image.worker.repository={{registry}}/hosting-worker \
       --set image.adminUi.repository={{registry}}/hosting-admin-ui \
-      --set image.mcpServer.repository={{registry}}/hosting-mcp-server \
       --set image.controlpanelApi.repository={{registry}}/controlpanel-api \
       --set image.controlpanelUi.repository={{registry}}/controlpanel-ui \
       --set config.baseDomain="$BASE_DOMAIN" \

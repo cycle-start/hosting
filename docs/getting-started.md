@@ -173,7 +173,6 @@ cmd/
   worker/            Temporal worker (workflows + activities)
   node-agent/        Temporal worker running on each VM node
   admin-ui/          Admin UI reverse proxy + SPA server
-  mcp-server/        MCP server for LLM tool integration
   dbadmin-proxy/     Reverse proxy for database admin UIs
   hostctl/           CLI for cluster bootstrap and test data seeding
 

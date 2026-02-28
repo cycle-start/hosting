@@ -15,8 +15,6 @@ image:
     tag: "latest"
   adminUi:
     tag: "latest"
-  mcpServer:
-    tag: "latest"
   controlpanelApi:
     tag: "latest"
   controlpanelUi:
@@ -33,10 +31,6 @@ worker:
 
 adminUi:
   replicas: 1
-  hostNetwork: false
-
-mcpServer:
-  enabled: false
   hostNetwork: false
 
 controlpanelApi:

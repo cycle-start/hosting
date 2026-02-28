@@ -35,7 +35,6 @@ Images are published to GitHub Container Registry:
 docker pull ghcr.io/cycle-start/hosting-core-api:latest
 docker pull ghcr.io/cycle-start/hosting-worker:latest
 docker pull ghcr.io/cycle-start/hosting-admin-ui:latest
-docker pull ghcr.io/cycle-start/hosting-mcp-server:latest
 docker pull ghcr.io/cycle-start/controlpanel-api:latest
 docker pull ghcr.io/cycle-start/controlpanel-ui:latest
 ```
