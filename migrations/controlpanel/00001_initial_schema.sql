@@ -62,7 +62,20 @@ CREATE TABLE customer_subscriptions (
 );
 CREATE INDEX idx_customer_subscriptions_customer ON customer_subscriptions(customer_id);
 
+CREATE TABLE user_oidc_connections (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    partner_id TEXT NOT NULL REFERENCES partners(id),
+    provider   TEXT NOT NULL,
+    subject    TEXT NOT NULL,
+    email      TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(user_id, provider),
+    UNIQUE(partner_id, provider, subject)
+);
+
 -- +goose Down
+DROP TABLE IF EXISTS user_oidc_connections;
 DROP TABLE IF EXISTS customer_subscriptions;
 DROP TABLE IF EXISTS brand_modules;
 DROP TABLE IF EXISTS customer_users;

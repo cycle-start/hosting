@@ -351,6 +351,16 @@ Names are `{prefix}{10-char-random}`, globally unique, auto-generated on creatio
 - Shard convergence trigger with idempotency test
 - Suspend/resume with HTTP 503 verification and restore
 
+### Control Panel
+
+React SPA (TypeScript, Vite, Tailwind) with Go API backend, served as an embedded SPA:
+
+- **Authentication:** Email/password login with JWT tokens; OIDC login via external identity providers (Google, Microsoft, custom)
+- **OIDC integration:** Platform-wide provider configuration via env vars; subject-based identity binding; connect/disconnect from Profile page; HMAC-signed OAuth state parameter
+- **Profile page:** Display name, language preferences, connected OIDC accounts
+- **Multi-partner:** Partner resolution from hostname; brand-aware theming
+- **i18n:** English, German, Norwegian translations
+
 ### Per-Tenant ULA on Service Nodes
 
 - Per-tenant ULA IPv6 addresses (`fd00:{hash}:{shard_index}::{uid}`) on DB and Valkey nodes (extends existing web-node ULA)

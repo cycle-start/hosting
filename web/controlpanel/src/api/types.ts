@@ -316,6 +316,17 @@ export interface WireGuardPeerCreateResult {
   client_config: string;
 }
 
+export interface OIDCProvider {
+  id: string;
+  name: string;
+}
+
+export interface OIDCConnection {
+  provider: string;
+  email: string;
+  created_at: string;
+}
+
 export interface ListResponse<T> {
   items: T[];
 }

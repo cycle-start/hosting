@@ -60,7 +60,11 @@
     "email": "Email",
     "password": "Password",
     "submit": "Sign in",
-    "failed": "Login failed"
+    "failed": "Login failed",
+    "signInWith": "Sign in with {{provider}}",
+    "or": "or",
+    "oidcNoAccount": "No account connected to this identity. Log in with email and password first, then connect your account in Profile.",
+    "oidcError": "Authentication failed. Please try again."
   },
   "profile": {
     "title": "Profile",
@@ -70,7 +74,13 @@
     "emailAddress": "Email Address",
     "language": "Language",
     "saveChanges": "Save Changes",
-    "saved": "Profile updated successfully."
+    "saved": "Profile updated successfully.",
+    "connectedAccounts": "Connected Accounts",
+    "connectedAccountsDescription": "Link external identity providers for faster sign-in.",
+    "connect": "Connect",
+    "connected": "Connected",
+    "oidcConnected": "Account connected successfully.",
+    "oidcConnectionFailed": "Failed to connect account."
   },
   "customers": {
     "title": "Customers",

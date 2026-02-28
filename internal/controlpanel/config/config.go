@@ -6,6 +6,17 @@ import (
 	"strings"
 )
 
+type OIDCProvider struct {
+	ID           string
+	Name         string
+	ClientID     string
+	ClientSecret string
+	AuthURL      string
+	TokenURL     string
+	UserInfoURL  string
+	Scopes       []string
+}
+
 type Config struct {
 	DatabaseURL    string
 	JWTSecret      string
@@ -16,6 +27,7 @@ type Config struct {
 	HostingAPIURL  string
 	HostingAPIKey  string
 	DevMode        bool
+	OIDCProviders  []OIDCProvider
 }
 
 func Load() (*Config, error) {
@@ -38,6 +50,8 @@ func Load() (*Config, error) {
 		HostingAPIKey:  getEnv("HOSTING_API_KEY", ""),
 		DevMode:        getEnv("DEV_MODE", "") == "true",
 	}
+
+	cfg.OIDCProviders = loadOIDCProviders()
 
 	return cfg, nil
 }
@@ -76,4 +90,75 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// Well-known OIDC provider endpoints.
+var wellKnownProviders = map[string]struct {
+	Name        string
+	AuthURL     string
+	TokenURL    string
+	UserInfoURL string
+}{
+	"google": {
+		Name:        "Google",
+		AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:    "https://oauth2.googleapis.com/token",
+		UserInfoURL: "https://openidconnect.googleapis.com/v1/userinfo",
+	},
+	"microsoft": {
+		Name:        "Microsoft",
+		AuthURL:     "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+		TokenURL:    "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+		UserInfoURL: "https://graph.microsoft.com/oidc/userinfo",
+	},
+}
+
+func loadOIDCProviders() []OIDCProvider {
+	providerList := getEnv("OIDC_PROVIDERS", "")
+	if providerList == "" {
+		return nil
+	}
+
+	var providers []OIDCProvider
+	for _, id := range strings.Split(providerList, ",") {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+
+		upper := strings.ToUpper(id)
+		clientID := getEnv("OIDC_"+upper+"_CLIENT_ID", "")
+		clientSecret := getEnv("OIDC_"+upper+"_CLIENT_SECRET", "")
+		if clientID == "" || clientSecret == "" {
+			continue
+		}
+
+		p := OIDCProvider{
+			ID:           id,
+			ClientID:     clientID,
+			ClientSecret: clientSecret,
+			Scopes:       []string{"openid", "email"},
+		}
+
+		if wk, ok := wellKnownProviders[id]; ok {
+			p.Name = wk.Name
+			p.AuthURL = wk.AuthURL
+			p.TokenURL = wk.TokenURL
+			p.UserInfoURL = wk.UserInfoURL
+		} else {
+			// Custom provider: discover from issuer URL
+			issuerURL := getEnv("OIDC_"+upper+"_ISSUER_URL", "")
+			if issuerURL == "" {
+				continue
+			}
+			issuerURL = strings.TrimRight(issuerURL, "/")
+			p.AuthURL = issuerURL + "/authorize"
+			p.TokenURL = issuerURL + "/token"
+			p.UserInfoURL = issuerURL + "/userinfo"
+			p.Name = getEnv("OIDC_"+upper+"_NAME", id)
+		}
+
+		providers = append(providers, p)
+	}
+	return providers
 }

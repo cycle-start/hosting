@@ -60,7 +60,11 @@
     "email": "E-post",
     "password": "Passord",
     "submit": "Logg inn",
-    "failed": "Innlogging mislyktes"
+    "failed": "Innlogging mislyktes",
+    "signInWith": "Logg inn med {{provider}}",
+    "or": "eller",
+    "oidcNoAccount": "Ingen konto koblet til denne identiteten. Logg inn med e-post og passord først, og koble deretter kontoen din i Profil.",
+    "oidcError": "Autentisering mislyktes. Prøv igjen."
   },
   "profile": {
     "title": "Profil",
@@ -70,7 +74,13 @@
     "emailAddress": "E-postadresse",
     "language": "Språk",
     "saveChanges": "Lagre endringer",
-    "saved": "Profil oppdatert."
+    "saved": "Profil oppdatert.",
+    "connectedAccounts": "Tilkoblede kontoer",
+    "connectedAccountsDescription": "Koble til eksterne identitetsleverandører for raskere innlogging.",
+    "connect": "Koble til",
+    "connected": "Tilkoblet",
+    "oidcConnected": "Konto koblet til.",
+    "oidcConnectionFailed": "Kunne ikke koble til konto."
   },
   "customers": {
     "title": "Kunder",

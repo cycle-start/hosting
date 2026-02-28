@@ -60,7 +60,11 @@
     "email": "E-Mail",
     "password": "Passwort",
     "submit": "Anmelden",
-    "failed": "Anmeldung fehlgeschlagen"
+    "failed": "Anmeldung fehlgeschlagen",
+    "signInWith": "Anmelden mit {{provider}}",
+    "or": "oder",
+    "oidcNoAccount": "Kein Konto mit dieser Identität verknüpft. Melden Sie sich zuerst mit E-Mail und Passwort an und verknüpfen Sie dann Ihr Konto im Profil.",
+    "oidcError": "Authentifizierung fehlgeschlagen. Bitte versuchen Sie es erneut."
   },
   "profile": {
     "title": "Profil",
@@ -70,7 +74,13 @@
     "emailAddress": "E-Mail-Adresse",
     "language": "Sprache",
     "saveChanges": "Änderungen speichern",
-    "saved": "Profil erfolgreich aktualisiert."
+    "saved": "Profil erfolgreich aktualisiert.",
+    "connectedAccounts": "Verknüpfte Konten",
+    "connectedAccountsDescription": "Verknüpfen Sie externe Identitätsanbieter für eine schnellere Anmeldung.",
+    "connect": "Verknüpfen",
+    "connected": "Verknüpft",
+    "oidcConnected": "Konto erfolgreich verknüpft.",
+    "oidcConnectionFailed": "Kontoverknüpfung fehlgeschlagen."
   },
   "customers": {
     "title": "Kunden",

@@ -17,6 +17,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithToken: (token: string) => void;
   logout: () => void;
   updateUser: (updates: Partial<User>) => void;
 }
@@ -72,6 +73,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(newToken);
   }, []);
 
+  const loginWithToken = useCallback((newToken: string) => {
+    localStorage.setItem(TOKEN_KEY, newToken);
+    setToken(newToken);
+  }, []);
+
   const updateUser = useCallback((updates: Partial<User>) => {
     setUser((prev) => (prev ? { ...prev, ...updates } : prev));
   }, []);
@@ -91,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!token && !!user,
         isLoading,
         login,
+        loginWithToken,
         logout,
         updateUser,
       }}

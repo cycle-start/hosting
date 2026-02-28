@@ -29,7 +29,7 @@ type Server struct {
 }
 
 func NewServer(logger zerolog.Logger, pool *pgxpool.Pool, cfg *config.Config) *Server {
-	services := core.NewServices(pool, cfg.JWTSecret, cfg.JWTIssuer)
+	services := core.NewServices(pool, cfg.JWTSecret, cfg.JWTIssuer, cfg.OIDCProviders)
 	hostingClient := hosting.NewClient(cfg.HostingAPIURL, cfg.HostingAPIKey)
 
 	s := &Server{
@@ -88,6 +88,12 @@ func (s *Server) setupRoutes(hostingClient *hosting.Client) {
 		auth := handler.NewAuth(s.services.Auth)
 		r.Post("/auth/login", auth.Login)
 
+		// OIDC (public, no JWT)
+		oidc := handler.NewOIDC(s.services.OIDC)
+		r.Get("/auth/oidc/providers", oidc.ListProviders)
+		r.Get("/auth/oidc/authorize", oidc.Authorize)
+		r.Get("/auth/oidc/callback", oidc.Callback)
+
 		// Terminal WebSocket (query-param auth, outside JWT middleware)
 		terminal := handler.NewTerminal(s.services.Auth, s.services.Customer, hostingClient, s.cfg.HostingWSURL(), s.cfg.HostingAPIKey)
 		r.Get("/api/v1/webroots/{id}/terminal", terminal.Connect)
@@ -99,6 +105,10 @@ func (s *Server) setupRoutes(hostingClient *hosting.Client) {
 			me := handler.NewMe(s.services.User, s.services.Customer)
 			r.Get("/me", me.Get)
 			r.Patch("/me", me.Update)
+
+			r.Get("/me/oidc-connections", oidc.ListConnections)
+			r.Post("/me/oidc-connections/authorize", oidc.AuthorizeConnect)
+			r.Delete("/me/oidc-connections/{provider}", oidc.Disconnect)
 
 			customer := handler.NewCustomer(s.services.Customer)
 			r.Get("/customers", customer.List)
