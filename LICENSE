@@ -1,0 +1,37 @@
+Hosting Platform License
+
+Copyright (c) 2025-2026 Edvin Syse. All rights reserved.
+
+Permission is hereby granted to any person obtaining a copy of this
+software and associated documentation files (the "Software") to use,
+copy, and modify the Software, subject to the following conditions:
+
+1. SINGLE-SERVER USE
+   You may use the Software free of charge to operate a single server
+   deployment (one control-plane node managing one or more tenant
+   workloads on that same server).
+
+2. MULTI-SERVER USE
+   Any deployment that spans more than one server — including but not
+   limited to clustered, distributed, or high-availability
+   configurations — requires a paid license obtained from the copyright
+   holder.
+
+3. MANAGED SERVICE
+   You may not offer the Software, or any derivative of it, to third
+   parties as a hosted or managed service without a separate commercial
+   agreement from the copyright holder.
+
+4. REDISTRIBUTION
+   You may not redistribute the Software or derivative works except as
+   source code that retains this license in full.
+
+5. NO WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
