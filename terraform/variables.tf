@@ -200,14 +200,14 @@ variable "stalwart_admin_password" {
 variable "ceph_fsid" {
   description = "Ceph cluster FSID (UUID). Generate with: just gen-ceph-keys"
   type        = string
-  default     = "481a00a9-12b6-4bf9-9d00-67861af03e06"
+  # No default — must be generated per deployment with: just gen-ceph-keys
 }
 
 variable "ceph_web_key" {
   description = "Pre-generated CephX key for the web client (full CryptoKey with header). Generate with: just gen-ceph-keys"
   type        = string
-  default     = "AQAAAAAAAAAAABAAt2/TZjzN7KpLOvQT0y8dfA=="
   sensitive   = true
+  # No default — must be generated per deployment with: just gen-ceph-keys
 }
 
 variable "storage_nodes" {

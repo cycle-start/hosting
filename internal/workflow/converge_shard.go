@@ -718,10 +718,12 @@ func convergeDatabaseShard(ctx workflow.Context, shardID string, nodes []model.N
 
 		// Configure replication from primary.
 		if primary.IPAddress != nil {
+			// TODO: read replication password from shard config or secret store
+			// instead of using the Ansible-provisioned default.
 			err = workflow.ExecuteActivity(replicaCtx, "ConfigureReplication", activity.ConfigureReplicationParams{
 				PrimaryHost:  *primary.IPAddress,
 				ReplUser:     "repl",
-				ReplPassword: "repl", // Default replication password for dev
+				ReplPassword: "repl_pass",
 			}).Get(ctx, nil)
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("configure replication on %s: %v", replica.ID, err))
