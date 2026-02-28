@@ -3,6 +3,21 @@
     name: nginx
     state: present
     update_cache: true
+  register: nginx_install
+
+# Nginx auto-starts on install with a default site on port 80.
+# Remove it immediately to avoid port conflicts with HAProxy in single-node mode.
+- name: Remove default nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  register: nginx_default_removed
+
+- name: Reload nginx after removing default site
+  systemd:
+    name: nginx
+    state: reloaded
+  when: nginx_default_removed.changed
 
 - name: Deploy hosting JSON log format
   copy:
