@@ -173,26 +173,17 @@ func (s *OIDCService) CreateLoginSession(ctx context.Context, tenantID string, d
 	return session, nil
 }
 
-// ValidateLoginSession checks a login session is valid and marks it used.
+// ValidateLoginSession atomically checks a login session is valid and marks it used.
 func (s *OIDCService) ValidateLoginSession(ctx context.Context, sessionID string) (*model.OIDCLoginSession, error) {
 	var sess model.OIDCLoginSession
 	err := s.db.QueryRow(ctx,
-		`SELECT id, tenant_id, database_id, expires_at, used FROM oidc_login_sessions WHERE id = $1`, sessionID,
-	).Scan(&sess.ID, &sess.TenantID, &sess.DatabaseID, &sess.ExpiresAt, &sess.Used)
+		`UPDATE oidc_login_sessions SET used = true
+		 WHERE id = $1 AND used = false AND expires_at > now()
+		 RETURNING id, tenant_id, database_id, expires_at`,
+		sessionID,
+	).Scan(&sess.ID, &sess.TenantID, &sess.DatabaseID, &sess.ExpiresAt)
 	if err != nil {
-		return nil, fmt.Errorf("oidc: login session not found: %w", err)
-	}
-
-	if sess.Used {
-		return nil, fmt.Errorf("oidc: login session already used")
-	}
-	if time.Now().After(sess.ExpiresAt) {
-		return nil, fmt.Errorf("oidc: login session expired")
-	}
-
-	_, err = s.db.Exec(ctx, `UPDATE oidc_login_sessions SET used = true WHERE id = $1`, sessionID)
-	if err != nil {
-		return nil, fmt.Errorf("oidc: mark login session used: %w", err)
+		return nil, fmt.Errorf("oidc: login session not found, already used, or expired")
 	}
 
 	return &sess, nil

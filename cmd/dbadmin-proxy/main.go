@@ -1,10 +1,7 @@
 package main
 
 import (
-	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -19,13 +16,15 @@ func main() {
 	listenAddr := envOr("LISTEN_ADDR", "127.0.0.1:4180")
 	coreAPIURL := requireEnv("CORE_API_URL")
 	coreAPIToken := requireEnv("CORE_API_TOKEN")
-	cookieSecret := requireEnv("COOKIE_SECRET")
 	sessionDir := envOr("SESSION_DIR", "/tmp/dbadmin-sessions")
 
 	// Ensure session directory exists.
 	if err := os.MkdirAll(sessionDir, 0700); err != nil {
 		log.Fatalf("create session dir: %v", err)
 	}
+
+	// Periodically clean up orphaned session files older than 60 seconds.
+	go cleanupSessionFiles(sessionDir, 60*time.Second, 30*time.Second)
 
 	mux := http.NewServeMux()
 
@@ -81,36 +80,11 @@ func main() {
 			MaxAge:   30,
 			HttpOnly: true,
 			Secure:   true,
-			SameSite: http.SameSiteStrictMode,
-		})
-
-		// Set signed session cookie (valid 24h) for general auth.
-		expiry := time.Now().Add(24 * time.Hour)
-		cookieVal := signCookie(session.TenantID, expiry, cookieSecret)
-		http.SetCookie(w, &http.Cookie{
-			Name:     "dbadmin_session",
-			Value:    cookieVal,
-			Path:     "/",
-			Expires:  expiry,
-			HttpOnly: true,
-			Secure:   true,
 			SameSite: http.SameSiteLaxMode,
 		})
 
 		log.Printf("login: created temp access for database %s, redirecting to signon", creds.DatabaseName)
 		http.Redirect(w, r, "/signon.php", http.StatusFound)
-	})
-
-	// Auth logout: clear cookie.
-	mux.HandleFunc("/auth/logout", func(w http.ResponseWriter, r *http.Request) {
-		http.SetCookie(w, &http.Cookie{
-			Name:     "dbadmin_session",
-			Value:    "",
-			Path:     "/",
-			MaxAge:   -1,
-			HttpOnly: true,
-		})
-		http.Error(w, "logged out", http.StatusOK)
 	})
 
 	// Unauthorized page: shown when phpMyAdmin session expires.
@@ -207,15 +181,6 @@ func requestTempAccess(apiURL, apiToken, databaseID string) (*tempAccessResult, 
 	return &result, nil
 }
 
-// signCookie produces "tenantID:expiry_unix:hmac_hex".
-func signCookie(tenantID string, expiry time.Time, secret string) string {
-	payload := fmt.Sprintf("%s:%d", tenantID, expiry.Unix())
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(payload))
-	sig := hex.EncodeToString(mac.Sum(nil))
-	return payload + ":" + sig
-}
-
 // randomAlphanumeric generates a random alphanumeric string of the given length.
 func randomAlphanumeric(n int) string {
 	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
@@ -240,4 +205,28 @@ func requireEnv(key string) string {
 		log.Fatalf("required environment variable %s is not set", key)
 	}
 	return v
+}
+
+// cleanupSessionFiles periodically removes session files older than maxAge.
+func cleanupSessionFiles(dir string, maxAge, interval time.Duration) {
+	for {
+		time.Sleep(interval)
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		cutoff := time.Now().Add(-maxAge)
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			info, err := e.Info()
+			if err != nil {
+				continue
+			}
+			if info.ModTime().Before(cutoff) {
+				os.Remove(filepath.Join(dir, e.Name()))
+			}
+		}
+	}
 }

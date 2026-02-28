@@ -15,6 +15,7 @@ import { NodesStep } from '@/steps/NodesStep'
 import { TLSStep } from '@/steps/TLSStep'
 import { ReviewStep } from '@/steps/ReviewStep'
 import { DeploySteps } from '@/steps/DeploySteps'
+import { ControlPlaneStatus } from '@/steps/ControlPlaneStatus'
 import { OverviewTab } from '@/steps/OverviewTab'
 
 interface Step {
@@ -499,6 +500,8 @@ function InstallStep({
         </p>
         <DeploySteps config={config} outputDir={outputDir} />
       </div>
+
+      <ControlPlaneStatus outputDir={outputDir} />
     </div>
   )
 }

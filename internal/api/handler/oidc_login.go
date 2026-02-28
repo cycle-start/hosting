@@ -96,9 +96,11 @@ func (h *OIDCLogin) ValidateLoginSession(w http.ResponseWriter, r *http.Request)
 	// If a database_id is attached, look up connection info (verified against session's tenant).
 	if session.DatabaseID != nil {
 		dbInfo, err := h.oidcSvc.GetDatabaseConnectionInfo(r.Context(), *session.DatabaseID, session.TenantID)
-		if err == nil {
-			result["database"] = dbInfo
+		if err != nil {
+			response.WriteError(w, http.StatusInternalServerError, "failed to look up database connection info")
+			return
 		}
+		result["database"] = dbInfo
 	}
 
 	response.WriteJSON(w, http.StatusOK, result)
