@@ -4,10 +4,12 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -165,16 +167,20 @@ func Generate(cfg *Config, outputDir string, progress ProgressFunc) (*GenerateRe
 		Content: cephKeyring,
 	})
 
-	// 7. Fetch kubeconfig from the controlplane node
-	progress("Fetching kubeconfig from controlplane...")
-	kubeconfig, err := fetchKubeconfig(cfg, controlplaneIP)
-	if err != nil {
-		progress(fmt.Sprintf("Warning: could not fetch kubeconfig: %v", err))
+	// 7. Fetch kubeconfig from the controlplane node (only if reachable)
+	if isReachable(controlplaneIP, "6443", 2*time.Second) {
+		progress("Fetching kubeconfig from controlplane...")
+		kubeconfig, err := fetchKubeconfig(cfg, controlplaneIP)
+		if err != nil {
+			progress(fmt.Sprintf("Warning: could not fetch kubeconfig: %v", err))
+		} else {
+			result.Files = append(result.Files, GeneratedFile{
+				Path:    "generated/kubeconfig.yaml",
+				Content: kubeconfig,
+			})
+		}
 	} else {
-		result.Files = append(result.Files, GeneratedFile{
-			Path:    "generated/kubeconfig.yaml",
-			Content: kubeconfig,
-		})
+		progress("Skipping kubeconfig fetch (controlplane not reachable yet)")
 	}
 
 	// 8. Write .gitignore if one doesn't exist
@@ -890,6 +896,16 @@ func generateCephKeyring() (keyring string, key string, err error) {
 	}
 
 	return keyring, key, nil
+}
+
+// isReachable checks if a TCP connection can be established to host:port within the timeout.
+func isReachable(host, port string, timeout time.Duration) bool {
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, port), timeout)
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
 }
 
 // fetchKubeconfig fetches the k3s kubeconfig from the controlplane node via SSH
