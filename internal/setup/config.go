@@ -66,7 +66,6 @@ type SSOConfig struct {
 	Mode string `json:"mode" yaml:"mode"` // "internal", "external", or ""
 
 	// Internal (Authelia) — admin account created during setup
-	AdminUsername string `json:"admin_username,omitempty" yaml:"admin_username,omitempty"`
 	AdminEmail    string `json:"admin_email,omitempty" yaml:"admin_email,omitempty"`
 	AdminPassword string `json:"admin_password,omitempty" yaml:"admin_password,omitempty"`
 

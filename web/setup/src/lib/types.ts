@@ -56,7 +56,6 @@ export interface EmailConfig {
 export interface SSOConfig {
   mode: '' | 'internal' | 'external'
   // Internal (Authelia)
-  admin_username: string
   admin_email: string
   admin_password: string
   // External OIDC

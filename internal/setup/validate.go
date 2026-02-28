@@ -149,11 +149,6 @@ func Validate(cfg *Config) []ValidationError {
 
 	// SSO
 	if cfg.SSO.Mode == "internal" {
-		if cfg.SSO.AdminUsername == "" {
-			add("sso.admin_username", "Admin username is required")
-		} else if !isAlphanumeric(cfg.SSO.AdminUsername) {
-			add("sso.admin_username", "Username must be alphanumeric")
-		}
 		if cfg.SSO.AdminEmail == "" {
 			add("sso.admin_email", "Admin email is required")
 		} else if !strings.Contains(cfg.SSO.AdminEmail, "@") {
@@ -191,13 +186,4 @@ func Validate(cfg *Config) []ValidationError {
 
 func isValidIP(s string) bool {
 	return net.ParseIP(strings.TrimSpace(s)) != nil
-}
-
-func isAlphanumeric(s string) bool {
-	for _, r := range s {
-		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-') {
-			return false
-		}
-	}
-	return true
 }

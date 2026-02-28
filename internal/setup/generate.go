@@ -1019,8 +1019,8 @@ func generateAutheliaConfig(cfg *Config, outputDir string) ([]GeneratedFile, err
 	// Build users_database.yml
 	var usersYml strings.Builder
 	usersYml.WriteString("users:\n")
-	usersYml.WriteString(fmt.Sprintf("  %s:\n", cfg.SSO.AdminUsername))
-	usersYml.WriteString(fmt.Sprintf("    displayname: '%s'\n", cfg.SSO.AdminUsername))
+	usersYml.WriteString(fmt.Sprintf("  %s:\n", cfg.SSO.AdminEmail))
+	usersYml.WriteString(fmt.Sprintf("    displayname: '%s'\n", cfg.SSO.AdminEmail))
 	usersYml.WriteString(fmt.Sprintf("    email: '%s'\n", cfg.SSO.AdminEmail))
 	usersYml.WriteString(fmt.Sprintf("    password: '%s'\n", passwordHash))
 

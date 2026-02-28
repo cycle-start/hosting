@@ -127,7 +127,7 @@ export function ReviewStep({ config, roles, errors, onGoToStep }: Props) {
             label="SSO"
             value={
               config.sso?.mode === 'internal'
-                ? `Authelia (admin: ${config.sso.admin_username || '—'})`
+                ? `Authelia (${config.sso.admin_email || '—'})`
                 : config.sso?.mode === 'external'
                   ? 'External OIDC'
                   : 'Disabled'

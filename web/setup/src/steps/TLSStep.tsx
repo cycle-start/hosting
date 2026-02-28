@@ -12,7 +12,7 @@ interface Props {
   errors: ValidationError[]
 }
 
-const defaultSSO = { mode: '' as const, admin_username: '', admin_email: '', admin_password: '', issuer_url: '', client_id: '', client_secret: '' }
+const defaultSSO = { mode: '' as const, admin_email: '', admin_password: '', issuer_url: '', client_id: '', client_secret: '' }
 
 export function TLSStep({ config, onChange, errors }: Props) {
   const tls = config.tls
@@ -134,18 +134,6 @@ export function TLSStep({ config, onChange, errors }: Props) {
               <p className="text-xs text-muted-foreground">
                 These credentials are used to log into all control plane services (Grafana, Headlamp, Temporal UI, Prometheus, Admin UI).
               </p>
-
-              <div className="space-y-2">
-                <Label htmlFor="sso_admin_username">Admin Username</Label>
-                <Input
-                  id="sso_admin_username"
-                  placeholder="admin"
-                  value={sso.admin_username}
-                  onChange={(e) => updateSSO({ admin_username: e.target.value })}
-                  className={fe('sso.admin_username') ? 'border-destructive' : ''}
-                />
-                <FieldError error={fe('sso.admin_username')} />
-              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="sso_admin_email">Admin Email</Label>
