@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as Tabs from '@radix-ui/react-tabs'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Loader2, Download, Check, AlertCircle, Terminal, FileText, ArrowRight, Copy } from 'lucide-react'
@@ -28,7 +28,7 @@ const STEPS: Step[] = [
   { id: 'deploy_mode', label: 'Deployment', visible: () => true },
   { id: 'region', label: 'Region', visible: () => true },
   { id: 'brand', label: 'Brand', visible: () => true },
-  { id: 'control_plane', label: 'Database', visible: () => true },
+  { id: 'control_plane', label: 'Infrastructure', visible: () => true },
   { id: 'nodes', label: 'Machines', visible: (c) => c.deploy_mode === 'multi' },
   { id: 'tls', label: 'Security', visible: () => true },
   { id: 'review', label: 'Review', visible: () => true },
@@ -50,6 +50,12 @@ export default function App() {
   const [visitedSteps, setVisitedSteps] = useState<Set<StepID>>(new Set(['deploy_mode']))
   const [outputDir, setOutputDir] = useState('')
   const [activeTab, setActiveTab] = useState<TopTab>('setup')
+  const mainRef = useRef<HTMLElement>(null)
+
+  // Scroll content area to top when step changes
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0)
+  }, [currentStep])
 
   useEffect(() => {
     api.getConfig().then(setConfig)
@@ -225,7 +231,7 @@ export default function App() {
         <div className="flex-1 flex flex-col min-h-0">
           {/* Setup tab — forceMount keeps deploy step state alive when switching tabs */}
           <Tabs.Content value="setup" forceMount className={cn('flex-1 flex flex-col min-h-0', activeTab !== 'setup' && 'hidden')}>
-            <main className={cn('flex-1 overflow-y-auto p-8', step.id !== 'install' && 'max-w-3xl')}>
+            <main ref={mainRef} className={cn('flex-1 overflow-y-auto p-8', step.id !== 'install' && 'max-w-3xl')}>
               {step.id === 'deploy_mode' && (
                 <DeployModeStep config={config} onChange={handleChange} outputDir={outputDir} />
               )}
