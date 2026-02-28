@@ -657,7 +657,7 @@ single-ssh:
 
 # Run the setup wizard for single-node deployment
 single-setup:
-    go run ./cmd/setup
+    go run ./cmd/setup -output seeds/single -host 0.0.0.0
 
 # Resolve VM name to IP (includes controlplane)
 _vm-ip name:
